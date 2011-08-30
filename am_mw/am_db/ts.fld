@@ -1,0 +1,12 @@
+/*ts_table 字段列表*/
+"db_id integer primary key autoincrement",	/**< 数据库保存的唯一索引*/ 
+"src integer",										/**< 源标识 C/T/S*/
+"db_net_id integer",								/**< 该TS所属网络的数据库保存的net_table中的唯一索引*/ 
+"ts_id integer", 									/**< Transport stream id*/ 
+"freq integer", 									/**< 频率,Hz*/ 
+"symb integer", 									/**< 符号率,symbol/s*/ 
+"mod integer",									/**< 调制方式*/ 
+"bw integer",                                       /**< 带宽*/
+"snr integer",										/**< SNR*/
+"ber integer",										/**< BER*/
+"strength integer",									/**< Strength*/

@@ -1,0 +1,8 @@
+/*teletext_table 字段列表*/
+"db_id integer primary key autoincrement",	/**< 数据库保存的唯一索引*/ 
+"db_srv_id integer",					/**< 所属service*/
+"pid integer",							/**< Teletext PID*/
+"type integer",						/**< Teletext type*/
+"magazine_number integer",				/**< Teletext Manazine Number*/
+"page_number integer",					/**< Teletext Page Number*/
+"language text",						/**< ISO-639-2语言编码,如eng, chs等*/

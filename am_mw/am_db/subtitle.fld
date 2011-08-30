@@ -1,0 +1,8 @@
+/*subtitle_table 字段列表*/
+"db_id integer primary key autoincrement",	/**< 数据库保存的唯一索引*/ 
+"db_srv_id integer",					/**< 所属service*/
+"pid integer",							/**< Subtitle PID*/
+"type integer",						/**< Subtitle type*/
+"composition_page_id integer",			/**< Composition page id*/
+"ancillary_page_id integer",				/**< Aancillary page id*/
+"language text",						/**< ISO-639-2语言编码,如eng, chs等*/

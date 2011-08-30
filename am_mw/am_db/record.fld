@@ -1,0 +1,17 @@
+/*rec_table 字段列表*/
+"db_id integer primary key autoincrement",				/**< 数据库保存的唯一索引*/ 
+"fend_no integer",									/**< 使用的前端设备*/ 
+"dvr_no integer",									/**< 使用的DVR设备*/ 
+"db_ts_id integer",									/**< 录像所属TS*/
+"db_srv_id integer",								/**< 录像所属SRV*/
+"db_evt_id integer",								/**< 录像事件*/
+"status integer",									/**< 录像状态信息，如未开始，已完成等*/
+"start integer",									/**< 开始时间，以秒为单位*/  
+"duration integer",									/**< 持续时间，以秒为单位*/ 
+"vid_fmt integer",									/**< 视频格式*/
+"aud1_fmt integer",									/**< 音频1格式*/
+"aud2_fmt integer",									/**< 音频2格式*/
+"pids text",										/**< 录像的PID信息*/
+"srv_name text",									/**< 录像频道名称*/
+"evt_name text",									/**< 录像事件名称*/
+"file_name text"									/**< 录像文件名称，可用于文件回放*/

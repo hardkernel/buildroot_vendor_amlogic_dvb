@@ -1,0 +1,23 @@
+/*srv_table 字段列表*/
+"db_id integer primary key autoincrement",				/**< 数据库保存的唯一索引*/ 
+"src integer",										/**< 源标识*/
+"db_net_id integer",								/**< 该TS所属网络的数据库保存的net_table中的唯一索引*/
+"db_ts_id integer", 									/**< 该service所属TS的数据库保存的ts_table中的唯一索引*/ 
+"name text",										/**< sevice name*/ 
+"service_id integer", 								/**< service id*/ 
+"service_type integer", 								/**< service type*/
+"eit_schedule_flag integer", 							/**< eit_schedule_flag*/
+"eit_pf_flag integer", 								/**< eit_present_following_flag*/
+"running_status integer", 							/**< running_status*/
+"free_ca_mode integer", 							/**< free_ca_mode*/
+"volume integer", 									/**< 音量*/
+"aud_track integer", 								/**< 声道*/
+"vid_pid integer", 									/**< 视频PID*/
+"aud1_pid integer", 								/**< 音频1 PID,无多伴音时默认使用该PID*/
+"aud2_pid integer", 								/**< 音频2 PID,多伴音时使用*/
+"vid_fmt integer",									/**< 视频压缩格式*/
+"aud1_fmt integer",								/**< 音频1压缩格式*/
+"aud2_fmt integer",								/**< 音频2压缩格式*/
+"chan_num numeric",								/**< 频道号*/
+"skip integer",										/**< 是否隐藏, 0不隐藏，1隐藏*/
+"lock integer",										/**< 父母锁, 0不加锁，1加锁*/
