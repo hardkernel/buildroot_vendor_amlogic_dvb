@@ -341,9 +341,20 @@ int main(int argc, char **argv)
 		AM_TRY(AM_FEND_Open(FEND_DEV_NO, &fpara));
 
 		p.frequency = freq;
-		p.u.qam.symbol_rate = 6875*1000;
-		p.u.qam.modulation = QAM_64;
+#if 1	
+		p.inversion = INVERSION_AUTO;
+		p.u.ofdm.bandwidth = BANDWIDTH_8_MHZ;
+		p.u.ofdm.code_rate_HP = FEC_AUTO;
+		p.u.ofdm.code_rate_LP = FEC_AUTO;
+		p.u.ofdm.constellation = QAM_AUTO;
+		p.u.ofdm.guard_interval = GUARD_INTERVAL_AUTO;
+		p.u.ofdm.hierarchy_information = HIERARCHY_AUTO;
+		p.u.ofdm.transmission_mode = TRANSMISSION_MODE_AUTO;
+#else		
+		p.u.qam.symbol_rate = 6875000;
 		p.u.qam.fec_inner = FEC_AUTO;
+		p.u.qam.modulation = QAM_64;
+#endif		
 		
 		AM_TRY(AM_FEND_Lock(FEND_DEV_NO, &p, &status));
 		

@@ -49,8 +49,12 @@
 #define GE2D_STRETCHBLIT   						0x46fe
 #define GE2D_FILLRECTANGLE   					0x46fd
 #define GE2D_SRCCOLORKEY   					0x46fc
+#ifndef CHIP_8626X
+#define GE2D_SET_COEF							0x46fa
+#else
 #define GE2D_SET_COEF							0x46fb
 #define GE2D_CONFIG_EX  			       			0x46fa
+#endif
 #define GE2D_CONFIG							0x46f9
 #define GE2D_ANTIFLICKER_ENABLE				0x46f8
 #define GE2D_BLIT_WITHOUTKEY				       0x46f7

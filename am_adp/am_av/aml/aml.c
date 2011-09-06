@@ -90,8 +90,10 @@ void *adec_handle;
 #define PCR_RECOVER_FILE	"/sys/class/tsync/pcr_recover"
 #endif
 
-#define AUDIO_PTS_FILE	"/sys/class/stb/audio_pts"
-#define VIDEO_PTS_FILE	"/sys/class/stb/video_pts"
+#define AUDIO_DMX_PTS_FILE	"/sys/class/stb/audio_pts"
+#define VIDEO_DMX_PTS_FILE	"/sys/class/stb/video_pts"
+#define AUDIO_PTS_FILE	"/sys/class/stb/pts_audio"
+#define VIDEO_PTS_FILE	"/sys/class/stb/pts_video"
 
 #define CANVAS_ALIGN(x)    (((x)+7)&~7)
 #define JPEG_WRTIE_UNIT    (32*1024)
@@ -2003,7 +2005,7 @@ static void *aml_timeshift_thread(void *arg)
 	struct am_io_param vstatus;
 	AV_PlayCmd_t cmd;
 	int blackout = aml_get_black_policy();
-	unsigned int playback_last_pts = 0;
+	int playback_alen=0, playback_vlen=0;
 
 	memset(&info, 0, sizeof(info));
 	tshift->last_cmd = -1;
@@ -2011,7 +2013,6 @@ static void *aml_timeshift_thread(void *arg)
 	info.status = AV_TIMESHIFT_STAT_INITOK;
 	AM_EVT_Signal(0, AM_AV_EVT_PLAYER_UPDATE_INFO, (void*)&info);
 	AM_TIME_GetClock(&update_time);
-	//tshift->state = AV_TIMESHIFT_STAT_STOP;
 
 	aml_set_black_policy(0);
 	while (tshift->running)
@@ -2031,12 +2032,6 @@ static void *aml_timeshift_thread(void *arg)
 			if (ret > 0)
 			{
 				tshift->left += ret;
-			}
-			else if (tshift->para.playback_only)
-			{
-				/*info.status = AV_TIMESHIFT_STAT_EXIT;
-				AM_EVT_Signal(0, AM_AV_EVT_PLAYER_UPDATE_INFO, (void*)&info);
-				break;*/
 			}
 		}
 		
@@ -2069,12 +2064,12 @@ static void *aml_timeshift_thread(void *arg)
 		{
 			tshift->timeout = 0;
 			trick_stat = aml_timeshift_get_trick_stat(tshift);
-			//AM_DEBUG(1, "trick_stat is %d", trick_stat);
+			AM_DEBUG(7, "trick_stat is %d", trick_stat);
 			if (trick_stat > 0)
 			{
 				tshift->timeout = FFFB_STEP;
 				info.current_time = tshift->fffb_base;
-				//info.current_time *= 1000;
+
 				if (tshift->rate)
 					info.full_time = tshift->file.total/tshift->rate;
 				else
@@ -2125,8 +2120,8 @@ static void *aml_timeshift_thread(void *arg)
 				/*If there is no data available in playback only mode, we send exit event*/
 				if (tshift->para.playback_only && !tshift->file.avail)
 				{
-					if ((playback_last_pts && playback_last_pts == aml_timeshift_get_pts(tshift)) || 
-						(!astatus.status.data_len && ! vstatus.status.data_len))
+					if (playback_alen == astatus.status.data_len && 
+						playback_vlen == vstatus.status.data_len)
 					{
 						AM_DEBUG(1, "@@@Playback End");
 						info.status = AV_TIMESHIFT_STAT_EXIT;
@@ -2135,7 +2130,8 @@ static void *aml_timeshift_thread(void *arg)
 					}
 					else
 					{
-						playback_last_pts = aml_timeshift_get_pts(tshift);
+						playback_alen = astatus.status.data_len;
+						playback_vlen = vstatus.status.data_len;
 					}
 				}
 			}
@@ -2739,7 +2735,7 @@ static AM_ErrorCode_t aml_get_pts(const char *class_file,  uint32_t *pts)
 	
 	if(AM_FileRead(class_file, buf, sizeof(buf))==AM_SUCCESS)
 	{
-		*pts = (uint32_t)atoi(buf);
+		*pts = (uint32_t)atol(buf);
 		return AM_SUCCESS;
 	}
 
@@ -2753,24 +2749,24 @@ static void* aml_av_monitor_thread(void *arg)
 	//AM_Bool_t reset_avail = AM_FALSE;
 	AM_Bool_t av_playing = AM_FALSE;
 	uint32_t last_apts, last_vpts, apts, vpts;
-	int fd, pts_repeat_count;
+	uint32_t last_dec_vpts, dec_vpts, dec_apts;
+	int fd, pts_repeat_count, vpts_repeat_count;
 	int pts_time, last_pts_time;
 	int alen, vlen;
-	int alen_repeat_count, vlen_repeat_count;
 	const int AUDIO_DATA_CHECK_PERIOD = 100;
 	const int PTS_CHECK_PERIOD = 1000;
 	AM_Bool_t notified = AM_FALSE;
-	AM_Bool_t vdec_start, adec_start, need_reset;
+	AM_Bool_t adec_start;
 	struct am_io_param astatus;
 	struct am_io_param vstatus;
 	struct timespec rt;
 	
 	last_apts = last_vpts = 0;
-	pts_repeat_count = 0;
+	last_dec_vpts = dec_vpts = 0;
+	pts_repeat_count = vpts_repeat_count = 0;
 	pts_time = last_pts_time = 0;
 	alen = vlen = 0;
-	adec_start = vdec_start = AM_FALSE;
-	alen_repeat_count = vlen_repeat_count = 0;
+	adec_start = AM_FALSE;
 	pthread_mutex_lock(&gAVMonLock);
 	while (1)
 	{
@@ -2784,11 +2780,11 @@ static void* aml_av_monitor_thread(void *arg)
 			break;
 			
 		fd = (int)dev->ts_player.drv_data;
-		if(ioctl(fd, AMSTREAM_IOC_AB_STATUS, (unsigned long)&astatus) != -1 && 
+		if(!av_playing && ioctl(fd, AMSTREAM_IOC_AB_STATUS, (unsigned long)&astatus) != -1 && 
 			ioctl(fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1)
 		{
 			/*当AUDIO 和 VIDEO数据达到某个长度时才开始播放, 只有音频时不进行检查直接播放*/
-			if (!av_playing && dev->ts_player.play_para.apid < 0x1fff && 
+			if (dev->ts_player.play_para.apid < 0x1fff && 
 				(dev->ts_player.play_para.vpid >= 0x1fff || 
 				(dev->ts_player.play_para.vpid < 0x1fff && astatus.status.data_len >= AUDIO_START_LEN)))
 			{ 
@@ -2810,107 +2806,89 @@ static void* aml_av_monitor_thread(void *arg)
 				audio_decode_start(adec_handle);
 #endif
 				av_playing = AM_TRUE;
-				//pts_repeat_count = 0;
-				alen = astatus.status.data_len;
-				vlen = vstatus.status.data_len;
-				adec_start = vdec_start = AM_FALSE;
-				alen_repeat_count = vlen_repeat_count = 0;
-			}
-			else if (av_playing)
-			{
-				if (! adec_start && astatus.status.data_len != alen)
-					adec_start = AM_TRUE;
-				if (! vdec_start && vstatus.status.data_len != vlen)
-					vdec_start = AM_TRUE;
-
-				need_reset = AM_FALSE;
-				/*检查是否需要reset av 播放*/
-				if (adec_start && (alen == astatus.status.data_len))
-				{
-					alen_repeat_count++;
-					AM_DEBUG(1, "@@ Audio buffer level has not changed for %d times @@", alen_repeat_count);
-					if (alen_repeat_count >= 2)
-						need_reset = AM_TRUE;
-				}
-				else if (alen != astatus.status.data_len && alen_repeat_count != 0)
-				{
-					/*重新计数*/
-					alen_repeat_count = 0;
-				}
-				
-				if (vdec_start && (vlen == vstatus.status.data_len))
-				{
-					vlen_repeat_count++;
-					AM_DEBUG(1, "@@ Video buffer level has not changed for %d times @@", vlen_repeat_count);
-					if (vlen_repeat_count >= 2)
-						need_reset = AM_TRUE;
-				}
-				else if (vlen != vstatus.status.data_len && vlen_repeat_count != 0)
-				{
-					/*重新计数*/
-					vlen_repeat_count = 0;
-				}
-				
-				if (need_reset)
-				{
-					AM_DEBUG(1, "@@ Need to restart Audio & Video @@");
-					aml_close_ts_mode(dev, AM_FALSE);
-					aml_open_mode(dev, AV_PLAY_TS);
-					aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
-					av_playing = AM_FALSE;
-					
-					continue;
-				}
-				AM_DEBUG(6,"Audio buffer level %d->%d", alen, astatus.status.data_len);
-				AM_DEBUG(6,"Video buffer level %d->%d", vlen, vstatus.status.data_len);
-				alen = astatus.status.data_len;
-				vlen = vstatus.status.data_len;
+				adec_start = AM_FALSE;
+				last_pts_time = 0;
+				vpts_repeat_count = 0;
+				last_dec_vpts = 0;
 			}
 		}
-
-		AM_TIME_GetClock(&pts_time);
-		if ((pts_time - last_pts_time) >= 1000)
+		
+		if (av_playing)
 		{
-			last_pts_time = pts_time;
-			if (aml_get_pts(AUDIO_PTS_FILE, &apts) == AM_SUCCESS && 
-				aml_get_pts(VIDEO_PTS_FILE, &vpts) == AM_SUCCESS)
+			AM_TIME_GetClock(&pts_time);
+			if ((pts_time - last_pts_time) >= 1000)
 			{
-				AM_DEBUG(6, "apts %u->%u, vpts %u->%u", last_apts, apts, last_vpts, vpts);
-				if (apts == last_apts && vpts == last_vpts)
+				last_pts_time = pts_time;
+				dec_vpts = aml_get_pts_video();
+				dec_apts = aml_get_pts_audio();
+				/*Audio PID有效并且audio已开始解码，检查是否需要reset av播放*/
+				if (dev->ts_player.play_para.apid < 0x1fff && 
+					!adec_start && dec_apts != (uint32_t)-1 && dec_vpts != 0)
 				{
-					if (! notified)
+					AM_DEBUG(1, "@@ audio pts is 0x%x, start av reset monitor @@", dec_apts);
+					adec_start = AM_TRUE;
+				}
+				if (adec_start && dec_vpts == last_dec_vpts)
+				{
+					vpts_repeat_count++;
+					AM_DEBUG(1, "@@ Videop PTS has not changed for %d times @@", vpts_repeat_count);
+					if (vpts_repeat_count >= 3)
 					{
-						pts_repeat_count++;
-						AM_DEBUG(1, "Audio & Video PTS have not changed for %d times", pts_repeat_count);
-						if (pts_repeat_count>= 3)
-						{
-							/*PTS 3秒内无变化，重新播放音视频*/
-							aml_close_ts_mode(dev, AM_FALSE);
-							aml_open_mode(dev, AV_PLAY_TS);
-							aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
-							av_playing = AM_FALSE;
-
-							AM_DEBUG(1, "Notify Audio & Video no data event");
-							AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
-							pts_repeat_count = 0;
-							notified = AM_TRUE;
-						}
+						AM_DEBUG(1, "@@ Need to restart Audio & Video @@");
+						aml_close_ts_mode(dev, AM_FALSE);
+						aml_open_mode(dev, AV_PLAY_TS);
+						aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
+						av_playing = AM_FALSE;			
+						
+						continue;
 					}
 				}
-				else if (notified)
+				else if (dec_vpts != last_dec_vpts && vpts_repeat_count != 0)
 				{
-					AM_DEBUG(1, "Audio or Video PTS changed, notify detect data event");
-					AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_DATA_RESUME, NULL);
-					pts_repeat_count = 0;
-					notified = AM_FALSE;
+					vpts_repeat_count = 0;
 				}
-				else if (!notified && pts_repeat_count)
+				last_dec_vpts = dec_vpts;
+			
+				if (av_playing && aml_get_pts(AUDIO_DMX_PTS_FILE, &apts) == AM_SUCCESS && 
+					aml_get_pts(VIDEO_DMX_PTS_FILE, &vpts) == AM_SUCCESS)
 				{
-					/*reset the count*/
-					pts_repeat_count = 0;
+					AM_DEBUG(6, "apts %u->%u, vpts %u->%u", last_apts, apts, last_vpts, vpts);
+					if (apts == last_apts && vpts == last_vpts)
+					{
+						if (! notified)
+						{
+							pts_repeat_count++;
+							AM_DEBUG(1, "Audio & Video PTS have not changed for %d times", pts_repeat_count);
+							if (pts_repeat_count>= 2)
+							{
+								/*PTS 3秒内无变化，重新播放音视频*/
+								aml_close_ts_mode(dev, AM_FALSE);
+								aml_open_mode(dev, AV_PLAY_TS);
+								aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
+								av_playing = AM_FALSE;
+
+								AM_DEBUG(1, "Notify Audio & Video no data event");
+								AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
+								pts_repeat_count = 0;
+								notified = AM_TRUE;
+							}
+						}
+					}
+					else if (notified)
+					{
+						AM_DEBUG(1, "Audio or Video PTS changed, notify detect data event");
+						AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_DATA_RESUME, NULL);
+						pts_repeat_count = 0;
+						notified = AM_FALSE;
+					}
+					else if (!notified && pts_repeat_count)
+					{
+						/*reset the count*/
+						pts_repeat_count = 0;
+					}
+					last_apts = apts;
+					last_vpts = vpts;
 				}
-				last_apts = apts;
-				last_vpts = vpts;
 			}
 		}
 	}
