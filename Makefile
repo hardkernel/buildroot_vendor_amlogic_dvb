@@ -4,9 +4,6 @@ include $(BASE)/rule/def.mk
 
 SUBDIRS=doc script include am_adp am_mw am_app test
 
-ifeq ($(TARGET),android)
-  SUBDIRS+=android
-endif
 
 include $(BASE)/rule/rule.mk
 

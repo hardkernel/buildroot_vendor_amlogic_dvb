@@ -23,6 +23,7 @@ CRT_END_O=$(NDK_LIBDIR)/crtend_android.o
 EX_LIBDIR=$(ROOTDIR)/android/ex_lib
 EX_INCDIR=$(ROOTDIR)/android/ex_include
 
+ANDROID_VERSION=2.2
 TARGET_PRODUCT=m1ref
 TARGET_BUILD_VARIANT=eng
 
