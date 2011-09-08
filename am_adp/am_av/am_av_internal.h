@@ -54,7 +54,8 @@ struct AV_TSPlayer
 	AM_AV_VFormat_t  vid_fmt;        /**< 视频压缩格式*/
 	AM_AV_TSSource_t src;            /**< TS源*/
 	pthread_t	av_mon_thread;	/**< 监控Audio Video buffer数据变化线程*/
-	AM_Bool_t	av_thread_running;	
+	AM_Bool_t	av_thread_running;
+	int             av_start_time;
 	AV_TSPlayPara_t play_para;	/**< 播放参数*/
 };
 

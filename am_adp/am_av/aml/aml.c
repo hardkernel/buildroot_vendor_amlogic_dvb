@@ -90,6 +90,9 @@ void *adec_handle;
 #define PCR_RECOVER_FILE	"/sys/class/tsync/pcr_recover"
 #endif
 
+#define PCR_NOT_RECOVER
+#define AUDIO_CACHE_TIME        200
+
 #define AUDIO_DMX_PTS_FILE	"/sys/class/stb/audio_pts"
 #define VIDEO_DMX_PTS_FILE	"/sys/class/stb/video_pts"
 #define AUDIO_PTS_FILE	"/sys/class/stb/pts_audio"
@@ -2686,6 +2689,8 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 		AM_DEBUG(1, "set ts skipbyte failed");
 		return AM_AV_ERR_SYS;
 	}
+
+	AM_TIME_GetClock(&dev->ts_player.av_start_time);
 	
 	/*创建AV监控线程*/
 	if (create_thread)
@@ -2783,10 +2788,19 @@ static void* aml_av_monitor_thread(void *arg)
 		if(!av_playing && ioctl(fd, AMSTREAM_IOC_AB_STATUS, (unsigned long)&astatus) != -1 && 
 			ioctl(fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1)
 		{
+			int time;
+
+			AM_TIME_GetClock(&time);
+
 			/*当AUDIO 和 VIDEO数据达到某个长度时才开始播放, 只有音频时不进行检查直接播放*/
 			if (dev->ts_player.play_para.apid < 0x1fff && 
 				(dev->ts_player.play_para.vpid >= 0x1fff || 
-				(dev->ts_player.play_para.vpid < 0x1fff && astatus.status.data_len >= AUDIO_START_LEN)))
+#ifndef PCR_NOT_RECOVER
+				(dev->ts_player.play_para.vpid < 0x1fff && astatus.status.data_len >= AUDIO_START_LEN)
+#else
+				(time-dev->ts_player.av_start_time >= AUDIO_CACHE_TIME)
+#endif
+				))
 			{ 
 #if !defined(ADEC_API_NEW)
 				adec_cmd("start");
@@ -3034,8 +3048,10 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 		break;
 		case AV_PLAY_TS:
 			tp = (AV_TSPlayPara_t *)para;
-#ifdef ADEC_API_NEW
+#if defined(ANDROID) || defined(CHIP_8626X)
+#ifndef PCR_NOT_RECOVER
 			AM_FileEcho(PCR_RECOVER_FILE, "1");
+#endif
 #endif
 			AM_TRY(aml_start_ts_mode(dev, tp, AM_TRUE));
 		break;
@@ -3148,7 +3164,9 @@ static AM_ErrorCode_t aml_close_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 		break;
 		case AV_PLAY_TS:
 #if defined(ANDROID) || defined(CHIP_8626X)
+#ifndef PCR_NOT_RECOVER
 			AM_FileEcho(PCR_RECOVER_FILE, "0");
+#endif
 #endif
 			ret = aml_close_ts_mode(dev, AM_TRUE);
 		break;
