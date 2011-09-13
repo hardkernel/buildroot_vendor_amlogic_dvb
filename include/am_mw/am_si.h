@@ -25,6 +25,11 @@
 #include "libdvbsi/tables/tot.h"
 #include "libdvbsi/tables/bat.h"
 #include "libdvbsi/descriptors/dr.h"
+#include "atsc/atsc_mgt.h"
+#include "atsc/atsc_tvct.h"
+#include "atsc/atsc_cvct.h"
+#include "atsc/atsc_rrt.h"
+#include "atsc/atsc_stt.h"
 
 
 #ifdef __cplusplus
@@ -45,6 +50,8 @@ extern "C"
 #define AM_SI_PID_EIT	(0x12)
 #define AM_SI_PID_TDT	(0x14)
 #define AM_SI_PID_TOT	(0x14)
+/*ATSC PSIP base pid*/
+#define AM_SI_ATSC_BASE_PID	ATSC_BASE_PID
 
 /*Table ID定义*/
 #define AM_SI_TID_PAT			(0x0)
@@ -61,6 +68,17 @@ extern "C"
 #define AM_SI_TID_EIT_SCHE_OTH	(0x60) /* 0x60 - 0x6f */
 #define AM_SI_TID_TDT			(0x70)
 #define AM_SI_TID_TOT			(0x73)
+
+/* atsc table */
+#define AM_SI_TID_PSIP_MGT			ATSC_PSIP_MGT_TID
+#define AM_SI_TID_PSIP_TVCT			ATSC_PSIP_TVCT_TID
+#define AM_SI_TID_PSIP_CVCT			ATSC_PSIP_CVCT_TID
+#define AM_SI_TID_PSIP_RRT			ATSC_PSIP_RRT_TID
+#define AM_SI_TID_PSIP_EIT			ATSC_PSIP_EIT_TID
+#define AM_SI_TID_PSIP_ETT			ATSC_PSIP_ETT_TID
+#define AM_SI_TID_PSIP_STT			ATSC_PSIP_STT_TID
+#define AM_SI_TID_PSIP_DCCT			ATSC_PSIP_DCCT_TID
+#define AM_SI_TID_PSIP_DCCSCT		ATSC_PSIP_DCCSCT_TID
 
 /*descriptor tag 定义*/
 

@@ -48,6 +48,7 @@ enum
 	AM_EPG_EVT_SET_EITSCHE_CHECK_TIME = 0x8000, /**< 设置自动更新间隔*/
 	AM_EPG_EVT_QUIT			= 0x10000, /**< 退出搜索事件*/
 	AM_EPG_EVT_SET_MON_SRV	= 0x20000, /**< 设置当前监控的service*/
+	AM_EPG_EVT_STT_DONE		= 0x40000, /**< STT接收完毕*/
 };
 
 typedef struct AM_EPG_Monitor_s AM_EPG_Monitor_t ;
@@ -96,6 +97,7 @@ struct AM_EPG_Monitor_s
 	AM_EPG_TableCtl_t 	eit51ctl;
 	AM_EPG_TableCtl_t 	eit60ctl;
 	AM_EPG_TableCtl_t 	eit61ctl;
+	AM_EPG_TableCtl_t	sttctl;
 
 	int					src;			/**< 源标识*/
 	int					fend_dev;		/**< FEND 设备号*/
@@ -119,6 +121,7 @@ struct AM_EPG_Monitor_s
 	dvbpsi_nit_t		*nits;
 	dvbpsi_eit_t		*eits;
 	dvbpsi_tot_t		*tots;
+	stt_section_info_t	*stts;
 
 	struct dvb_frontend_event 		fe_evt;			/**< 前端事件*/
 	struct dvb_frontend_parameters 	curr_param;		/**< 当前正在监控的频点*/ 

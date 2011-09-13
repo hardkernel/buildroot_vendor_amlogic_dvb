@@ -42,6 +42,10 @@
 #define NIT_TIMEOUT 10000
 #define CAT_TIMEOUT 3000
 #define BAT_TIMEOUT 10000
+#define MGT_TIMEOUT 2500
+#define STT_TIMEOUT 0
+#define VCT_TIMEOUT 2500
+#define RRT_TIMEOUT 70000
 
 /*子表最大个数*/
 #define MAX_BAT_SUBTABLE_CNT 32
@@ -169,7 +173,7 @@ const char *sql_stmts[MAX_STMT] =
 	"delete  from srv_table where db_ts_id=?",
 	"select db_id from srv_table where db_net_id=? and db_ts_id=? and service_id=?",
 	"insert into srv_table(db_net_id, db_ts_id,service_id) values(?,?,?)",
-	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?, running_status=?, free_ca_mode=?, volume=?, aud_track=?, vid_pid=?, aud1_pid=?, aud2_pid=?,vid_fmt=?,aud1_fmt=?,aud2_fmt=?,skip=0,lock=0,chan_num=0 where db_id=?",
+	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?, running_status=?, free_ca_mode=?, volume=?, aud_track=?, vid_pid=?, aud1_pid=?, aud2_pid=?,vid_fmt=?,aud1_fmt=?,aud2_fmt=?,skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,hide_guide=?,source_id=? where db_id=?",
 	"select db_id,service_type from srv_table where db_ts_id=? order by service_id",
 	"update srv_table set chan_num=? where db_id=?",
 	"delete  from evt_table where db_ts_id=?",
@@ -185,9 +189,40 @@ const char *sql_stmts[MAX_STMT] =
  * static functions
  ***************************************************************************/
 static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner);
+static AM_ErrorCode_t am_scan_request_section(AM_SCAN_Scanner_t *scanner, AM_SCAN_TableCtl_t *scl);
 static AM_ErrorCode_t am_scan_request_next_pmt(AM_SCAN_Scanner_t *scanner);
 static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner);
 extern AM_ErrorCode_t AM_EPG_ConvertCode(char *in_code,int in_len,char *out_code,int out_len);
+
+static AM_ErrorCode_t convert_code_to_utf8(const char *cod, char *in_code,int in_len,char *out_code,int out_len)
+{
+    iconv_t handle;
+    char **pin=&in_code;
+    char **pout=&out_code;
+
+	if (!in_code || !out_code || in_len <= 0 || out_len <= 0)
+		return AM_FAILURE;
+
+	memset(out_code,0,out_len);
+
+	AM_DEBUG(6, "%s --> utf-8, in_len %d, out_len %d", cod, in_len, out_len);	
+    handle=iconv_open("utf-8",cod);
+
+    if (handle == (iconv_t)-1)
+    {
+    	AM_DEBUG(1, "convert_code_to_utf8 iconv_open err");
+    	return AM_FAILURE;
+    }
+
+    if(iconv(handle,pin,(size_t *)&in_len,pout,(size_t *)&out_len) == (size_t)-1)
+    {
+        AM_DEBUG(1, "convert_code_to_utf8 iconv err: %s, in_len %d, out_len %d", strerror(errno), in_len, out_len);
+        iconv_close(handle);
+        return AM_FAILURE;
+    }
+
+    return iconv_close(handle);
+}
 
 /**\brief 插入一个网络记录，返回其索引*/
 static int insert_net(sqlite3_stmt **stmts, int src, int orig_net_id)
@@ -348,77 +383,95 @@ static void store_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_
 	dvbpsi_sdt_service_t *srv;
 	dvbpsi_descriptor_t *descr;
 	dvbpsi_nit_t *nit;
+	cvct_section_info_t *cvct;
+	tvct_section_info_t *tvct;
+	cvct_channel_info_t *ccinfo;
+	tvct_channel_info_t *tcinfo;
 	int net_dbid,dbid, srv_dbid;
 	int orig_net_id = -1;
 	char selbuf[256];
 	char insbuf[400];
 	sqlite3 *hdb = result->hdb;
-	
+	uint16_t vid, aid1, aid2, srv_id;
+	uint8_t srv_type, eit_sche, eit_pf, rs, free_ca;
+	int afmt1, afmt2, vfmt, avfmt, chan_num;
+	int major_chan_num, minor_chan_num, source_id;
+	uint8_t access_controlled, hidden, hide_guide;
+	char name[AM_DB_MAX_SRV_NAME_LEN + 1];
+		
 	/*没有PAT，不存储*/
 	if (!ts->pats)
 	{
 		AM_DEBUG(1, "No PAT found in ts, will not store to dbase");
 		return;
 	}
-
-	/*获取所在网络*/
-	if (ts->sdts)
+	
+	if (result->standard != AM_SCAN_STANDARD_ATSC)
 	{
-		/*按照SDT中描述的orignal_network_id查找网络记录，不存在则新添加一个network记录*/
-		orig_net_id = ts->sdts->i_network_id;
-	}
-	else if (result->nits)
-	{
-		/*在自动搜索时按NIT表描述的network_id查找网络*/
-		orig_net_id = result->nits->i_network_id;
-		
-	}
-
-	if (orig_net_id != -1)
-	{
-		net_dbid = insert_net(stmts, result->src, orig_net_id);
-		if (net_dbid != -1)
+		/*获取所在网络*/
+		if (ts->sdts)
 		{
-			char netname[256];
+			/*按照SDT中描述的orignal_network_id查找网络记录，不存在则新添加一个network记录*/
+			orig_net_id = ts->sdts->i_network_id;
+		}
+		else if (result->nits)
+		{
+			/*在自动搜索时按NIT表描述的network_id查找网络*/
+			orig_net_id = result->nits->i_network_id;
+		
+		}
 
-			netname[0] = '\0';
-			/*新增加一个network记录*/
-			if (result->nits && (orig_net_id == result->nits->i_network_id))
+		if (orig_net_id != -1)
+		{
+			net_dbid = insert_net(stmts, result->src, orig_net_id);
+			if (net_dbid != -1)
 			{
-				AM_SI_LIST_BEGIN(result->nits, nit)
-				AM_SI_LIST_BEGIN(nit->p_first_descriptor, descr)
-				if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_NETWORK_NAME)
-				{
-					dvbpsi_network_name_dr_t *pnn = (dvbpsi_network_name_dr_t*)descr->p_decoded;
+				char netname[256];
 
-					/*取网络名称*/
-					if (descr->i_length > 0)
+				netname[0] = '\0';
+				/*新增加一个network记录*/
+				if (result->nits && (orig_net_id == result->nits->i_network_id))
+				{
+					AM_SI_LIST_BEGIN(result->nits, nit)
+					AM_SI_LIST_BEGIN(nit->p_first_descriptor, descr)
+					if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_NETWORK_NAME)
 					{
-						AM_EPG_ConvertCode((char*)pnn->i_network_name, descr->i_length,\
-									netname, 255);
-						netname[255] = 0;
-						break;
+						dvbpsi_network_name_dr_t *pnn = (dvbpsi_network_name_dr_t*)descr->p_decoded;
+
+						/*取网络名称*/
+						if (descr->i_length > 0)
+						{
+							AM_EPG_ConvertCode((char*)pnn->i_network_name, descr->i_length,\
+										netname, 255);
+							netname[255] = 0;
+							break;
+						}
 					}
+					AM_SI_LIST_END()	
+					AM_SI_LIST_END()
 				}
-				AM_SI_LIST_END()	
-				AM_SI_LIST_END()
-			}
 			
-			AM_DEBUG(0, "###Network Name is '%s'", netname);
-			sqlite3_bind_text(stmts[UPDATE_NET], 1, netname, -1, SQLITE_STATIC);
-			sqlite3_bind_int(stmts[UPDATE_NET], 2, net_dbid);
-			sqlite3_step(stmts[UPDATE_NET]);
-			sqlite3_reset(stmts[UPDATE_NET]);
+				AM_DEBUG(0, "###Network Name is '%s'", netname);
+				sqlite3_bind_text(stmts[UPDATE_NET], 1, netname, -1, SQLITE_STATIC);
+				sqlite3_bind_int(stmts[UPDATE_NET], 2, net_dbid);
+				sqlite3_step(stmts[UPDATE_NET]);
+				sqlite3_reset(stmts[UPDATE_NET]);
+			}
+			else
+			{
+				AM_DEBUG(1, "insert new network error");
+				return;
+			}
 		}
 		else
 		{
-			AM_DEBUG(1, "insert new network error");
-			return;
+			/*没有找到有效的orignal_network_id,则网络标识为无效*/
+			net_dbid = -1;
 		}
 	}
 	else
 	{
-		/*没有找到有效的orignal_network_id,则网络标识为无效*/
+		/*No network in ATSC*/
 		net_dbid = -1;
 	}
 		
@@ -470,11 +523,6 @@ static void store_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_
 	
 	/*遍历PMT表*/
 	AM_SI_LIST_BEGIN(ts->pmts, pmt)
-		uint16_t vid, aid1, aid2, srv_id;
-		uint8_t srv_type, eit_sche, eit_pf, rs, free_ca;
-		int afmt1, afmt2, vfmt, avfmt;
-		char name[AM_DB_MAX_SRV_NAME_LEN + 1];
-
 		name[0] = '\0';
 		vid = aid1 = aid2 = 0x1fff;
 		srv_id = pmt->i_program_number;
@@ -485,6 +533,13 @@ static void store_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_
 		free_ca = 1;
 		vfmt = 0;
 		afmt1 = afmt2 = 0;
+		major_chan_num = 0;
+		minor_chan_num = 0;
+		access_controlled = 0;
+		hidden = 0;
+		hide_guide = 0;
+		chan_num = 0;
+		source_id = 0;
 		
 		/*添加新业务到数据库*/
 		srv_dbid = insert_srv(stmts, net_dbid, dbid, srv_id);
@@ -626,56 +681,146 @@ static void store_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_
 			AM_SI_LIST_END()
 		AM_SI_LIST_END()
 
-		AM_SI_LIST_BEGIN(ts->sdts, sdt)
-		AM_SI_LIST_BEGIN(sdt->p_first_service, srv)
-			/*从SDT表中查找该service并获取信息*/
-			if (srv->i_service_id == srv_id)
-			{
-				AM_DEBUG(0 ,"SDT for service %d found!", srv_id);
-				eit_sche = (uint8_t)srv->b_eit_schedule;
-				eit_pf = (uint8_t)srv->b_eit_present;
-				rs = srv->i_running_status;
-				free_ca = (uint8_t)srv->b_free_ca;
-				
-				AM_SI_LIST_BEGIN(srv->p_first_descriptor, descr)
-				if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE)
+		if (result->standard != AM_SCAN_STANDARD_ATSC)
+		{
+			AM_SI_LIST_BEGIN(ts->sdts, sdt)
+			AM_SI_LIST_BEGIN(sdt->p_first_service, srv)
+				/*从SDT表中查找该service并获取信息*/
+				if (srv->i_service_id == srv_id)
 				{
-					dvbpsi_service_dr_t *psd = (dvbpsi_service_dr_t*)descr->p_decoded;
+					AM_DEBUG(0 ,"SDT for service %d found!", srv_id);
+					eit_sche = (uint8_t)srv->b_eit_schedule;
+					eit_pf = (uint8_t)srv->b_eit_present;
+					rs = srv->i_running_status;
+					free_ca = (uint8_t)srv->b_free_ca;
 				
-					/*取节目名称*/
-					if (psd->i_service_name_length > 0)
+					AM_SI_LIST_BEGIN(srv->p_first_descriptor, descr)
+					if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE)
 					{
-						AM_EPG_ConvertCode((char*)psd->i_service_name, psd->i_service_name_length,\
-									name, AM_DB_MAX_SRV_NAME_LEN);
-						name[AM_DB_MAX_SRV_NAME_LEN] = 0;
-					}
-					/*业务类型*/
-					srv_type = psd->i_service_type;
+						dvbpsi_service_dr_t *psd = (dvbpsi_service_dr_t*)descr->p_decoded;
+				
+						/*取节目名称*/
+						if (psd->i_service_name_length > 0)
+						{
+							AM_EPG_ConvertCode((char*)psd->i_service_name, psd->i_service_name_length,\
+										name, AM_DB_MAX_SRV_NAME_LEN);
+							name[AM_DB_MAX_SRV_NAME_LEN] = 0;
+						}
+						/*业务类型*/
+						srv_type = psd->i_service_type;
 					
-					/*跳出多层循环*/
-					goto SDT_END;
+						/*跳出多层循环*/
+						goto SDT_END;
+					}
+					AM_SI_LIST_END()
 				}
+			AM_SI_LIST_END()
+			AM_SI_LIST_END()
+		}
+		else if (ts->cvcts)
+		{
+			/*ATSC CVCT*/
+			AM_SI_LIST_BEGIN(ts->cvcts, cvct)
+			if (cvct->transport_stream_id == ts->pats->i_ts_id)
+			{
+				AM_SI_LIST_BEGIN(cvct->vct_chan_info, ccinfo)
+					/*从VCT表中查找该service并获取信息*/
+					if (ccinfo->program_number == srv_id)
+					{
+						AM_DEBUG(0 ,"CVCT for program %d found!", srv_id);
+						major_chan_num = ccinfo->major_channel_number;
+						minor_chan_num = ccinfo->minor_channel_number;
+						
+						chan_num = (major_chan_num<<16) | (minor_chan_num&0xffff);
+						hidden = ccinfo->hidden;
+						hide_guide = ccinfo->hide_guide;
+						source_id = ccinfo->source_id;
+						/*取节目名称
+						convert_code_to_utf8("utf-16", (char*)ccinfo->short_name, sizeof(ccinfo->short_name),\
+											name, AM_DB_MAX_SRV_NAME_LEN);*/
+						memcpy(name, ccinfo->short_name, sizeof(ccinfo->short_name));
+						name[sizeof(ccinfo->short_name)] = 0;
+						/*业务类型*/
+						srv_type = ccinfo->service_type;
+						
+						/*跳出多层循环*/
+						goto SDT_END;
+					}
 				AM_SI_LIST_END()
 			}
-		AM_SI_LIST_END()
-		AM_SI_LIST_END()
-		
+			else
+			{
+				AM_DEBUG(1, ">>>>>>Found unknown CVCT in current TS, current ts id is %d, this ts id is %d", 
+						ts->pats->i_ts_id, cvct->transport_stream_id);
+			}
+			AM_SI_LIST_END()
+		}
+		else if (ts->tvcts)
+		{
+			/*ATSC TVCT*/
+			AM_SI_LIST_BEGIN(ts->tvcts, tvct)
+			if (tvct->transport_stream_id == ts->pats->i_ts_id)
+			{
+				AM_SI_LIST_BEGIN(tvct->vct_chan_info, tcinfo)
+					/*从VCT表中查找该service并获取信息*/
+					if (tcinfo->program_number == srv_id)
+					{
+						AM_DEBUG(0 ,"TVCT for program %d found!", srv_id);
+						major_chan_num = tcinfo->major_channel_number;
+						minor_chan_num = tcinfo->minor_channel_number;
+				
+						chan_num = (major_chan_num<<16) | (minor_chan_num&0xffff);
+						hidden = tcinfo->hidden;
+						hide_guide = tcinfo->hide_guide;
+						source_id = tcinfo->source_id;
+						/*取节目名称
+						convert_code_to_utf8("utf-16", (char*)tcinfo->short_name, sizeof(tcinfo->short_name),\
+											name, AM_DB_MAX_SRV_NAME_LEN);*/
+						memcpy(name, tcinfo->short_name, sizeof(tcinfo->short_name));
+						name[sizeof(tcinfo->short_name)] = 0;
+						/*业务类型*/
+						srv_type = tcinfo->service_type;
+						AM_DEBUG(1, "major %d, minor %d, short_name %s, srv_type %d", major_chan_num, minor_chan_num, (char*)tcinfo->short_name, srv_type);
+						/*跳出多层循环*/
+						goto SDT_END;
+					}
+				AM_SI_LIST_END()
+			}
+			else
+			{
+				AM_DEBUG(1, ">>>>>>Found unknown TVCT in current TS, current ts id is %d, this ts id is %d", 
+						ts->pats->i_ts_id, tvct->transport_stream_id);
+			}
+			AM_SI_LIST_END()
+		}
 SDT_END:
 	//if (vid != 0x1fff || aid1 != 0x1fff)
 	{
+		uint8_t tv_srv_type, radio_srv_type;
+		
+		if (result->standard != AM_SCAN_STANDARD_ATSC)
+		{
+			tv_srv_type = 0x1;
+			radio_srv_type = 0x2;
+		}
+		else
+		{
+			tv_srv_type = 0x2;
+			radio_srv_type = 0x3;
+		}
 		/*对于SDT没有描述srv_type但音视频PID有效的节目，按电视或广播节目存储*/
 		if (vid != 0x1fff && srv_type == 0)
-			srv_type = 0x1;
+			srv_type = tv_srv_type;
 		else if (vid == 0x1fff && aid1 != 0x1fff && srv_type == 0)
-			srv_type = 0x2;
+			srv_type = radio_srv_type;
 
 		/*SDT描述为TV 或 Radio的节目，但音视频PID无效，不存储为TV或Radio*/
-		if (vid == 0x1fff && aid1 == 0x1fff && (srv_type == 1 || srv_type == 2))
+		if (vid == 0x1fff && aid1 == 0x1fff && (srv_type == tv_srv_type || srv_type == radio_srv_type))
 		{
 			srv_type = 0;
 		}
 
-		if (!strcmp(name, "") && (srv_type == 0x1 || srv_type == 0x2))
+		if (!strcmp(name, "") && (srv_type == tv_srv_type || srv_type == radio_srv_type))
 			strcpy(name, "No Name");
 				
 		sqlite3_bind_int(stmts[UPDATE_SRV], 1, result->src);
@@ -693,7 +838,14 @@ SDT_END:
 		sqlite3_bind_int(stmts[UPDATE_SRV], 13, vfmt);
 		sqlite3_bind_int(stmts[UPDATE_SRV], 14, afmt1);
 		sqlite3_bind_int(stmts[UPDATE_SRV], 15, afmt2);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 16, srv_dbid);
+		sqlite3_bind_int(stmts[UPDATE_SRV], 16, chan_num);
+		sqlite3_bind_int(stmts[UPDATE_SRV], 17, major_chan_num);
+		sqlite3_bind_int(stmts[UPDATE_SRV], 18, minor_chan_num);
+		sqlite3_bind_int(stmts[UPDATE_SRV], 19, access_controlled);
+		sqlite3_bind_int(stmts[UPDATE_SRV], 20, hidden);
+		sqlite3_bind_int(stmts[UPDATE_SRV], 21, hide_guide);
+		sqlite3_bind_int(stmts[UPDATE_SRV], 22, source_id);
+		sqlite3_bind_int(stmts[UPDATE_SRV], 23, srv_dbid);
 		sqlite3_step(stmts[UPDATE_SRV]);
 		sqlite3_reset(stmts[UPDATE_SRV]);
 	
@@ -710,7 +862,7 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 	char sqlstr[128];
 	sqlite3 *hdb = result->hdb;
 	sqlite3_stmt	*stmts[MAX_STMT];
-	int i;
+	int i, ret;
 	
 	assert(result);
 
@@ -718,9 +870,10 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 	memset(stmts, 0, sizeof(sqlite3_stmt*) * MAX_STMT);
 	for (i=0; i<MAX_STMT; i++)
 	{
-		if (sqlite3_prepare(hdb, sql_stmts[i], -1, &stmts[i], NULL) != SQLITE_OK)
+		ret = sqlite3_prepare(hdb, sql_stmts[i], -1, &stmts[i], NULL);
+		if (ret != SQLITE_OK)
 		{
-			AM_DEBUG(0, "Prepare sqlite3 failed");
+			AM_DEBUG(0, "Prepare sqlite3 failed, ret = %x", ret);
 			goto store_end;
 		}
 	}
@@ -750,12 +903,13 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
 	}
 	
+	AM_DEBUG(1, "Store tses, %p", result->tses);
 	/*依次存储每个TS*/
 	AM_SI_LIST_BEGIN(result->tses, ts)
 		store_ts(stmts, result, ts);
 	AM_SI_LIST_END()
 
-	if (result->tses)
+	if (result->tses && result->standard != AM_SCAN_STANDARD_ATSC)
 	{
 		int *srv_dbids;
 		int row = AM_DB_MAX_SRV_CNT_PER_SRC, i, j;
@@ -1186,25 +1340,70 @@ static void am_scan_sdt_done(AM_SCAN_Scanner_t *scanner)
 	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_SDT_DONE, (void*)scanner->curr_ts->sdts);
 }
 
+/**\brief MGT搜索完毕(包括超时)处理*/
+static void am_scan_mgt_done(AM_SCAN_Scanner_t *scanner)
+{
+	am_scan_free_filter(scanner, &scanner->mgtctl.fid);
+	/*清除事件标志*/
+	//scanner->evt_flag &= ~scanner->mgtctl.evt_flag;
+	/*清除搜索标识*/
+	scanner->recv_status &= ~scanner->mgtctl.recv_flag;
+
+	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_MGT_DONE, (void*)scanner->curr_ts->mgts);
+	
+	/*开始搜索VCT表*/
+	if (scanner->curr_ts->mgts)
+	{
+		if (! scanner->curr_ts->mgts->is_cable)
+			scanner->vctctl.tid = AM_SI_TID_PSIP_TVCT;
+		else
+			scanner->vctctl.tid = AM_SI_TID_PSIP_CVCT;
+		am_scan_request_section(scanner, &scanner->vctctl);
+	}
+}
+
+/**\brief VCT搜索完毕(包括超时)处理*/
+static void am_scan_vct_done(AM_SCAN_Scanner_t *scanner)
+{
+	am_scan_free_filter(scanner, &scanner->vctctl.fid);
+	/*清除事件标志*/
+	//scanner->evt_flag &= ~scanner->vctctl.evt_flag;
+	/*清除搜索标识*/
+	scanner->recv_status &= ~scanner->vctctl.recv_flag;
+
+	if (scanner->vctctl.tid == AM_SI_TID_PSIP_CVCT)
+		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_CVCT_DONE, (void*)scanner->curr_ts->cvcts);
+	else
+		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TVCT_DONE, (void*)scanner->curr_ts->tvcts);
+}
+
 /**\brief 根据过滤器号取得相应控制数据*/
 static AM_SCAN_TableCtl_t *am_scan_get_section_ctrl_by_fid(AM_SCAN_Scanner_t *scanner, int fid)
 {
 	AM_SCAN_TableCtl_t *scl = NULL;
-
 	
 	if (scanner->patctl.fid == fid)
 		scl = &scanner->patctl;
-	else if (scanner->catctl.fid == fid)
-		scl = &scanner->catctl;
 	else if (scanner->pmtctl.fid == fid)
 		scl = &scanner->pmtctl;
-	else if (scanner->sdtctl.fid == fid)
-		scl = &scanner->sdtctl;
-	else if (scanner->nitctl.fid == fid)
-		scl = &scanner->nitctl;
-	else if (scanner->batctl.fid == fid)
-		scl = &scanner->batctl;
-	
+	else if (scanner->standard == AM_SCAN_STANDARD_ATSC)
+	{
+		if (scanner->mgtctl.fid == fid)
+			scl = &scanner->mgtctl;
+		else if (scanner->vctctl.fid == fid)
+			scl = &scanner->vctctl;
+	}
+	else
+	{
+		if (scanner->catctl.fid == fid)
+			scl = &scanner->catctl;
+		else if (scanner->sdtctl.fid == fid)
+			scl = &scanner->sdtctl;
+		else if (scanner->nitctl.fid == fid)
+			scl = &scanner->nitctl;
+		else if (scanner->batctl.fid == fid)
+			scl = &scanner->batctl;
+	}
 	
 	return scl;
 }
@@ -1284,6 +1483,18 @@ static void am_scan_section_handler(int dev_no, int fid, const uint8_t *data, in
 			case AM_SI_TID_BAT:
 				AM_DEBUG(1, "BAT ext 0x%x, sec %d, last %d", header.extension, header.sec_num, header.last_sec_num);
 				COLLECT_SECTION(dvbpsi_bat_t, scanner->result.bats);
+				break;
+			case AM_SI_TID_PSIP_MGT:
+				if (scanner->curr_ts)
+					COLLECT_SECTION(mgt_section_info_t, scanner->curr_ts->mgts);
+				break;
+			case AM_SI_TID_PSIP_TVCT:
+				if (scanner->curr_ts)
+					COLLECT_SECTION(tvct_section_info_t, scanner->curr_ts->tvcts);
+				break;
+			case AM_SI_TID_PSIP_CVCT:
+				if (scanner->curr_ts)
+					COLLECT_SECTION(cvct_section_info_t, scanner->curr_ts->cvcts);
 				break;
 			default:
 				AM_DEBUG(1, "Scan: Unkown section data, table_id 0x%x", data[0]);
@@ -1537,6 +1748,8 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 		AM_DEBUG(1, "Scan already start");
 		return AM_SUCCESS;
 	}
+	
+	AM_DEBUG(1, "@@@ Start scan use standard: %s @@@", (scanner->standard==AM_SCAN_STANDARD_DVB)?"DVB":"ATSC");
 
 	/*注册前端事件*/
 	AM_EVT_Subscribe(scanner->fend_dev, AM_FEND_EVT_STATUS_CHANGED, am_scan_fend_callback, (void*)scanner);
@@ -1550,20 +1763,30 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 	am_scan_tablectl_init(&scanner->pmtctl, AM_SCAN_RECVING_PMT, AM_SCAN_EVT_PMT_DONE, PMT_TIMEOUT, 
 						0x1fff, AM_SI_TID_PMT, "PMT", 1, am_scan_pmt_done, 0);
 	am_scan_tablectl_init(&scanner->catctl, AM_SCAN_RECVING_CAT, AM_SCAN_EVT_CAT_DONE, CAT_TIMEOUT, 
-						AM_SI_PID_CAT, AM_SI_TID_CAT, "CAT", 1, am_scan_cat_done, 0);
-	am_scan_tablectl_init(&scanner->sdtctl, AM_SCAN_RECVING_SDT, AM_SCAN_EVT_SDT_DONE, SDT_TIMEOUT, 
-						AM_SI_PID_SDT, AM_SI_TID_SDT_ACT, "SDT", 1, am_scan_sdt_done, 0);
-	am_scan_tablectl_init(&scanner->nitctl, AM_SCAN_RECVING_NIT, AM_SCAN_EVT_NIT_DONE, NIT_TIMEOUT, 
-						AM_SI_PID_NIT, AM_SI_TID_NIT_ACT, "NIT", 1, am_scan_nit_done, 0);
-	am_scan_tablectl_init(&scanner->batctl, AM_SCAN_RECVING_BAT, AM_SCAN_EVT_BAT_DONE, BAT_TIMEOUT, 
-						AM_SI_PID_BAT, AM_SI_TID_BAT, "BAT", MAX_BAT_SUBTABLE_CNT, 
-						am_scan_bat_done, BAT_REPEAT_DISTANCE);
+							AM_SI_PID_CAT, AM_SI_TID_CAT, "CAT", 1, am_scan_cat_done, 0);
+	if (scanner->standard == AM_SCAN_STANDARD_ATSC)
+	{
+		am_scan_tablectl_init(&scanner->mgtctl, AM_SCAN_RECVING_MGT, AM_SCAN_EVT_MGT_DONE, MGT_TIMEOUT, 
+						AM_SI_ATSC_BASE_PID, AM_SI_TID_PSIP_MGT, "MGT", 1, am_scan_mgt_done, 0);
+		am_scan_tablectl_init(&scanner->vctctl, AM_SCAN_RECVING_VCT, AM_SCAN_EVT_VCT_DONE, VCT_TIMEOUT, 
+						AM_SI_ATSC_BASE_PID, AM_SI_TID_PSIP_CVCT, "VCT", 1, am_scan_vct_done, 0);
+	}
+	else
+	{
+		am_scan_tablectl_init(&scanner->sdtctl, AM_SCAN_RECVING_SDT, AM_SCAN_EVT_SDT_DONE, SDT_TIMEOUT, 
+							AM_SI_PID_SDT, AM_SI_TID_SDT_ACT, "SDT", 1, am_scan_sdt_done, 0);
+		am_scan_tablectl_init(&scanner->nitctl, AM_SCAN_RECVING_NIT, AM_SCAN_EVT_NIT_DONE, NIT_TIMEOUT, 
+							AM_SI_PID_NIT, AM_SI_TID_NIT_ACT, "NIT", 1, am_scan_nit_done, 0);
+		am_scan_tablectl_init(&scanner->batctl, AM_SCAN_RECVING_BAT, AM_SCAN_EVT_BAT_DONE, BAT_TIMEOUT, 
+							AM_SI_PID_BAT, AM_SI_TID_BAT, "BAT", MAX_BAT_SUBTABLE_CNT, 
+							am_scan_bat_done, BAT_REPEAT_DISTANCE);
+	}
 
 	scanner->curr_freq = -1;
 	scanner->end_code = AM_SCAN_RESULT_UNLOCKED;
 
 	/*自动搜索模式时按指定主频点列表开始NIT表请求,其他模式直接按指定频点开始搜索*/
-	if (scanner->result.mode & AM_SCAN_MODE_AUTO)
+	if ((scanner->result.mode & AM_SCAN_MODE_AUTO) && scanner->standard == AM_SCAN_STANDARD_DVB)
 		AM_TRY(am_scan_try_nit(scanner));
 	else
 		AM_TRY(am_scan_start_next_ts(scanner));
@@ -1638,15 +1861,31 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 			scanner->curr_ts->ber = si.ber;
 			scanner->curr_ts->strength = si.strength;
 			
-			am_scan_tablectl_clear(&scanner->patctl);
-			am_scan_tablectl_clear(&scanner->pmtctl);
-			am_scan_tablectl_clear(&scanner->catctl);
-			am_scan_tablectl_clear(&scanner->sdtctl);
+			if (scanner->standard == AM_SCAN_STANDARD_ATSC)
+			{
+				am_scan_tablectl_clear(&scanner->patctl);
+				am_scan_tablectl_clear(&scanner->pmtctl);
+				am_scan_tablectl_clear(&scanner->catctl);
+				am_scan_tablectl_clear(&scanner->mgtctl);
+				
+				/*请求数据*/
+				am_scan_request_section(scanner, &scanner->patctl);
+				am_scan_request_section(scanner, &scanner->catctl);
+				am_scan_request_section(scanner, &scanner->mgtctl);
+			}
+			else
+			{
+				am_scan_tablectl_clear(&scanner->patctl);
+				am_scan_tablectl_clear(&scanner->pmtctl);
+				am_scan_tablectl_clear(&scanner->catctl);
+				am_scan_tablectl_clear(&scanner->sdtctl);
 
-			/*请求数据*/
-			am_scan_request_section(scanner, &scanner->patctl);
-			am_scan_request_section(scanner, &scanner->catctl);
-			am_scan_request_section(scanner, &scanner->sdtctl);
+				/*请求数据*/
+				am_scan_request_section(scanner, &scanner->patctl);
+				am_scan_request_section(scanner, &scanner->catctl);
+				am_scan_request_section(scanner, &scanner->sdtctl);
+			}
+			
 
 			scanner->curr_ts->fend_para = scanner->start_freqs[scanner->curr_freq];
 			/*添加到搜索结果列表*/
@@ -1717,9 +1956,18 @@ static void am_scan_get_wait_timespec(AM_SCAN_Scanner_t *scanner, struct timespe
 	TIMEOUT_CHECK(pat);
 	TIMEOUT_CHECK(pmt);
 	TIMEOUT_CHECK(cat);
-	TIMEOUT_CHECK(sdt);
-	TIMEOUT_CHECK(nit);
-	TIMEOUT_CHECK(bat);
+	if (scanner->standard == AM_SCAN_STANDARD_ATSC)
+	{
+		TIMEOUT_CHECK(mgt);
+		TIMEOUT_CHECK(vct);
+	}
+	else
+	{
+		TIMEOUT_CHECK(sdt);
+		TIMEOUT_CHECK(nit);
+		TIMEOUT_CHECK(bat);
+	}
+	
 	
 	if (scanner->stage == AM_SCAN_STAGE_TS && \
 		scanner->recv_status == AM_SCAN_RECVING_COMPLETE)
@@ -1788,6 +2036,12 @@ handle_events:
 			/*BAT表收齐事件*/
 			if (evt_flag & AM_SCAN_EVT_BAT_DONE)
 				scanner->batctl.done(scanner);
+			/*MGT表收齐事件*/
+			if (evt_flag & AM_SCAN_EVT_MGT_DONE)
+				scanner->mgtctl.done(scanner);
+			/*VCT表收齐事件*/
+			if (evt_flag & AM_SCAN_EVT_VCT_DONE)
+				scanner->vctctl.done(scanner);
 
 			/*退出事件*/
 			if (evt_flag & AM_SCAN_EVT_QUIT)
@@ -1825,26 +2079,46 @@ handle_events:
 		AM_DMX_FreeFilter(scanner->dmx_dev, scanner->pmtctl.fid);
 	if (scanner->catctl.fid != -1)
 		AM_DMX_FreeFilter(scanner->dmx_dev, scanner->catctl.fid);
-	if (scanner->nitctl.fid != -1)
-		AM_DMX_FreeFilter(scanner->dmx_dev, scanner->nitctl.fid);
-	if (scanner->sdtctl.fid != -1)
-		AM_DMX_FreeFilter(scanner->dmx_dev, scanner->sdtctl.fid);
-	if (scanner->batctl.fid != -1)
-		AM_DMX_FreeFilter(scanner->dmx_dev, scanner->batctl.fid);
+	if (scanner->standard != AM_SCAN_STANDARD_ATSC)
+	{
+		if (scanner->nitctl.fid != -1)
+			AM_DMX_FreeFilter(scanner->dmx_dev, scanner->nitctl.fid);
+		if (scanner->sdtctl.fid != -1)
+			AM_DMX_FreeFilter(scanner->dmx_dev, scanner->sdtctl.fid);
+		if (scanner->batctl.fid != -1)
+			AM_DMX_FreeFilter(scanner->dmx_dev, scanner->batctl.fid);
+	}
+	else
+	{
+		if (scanner->mgtctl.fid != -1)
+		AM_DMX_FreeFilter(scanner->dmx_dev, scanner->mgtctl.fid);
+		if (scanner->vctctl.fid != -1)
+			AM_DMX_FreeFilter(scanner->dmx_dev, scanner->vctctl.fid);
+	}
+	
 	pthread_mutex_unlock(&scanner->lock);
 	AM_DEBUG(0, "Waiting for dmx callback...");
 	/*等待回调函数执行完毕*/
 	AM_DMX_Sync(scanner->dmx_dev);
 	AM_DEBUG(0, "OK");
 	pthread_mutex_lock(&scanner->lock);
+
 	/*表控制释放*/
 	am_scan_tablectl_deinit(&scanner->patctl);
 	am_scan_tablectl_deinit(&scanner->pmtctl);
 	am_scan_tablectl_deinit(&scanner->catctl);
-	am_scan_tablectl_deinit(&scanner->nitctl);
-	am_scan_tablectl_deinit(&scanner->sdtctl);
-	am_scan_tablectl_deinit(&scanner->batctl);
-	
+	if (scanner->standard != AM_SCAN_STANDARD_ATSC)
+	{
+		am_scan_tablectl_deinit(&scanner->nitctl);
+		am_scan_tablectl_deinit(&scanner->sdtctl);
+		am_scan_tablectl_deinit(&scanner->batctl);
+	}
+	else
+	{
+		am_scan_tablectl_deinit(&scanner->mgtctl);
+		am_scan_tablectl_deinit(&scanner->vctctl);
+	}
+
 	if (scanner->start_freqs != NULL)
 		free(scanner->start_freqs);
 	/*释放SI资源*/
@@ -1862,7 +2136,7 @@ handle_events:
 
 		ts = tnext;
 	}
-	
+
 	AM_SI_Destroy(scanner->hsi);
 	pthread_mutex_unlock(&scanner->lock);
 
@@ -1897,6 +2171,12 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 		return AM_SCAN_ERR_INVALID_PARAM;
 		
 	*handle = 0;	
+	if (para->standard != AM_SCAN_STANDARD_DVB && para->standard != AM_SCAN_STANDARD_ATSC)
+	{
+		AM_DEBUG(1, "Unknown scan standard, must be DVB or ATSC");
+		return AM_SCAN_ERR_INVALID_PARAM;
+	}
+	
 	/*分析搜索模式*/
 	smode &= 0x07;
 	if (smode != AM_SCAN_MODE_AUTO && 
@@ -1975,13 +2255,15 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	scanner->result.mode = para->mode;
 	scanner->result.src = para->source;
 	scanner->result.hdb = para->hdb;
+	scanner->result.standard = para->standard;
 	scanner->fend_dev = para->fend_dev_id;
 	scanner->dmx_dev = para->dmx_dev_id;
+	scanner->standard = para->standard;
 	if (! para->store_cb)
 		scanner->store_cb = am_scan_default_store;
 	else
 		scanner->store_cb = para->store_cb;
-
+	
 	pthread_mutexattr_init(&mta);
 	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE_NP);
 	pthread_mutex_init(&scanner->lock, &mta);

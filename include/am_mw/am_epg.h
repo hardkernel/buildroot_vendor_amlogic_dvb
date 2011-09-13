@@ -65,10 +65,19 @@ enum AM_EPG_Mode
 	AM_EPG_SCAN_EIT_PF_OTH 		= 0x80,	/**< 监控其他频点eit pf*/
 	AM_EPG_SCAN_EIT_SCHE_ACT	= 0x100,	/**< 监控当前频点eit schedule*/
 	AM_EPG_SCAN_EIT_SCHE_OTH 	= 0x200,	/**< 监控其他频点eit schedule*/
+	
+	/*For ATSC*/
+	AM_EPG_SCAN_MGT	= 0x400,	/**< 监控MGT*/
+	AM_EPG_SCAN_VCT	= 0x800,	/**< 监控VCT*/
+	AM_EPG_SCAN_STT	= 0x1000,	/**< 监控STT*/
+	AM_EPG_SCAN_RRT	= 0x2000,	/**< 监控RRT*/
+	
+	/*Composed mode*/
 	AM_EPG_SCAN_EIT_PF_ALL		= AM_EPG_SCAN_EIT_PF_ACT | AM_EPG_SCAN_EIT_PF_OTH,/**< 监控所有eit pf*/
 	AM_EPG_SCAN_EIT_SCHE_ALL 	= AM_EPG_SCAN_EIT_SCHE_ACT | AM_EPG_SCAN_EIT_SCHE_OTH,/**< 监控所有eit schedule*/
 	AM_EPG_SCAN_EIT_ALL 		= AM_EPG_SCAN_EIT_PF_ALL | AM_EPG_SCAN_EIT_SCHE_ALL, /**< 监控所有eit*/
-	AM_EPG_SCAN_ALL				= AM_EPG_SCAN_PAT|AM_EPG_SCAN_PMT|AM_EPG_SCAN_CAT|AM_EPG_SCAN_SDT|AM_EPG_SCAN_NIT|AM_EPG_SCAN_TDT|AM_EPG_SCAN_EIT_ALL,
+	AM_EPG_SCAN_ALL				= AM_EPG_SCAN_PAT|AM_EPG_SCAN_PMT|AM_EPG_SCAN_CAT|AM_EPG_SCAN_SDT|AM_EPG_SCAN_NIT|AM_EPG_SCAN_TDT|AM_EPG_SCAN_EIT_ALL|
+									AM_EPG_SCAN_MGT|AM_EPG_SCAN_VCT|AM_EPG_SCAN_STT|AM_EPG_SCAN_RRT,
 };
 
 /**\brief EPG监控事件类型*/
@@ -82,6 +91,7 @@ enum AM_EPG_EventType
 	AM_EPG_EVT_NEW_NIT,    /**< 发现新版本NIT，参数为dvbpsi_nit_t*/
 	AM_EPG_EVT_NEW_TDT,    /**< 发现新版本NIT，参数为dvbpsi_tot_t*/
 	AM_EPG_EVT_NEW_EIT,	   /**< 接收到新的EIT单个section，参数为dvbpsi_eit_t*/
+	AM_EPG_EVT_NEW_STT,		/**< 发新新版本STT， 参数为stt_section_info_t*/
 	AM_EPG_EVT_EIT_DONE,   /**< 所有EIT接收完毕*/
 	AM_EPG_EVT_EIT_UPDATE,	/**< 通知接收到新的EIT数据，用于上层实现更新*/
 	AM_EPG_EVT_NEW_SUB_PLAY,	/**< 提前通知有将开始的预约节目要播放,参数为db_evt_id*/

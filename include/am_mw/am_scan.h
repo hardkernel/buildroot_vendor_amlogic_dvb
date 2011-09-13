@@ -59,6 +59,9 @@ enum AM_SCAN_ProgressEvt
 	AM_SCAN_PROGRESS_PMT_DONE,		/**< 当前TS的所有PMT表搜索完毕，参数为dvbpsi_pmt_t*/
 	AM_SCAN_PROGRESS_CAT_DONE,		/**< 当前TS的CAT表搜索完毕，参数为dvbpsi_cat_t*/
 	AM_SCAN_PROGRESS_SDT_DONE,		/**< 当前TS的SDT表搜索完毕，参数为dvbpsi_sdt_t*/
+	AM_SCAN_PROGRESS_MGT_DONE,		/**< 当前TS的MGT表搜索完毕，参数为mgt_section_info_t*/
+	AM_SCAN_PROGRESS_TVCT_DONE,		/**< 当前TS的TVCT表搜索完毕，参数为tvct_section_info_t*/
+	AM_SCAN_PROGRESS_CVCT_DONE,		/**< 当前TS的CVCT表搜索完毕，参数为cvct_section_info_t*/
 	AM_SCAN_PROGRESS_STORE_BEGIN,	/**< 开始存储*/
 	AM_SCAN_PROGRESS_STORE_END,		/**< 存储完毕*/
 };
@@ -80,6 +83,14 @@ enum AM_SCAN_Source
 	AM_SCAN_SRC_DVBT       = 0x02, /**< DVBT搜索 */
 	AM_SCAN_SRC_DVBS       = 0x03, /**< DVBS搜索 */
 };
+
+/**\brief 标准定义*/
+enum AM_SCAN_Standard
+{
+	AM_SCAN_STANDARD_DVB	= 0x00,	/**< DVB标准*/
+	AM_SCAN_STANDARD_ATSC	= 0x01,	/**< ATSC标准*/
+};
+
 /**\brief 搜索模式定义*/
 enum AM_SCAN_Mode
 {
@@ -130,6 +141,9 @@ typedef struct AM_SCAN_TS_s
 	dvbpsi_cat_t 					*cats;		/**< 搜索到的CAT表*/
 	dvbpsi_pmt_t 					*pmts;		/**< 搜索到的PMT表*/
 	dvbpsi_sdt_t 					*sdts;		/**< 搜索到的SDT表*/
+	mgt_section_info_t				*mgts;		/**< 搜索到的MGT表*/
+	cvct_section_info_t				*cvcts;		/**< 搜索到的CVCT表*/
+	tvct_section_info_t				*tvcts;		/**< 搜索到的TVCT表*/
 
 	struct AM_SCAN_TS_s 			*p_next;	/**< 指向下一个TS*/
 }AM_SCAN_TS_t;
@@ -139,6 +153,7 @@ typedef struct
 {
 	int 		 src;	/**< 源标识*/
 	int 		 mode;	/**< 搜索模式*/
+	int			 standard;/**< ATSC or DVB*/
 	sqlite3		 *hdb;	/**< 数据库句柄*/
 	dvbpsi_nit_t *nits;	/**< 搜索到的NIT表*/
 	dvbpsi_bat_t *bats;	/**< 搜索到的BAT表*/
@@ -158,6 +173,7 @@ typedef struct
 	int dmx_dev_id;	/**< demux设备号*/
 	int source;		/**< 源标识*/
 	int mode;			/**< 搜索模式，见AM_SCAN_Mode_t*/
+	int standard;	/**< 搜索标准，DVB/ATSC*/
 	
 	int start_para_cnt;	/**< 前端参数个数*/
 	struct dvb_frontend_parameters *start_para;	/**< 前端参数列表，自动搜索时对应主频点列表，

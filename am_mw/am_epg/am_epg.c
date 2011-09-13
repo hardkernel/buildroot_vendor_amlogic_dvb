@@ -8,7 +8,7 @@
  * \date 2010-11-04: create the document
  ***************************************************************************/
 
-#define AM_DEBUG_LEVEL 1
+#define AM_DEBUG_LEVEL 3
 
 #include <errno.h>
 #include <iconv.h>
@@ -49,6 +49,9 @@
 /*TDT 自动更新间隔*/
 #define TDT_CHECK_DISTANCE 1000*3600
 
+/*STT 自动更新间隔*/
+#define STT_CHECK_DISTANCE 1000*3600
+
 /*预约播放检查间隔*/
 #define EPG_SUB_CHECK_TIME (10*1000)
 /*预约播放提前通知时间*/
@@ -65,6 +68,9 @@
 #define BIT_TEST(a, b) ((a)[BIT_SLOT(b)] & BIT_MASK(b))
 #define BIT_MASK_EX(b) (0xff >> (7 - ((b) % 8)))
 #define BIT_CLEAR_EX(a, b) ((a)[BIT_SLOT(b)] &= BIT_MASK_EX(b))
+
+/*Use the following macros to fix type disagree*/
+#define dvbpsi_stt_t stt_section_info_t
 
 /*清除一个subtable控制数据*/
 #define SUBCTL_CLEAR(sc)\
@@ -108,6 +114,8 @@
 			am_epg_tablectl_mark_section(sec_ctrl, &header); /*设置为已接收*/\
 		}\
 	AM_MACRO_END
+
+
 
 /*判断并设置某个表的监控*/
 #define SET_MODE(table, ctl, f, reset)\
@@ -424,6 +432,8 @@ static AM_EPG_TableCtl_t *am_epg_get_section_ctrl_by_fid(AM_EPG_Monitor_t *mon, 
 		scl = &mon->eit60ctl;
 	else if (mon->eit61ctl.fid == fid)
 		scl = &mon->eit61ctl;
+	else if (mon->sttctl.fid == fid)
+		scl = &mon->sttctl;
 
 	
 	return scl;
@@ -547,7 +557,7 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 				
 				if (AM_SI_DecodeSection(mon->hsi, sec_ctrl->pid, (uint8_t*)data, len, (void**)&p_eit) == AM_SUCCESS)
 				{
-					AM_DEBUG(2, "EIT tid 0x%x, ext 0x%x, sec %x, last %x", header.table_id,
+					AM_DEBUG(5, "EIT tid 0x%x, ext 0x%x, sec %x, last %x", header.table_id,
 								header.extension, header.sec_num, header.last_sec_num);
 					am_epg_tablectl_mark_section_eit(sec_ctrl, &header, data[12]);
 					/*触发通知事件*/
@@ -559,6 +569,36 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 						mon->eit_has_data = AM_TRUE;
 				}
 			}
+				break;
+			case AM_SI_TID_PSIP_STT:
+#ifdef USE_TDT_TIME
+			{
+				stt_section_info_t *p_stt;
+				
+				AM_DEBUG(1, ">>>>>>>New STT found");
+				
+				if (AM_SI_DecodeSection(mon->hsi, sec_ctrl->pid, (uint8_t*)data, len, (void**)&p_stt) == AM_SUCCESS)
+				{
+					uint16_t mjd;
+					uint8_t hour, min, sec;
+					
+					p_stt->p_next = NULL;
+					AM_DEBUG(1, ">>>>>>>STT UTC time is %u", p_stt->utc_time);
+					/*取UTC时间*/
+					pthread_mutex_lock(&time_lock);
+					curr_time.tdt_utc_time = p_stt->utc_time;
+					/*更新system time，用于时间自动累加*/
+					AM_TIME_GetClock(&curr_time.tdt_sys_time);
+					pthread_mutex_unlock(&time_lock);
+	   
+					/*触发通知事件*/
+					AM_EVT_Signal((int)mon, AM_EPG_EVT_NEW_STT, (void*)p_stt);
+					
+					/*释放改STT*/
+					AM_SI_ReleaseSection(mon->hsi, (void*)p_stt);
+				}
+			}
+#endif			
 				break;
 			default:
 				AM_DEBUG(1, "EPG: Unkown section data, table_id 0x%x", data[0]);
@@ -651,8 +691,6 @@ static AM_ErrorCode_t am_epg_request_section(AM_EPG_Monitor_t *mon, AM_EPG_Table
 static void am_epg_nit_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->nitctl.fid);
-	/*清除事件标志*/
-	//mon->evt_flag &= ~mon->nitctl.evt_flag;
 
 	/*触发通知事件*/
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_NIT, (void*)mon->nits);
@@ -669,8 +707,6 @@ static void am_epg_nit_done(AM_EPG_Monitor_t *mon)
 static void am_epg_pat_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->patctl.fid);
-	/*清除事件标志*/
-	//mon->evt_flag &= ~mon->patctl.evt_flag;
 
 	/*触发通知事件*/
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_PAT, (void*)mon->pats);
@@ -687,8 +723,6 @@ static void am_epg_pat_done(AM_EPG_Monitor_t *mon)
 static void am_epg_pmt_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->pmtctl.fid);
-	/*清除事件标志*/
-	//mon->evt_flag &= ~mon->pmtctl.evt_flag;
 
 	/*触发通知事件*/
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_PMT, (void*)mon->pmts);
@@ -705,8 +739,6 @@ static void am_epg_pmt_done(AM_EPG_Monitor_t *mon)
 static void am_epg_cat_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->catctl.fid);
-	/*清除事件标志*/
-	//mon->evt_flag &= ~mon->catctl.evt_flag;
 
 	/*触发通知事件*/
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_CAT, (void*)mon->cats);
@@ -723,8 +755,6 @@ static void am_epg_cat_done(AM_EPG_Monitor_t *mon)
 static void am_epg_sdt_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->sdtctl.fid);
-	/*清除事件标志*/
-	//mon->evt_flag &= ~mon->sdtctl.evt_flag;
 
 	/*触发通知事件*/
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_SDT, (void*)mon->sdts);
@@ -741,8 +771,6 @@ static void am_epg_sdt_done(AM_EPG_Monitor_t *mon)
 static void am_epg_tdt_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->totctl.fid);
-	/*清除事件标志*/
-	//mon->evt_flag &= ~mon->totctl.evt_flag;
 
 	/*设置完成时间以进行下一次刷新*/
 	AM_TIME_GetClock(&mon->totctl.check_time);
@@ -752,8 +780,6 @@ static void am_epg_tdt_done(AM_EPG_Monitor_t *mon)
 static void am_epg_eit4e_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->eit4ectl.fid);
-	/*清除事件标志*/
-	//mon->evt_flag &= ~mon->eit4ectl.evt_flag;
 
 	if (mon->mon_service == 0xffff)
 	{
@@ -776,8 +802,6 @@ static void am_epg_eit4e_done(AM_EPG_Monitor_t *mon)
 static void am_epg_eit4f_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->eit4fctl.fid);
-	/*清除事件标志*/
-	//mon->evt_flag &= ~mon->eit4fctl.evt_flag;
 
 	/*设置完成时间以进行下一次刷新*/
 	AM_TIME_GetClock(&mon->eit4fctl.check_time);
@@ -788,8 +812,6 @@ static void am_epg_eit4f_done(AM_EPG_Monitor_t *mon)
 static void am_epg_eit50_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->eit50ctl.fid);
-	/*清除事件标志*/
-	//mon->evt_flag &= ~mon->eit50ctl.evt_flag;
 
 	/*设置完成时间以进行下一次刷新*/
 	AM_TIME_GetClock(&mon->eit50ctl.check_time);
@@ -800,8 +822,6 @@ static void am_epg_eit50_done(AM_EPG_Monitor_t *mon)
 static void am_epg_eit51_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->eit51ctl.fid);
-	/*清除事件标志*/
-	//mon->evt_flag &= ~mon->eit51ctl.evt_flag;
 
 	/*设置完成时间以进行下一次刷新*/
 	AM_TIME_GetClock(&mon->eit51ctl.check_time);
@@ -812,8 +832,6 @@ static void am_epg_eit51_done(AM_EPG_Monitor_t *mon)
 static void am_epg_eit60_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->eit60ctl.fid);
-	/*清除事件标志*/
-	//mon->evt_flag &= ~mon->eit60ctl.evt_flag;
 
 	/*设置完成时间以进行下一次刷新*/
 	AM_TIME_GetClock(&mon->eit60ctl.check_time);
@@ -824,12 +842,19 @@ static void am_epg_eit60_done(AM_EPG_Monitor_t *mon)
 static void am_epg_eit61_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->eit61ctl.fid);
-	/*清除事件标志*/
-	//mon->evt_flag &= ~mon->eit61ctl.evt_flag;
 
 	/*设置完成时间以进行下一次刷新*/
 	AM_TIME_GetClock(&mon->eit61ctl.check_time);
 	mon->eit61ctl.data_arrive_time = 0;
+}
+
+/**\brief TDT搜索完毕处理*/
+static void am_epg_stt_done(AM_EPG_Monitor_t *mon)
+{
+	am_epg_free_filter(mon, &mon->sttctl.fid);
+
+	/*设置完成时间以进行下一次刷新*/
+	AM_TIME_GetClock(&mon->sttctl.check_time);
 }
 
 /**\brief table control data init*/
@@ -859,6 +884,8 @@ static void am_epg_tablectl_data_init(AM_EPG_Monitor_t *mon)
 							 0xff, "EIT sche other(60)", MAX_EIT_SUBTABLE_CNT, am_epg_eit60_done, EIT60_REPEAT_DISTANCE);
 	am_epg_tablectl_init(&mon->eit61ctl, AM_EPG_EVT_EIT61_DONE, AM_SI_PID_EIT, AM_SI_TID_EIT_SCHE_OTH + 1,
 							 0xff, "EIT sche other(61)", MAX_EIT_SUBTABLE_CNT, am_epg_eit61_done, EIT61_REPEAT_DISTANCE);
+	am_epg_tablectl_init(&mon->sttctl, AM_EPG_EVT_STT_DONE, AM_SI_ATSC_BASE_PID, AM_SI_TID_PSIP_STT,
+							 0xff, "STT", 1, am_epg_stt_done, 0);
 }
 
 /**\brief 按照当前模式重新设置监控*/
@@ -876,6 +903,8 @@ static void am_epg_set_mode(AM_EPG_Monitor_t *mon, AM_Bool_t reset)
 	SET_MODE(eit, eit51ctl, AM_EPG_SCAN_EIT_SCHE_ACT, reset);
 	SET_MODE(eit, eit60ctl, AM_EPG_SCAN_EIT_SCHE_OTH, reset);
 	SET_MODE(eit, eit61ctl, AM_EPG_SCAN_EIT_SCHE_OTH, reset);
+	/*For ATSC, we only monitor STT now*/
+	SET_MODE(stt, sttctl, AM_EPG_SCAN_STT, reset);
 }
 
 /**\brief 按照当前模式重置所有表监控*/
@@ -1038,6 +1067,8 @@ static void am_epg_get_next_ms(AM_EPG_Monitor_t *mon, int *ms)
 	REFRESH_CHECK(eit, eit51, AM_EPG_SCAN_EIT_SCHE_ACT, mon->eitsche_check_time);
 	REFRESH_CHECK(eit, eit60, AM_EPG_SCAN_EIT_SCHE_OTH, mon->eitsche_check_time);
 	REFRESH_CHECK(eit, eit61, AM_EPG_SCAN_EIT_SCHE_OTH, mon->eitsche_check_time);
+	
+	REFRESH_CHECK(stt, stt, AM_EPG_SCAN_STT, STT_CHECK_DISTANCE);
 
 	/*EIT数据更新通知检查*/
 	EVENT_CHECK(mon->new_eit_check_time, NEW_EIT_CHECK_DISTANCE, am_epg_check_update);
@@ -1140,6 +1171,9 @@ handle_events:
 			/*TDT表收齐事件*/
 			if (evt_flag & AM_EPG_EVT_TDT_DONE)
 				mon->totctl.done(mon);
+			/*STT表收齐事件*/
+			if (evt_flag & AM_EPG_EVT_STT_DONE)
+				mon->sttctl.done(mon);
 			/*设置监控模式事件*/
 			if (evt_flag & AM_EPG_EVT_SET_MODE)
 				am_epg_set_mode(mon, AM_TRUE);
@@ -1218,6 +1252,7 @@ handle_events:
 	am_epg_tablectl_deinit(&mon->eit51ctl);
 	am_epg_tablectl_deinit(&mon->eit60ctl);
 	am_epg_tablectl_deinit(&mon->eit61ctl);
+	am_epg_tablectl_deinit(&mon->sttctl);
 	
 	pthread_mutex_unlock(&mon->lock);
 

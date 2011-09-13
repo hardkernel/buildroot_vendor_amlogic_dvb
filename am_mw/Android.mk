@@ -57,7 +57,14 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/libdvbsi/descriptors/dr_06.c\
 		   am_si/libdvbsi/psi.c\
 		   am_si/libdvbsi/dvbpsi.c\
-		   am_si/libdvbsi/descriptor.c
+		   am_si/libdvbsi/descriptor.c\
+		   am_si/atsc/atsc_cvct.c\
+		   am_si/atsc/atsc_tvct.c\
+		   am_si/atsc/atsc_mgt.c\
+		   am_si/atsc/atsc_rrt.c\
+		   am_si/atsc/atsc_stt.c\
+		   am_si/atsc/atsc_descriptor.c\
+		   am_si/atsc/huffman_decode.c
 
 
 
@@ -68,6 +75,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/descriptors\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/tables\
+		    $(LOCAL_PATH)/../include/am_mw/atsc\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    $(LOCAL_PATH)/../android/ex_include
 

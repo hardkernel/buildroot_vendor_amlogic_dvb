@@ -39,7 +39,9 @@ enum
 	AM_SCAN_RECVING_SDT 		= 0x08,
 	AM_SCAN_RECVING_NIT			= 0x10,
 	AM_SCAN_RECVING_BAT			= 0x20,
-	AM_SCAN_RECVING_WAIT_FEND	= 0x40,
+	AM_SCAN_RECVING_MGT			= 0x40,
+	AM_SCAN_RECVING_VCT			= 0x80,
+	AM_SCAN_RECVING_WAIT_FEND	= 0x100,
 };
 
 /*SCAN内部事件类型*/
@@ -52,8 +54,10 @@ enum
 	AM_SCAN_EVT_SDT_DONE 	= 0x10, /**< SDT表已经接收完毕*/
 	AM_SCAN_EVT_NIT_DONE 	= 0x20, /**< NIT表已经接收完毕*/
 	AM_SCAN_EVT_BAT_DONE 	= 0x40, /**< BAT表已经接收完毕*/
-	AM_SCAN_EVT_QUIT		= 0x80, /**< 退出搜索事件*/
-	AM_SCAN_EVT_START		= 0x100,/**< 开始搜索事件*/
+	AM_SCAN_EVT_MGT_DONE 	= 0x80, /**< MGT表已经接收完毕*/
+	AM_SCAN_EVT_VCT_DONE 	= 0x100, /**< VCT表已经接收完毕*/
+	AM_SCAN_EVT_QUIT		= 0x200, /**< 退出搜索事件*/
+	AM_SCAN_EVT_START		= 0x400,/**< 开始搜索事件*/
 };
 
 /*SCAN 所在阶段*/
@@ -65,7 +69,7 @@ enum
 	AM_SCAN_STAGE_DONE
 };
 
-/*sqlite3 stmts*/
+/*sqlite3 stmts for DVB*/
 enum
 {
 	QUERY_NET,
@@ -129,7 +133,11 @@ struct AM_SCAN_Scanner_s
 	AM_SCAN_TableCtl_t				sdtctl;			/**< SDT接收控制*/
 	AM_SCAN_TableCtl_t				nitctl;			/**< NIT接收控制*/
 	AM_SCAN_TableCtl_t				batctl;			/**< BAT接收控制*/
+	/*ATSC tables*/
+	AM_SCAN_TableCtl_t				mgtctl;			/**< MGT接收控制*/
+	AM_SCAN_TableCtl_t				vctctl;			/**< VCT接收控制*/
 
+	int								standard;
 	int								evt_flag;		/**< 事件标志*/
 	int								recv_status;	/**< 接收状态*/
 	int								stage;			/**< 执行阶段*/

@@ -27,6 +27,24 @@
 		case _tag:\
 			_func(des);\
 			break;
+			
+/**\brief 解析ATSC表*/
+#define si_decode_psip_table(p_table, tab, _type, _buf, _len)\
+	AM_MACRO_BEGIN\
+		_type *p_sec = atsc_psip_new_##tab##_info();\
+		if (p_sec == NULL){\
+			ret = AM_SI_ERR_NO_MEM;\
+		} else {\
+			ret = atsc_psip_parse_##tab(_buf,(uint32_t)_len, p_sec);\
+		}\
+		if (ret == AM_SUCCESS){\
+			p_sec->i_table_id = _buf[0];\
+			p_table = (void*)p_sec;\
+		} else if (p_sec){\
+			atsc_psip_free_##tab##_info(p_sec);\
+			p_table = NULL;\
+		}\
+	AM_MACRO_END
 
 /****************************************************************************
  * Static data
@@ -478,7 +496,8 @@ AM_ErrorCode_t AM_SI_Destroy(int handle)
 /**\brief 解析一个section,并返回解析数据
  * 支持的表(相应返回结构):CAT(dvbpsi_cat_t) PAT(dvbpsi_pat_t) PMT(dvbpsi_pmt_t) 
  * SDT(dvbpsi_sdt_t) EIT(dvbpsi_eit_t) TOT(dvbpsi_tot_t) NIT(dvbpsi_nit_t).
- *
+ * CVCT(cvct_section_info_t) TVCT(tvct_section_info_t) MGT(mgt_section_info_t)
+ * RRT(rrt_section_info_t) STT(stt_section_info_t)
  * e.g.解析一个PAT section:
  * 	dvbpsi_pat_t *pat_sec;
  * 	AM_SI_DecodeSection(hSI, AM_SI_PID_PAT, pat_buf, len, &pat_sec);
@@ -494,18 +513,24 @@ AM_ErrorCode_t AM_SI_Destroy(int handle)
  */
 AM_ErrorCode_t AM_SI_DecodeSection(int handle, uint16_t pid, uint8_t *buf, uint16_t len, void **sec)
 {
-	dvbpsi_psi_section_t *psi_sec;
+	dvbpsi_psi_section_t *psi_sec = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
+	uint8_t table_id;
 
 	assert(buf && sec);
 	AM_TRY(si_check_handle(handle));
 	
-	/*生成dvbpsi section*/
-	AM_TRY(si_gen_dvbpsi_section(buf, len, &psi_sec));
+	table_id = buf[0];
+	
+	if (table_id <= AM_SI_TID_TOT)
+	{
+		/*生成dvbpsi section*/
+		AM_TRY(si_gen_dvbpsi_section(buf, len, &psi_sec));
+	}
 
 	*sec = NULL;
 	/*Decode*/
-	switch (psi_sec->i_table_id)
+	switch (table_id)
 	{
 		case AM_SI_TID_PAT:
 			if (pid != AM_SI_PID_PAT)
@@ -559,6 +584,36 @@ AM_ErrorCode_t AM_SI_DecodeSection(int handle, uint16_t pid, uint8_t *buf, uint1
 				ret = AM_SI_ERR_NOT_SUPPORTED;
 			else
 				ret = si_decode_tot(sec, psi_sec);
+			break;
+		case AM_SI_TID_PSIP_MGT:
+			if (pid != AM_SI_ATSC_BASE_PID)
+				ret = AM_SI_ERR_NOT_SUPPORTED;
+			else
+				si_decode_psip_table(*sec, mgt, mgt_section_info_t, buf, len);
+			break;
+		case AM_SI_TID_PSIP_TVCT:
+			if (pid != AM_SI_ATSC_BASE_PID)
+				ret = AM_SI_ERR_NOT_SUPPORTED;
+			else
+				si_decode_psip_table(*sec, tvct, tvct_section_info_t, buf, len);
+			break;
+		case AM_SI_TID_PSIP_CVCT:
+			if (pid != AM_SI_ATSC_BASE_PID)
+				ret = AM_SI_ERR_NOT_SUPPORTED;
+			else
+				si_decode_psip_table(*sec, cvct, cvct_section_info_t, buf, len);
+			break;
+		case AM_SI_TID_PSIP_RRT:
+			if (pid != AM_SI_ATSC_BASE_PID)
+				ret = AM_SI_ERR_NOT_SUPPORTED;
+			else
+				si_decode_psip_table(*sec, rrt, rrt_section_info_t, buf, len);
+			break;
+		case AM_SI_TID_PSIP_STT:
+			if (pid != AM_SI_ATSC_BASE_PID)
+				ret = AM_SI_ERR_NOT_SUPPORTED;
+			else
+				si_decode_psip_table(*sec, stt, stt_section_info_t, buf, len);
 			break;
 		default:
 			ret = AM_SI_ERR_NOT_SUPPORTED;
@@ -618,6 +673,21 @@ AM_ErrorCode_t AM_SI_ReleaseSection(int handle, void *sec)
 		case AM_SI_TID_TOT:
 		case AM_SI_TID_TDT:
 			dvbpsi_DeleteTOT((dvbpsi_tot_t*)sec);
+			break;
+		case AM_SI_TID_PSIP_MGT:
+			atsc_psip_free_mgt_info((mgt_section_info_t*)sec);
+			break;
+		case AM_SI_TID_PSIP_TVCT:
+			atsc_psip_free_tvct_info((tvct_section_info_t*)sec);
+			break;
+		case AM_SI_TID_PSIP_CVCT:
+			atsc_psip_free_cvct_info((cvct_section_info_t*)sec);
+			break;
+		case AM_SI_TID_PSIP_RRT:
+			atsc_psip_free_rrt_info((rrt_section_info_t*)sec);
+			break;
+		case AM_SI_TID_PSIP_STT:
+			atsc_psip_free_stt_info((stt_section_info_t*)sec);
 			break;
 		default:
 			ret = AM_SI_ERR_INVALID_SECTION_DATA;

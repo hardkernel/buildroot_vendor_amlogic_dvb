@@ -21,3 +21,15 @@
 "chan_num numeric",								/**< 频道号*/
 "skip integer",										/**< 是否隐藏, 0不隐藏，1隐藏*/
 "lock integer",										/**< 父母锁, 0不加锁，1加锁*/
+
+/**< Note: the following fields are added for ATSC only, and they are NOT available for DVB*/
+"major_chan_num integer",							/**< ATSC 主频道号*/
+"minor_chan_num integer",							/**< ATSC 次频道号*/
+"access_controlled integer",						/**< ATSC. when set, that the events associated with 
+														this virtual channel may be access controlled. 
+														When the flag is set to ‘0’, event access is not 
+														restricted*/
+"hidden integer",									/**< ATSC 是否隐藏*/
+"hide_guide integer",								/**< ATSC 隐藏的节目是否可以在EPG中显示*/
+"source_id integer",								/**< ATSC program 的 source id，用于与EIT ETT中的source id对应*/
+
