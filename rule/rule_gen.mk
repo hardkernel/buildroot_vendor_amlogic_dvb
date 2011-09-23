@@ -1,5 +1,7 @@
 #CFLAGS+=-O0
 ifneq ($(TARGET),android)
+	LDFLAGS+=-lpthread -lrt -lsqlite3
+else
 	ifeq ($(ANDROID_VERSION),2.2)
 		LICUDATA:=-licudata
 		LGPSSTUB:=-lgpsstub
@@ -7,8 +9,6 @@ ifneq ($(TARGET),android)
 		LICUDATA:=
 		LGPSSTUB:=
 	endif
-	LDFLAGS+=-lpthread -lrt -lsqlite3
-else
 	LDFLAGS+=-liconv -lsqlite -licui18n -lamplayer
 endif
 
