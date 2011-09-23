@@ -435,6 +435,14 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 	if (rec->rec_pids.pid_count <= 0)
 		return AM_REC_ERR_INVALID_PARAM;
 
+	snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), "%s/DVBRecordFiles", rec->store_dir);
+	/*尝试创建录像文件夹*/
+	if (mkdir(rec->rec_file_name, 0666) && errno != EEXIST)
+	{
+		AM_DEBUG(0, "Cannot create record store directory '%s', error: %s.", rec->rec_file_name, strerror(errno));	
+		return AM_REC_ERR_CANNOT_OPEN_FILE;
+	}
+		
 	/*设置输出文件名*/
 	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
 	{
@@ -449,47 +457,37 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 		struct stat st;
 		struct tm stim;
 
-		snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), "%s/DVBRecordFiles", rec->store_dir);
-		/*尝试创建录像文件夹*/
-		if (mkdir(rec->rec_file_name, 0666) && errno != EEXIST)
+		/*新建一个不同名的文件名*/
+		AM_EPG_GetUTCTime(&now);
+		tnow = (time_t)now;
+		gmtime_r(&tnow, &stim);
+		srand(now);
+		do
 		{
-			AM_DEBUG(0, "Cannot create record store directory '%s', error: %s.", rec->rec_file_name, strerror(errno));	
-			/*无需返回错误*/
+			now = rand();
+			snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), "%s/DVBRecordFiles/REC_%04d%02d%02d_%d.ts", 
+				rec->store_dir, stim.tm_year + 1900, stim.tm_mon+1, stim.tm_mday, now);
+			if (stat(rec->rec_file_name, &st) && errno == ENOENT)
+				break;
+		}while(1);
+
+		if (rec->rec_db_id != -1)
+		{
+			AM_DEBUG(0, "Assign record file name to : %s", rec->rec_file_name);
+			am_rec_db_update_record_file_name(rec->hdb, rec->rec_db_id, rec->rec_file_name + strlen(rec->store_dir) + 1);
+		}
+	
+		/*设置定时录像结束检查时间*/
+		if (duration > 0)
+		{
+			AM_TIME_GetClock(&rec->rec_end_check_time);
+			//rec->rec_end_check_time += duration*1000;
+			rec->rec_duration = duration*1000;
 		}
 		else
 		{
-			/*新建一个不同名的文件名*/
-			AM_EPG_GetUTCTime(&now);
-			tnow = (time_t)now;
-			gmtime_r(&tnow, &stim);
-			srand(now);
-			do
-			{
-				now = rand();
-				snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), "%s/DVBRecordFiles/REC_%04d%02d%02d_%d.ts", 
-					rec->store_dir, stim.tm_year + 1900, stim.tm_mon+1, stim.tm_mday, now);
-				if (stat(rec->rec_file_name, &st) && errno == ENOENT)
-					break;
-			}while(1);
-
-			if (rec->rec_db_id != -1)
-			{
-				AM_DEBUG(0, "Assign record file name to : %s", rec->rec_file_name);
-				am_rec_db_update_record_file_name(rec->hdb, rec->rec_db_id, rec->rec_file_name + strlen(rec->store_dir) + 1);
-			}
-		
-			/*设置定时录像结束检查时间*/
-			if (duration > 0)
-			{
-				AM_TIME_GetClock(&rec->rec_end_check_time);
-				//rec->rec_end_check_time += duration*1000;
-				rec->rec_duration = duration*1000;
-			}
-			else
-			{
-				/*即时录像时不检查结束时间*/
-				rec->rec_end_check_time = 0;
-			}
+			/*即时录像时不检查结束时间*/
+			rec->rec_end_check_time = 0;
 		}
 	}
 	
@@ -508,8 +506,9 @@ static int am_rec_start_record(AM_REC_Recorder_t *rec)
 		goto start_end;
 	}
 	/*取录像相关参数*/
-	AM_TRY(am_rec_fill_rec_param(rec));
-	
+	if ((ret = am_rec_fill_rec_param(rec)) != 0)
+		goto start_end;
+		
 	/*打开录像文件*/
 	if (! (rec->stat_flag & REC_STAT_FL_TIMESHIFTING))
 	{
