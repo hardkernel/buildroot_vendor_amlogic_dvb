@@ -412,7 +412,13 @@ static AM_ErrorCode_t adec_set_volume(AM_AOUT_Device_t *dev, int vol)
 	
 	return adec_cmd(buf);
 #else
-	return 0;
+	int ret=0;
+	ret = audio_decode_set_volume(adec_handle,vol);
+
+	if(ret==-1)
+		return AM_FAILURE;
+	else
+		return AM_SUCCESS;
 #endif	
 }
 
@@ -423,14 +429,20 @@ static AM_ErrorCode_t adec_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 	
 	return adec_cmd(cmd);
 #else
-	return 0;
+	int ret=0;
+	ret = audio_decode_set_mute(adec_handle);
+
+	if(ret==-1)
+		return AM_FAILURE;
+	else
+		return AM_SUCCESS;
 #endif	
 }
 
 static AM_ErrorCode_t adec_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_OutputMode_t mode)
 {
 #ifndef ADEC_API_NEW
-	const char *cmd = NULL;
+	
 	
 	switch(mode)
 	{
@@ -451,7 +463,28 @@ static AM_ErrorCode_t adec_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_Output
 	
 	return adec_cmd(cmd);
 #else
-	return 0;
+	int ret=0;
+	switch(mode)
+	{
+		case AM_AOUT_OUTPUT_STEREO:
+		default:
+			ret=audio_channel_stereo(adec_handle);
+		break;
+		case AM_AOUT_OUTPUT_DUAL_LEFT:
+			ret=audio_channel_left_mono(adec_handle);
+		break;
+		case AM_AOUT_OUTPUT_DUAL_RIGHT:
+			ret=audio_channel_right_mono(adec_handle);
+		break;
+		case AM_AOUT_OUTPUT_SWAP:
+			ret=audio_channels_swap(adec_handle);
+		break;
+	}
+	
+	if(ret==-1)
+		return AM_FAILURE;
+	else
+		return AM_SUCCESS;
 #endif	
 }
 
