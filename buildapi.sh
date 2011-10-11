@@ -26,8 +26,9 @@ echo Commit: `git show HEAD | head -1 | grep commit | sed s/commit\ //` >> $TPAT
 
 cp $ANDROID_PRODUCT_OUT/system/lib/libam_adp.so $TPATH || return 1
 cp $ANDROID_PRODUCT_OUT/system/lib/libam_mw.so $TPATH || return 1
-cp -a include doc test $TPATH || return 1
-cp rule/no_src_Android.mk $TPATH/Android.mk
+cp -a android include doc Android.mk test $TPATH || return 1
+cat rule/no_src_Android.mk | sed s/SLIB_TARGET/libam_adp/ > $TPATH/am_adp/Android.mk
+cat rule/no_src_Android.mk | sed s/SLIB_TARGET/libam_mw/ > $TPATH/am_mw/Android.mk
 
 cd .tmp
 
