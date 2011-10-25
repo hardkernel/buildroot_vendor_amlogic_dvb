@@ -116,8 +116,11 @@ typedef enum
 {
 	AM_AV_TS_SRC_TS0,                    /**< TS输入0*/
 	AM_AV_TS_SRC_TS1,                    /**< TS输入1*/
-	AM_AV_TS_SRC_TS2,                    /**< TS输入1*/	
-	AM_AV_TS_SRC_HIU                     /**< HIU 接口*/
+	AM_AV_TS_SRC_TS2,                    /**< TS输入2*/
+	AM_AV_TS_SRC_HIU,                    /**< HIU 接口*/
+	AM_AV_TS_SRC_DMX0,                   /**< Demux0*/
+	AM_AV_TS_SRC_DMX1,                   /**< Demux1*/
+	AM_AV_TS_SRC_DMX2                    /**< Demux2*/
 } AM_AV_TSSource_t;
 
 /**\brief 音频压缩格式*/
