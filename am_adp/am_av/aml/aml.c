@@ -2939,6 +2939,12 @@ static void* aml_av_monitor_thread(void *arg)
 			}
 		}
 	}
+	/*If notified, send resume event*/
+	if (notified)
+	{
+		AM_DEBUG(1, "About to exit av monitor thread, notify detect data event");
+		AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_DATA_RESUME, NULL);
+	}
 	pthread_mutex_unlock(&gAVMonLock);
 
 	AM_DEBUG(1, "AV  monitor thread exit now");
