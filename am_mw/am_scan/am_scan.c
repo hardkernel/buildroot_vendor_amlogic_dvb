@@ -1541,6 +1541,15 @@ static AM_ErrorCode_t am_scan_request_section(AM_SCAN_Scanner_t *scanner, AM_SCA
 	param.pid = scl->pid;
 	param.filter.filter[0] = scl->tid;
 	param.filter.mask[0] = 0xff;
+	
+	/*For PMT, we must filter its extension*/
+	if (scl->tid == AM_SI_TID_PMT)
+	{
+		param.filter.filter[1] = (uint8_t)((scl->ext&0xff00)>>8);
+		param.filter.mask[1] = 0xff;
+		param.filter.filter[2] = (uint8_t)(scl->ext);
+		param.filter.mask[2] = 0xff;
+	}
 
 	/*Current next indicator must be 1*/
 	param.filter.filter[3] = 0x01;
@@ -1596,6 +1605,7 @@ static AM_ErrorCode_t am_scan_request_next_pmt(AM_SCAN_Scanner_t *scanner)
 	/*初始化接收控制数据*/
 	am_scan_tablectl_clear(&scanner->pmtctl);
 	scanner->pmtctl.pid = scanner->cur_prog->i_pid;
+	scanner->pmtctl.ext = scanner->cur_prog->i_number;
 
 	AM_TRY(am_scan_request_section(scanner, &scanner->pmtctl));
 
