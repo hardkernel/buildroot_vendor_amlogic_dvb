@@ -3255,6 +3255,17 @@ static AM_ErrorCode_t aml_ts_source(AM_AV_Device_t *dev, AM_AV_TSSource_t src)
 		case AM_AV_TS_SRC_HIU:
 			cmd = "hiu";
 		break;
+		case AM_AV_TS_SRC_DMX0:
+			cmd = "dmx0";
+		break;
+		case AM_AV_TS_SRC_DMX1:
+			cmd = "dmx1";
+		break;
+#if defined(CHIP_8226M) || defined(CHIP_8626X)
+		case AM_AV_TS_SRC_DMX2:
+			cmd = "dmx2";
+		break;
+#endif
 		default:
 			AM_DEBUG(1, "illegal ts source %d", src);
 			return AM_AV_ERR_NOT_SUPPORTED;

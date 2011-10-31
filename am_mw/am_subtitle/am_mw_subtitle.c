@@ -14,6 +14,7 @@
 #include "memwatch.h"
 #include "semaphore.h"
 #include "am_dmx.h"
+#include <am_debug.h>
 
 
 #define LINUX_PES_FILTER
@@ -22,7 +23,7 @@
 #include "am_pesfilter.h"
 #endif
 
-#define DVBSUB_DEBUG                                (0)
+#define DVBSUB_DEBUG                                (1)
 #if DVBSUB_DEBUG
 #define subtitle_debug                                  printf
 #else
@@ -323,7 +324,7 @@ static inline int copy_data_to_pes_buffer(char* buffer,int len)
 		else
 		{
 			//buffer overflow
-			printf("buffer overflow\n");
+			printf("buffer overflow\n"); 
 			return 0;
 		}
 	}
@@ -439,6 +440,7 @@ static void pes_filter_callback(int dev_no,int fhandle,const unsigned char *data
 	int data_remain=len;
 	int data_copy=0;
 	pthread_mutex_lock(&context_sub.rd_wr_Mutex);
+
 #ifdef DEBUG_SUB
 
 	if(fp2==0)
@@ -538,6 +540,7 @@ static int close_demux_pes_filter()
 int am_mw_start_subtitle(int composition_id, int ancillary_id,int dmx_id,int pid)
 {
 	int ret=AM_SUCCESS;
+
 	ret=dvbsub_decoder_create(composition_id,ancillary_id,subtitle_cb,&context_sub.decode_handle);
 	if(ret)
 	{
@@ -1032,14 +1035,14 @@ static void *get_pes_packet_thread(void *para)
 }
 
 
-static int get_curretn_pts()
+static unsigned long get_curretn_pts()
 {
 	char buffer[16];
 	int ret=AM_SUCCESS;
-	int pts=0xffffffff;
+	unsigned long pts=0xffffffff;
 	ret=AM_FileRead("/sys/class/tsync/pts_video",buffer,11);
 	if(!ret)
-		pts=strtol(buffer,0,16);
+		pts=strtoul(buffer,0,16);
 	return pts;
 }
 
@@ -1134,10 +1137,12 @@ start:
 				time_out = sub_display->sub_pic->timeout;
 				hide_pts = disp_pts + (INT64U)(time_out * 90000);
 				temp_pts = disp_pts;
+
                 		if (disp_pts & (((INT64U)(1 << 16)) << 16))
 			      	{
 					cur_pts += (((INT64U)(1 << 16)) << 16);
 			  	}
+
 				if (sub_display->state == SUBTITLE_READY)
 				{
 
