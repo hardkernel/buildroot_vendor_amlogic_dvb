@@ -158,10 +158,35 @@ extern AM_ErrorCode_t AM_SMC_Read(int dev_no, uint8_t *data, int len, int timeou
  * \param[in] len 希望发送的数据长度
  * \param timeout 读取超时时间，以毫秒为单位，<0表示永久等待。
  * \return
- *   - AM_SUCCESS 成功
+ *  - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_smc.h)
  */
 extern AM_ErrorCode_t AM_SMC_Write(int dev_no, const uint8_t *data, int len, int timeout);
+
+/**\brief 从智能卡读取数据
+ *直接从智能卡读取数据，调用函数的线程会阻塞，直到读取到期望数目的数据，或到达超时时间。
+ * \param dev_no 智能卡设备号
+ * \param[out] data 数据缓冲区
+ * \param[in] len 希望读取的数据长度
+ * \param timeout 读取超时时间，以毫秒为单位，<0表示永久等待。
+ * \return
+ *   - >=0 实际读取的数据长度
+ *   - 其他值 错误代码(见am_smc.h)
+ */
+extern AM_ErrorCode_t AM_SMC_ReadEx(int dev_no, uint8_t *data, int len, int timeout);
+
+
+/**\brief 向智能卡发送数据
+ *直接向智能卡发送数据，调用函数的线程会阻塞，直到全部数据被写入，或到达超时时间。
+ * \param dev_no 智能卡设备号
+ * \param[in] data 数据缓冲区
+ * \param[in] len 希望发送的数据长度
+ * \param timeout 读取超时时间，以毫秒为单位，<0表示永久等待。
+ * \return
+ *   - >=0 实际写入的数据长度
+ *   - 其他值 错误代码(见am_smc.h)
+ */
+extern AM_ErrorCode_t AM_SMC_WriteEx(int dev_no, const uint8_t *data, int len, int timeout);
 
 /**\brief 按T0协议传输数据
  * \param dev_no 智能卡设备号

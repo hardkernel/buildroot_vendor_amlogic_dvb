@@ -120,6 +120,8 @@ typedef struct
 	int             len;
 	int             times;
 	int             pos;
+	int             dev_no;
+	AM_Bool_t       is_audio;
 	AM_Bool_t       running;
 } AV_DataSource_t;
 
@@ -604,6 +606,7 @@ static void* aml_data_source_thread(void *arg)
 					if(src->times)
 					{
 						src->pos = 0;
+						AM_EVT_Signal(src->dev_no, src->is_audio?AM_AV_EVT_AUDIO_ES_END:AM_AV_EVT_VIDEO_ES_END, NULL);
 					}
 					else
 					{
@@ -628,7 +631,7 @@ static void* aml_data_source_thread(void *arg)
 }
 
 /**\brief 创建一个音视频数据注入数据*/
-static AV_DataSource_t* aml_create_data_source(const char *fname)
+static AV_DataSource_t* aml_create_data_source(const char *fname, int dev_no, AM_Bool_t is_audio)
 {
 	AV_DataSource_t *src;
 	
@@ -648,6 +651,9 @@ static AV_DataSource_t* aml_create_data_source(const char *fname)
 		free(src);
 		return NULL;
 	}
+
+	src->dev_no   = dev_no;
+	src->is_audio = is_audio;
 	
 	pthread_mutex_init(&src->lock, NULL);
 	pthread_cond_init(&src->cond, NULL);
@@ -2534,7 +2540,7 @@ static AM_ErrorCode_t aml_decode_jpeg(AV_JPEGData_t *jpeg, const uint8_t *data, 
 
 static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para)
 {
-#ifndef ANDROID
+//#ifndef ANDROID
 	char buf[32];
 	int v;
 	
@@ -2649,7 +2655,7 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_COMBINED;
 		}
 	}
-#endif
+//#endif
 
 #if !defined(ADEC_API_NEW)
 	adec_cmd("stop");
@@ -2687,30 +2693,36 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	}
 #endif
 	
-	val = tp->vfmt;
-	if(ioctl(fd, AMSTREAM_IOC_VFORMAT, val)==-1)
-	{
-		AM_DEBUG(1, "set video format failed");
-		return AM_AV_ERR_SYS;
+	if(tp->vpid && (tp->vpid<0x1fff)){
+		val = tp->vfmt;
+		if(ioctl(fd, AMSTREAM_IOC_VFORMAT, val)==-1)
+		{
+			AM_DEBUG(1, "set video format failed");
+			return AM_AV_ERR_SYS;
+		}
+		val = tp->vpid;
+		if(ioctl(fd, AMSTREAM_IOC_VID, val)==-1)
+		{
+			AM_DEBUG(1, "set video PID failed");
+			return AM_AV_ERR_SYS;
+		}
 	}
-	val = tp->vpid;
-	if(ioctl(fd, AMSTREAM_IOC_VID, val)==-1)
-	{
-		AM_DEBUG(1, "set video PID failed");
-		return AM_AV_ERR_SYS;
+
+	if(tp->apid && (tp->apid<0x1fff)){
+		val = tp->afmt;
+		if(ioctl(fd, AMSTREAM_IOC_AFORMAT, val)==-1)
+		{
+			AM_DEBUG(1, "set audio format failed");
+			return AM_AV_ERR_SYS;
+		}
+		val = tp->apid;
+		if(ioctl(fd, AMSTREAM_IOC_AID, val)==-1)
+		{
+			AM_DEBUG(1, "set audio PID failed");
+			return AM_AV_ERR_SYS;
+		}
 	}
-	val = tp->afmt;
-	if(ioctl(fd, AMSTREAM_IOC_AFORMAT, val)==-1)
-	{
-		AM_DEBUG(1, "set audio format failed");
-		return AM_AV_ERR_SYS;
-	}
-	val = tp->apid;
-	if(ioctl(fd, AMSTREAM_IOC_AID, val)==-1)
-	{
-		AM_DEBUG(1, "set audio PID failed");
-		return AM_AV_ERR_SYS;
-	}
+
 	if(ioctl(fd, AMSTREAM_IOC_PORT_INIT, 0)==-1)
 	{
 		AM_DEBUG(1, "amport init failed");
@@ -2963,7 +2975,7 @@ static AM_ErrorCode_t aml_open_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 	switch(mode)
 	{
 		case AV_PLAY_VIDEO_ES:
-			src = aml_create_data_source(STREAM_VBUF_FILE);
+			src = aml_create_data_source(STREAM_VBUF_FILE, dev->dev_no, AM_FALSE);
 			if(!src)
 			{
 				AM_DEBUG(1, "cannot create data source \"/dev/amstream_vbuf\"");
@@ -2982,7 +2994,7 @@ static AM_ErrorCode_t aml_open_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 
 		break;
 		case AV_PLAY_AUDIO_ES:
-			src = aml_create_data_source(STREAM_ABUF_FILE);
+			src = aml_create_data_source(STREAM_ABUF_FILE, dev->dev_no, AM_TRUE);
 			if(!src)
 			{
 				AM_DEBUG(1, "cannot create data source \"/dev/amstream_abuf\"");

@@ -68,8 +68,10 @@ enum AM_AV_EventType
 	AM_AV_EVT_VIDEO_DISABLED,          /**< 视频曾隐藏*/
 	AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED, /**< 视频长宽比变化，参数为新的长宽比(AM_AV_VideoAspectRatio_t)*/
 	AM_AV_EVT_VIDEO_DISPLAY_MODE_CHANGED, /**< 视频显示模式变化，参数为新的显示模式(AM_AV_VideoDisplayMode_t)*/
-	AM_AV_EVT_AV_NO_DATA,		/**< 播放过程中检测到Audio PTS 和 Video PTS 一段时间未变化，通知无数据*/
+	AM_AV_EVT_AV_NO_DATA,		   /**< 播放过程中检测到Audio PTS 和 Video PTS 一段时间未变化，通知无数据*/
 	AM_AV_EVT_AV_DATA_RESUME,	/**< 在AM_AV_EVT_AV_NO_DATA后，检测到Audio or Video PTS有变化，通知有数据*/
+	AM_AV_EVT_VIDEO_ES_END,     /**< 注入视频ES数据结束*/
+	AM_AV_EVT_AUDIO_ES_END,     /**< 注入音频ES数据结束*/
 	AM_AV_EVT_END
 };
 
@@ -140,7 +142,12 @@ typedef enum
 	AFORMAT_ADPCM = 11,
 	AFORMAT_AMR  = 12,
 	AFORMAT_RAAC  = 13,
-	AFORMAT_MAX    = 14
+	AFORMAT_WMA  = 14,
+	AFORMAT_WMAPRO = 15,
+	AFORMAT_PCM_BLURAY = 16,
+	AFORMAT_ALAC = 17,
+	AFORMAT_VORBIS = 18,
+	AFORMAT_MAX = 19
 } AM_AV_AFormat_t;
 
 /**\brief 视频压缩格式*/
@@ -153,6 +160,9 @@ typedef enum
 	VFORMAT_REAL,
 	VFORMAT_JPEG,
 	VFORMAT_VC1,
+	VFORMAT_AVS,
+	VFORMAT_YUV,    // Use SW decoder
+	VFORMAT_H264MVC,
 	VFORMAT_MAX
 } AM_AV_VFormat_t;
 

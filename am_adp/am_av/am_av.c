@@ -1848,7 +1848,7 @@ AM_ErrorCode_t AM_AV_EnableVideo(int dev_no)
 	
 	pthread_mutex_lock(&dev->lock);
 	
-	if(!dev->video_enable)
+	//if(!dev->video_enable)
 	{
 		if(dev->drv->set_video_para)
 		{
@@ -1882,7 +1882,7 @@ AM_ErrorCode_t AM_AV_DisableVideo(int dev_no)
 	
 	pthread_mutex_lock(&dev->lock);
 	
-	if(dev->video_enable)
+	//if(dev->video_enable)
 	{
 		if(dev->drv->set_video_para)
 		{
