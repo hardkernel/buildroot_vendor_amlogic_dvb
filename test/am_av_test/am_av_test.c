@@ -3,7 +3,6 @@
  */
 /**\file
  * \brief 音视频解码测试
- *
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2010-08-11: create the document
  ***************************************************************************/
@@ -25,6 +24,7 @@
 #include <arpa/inet.h>
 
 #include <am_misc.h>
+#include <am_aout.h>
 
 /****************************************************************************
  * Macro definitions
@@ -35,6 +35,7 @@
 #define DMX_DEV_NO  1
 #define AV_DEV_NO   0
 #define OSD_DEV_NO  0
+#define AOUT_DEV_NO 0
 
 #ifdef ENABLE_JPEG_TEST
 #define OSD_FORMAT  AM_OSD_FMT_COLOR_8888
@@ -74,10 +75,22 @@ static void normal_help(void)
 #ifdef ENABLE_JPEG_TEST		
 	printf("* snapshot\n");
 #endif
+	printf("* ltrack\n");
+	printf("* rtrack\n");
+	printf("* swaptrack\n");
+	printf("* stereo\n");
+	printf("* mute\n");
+	printf("* unmute\n");
+	printf("* vol VAL\n");
+	printf("* aout\n");
+	printf("* 16x9\n");
+	printf("* 4x3\n");
 }
 
 static int normal_cmd(const char *cmd)
 {
+	printf("cmd:%s\n", cmd);
+	
 	if(!strncmp(cmd, "blackout", 8))
 	{
 		AM_AV_EnableVideoBlackout(AV_DEV_NO);
@@ -169,6 +182,70 @@ static int normal_cmd(const char *cmd)
 #endif		
 #endif
 	}
+	else if(!strncmp(cmd, "ltrack", 6))
+	{
+		printf("ltrack\n");
+		AM_AOUT_SetOutputMode(AOUT_DEV_NO, AM_AOUT_OUTPUT_DUAL_LEFT);
+	}	
+	else if(!strncmp(cmd, "rtrack", 6))
+	{
+		printf("rtrack\n");
+		AM_AOUT_SetOutputMode(AOUT_DEV_NO, AM_AOUT_OUTPUT_DUAL_RIGHT);
+	}	
+	else if(!strncmp(cmd, "swaptrack", 9))
+	{
+		printf("strack\n");
+		AM_AOUT_SetOutputMode(AOUT_DEV_NO, AM_AOUT_OUTPUT_SWAP);
+	}	
+	else if(!strncmp(cmd, "stereo", 6))
+	{
+		printf("stereo\n");
+		AM_AOUT_SetOutputMode(AOUT_DEV_NO, AM_AOUT_OUTPUT_STEREO);
+	}	
+	else if(!strncmp(cmd, "mute", 4))
+	{
+		printf("mute\n");
+		AM_AOUT_SetMute(AOUT_DEV_NO, AM_TRUE);
+	}	
+	else if(!strncmp(cmd, "unmute", 6))
+	{
+		printf("unmute\n");
+		AM_AOUT_SetMute(AOUT_DEV_NO, AM_FALSE);
+	}	
+	else if(!strncmp(cmd, "vol", 3))
+	{
+		int v;
+		
+		sscanf(cmd+3, "%d", &v);
+		AM_AOUT_SetVolume(AOUT_DEV_NO, v);
+	}	
+	else if(!strncmp(cmd, "aout", 5))
+	{
+		AM_Bool_t mute;
+		AM_AOUT_OutputMode_t out;
+		int vol;
+		
+		AM_AOUT_GetMute(AOUT_DEV_NO, &mute);
+		AM_AOUT_GetOutputMode(AOUT_DEV_NO, &out);
+		AM_AOUT_GetVolume(AOUT_DEV_NO, &vol);
+
+		printf("Audio Out Info:\n");
+		printf("Mute: %s\n", mute?"true":"false");
+		printf("Mode: %s\n", (out==AM_AOUT_OUTPUT_STEREO)?"STEREO":
+							(out==AM_AOUT_OUTPUT_DUAL_LEFT)?"DUALLEFT":
+							(out==AM_AOUT_OUTPUT_DUAL_RIGHT)?"DUALRIGHT":
+							(out==AM_AOUT_OUTPUT_SWAP)?"SWAP":"???");
+		printf("Volume: %d\n", vol);
+	}
+	else if(!strncmp(cmd, "16x9", 4))
+	{
+		AM_AV_SetVideoAspectRatio(AV_DEV_NO, AM_AV_VIDEO_ASPECT_16_9);
+	}
+	else if(!strncmp(cmd, "4x3", 3))
+	{
+		AM_AV_SetVideoAspectRatio(AV_DEV_NO, AM_AV_VIDEO_ASPECT_4_3);
+	}
+
 	else
 	{
 		return 0;
@@ -568,6 +645,7 @@ int main(int argc, char **argv)
 	int apid=-1, vpid=-1, vfmt=0, afmt=0, freq=0;
 	int i, v, loop=0, pos=0, port=1234;
 	struct in_addr addr;
+	AM_AOUT_OpenPara_t aout_para;
 	
 	if(argc<2)
 		usage();
@@ -587,6 +665,9 @@ int main(int argc, char **argv)
 	AM_TRY(AM_OSD_Open(OSD_DEV_NO, &osd_p));
 #endif
 #endif
+
+	memset(&aout_para, 0, sizeof(aout_para));
+	AM_AOUT_Open(AOUT_DEV_NO, &aout_para);
 	
 	if(strcmp(argv[1], "dvb")==0)
 	{
@@ -690,6 +771,7 @@ int main(int argc, char **argv)
 #endif
 #endif
 	AM_AV_Close(AV_DEV_NO);
+	AM_AOUT_Close(AOUT_DEV_NO);
 	
 	return 0;	
 }

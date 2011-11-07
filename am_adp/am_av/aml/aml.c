@@ -57,6 +57,18 @@ extern int audio_decode_release(void **handle);
 extern int audio_decode_basic_init(void);
 extern void audio_set_av_sync_threshold(void *handle, int threshold);
 
+extern int audio_decode_set_mute(void *handle, int);
+#ifdef CHIP_8626X
+extern int audio_decode_set_volume( int);
+#else
+extern int audio_decode_set_volume(void *, float);
+#endif
+extern int audio_channels_swap(void *);
+extern int audio_channel_left_mono(void *);
+extern int audio_channel_right_mono(void *);
+extern int audio_channel_stereo(void *);
+extern int audio_output_muted(void *handle);
+
 void *adec_handle;
 #endif
 
@@ -415,8 +427,11 @@ static AM_ErrorCode_t adec_set_volume(AM_AOUT_Device_t *dev, int vol)
 	return adec_cmd(buf);
 #else
 	int ret=0;
+#ifdef CHIP_8626X
+	ret = audio_decode_set_volume(vol);
+#else
 	ret = audio_decode_set_volume(adec_handle,vol);
-
+#endif
 	if(ret==-1)
 		return AM_FAILURE;
 	else
@@ -432,7 +447,7 @@ static AM_ErrorCode_t adec_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 	return adec_cmd(cmd);
 #else
 	int ret=0;
-	ret = audio_decode_set_mute(adec_handle);
+	ret = audio_decode_set_mute(adec_handle, mute?1:0);
 
 	if(ret==-1)
 		return AM_FAILURE;
@@ -511,7 +526,16 @@ static AM_ErrorCode_t amp_set_volume(AM_AOUT_Device_t *dev, int vol)
 		AM_DEBUG(1, "MP_SetVolume failed");
 		return AM_AV_ERR_SYS;
 	}
-#endif	
+#endif
+#ifdef PLAYER_API_NEW
+	int media_id = (int)dev->drv_data;
+
+	if(audio_set_volume(media_id, vol)==-1)
+	{
+		AM_DEBUG(1, "audio_set_volume failed");
+		return AM_AV_ERR_SYS;
+	}
+#endif
 	return AM_SUCCESS;
 }
 
@@ -525,7 +549,17 @@ static AM_ErrorCode_t amp_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 		AM_DEBUG(1, "MP_SetVolume failed");
 		return AM_AV_ERR_SYS;
 	}
-#endif	
+#endif
+#ifdef PLAYER_API_NEW
+	int media_id = (int)dev->drv_data;
+
+	printf("audio_set_mute %d\n", mute);
+	if(audio_set_mute(media_id, mute?0:1)==-1)
+	{
+		AM_DEBUG(1, "audio_set_mute failed");
+		return AM_AV_ERR_SYS;
+	}
+#endif
 	return AM_SUCCESS;
 }
 
@@ -558,7 +592,34 @@ static AM_ErrorCode_t amp_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_OutputM
 		AM_DEBUG(1, "MP_SetTone failed");
 		return AM_AV_ERR_SYS;
 	}
-#endif	
+#endif
+#ifdef PLAYER_API_NEW
+	int media_id = (int)dev->drv_data;
+	int ret=0;
+	
+	switch(mode)
+	{
+		case AM_AOUT_OUTPUT_STEREO:
+		default:
+			ret = audio_stereo(media_id);
+		break;
+		case AM_AOUT_OUTPUT_DUAL_LEFT:
+			ret = audio_left_mono(media_id);
+		break;
+		case AM_AOUT_OUTPUT_DUAL_RIGHT:
+			ret = audio_right_mono(media_id);
+		break;
+		case AM_AOUT_OUTPUT_SWAP:
+			ret = audio_swap_left_right(media_id);
+		break;
+	}
+	if(ret==-1)
+	{
+		AM_DEBUG(1, "audio_set_mode failed");
+		return AM_AV_ERR_SYS;
+	}
+#endif
+
 	return AM_SUCCESS;
 }
 
@@ -2596,6 +2657,22 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 		if(sscanf(buf, "%d", &v)==1)
 		{
 			dev->video_mode = v;
+#ifndef 	CHIP_8226H
+			switch(v) {
+				case 0:
+				case 1:
+					dev->video_ratio = AM_AV_VIDEO_ASPECT_AUTO;
+					dev->video_mode = v;
+					break;
+				case 2:
+					dev->video_ratio = AM_AV_VIDEO_ASPECT_4_3;
+				case 3:
+					dev->video_ratio = AM_AV_VIDEO_ASPECT_16_9;
+					dev->video_mode = AM_AV_VIDEO_DISPLAY_FULL_SCREEN;
+					break;
+			}
+			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_IGNORE;
+ #endif		
 		}
 	}
 	if(AM_FileRead(DISP_MODE_FILE, buf, sizeof(buf))==AM_SUCCESS)
@@ -2677,7 +2754,7 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	
 	fd = (int)dev->ts_player.drv_data;
 	
-	AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
+//	AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
 
 #if defined(ANDROID) || defined(CHIP_8626X)
 	/*Set tsync enable/disable*/
@@ -2863,6 +2940,8 @@ static void* aml_av_monitor_thread(void *arg)
 
 				audio_decode_init(&adec_handle);
 				audio_decode_start(adec_handle);
+
+				AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
 #endif
 				av_playing = AM_TRUE;
 				adec_start = AM_FALSE;
@@ -3158,6 +3237,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 				}
 
 				player_start_play(data->media_id);
+				AM_AOUT_SetDriver(AOUT_DEV_NO, &amplayer_aout_drv, (void*)data->media_id);
 			}
 #endif
 		break;
@@ -3581,6 +3661,21 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 					cmd = "4x3";
 				break;
 			}
+#ifndef 	CHIP_8226H
+			name = VID_SCREEN_MODE_FILE;
+			switch((int)val)
+			{
+				case AM_AV_VIDEO_ASPECT_AUTO:
+					cmd = "0";
+				break;
+				case AM_AV_VIDEO_ASPECT_16_9:
+					cmd = "3";
+				break;
+				case AM_AV_VIDEO_ASPECT_4_3:
+					cmd = "2";
+				break;
+			}
+ #endif
 		break;
 		case AV_VIDEO_PARA_RATIO_MATCH:
 			name = VID_ASPECT_MATCH_FILE;

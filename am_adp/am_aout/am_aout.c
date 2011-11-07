@@ -298,8 +298,9 @@ AM_ErrorCode_t AM_AOUT_SetOutputMode(int dev_no, AM_AOUT_OutputMode_t mode)
 	AM_TRY(aout_get_openned_dev(dev_no, &dev));
 	
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->mode!=mode)
+
+	/*do not check, for SWAP is a toggle operation*/
+	//if(dev->mode!=mode)
 	{
 		if(dev->drv && dev->drv->set_output_mode)
 			ret = dev->drv->set_output_mode(dev, mode);
