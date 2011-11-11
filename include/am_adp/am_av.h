@@ -126,8 +126,7 @@ typedef enum
 } AM_AV_TSSource_t;
 
 /**\brief 音频压缩格式*/
-typedef enum
-{
+typedef enum {
 	AFORMAT_MPEG   = 0,
 	AFORMAT_PCM_S16LE = 1,
 	AFORMAT_AAC   = 2,
@@ -143,11 +142,13 @@ typedef enum
 	AFORMAT_AMR  = 12,
 	AFORMAT_RAAC  = 13,
 	AFORMAT_WMA  = 14,
-	AFORMAT_WMAPRO = 15,
-	AFORMAT_PCM_BLURAY = 16,
-	AFORMAT_ALAC = 17,
-	AFORMAT_VORBIS = 18,
-	AFORMAT_MAX = 19
+	AFORMAT_WMAPRO    = 15,
+	AFORMAT_PCM_BLURAY	= 16,
+	AFORMAT_ALAC  = 17,
+	AFORMAT_VORBIS    = 18,
+	AFORMAT_AAC_LATM   = 19,
+	AFORMAT_UNSUPPORT = 20,
+	AFORMAT_MAX    = 21
 } AM_AV_AFormat_t;
 
 /**\brief 视频压缩格式*/

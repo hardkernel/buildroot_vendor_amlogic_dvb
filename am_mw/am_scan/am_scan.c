@@ -613,15 +613,17 @@ static void store_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_
 						vfmt = avfmt;
 					}
 					break;
-				/*audio pid and audio format*/
+				/*audio pid and audio format*/ 
 				case 0x3:
 				case 0x4:
 					if (avfmt == -1)
 						avfmt = AFORMAT_MPEG;
 				case 0x0f:
-				case 0x11:
 					if (avfmt == -1)
 						avfmt = AFORMAT_AAC;
+				case 0x11:
+					if (avfmt == -1)
+						avfmt = AFORMAT_AAC_LATM;
 				case 0x81:
 					if (avfmt == -1)
 						avfmt = AFORMAT_AC3;
