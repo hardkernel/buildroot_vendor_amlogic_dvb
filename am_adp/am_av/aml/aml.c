@@ -2748,6 +2748,18 @@ static AM_ErrorCode_t aml_close(AM_AV_Device_t *dev)
 	return AM_SUCCESS;
 }
 
+typedef struct {
+    unsigned int    format;  ///< video format, such as H264, MPEG2...
+    unsigned int    width;   ///< video source width
+    unsigned int    height;  ///< video source height
+    unsigned int    rate;    ///< video source frame duration
+    unsigned int    extra;   ///< extra data information of video stream
+    unsigned int    status;  ///< status of video stream
+    float		    ratio;   ///< aspect ratio of video source
+    void *          param;   ///< other parameters for video decoder
+} dec_sysinfo_t;
+dec_sysinfo_t am_sysinfo;
+
 static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp, AM_Bool_t create_thread)
 {
 	int fd, val;
@@ -2769,7 +2781,9 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 		aml_set_tsync_enable(1);
 	}
 #endif
+
 	
+
 	if(tp->vpid && (tp->vpid<0x1fff)){
 		val = tp->vfmt;
 		if(ioctl(fd, AMSTREAM_IOC_VFORMAT, val)==-1)
@@ -2784,6 +2798,16 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 			return AM_AV_ERR_SYS;
 		}
 	}
+
+	if ((tp->vfmt == VFORMAT_H264) || (tp->vfmt == VFORMAT_VC1)) {
+
+		memset(&am_sysinfo,0,sizeof(dec_sysinfo_t));
+		if(ioctl(fd, AMSTREAM_IOC_SYSINFO, (unsigned long)&am_sysinfo)==-1)
+		{
+			AM_DEBUG(1, "set AMSTREAM_IOC_SYSINFO");
+			return AM_AV_ERR_SYS;
+		}
+	}	
 
 	if(tp->apid && (tp->apid<0x1fff)){
 		val = tp->afmt;
