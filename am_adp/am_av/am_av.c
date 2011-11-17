@@ -1669,6 +1669,9 @@ AM_ErrorCode_t AM_AV_SetVideoContrast(int dev_no, int val)
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
+
+	val = AM_MAX(val, AM_AV_VIDEO_CONTRAST_MIN);
+	val = AM_MIN(val, AM_AV_VIDEO_CONTRAST_MAX);
 	
 	pthread_mutex_lock(&dev->lock);
 	
@@ -1729,6 +1732,9 @@ AM_ErrorCode_t AM_AV_SetVideoSaturation(int dev_no, int val)
 	
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
 	
+	val = AM_MAX(val, AM_AV_VIDEO_SATURATION_MIN);
+	val = AM_MIN(val, AM_AV_VIDEO_SATURATION_MAX);
+
 	pthread_mutex_lock(&dev->lock);
 	
 	if(dev->video_saturation!=val)
@@ -1787,6 +1793,9 @@ AM_ErrorCode_t AM_AV_SetVideoBrightness(int dev_no, int val)
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
+
+	val = AM_MAX(val, AM_AV_VIDEO_BRIGHTNESS_MIN);
+	val = AM_MIN(val, AM_AV_VIDEO_BRIGHTNESS_MAX);
 	
 	pthread_mutex_lock(&dev->lock);
 	

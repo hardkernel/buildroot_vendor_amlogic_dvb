@@ -24,6 +24,13 @@ extern "C"
  * Macro definitions
  ***************************************************************************/
 
+#define AM_AV_VIDEO_CONTRAST_MIN   -1024  /**< 最小对比度值*/
+#define AM_AV_VIDEO_CONTRAST_MAX   1024   /**< 最大对比度值*/
+#define AM_AV_VIDEO_SATURATION_MIN -1024  /**< 最小色度值*/
+#define AM_AV_VIDEO_SATURATION_MAX 1024   /**< 最大色度值*/
+#define AM_AV_VIDEO_BRIGHTNESS_MIN -1024  /**< 最小对比度值*/
+#define AM_AV_VIDEO_BRIGHTNESS_MAX 1024   /**< 最大对比度值*/
+
 /****************************************************************************
  * Error code definitions
  ****************************************************************************/
@@ -275,29 +282,31 @@ typedef struct
 	int              data_width;  /**< 音频采样数据位数(播放PCM音频时使用)*/
 } AM_AV_InjectPara_t;
 
+/**\brief 视频解码状态*/
 typedef struct
 {
 	AM_AV_VFormat_t  vid_fmt;     /**< 视频格式*/
-	int              SourceWidth;         
-	int              SourceHight;                 
-	int              FrameRate;                   
-	char             bInterlaced;                  
-	int              FrameCount;
-	int              vb_size;
-	int              vb_data;
-	int              vb_free;
+	int              src_w;       /**< 视频源宽度*/ 
+	int              src_h;       /**< 视频源高度*/
+	int              fps;         /**< 视频帧率*/
+	char             interlaced;  /**< 是否隔行*/
+	int              frames;      /**< 已经解码的帧数目*/
+	int              vb_size;     /**< 视频缓冲区大小*/
+	int              vb_data;     /**< 视频缓冲区中数据占用空间大小*/
+	int              vb_free;     /**< 视频缓冲区中空闲空间大小*/
 }AM_AV_VideoStatus_t;
 
+/**\brief 音频解码状态*/
 typedef struct
 {
-	AM_AV_AFormat_t  	aud_fmt;     /**< 音频格式*/
-	int              	SampleRate;  
-	int     			BitWidth;    
-	int 				Channels;    
-	unsigned int    	FrameCount;
-	int              ab_size;
-	int              ab_data;
-	int              ab_free;
+	AM_AV_AFormat_t  aud_fmt;     /**< 音频格式*/
+	int              sample_rate; /**< 采样率*/
+	int              resolution;  /**< 数据精度(8/16bits)*/
+	int              channels;    /**< 声道数目*/
+	unsigned int     frames;      /**< 已解码的采样数目*/
+	int              ab_size;     /**< 音频缓冲区大小*/
+	int              ab_data;     /**< 音频缓冲区中数据占用大小*/
+	int              ab_free;     /**< 音频缓冲区中空闲空间大小*/
 }AM_AV_AudioStatus_t;
 
 /**\brief Timeshift播放参数*/
@@ -331,8 +340,8 @@ typedef struct player_info
 	long curtime_old_time;    
 	unsigned int video_error_cnt;
 	unsigned int audio_error_cnt;
-	float		    audio_bufferlevel;
-	float		    video_bufferlevel;
+	float audio_bufferlevel;
+	float video_bufferlevel;
 }player_info_t;
 
 /****************************************************************************

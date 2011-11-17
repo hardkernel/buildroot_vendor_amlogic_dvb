@@ -180,6 +180,9 @@ AM_ErrorCode_t AM_AOUT_SetVolume(int dev_no, int vol)
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
 	AM_TRY(aout_get_openned_dev(dev_no, &dev));
+
+	vol = AM_MAX(vol, AM_AOUT_VOLUME_MIN);
+	vol = AM_MIN(vol, AM_AOUT_VOLUME_MAX);
 	
 	pthread_mutex_lock(&dev->lock);
 	

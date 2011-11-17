@@ -430,7 +430,7 @@ static AM_ErrorCode_t adec_set_volume(AM_AOUT_Device_t *dev, int vol)
 #ifdef CHIP_8626X
 	ret = audio_decode_set_volume(vol);
 #else
-	ret = audio_decode_set_volume(adec_handle,vol);
+	ret = audio_decode_set_volume(adec_handle,((float)vol)/100);
 #endif
 	if(ret==-1)
 		return AM_FAILURE;
@@ -3872,11 +3872,11 @@ static AM_ErrorCode_t aml_get_astatus(AM_AV_Device_t *dev, AM_AV_AudioStatus_t *
 		goto get_fail;
 	}
 	
-	para->Channels  = astatus.astatus.channels;
-	para->SampleRate = astatus.astatus.sample_rate;
-	para->BitWidth = 0;
-	para->FrameCount = 18;
-	para->aud_fmt = -1;
+	para->channels    = astatus.astatus.channels;
+	para->sample_rate = astatus.astatus.sample_rate;
+	para->resolution  = astatus.astatus.resolution;
+	para->frames      = 1;
+	para->aud_fmt     = -1;
 	
 	if(AM_FileRead(ASTREAM_FORMAT_FILE, buf, sizeof(buf))==AM_SUCCESS)
 	{
@@ -3908,10 +3908,8 @@ static AM_ErrorCode_t aml_get_astatus(AM_AV_Device_t *dev, AM_AV_AudioStatus_t *
 			para->aud_fmt = AFORMAT_AMR;
 		else if(!strncmp(buf, "amadec_raac", 11))
 			para->aud_fmt = AFORMAT_RAAC;
-#if 0
 		else if(!strncmp(buf, "amadec_wma", 10))
 			para->aud_fmt = AFORMAT_WMA;
-#endif
 	}
 	
 	rc = ioctl(fd, AMSTREAM_IOC_AB_STATUS, (int)&astatus);
@@ -3936,6 +3934,7 @@ get_fail:
 static AM_ErrorCode_t aml_get_vstatus(AM_AV_Device_t *dev, AM_AV_VideoStatus_t *para)
 {
 	struct am_io_param vstatus;
+	char buf[32];
 	int fd, rc;
 
 	pthread_mutex_lock(&gAVMonLock);
@@ -3955,14 +3954,20 @@ static AM_ErrorCode_t aml_get_vstatus(AM_AV_Device_t *dev, AM_AV_VideoStatus_t *
 	}
 	
 	para->vid_fmt   = dev->ts_player.vid_fmt;
-	para->SourceWidth   = vstatus.vstatus.width;
-	para->SourceHight   = vstatus.vstatus.height;
-	para->FrameRate   	= vstatus.vstatus.fps;
+	para->src_w     = vstatus.vstatus.width;
+	para->src_h     = vstatus.vstatus.height;
+	para->fps       = vstatus.vstatus.fps;
+	para->frames    = 1;
+	para->interlaced  = 1;
 
-#ifndef PLAYER_API_NEW
-	para->FrameCount   = vstatus.vstatus.frame_count;
-#endif
-	para->bInterlaced  = 1;
+	if(AM_FileRead("/sys/class/video/frame_format", buf, sizeof(buf))>=0){
+		char *ptr = strstr(buf, "interlace");
+		if(ptr){
+			para->interlaced = 1;
+		}else{
+			para->interlaced = 0;
+		}
+	}
 	
 	rc = ioctl(fd, AMSTREAM_IOC_VB_STATUS, (int)&vstatus);
 	if(rc==-1)
