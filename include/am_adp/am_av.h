@@ -879,9 +879,23 @@ extern AM_ErrorCode_t AM_AV_ClearVideoBuffer(int dev_no);
  */
 extern AM_ErrorCode_t AM_AV_GetVideoFrame(int dev_no, const AM_AV_SurfacePara_t *para, AM_OSD_Surface_t **s);
 
-extern AM_ErrorCode_t AM_AV_GetVideoStatus(int dev_no,AM_AV_VideoStatus_t *status);
+/**\brief 取得当前视频解码状态
+ * \param dev_no 音视频设备号
+ * \param[out] status 返回视频解码状态
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+extern AM_ErrorCode_t AM_AV_GetVideoStatus(int dev_no, AM_AV_VideoStatus_t *status);
 
-extern AM_ErrorCode_t AM_AV_GetAudioStatus(int dev_no,AM_AV_AudioStatus_t *status);
+/**\brief 取得当前音频解码状态
+ * \param dev_no 音视频设备号
+ * \param[out] status 返回视频解码状态
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+extern AM_ErrorCode_t AM_AV_GetAudioStatus(int dev_no, AM_AV_AudioStatus_t *status);
 
 
 /**\brief 开始进入Timeshift模式
