@@ -42,6 +42,13 @@ static AM_ErrorCode_t dvb_get_ber (AM_FEND_Device_t *dev, int *ber);
 static AM_ErrorCode_t dvb_get_strength (AM_FEND_Device_t *dev, int *strength);
 static AM_ErrorCode_t dvb_wait_event (AM_FEND_Device_t *dev, struct dvb_frontend_event *evt, int timeout);
 static AM_ErrorCode_t dvb_set_delay(AM_FEND_Device_t *dev,  int delay);
+static AM_ErrorCode_t dvb_diseqc_reset_overload(AM_FEND_Device_t *dev);
+static AM_ErrorCode_t dvb_diseqc_send_master_cmd(AM_FEND_Device_t *dev, struct dvb_diseqc_master_cmd* cmd);
+static AM_ErrorCode_t dvb_diseqc_recv_slave_reply(AM_FEND_Device_t *dev, struct dvb_diseqc_slave_reply* reply);
+static AM_ErrorCode_t dvb_diseqc_send_burst(AM_FEND_Device_t *dev, fe_sec_mini_cmd_t minicmd);
+static AM_ErrorCode_t dvb_set_tone(AM_FEND_Device_t *dev, fe_sec_tone_mode_t tone);
+static AM_ErrorCode_t dvb_set_voltage(AM_FEND_Device_t *dev, fe_sec_voltage_t voltage);
+static AM_ErrorCode_t dvb_enable_high_lnb_voltage(AM_FEND_Device_t *dev, long arg);
 static AM_ErrorCode_t dvb_close (AM_FEND_Device_t *dev);
 
 /****************************************************************************
@@ -58,6 +65,13 @@ const AM_FEND_Driver_t linux_dvb_fend_drv =
 .get_strength = dvb_get_strength,
 .wait_event = dvb_wait_event,
 .set_delay  = dvb_set_delay,
+.diseqc_reset_overload = dvb_diseqc_reset_overload,
+.diseqc_send_master_cmd = dvb_diseqc_send_master_cmd,
+.diseqc_recv_slave_reply = dvb_diseqc_recv_slave_reply,
+.diseqc_send_burst = dvb_diseqc_send_burst,
+.set_tone = dvb_set_tone,
+.set_voltage = dvb_set_voltage,
+.enable_high_lnb_voltage = dvb_enable_high_lnb_voltage,	
 .close = dvb_close
 };
 
@@ -217,6 +231,97 @@ static AM_ErrorCode_t dvb_set_delay(AM_FEND_Device_t *dev,  int delay)
 	}
 #endif
 	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t dvb_diseqc_reset_overload(AM_FEND_Device_t *dev)
+{
+	int fd = (int)dev->drv_data;
+	
+	if(ioctl(fd, FE_DISEQC_RESET_OVERLOAD, 0)==-1)
+	{
+		AM_DEBUG(1, "ioctl FE_DISEQC_RESET_OVERLOAD failed, error:%s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	return AM_SUCCESS;	
+}
+
+static AM_ErrorCode_t dvb_diseqc_send_master_cmd(AM_FEND_Device_t *dev, struct dvb_diseqc_master_cmd* cmd)
+{
+	int fd = (int)dev->drv_data;
+	
+	if(ioctl(fd, FE_DISEQC_SEND_MASTER_CMD, cmd)==-1)
+	{
+		AM_DEBUG(1, "ioctl FE_DISEQC_SEND_MASTER_CMD failed, error:%s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t dvb_diseqc_recv_slave_reply(AM_FEND_Device_t *dev, struct dvb_diseqc_slave_reply* reply)
+{
+	int fd = (int)dev->drv_data;
+	
+	if(ioctl(fd, FE_DISEQC_RECV_SLAVE_REPLY, reply)==-1)
+	{
+		AM_DEBUG(1, "ioctl FE_DISEQC_RECV_SLAVE_REPLY failed, error:%s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t dvb_diseqc_send_burst(AM_FEND_Device_t *dev, fe_sec_mini_cmd_t minicmd)
+{
+	int fd = (int)dev->drv_data;
+	
+	if(ioctl(fd, FE_DISEQC_SEND_BURST, minicmd)==-1)
+	{
+		AM_DEBUG(1, "ioctl FE_DISEQC_SEND_BURST failed, error:%s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	return AM_SUCCESS;	
+}
+
+static AM_ErrorCode_t dvb_set_tone(AM_FEND_Device_t *dev, fe_sec_tone_mode_t tone)
+{
+	int fd = (int)dev->drv_data;
+	
+	if(ioctl(fd, FE_SET_TONE, tone)==-1)
+	{
+		AM_DEBUG(1, "ioctl FE_SET_TONE failed, error:%s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	return AM_SUCCESS;	
+}
+
+static AM_ErrorCode_t dvb_set_voltage(AM_FEND_Device_t *dev, fe_sec_voltage_t voltage)
+{
+	int fd = (int)dev->drv_data;
+	
+	if(ioctl(fd, FE_SET_VOLTAGE, voltage)==-1)
+	{
+		AM_DEBUG(1, "ioctl FE_SET_VOLTAGE failed, error:%s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	return AM_SUCCESS;	
+}
+
+static AM_ErrorCode_t dvb_enable_high_lnb_voltage(AM_FEND_Device_t *dev, long arg)
+{
+	int fd = (int)dev->drv_data;
+	
+	if(ioctl(fd, FE_ENABLE_HIGH_LNB_VOLTAGE, arg)==-1)
+	{
+		AM_DEBUG(1, "ioctl FE_ENABLE_HIGH_LNB_VOLTAGE failed, error:%s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	return AM_SUCCESS;	
 }
 
 static AM_ErrorCode_t dvb_close (AM_FEND_Device_t *dev)

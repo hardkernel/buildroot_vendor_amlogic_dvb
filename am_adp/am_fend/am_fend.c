@@ -682,6 +682,262 @@ AM_ErrorCode_t AM_FEND_SetThreadDelay(int dev_no, int delay)
 	return ret;
 }
 
+/**\brief 重置数字卫星设备控制
+ * \param dev_no 前端设备号
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_DiseqcResetOverload(int dev_no)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	
+	if(!dev->drv->diseqc_reset_overload)
+	{
+		AM_DEBUG(1, "fronend %d no not support diseqc_reset_overload", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+	
+	if(dev->thread==pthread_self())
+	{
+		AM_DEBUG(1, "cannot invoke AM_FEND_DiseqcResetOverload in callback");
+		return AM_FEND_ERR_INVOKE_IN_CB;
+	}
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	if(dev->drv->diseqc_reset_overload)
+		ret = dev->drv->diseqc_reset_overload(dev);
+	
+	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
+
+/**\brief 发送数字卫星设备控制命令
+ * \param dev_no 前端设备号 
+ * \param[in] cmd 数字卫星设备控制命令
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_DiseqcSendMasterCmd(int dev_no, struct dvb_diseqc_master_cmd* cmd)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	assert(cmd);
+	
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	
+	if(!dev->drv->diseqc_send_master_cmd)
+	{
+		AM_DEBUG(1, "fronend %d no not support diseqc_send_master_cmd", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+	
+	if(dev->thread==pthread_self())
+	{
+		AM_DEBUG(1, "cannot invoke AM_FEND_DiseqcSendMasterCmd in callback");
+		return AM_FEND_ERR_INVOKE_IN_CB;
+	}
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	if(dev->drv->diseqc_send_master_cmd)
+		ret = dev->drv->diseqc_send_master_cmd(dev, cmd);
+	
+	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
+
+/**\brief 接收数字卫星设备控制2.0命令回应
+ * \param dev_no 前端设备号 
+ * \param[out] reply 数字卫星设备控制回应
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_DiseqcRecvSlaveReply(int dev_no, struct dvb_diseqc_slave_reply* reply)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	assert(reply);
+	
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	
+	if(!dev->drv->diseqc_recv_slave_reply)
+	{
+		AM_DEBUG(1, "fronend %d no not support diseqc_recv_slave_reply", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+	
+	if(dev->thread==pthread_self())
+	{
+		AM_DEBUG(1, "cannot invoke AM_FEND_DiseqcRecvSlaveReply in callback");
+		return AM_FEND_ERR_INVOKE_IN_CB;
+	}
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	if(dev->drv->diseqc_recv_slave_reply)
+		ret = dev->drv->diseqc_recv_slave_reply(dev, reply);
+	
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+/**\brief 发送数字卫星设备控制tone burst
+ * \param dev_no 前端设备号 
+ * \param tone burst控制方式
+
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_DiseqcSendBurst(int dev_no, fe_sec_mini_cmd_t minicmd)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+ 	
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	
+	if(!dev->drv->diseqc_send_burst)
+	{
+		AM_DEBUG(1, "fronend %d no not support diseqc_send_burst", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+	
+	if(dev->thread==pthread_self())
+	{
+		AM_DEBUG(1, "cannot invoke AM_FEND_DiseqcSendBurst in callback");
+		return AM_FEND_ERR_INVOKE_IN_CB;
+	}
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	if(dev->drv->diseqc_send_burst)
+		ret = dev->drv->diseqc_send_burst(dev, minicmd);
+	
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+/**\brief 设置卫星设备tone模式
+ * \param dev_no 前端设备号 
+ * \param tone 卫星设备tone模式
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_SetTone(int dev_no, fe_sec_tone_mode_t tone)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+ 	
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	
+	if(!dev->drv->set_tone)
+	{
+		AM_DEBUG(1, "fronend %d no not support set_tone", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+	
+	if(dev->thread==pthread_self())
+	{
+		AM_DEBUG(1, "cannot invoke AM_FEND_SetTone in callback");
+		return AM_FEND_ERR_INVOKE_IN_CB;
+	}
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	if(dev->drv->set_tone)
+		ret = dev->drv->set_tone(dev, tone);
+	
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+/**\brief 设置卫星设备控制电压
+ * \param dev_no 前端设备号 
+ * \param voltage 卫星设备控制电压 
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_SetVoltage(int dev_no, fe_sec_voltage_t voltage)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+ 	
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	
+	if(!dev->drv->set_voltage)
+	{
+		AM_DEBUG(1, "fronend %d no not support set_voltage", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+	
+	if(dev->thread==pthread_self())
+	{
+		AM_DEBUG(1, "cannot invoke AM_FEND_SetVoltage in callback");
+		return AM_FEND_ERR_INVOKE_IN_CB;
+	}
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	if(dev->drv->set_voltage)
+		ret = dev->drv->set_voltage(dev, voltage);
+	
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+/**\brief 控制卫星设备LNB高电压
+ * \param dev_no 前端设备号 
+ * \param arg 0表示禁止，!=0表示允许
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_EnableHighLnbVoltage(int dev_no, long arg)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+ 	
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	
+	if(!dev->drv->enable_high_lnb_voltage)
+	{
+		AM_DEBUG(1, "fronend %d no not support enable_high_lnb_voltage", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+	
+	if(dev->thread==pthread_self())
+	{
+		AM_DEBUG(1, "cannot invoke AM_FEND_EnableHighLnbVoltage in callback");
+		return AM_FEND_ERR_INVOKE_IN_CB;
+	}
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	if(dev->drv->enable_high_lnb_voltage)
+		ret = dev->drv->enable_high_lnb_voltage(dev, arg);
+	
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
 /**\brief 转化信号强度dBm值为百分比(NorDig)
  * \param rf_power_dbm dBm值
  * \param constellation 调制模式
