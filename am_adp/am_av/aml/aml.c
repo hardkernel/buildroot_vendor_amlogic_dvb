@@ -114,7 +114,7 @@ void *adec_handle;
 #define JPEG_WRTIE_UNIT    (32*1024)
 #define AUDIO_START_LEN (0*1024)
 #define AUDIO_LOW_LEN (1*1024)
-#define AV_SYNC_THRESHOLD	500
+#define AV_SYNC_THRESHOLD	300
 
 /****************************************************************************
  * Type definitions
@@ -1197,6 +1197,11 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 		adec_cmd("start");
 #else
 		audio_decode_init(&adec_handle);
+
+#ifdef CHIP_8626X
+		audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
+#endif
+		
 		audio_decode_start(adec_handle);
 #endif
 		AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
@@ -1811,6 +1816,11 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 			}
 		}
 		audio_decode_init(&adec_handle);
+
+#ifdef CHIP_8626X
+		audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
+#endif
+		
 		audio_decode_start(adec_handle);
 #endif
 		AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
@@ -2972,6 +2982,11 @@ static void* aml_av_monitor_thread(void *arg)
 				}
 
 				audio_decode_init(&adec_handle);
+
+#ifdef CHIP_8626X
+				audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
+#endif
+
 				audio_decode_start(adec_handle);
 
 				AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
@@ -3205,6 +3220,11 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 			adec_cmd("start");
 #else
 			audio_decode_init(&adec_handle);
+
+#ifdef CHIP_8626X
+			audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
+#endif
+
 			audio_decode_start(adec_handle);
 #endif
 			AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
