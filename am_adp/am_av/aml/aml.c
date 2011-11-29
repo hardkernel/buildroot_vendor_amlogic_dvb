@@ -102,7 +102,7 @@ void *adec_handle;
 #define PCR_RECOVER_FILE	"/sys/class/tsync/pcr_recover"
 #endif
 
-#define PCR_NOT_RECOVER
+//#define PCR_NOT_RECOVER
 #define AUDIO_CACHE_TIME        200
 
 #define AUDIO_DMX_PTS_FILE	"/sys/class/stb/audio_pts"
@@ -1689,11 +1689,22 @@ static int aml_timeshift_get_trick_stat(AV_TimeshiftData_t *tshift)
 
 static AM_ErrorCode_t aml_set_deinterlace(int val)
 {
+	AM_ErrorCode_t ret;
 	char buf[16];
-
-	snprintf(buf, sizeof(buf), "%d", val);
 	
-	return AM_FileEcho("/sys/module/deinterlace/parameters/deinterlace_mode", buf);
+	snprintf(buf, sizeof(buf), "%d", val);
+
+#ifdef DEINTERLACE_OLD
+	return AM_FileEcho("/sys/module/deinterlace/parameters/deinterlace_mode", buf);		
+	
+#else
+	ret = AM_FileEcho("/sys/class/vfm/map","rm all");
+	if(ret == AM_SUCCESS)
+		ret = AM_FileEcho("/sys/class/vfm/map", (val)?"add default decoder deinterlace amvideo":"add default decoder amvideo");
+	return ret;
+#endif
+	
+	
 }
 
 /**\brief 设置Timeshift参数*/
@@ -3205,6 +3216,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 			AM_FileEcho(PCR_RECOVER_FILE, "1");
 #endif
 #endif
+			aml_set_deinterlace(2);
 			AM_TRY(aml_start_ts_mode(dev, tp, AM_TRUE));
 		break;
 		case AV_PLAY_FILE:
@@ -3321,7 +3333,8 @@ static AM_ErrorCode_t aml_close_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 			AM_FileEcho(PCR_RECOVER_FILE, "0");
 #endif
 #endif
-			ret = aml_close_ts_mode(dev, AM_TRUE);
+		aml_set_deinterlace(0);
+		ret = aml_close_ts_mode(dev, AM_TRUE);
 		break;
 		case AV_PLAY_FILE:
 			data = (AV_FilePlayerData_t*)dev->file_player.drv_data;
