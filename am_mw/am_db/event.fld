@@ -14,3 +14,4 @@
 "nibble_level integer",								/**< 事件分类，具体值对应的分类参考DVB SI 标准的Content Descriptor描述*/
 "sub_flag integer",									/**< 预约标志, 0未被预约，1预约播放，2预约录像*/
 "sub_status integer",								/**< 预约播放状态, 0-尚未通知用户, 1-已得到用户确认,正等待开始时间到达时通知播放*/
+"parental_rating integer"							/**< 父母权限控制*/
