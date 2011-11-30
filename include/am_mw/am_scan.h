@@ -153,11 +153,13 @@ typedef struct
 {
 	int 		 src;	/**< 源标识*/
 	int 		 mode;	/**< 搜索模式*/
-	int			 standard;/**< ATSC or DVB*/
+	int		 standard; /**< ATSC or DVB*/
 	sqlite3		 *hdb;	/**< 数据库句柄*/
 	dvbpsi_nit_t *nits;	/**< 搜索到的NIT表*/
 	dvbpsi_bat_t *bats;	/**< 搜索到的BAT表*/
 	AM_SCAN_TS_t *tses;	/**< 所有TS列表*/
+	AM_Bool_t     enable_lcn; /**< 使用LCN排序*/
+	AM_Bool_t     resort_all; /**< 重新排列数据库中的所有service*/
 }AM_SCAN_Result_t;
 
 
@@ -169,18 +171,17 @@ typedef void (*AM_SCAN_StoreCb) (AM_SCAN_Result_t *result);
 /**\brief 搜索创建参数*/
 typedef struct
 {
-	int fend_dev_id;	/**< 前端设备号*/
-	int dmx_dev_id;	/**< demux设备号*/
-	int source;		/**< 源标识*/
-	int mode;			/**< 搜索模式，见AM_SCAN_Mode_t*/
-	int standard;	/**< 搜索标准，DVB/ATSC*/
-	
-	int start_para_cnt;	/**< 前端参数个数*/
-	struct dvb_frontend_parameters *start_para;	/**< 前端参数列表，自动搜索时对应主频点列表，
- 											手动搜索时为单个频点，全频段搜索时可自定义频点列表或留空使用默认值*/
-
-	AM_SCAN_StoreCb store_cb;	/**< 搜索完成时存储回调函数*/
-	sqlite3 *hdb;				/**< 数据库句柄*/
+	int fend_dev_id;                /**< 前端设备号*/
+	int dmx_dev_id;                 /**< demux设备号*/
+	int source;                     /**< 源标识*/
+	int mode;                       /**< 搜索模式，见AM_SCAN_Mode_t*/
+	int standard;                   /**< 搜索标准，DVB/ATSC*/
+	int start_para_cnt;             /**< 前端参数个数*/
+	struct dvb_frontend_parameters *start_para;  /**< 前端参数列表，自动搜索时对应主频点列表，手动搜索时为单个频点，全频段搜索时可自定义频点列表或留空使用默认值*/
+	AM_SCAN_StoreCb store_cb;       /**< 搜索完成时存储回调函数*/
+	sqlite3 *hdb;                   /**< 数据库句柄*/
+	AM_Bool_t enable_lcn;           /**< 根据逻辑频道号进行排序*/
+	AM_Bool_t resort_all;           /**< 重新排列数据库中的所有service*/
 }AM_SCAN_CreatePara_t;
 
 
