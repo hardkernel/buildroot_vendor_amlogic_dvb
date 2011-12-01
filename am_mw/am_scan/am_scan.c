@@ -1063,10 +1063,9 @@ lcn_found:
 					sqlite3_step(stmts[UPDATE_CHAN_NUM]);
 					sqlite3_reset(stmts[UPDATE_CHAN_NUM]);
 				}
+				sqlite3_reset(stmts[QUERY_SRV_TS_NET_ID]);
 			}
 			sorted = AM_TRUE;
-
-			sqlite3_reset(stmts[QUERY_SRV_TS_NET_ID]);
 		}
 	}
 
