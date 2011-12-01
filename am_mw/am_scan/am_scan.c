@@ -189,10 +189,10 @@ const char *sql_stmts[MAX_STMT] =
 	"insert into teletext_table(db_srv_id,pid,type,magazine_number,page_number,language) values(?,?,?,?,?,?)",
 	"delete from subtitle_table where db_srv_id in (select db_id from srv_table where db_ts_id=?)",
 	"delete from teletext_table where db_srv_id in (select db_id from srv_table where db_ts_id=?)",
-	"select srv_table.service_id ts_table.ts_id net_table.network from srv_table, ts_table, net_table where srv_table.db_id=? and ts_table.db_id=srv_table.db_ts_id and net_table.db_id=srv_table.db_net_id"
-	"update srv_table set skip=? where db_id=?"
-	"select max(chan_num) from srv_table where service_type=?"
-	"select max(chan_num) from srv_table"
+	"select srv_table.service_id, ts_table.ts_id, net_table.network_id from srv_table, ts_table, net_table where srv_table.db_id=? and ts_table.db_id=srv_table.db_ts_id and net_table.db_id=srv_table.db_net_id",
+	"update srv_table set skip=? where db_id=?",
+	"select max(chan_num) from srv_table where service_type=?",
+	"select max(chan_num) from srv_table",
 };
 
 /****************************************************************************
@@ -934,7 +934,7 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 		ret = sqlite3_prepare(hdb, sql_stmts[i], -1, &stmts[i], NULL);
 		if (ret != SQLITE_OK)
 		{
-			AM_DEBUG(0, "Prepare sqlite3 failed, ret = %x", ret);
+			AM_DEBUG(0, "Prepare sqlite3 failed, stmts[%d] ret = %x", i, ret);
 			goto store_end;
 		}
 	}
