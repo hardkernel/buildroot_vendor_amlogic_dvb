@@ -25,6 +25,7 @@
 #include "libdvbsi/tables/tot.h"
 #include "libdvbsi/tables/bat.h"
 #include "libdvbsi/descriptors/dr.h"
+#include "atsc/atsc_descriptor.h"
 #include "atsc/atsc_mgt.h"
 #include "atsc/atsc_tvct.h"
 #include "atsc/atsc_cvct.h"
@@ -136,6 +137,9 @@ extern "C"
 #define AM_SI_DESCR_ENHANCED_AC3			(0x7A)
 #define AM_SI_DESCR_DTS						(0x7B)
 #define AM_SI_DESCR_AAC						(0x7C)
+
+/*ATSC descriptor*/
+#define AM_SI_DESCR_SERVICE_LOCATION		(0xA1)
 
 /**\brief 遍历SI提供的链表开始*/
 #define AM_SI_LIST_BEGIN(l, v) for ((v)=(l); (v)!=NULL; (v)=(v)->p_next){

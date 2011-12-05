@@ -42,6 +42,7 @@ enum
 	AM_SCAN_RECVING_MGT			= 0x40,
 	AM_SCAN_RECVING_VCT			= 0x80,
 	AM_SCAN_RECVING_WAIT_FEND	= 0x100,
+	AM_SCAN_SEARCHING_ATV		= 0x200,
 };
 
 /*SCAN内部事件类型*/
@@ -58,6 +59,7 @@ enum
 	AM_SCAN_EVT_VCT_DONE 	= 0x100, /**< VCT表已经接收完毕*/
 	AM_SCAN_EVT_QUIT		= 0x200, /**< 退出搜索事件*/
 	AM_SCAN_EVT_START		= 0x400,/**< 开始搜索事件*/
+	AM_SCAN_EVT_ATV_SEARCH_DONE	= 0X800,	/**< 当前设置的ATV 频率搜索完毕*/
 };
 
 /*SCAN 所在阶段*/
@@ -92,6 +94,18 @@ enum
 	DELETE_TS_SUBTITLES,
 	DELETE_TS_TELETEXTS,
 	MAX_STMT
+};
+
+/**\brief ATV msg定义*/
+enum CC_ATV_MSG_ID 
+{
+    CC_ATV_MSG_UPDATE_CHANNEL_INFO,
+    CC_ATV_MSG_UPDATE_SEARCHING_FREQ,
+    CC_ATV_MSG_AUTO_SEARCH_FINISHED,
+    CC_ATV_MSG_AUTO_SEARCH_ABORTED,
+    CC_ATV_MSG_MANUAL_SEARCH_FINISHED,
+    CC_ATV_MSG_MANUAL_SEARCH_ABORTED,
+    CC_ATV_MSG_DETECT_FREQUENCY_FINISHED,
 };
 
 /**\brief 子表接收控制*/
@@ -149,16 +163,18 @@ struct AM_SCAN_Scanner_s
 	int								hsi;			/**< SI解析句柄*/
 	int								curr_freq;		/**< 当前正在搜索的频点*/ 
 	int								start_freqs_cnt;/**< 需要搜索的频点个数*/
+	int								analog_freq_start;	/**< 第一个模拟频点索引，数字频点在前，模拟频点在后*/
 	struct dvb_frontend_event		fe_evt;			/**< 前段事件*/
 	struct dvb_frontend_parameters 	*start_freqs;	/**< 需要搜索的频点列表*/ 
 	AM_SCAN_TS_t					*curr_ts;		/**< 当前正在搜索的TS数据*/
 	dvbpsi_pat_program_t			*cur_prog;		/**< 当前正在接收PMT的Program*/
 	AM_SCAN_StoreCb 				store_cb;		/**< 存储回调*/
 	AM_SCAN_Result_t				result;			/**< 搜索结果*/
-	int							end_code;		/**< 搜索结束码*/
-	void						*user_data;		/**< 用户数据*/
-	AM_Bool_t					store;			/**< 是否存储*/
+	int								end_code;		/**< 搜索结束码*/
+	void							*user_data;		/**< 用户数据*/
+	AM_Bool_t						store;			/**< 是否存储*/
 };
+
 
 /****************************************************************************
  * Function prototypes  

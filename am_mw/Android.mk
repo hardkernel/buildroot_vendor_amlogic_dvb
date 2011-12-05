@@ -9,6 +9,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_font/am_font.c am_font/freetype.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
+		   am_scan/atv_scan.cpp\
 		   am_subtitle/am_mw_subtitle.c am_subtitle/dvb_sub.c am_subtitle/sub_memory.c\
 		   am_teletext/am_mw_teletext.c am_teletext/VTCommon.c am_teletext/VTDrawer.c am_teletext/VTTeletext.c\
 		   am_teletext/VTCharacterSet.c am_teletext/VTDecoder.c am_teletext/VTMosaicGraphics.c am_teletext/VTTopText.c\
@@ -77,10 +78,14 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/tables\
 		    $(LOCAL_PATH)/../include/am_mw/atsc\
 		    $(LOCAL_PATH)/../android/ndk/include\
-		    $(LOCAL_PATH)/../android/ex_include
+		    $(LOCAL_PATH)/../android/ex_include\
+		    $(LOCAL_PATH)/../../tvapi\
+		    frameworks/base/core/jni \
+		    $(LOCAL_PATH)/../../tvapi/include\
+		    $(LOCAL_PATH)/../../tvapi/libtvservice/atv
 
 LOCAL_STATIC_LIBRARIES += libfreetype libiconv
-LOCAL_SHARED_LIBRARIES += libam_adp libsqlite libamplayer liblog libc
+LOCAL_SHARED_LIBRARIES += libam_adp libsqlite libamplayer liblog libc libutils libbinder libtv_client
 
 LOCAL_PRELINK_MODULE := false
 
