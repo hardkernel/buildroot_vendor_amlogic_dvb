@@ -24,6 +24,13 @@ extern "C"
  * Macro definitions
  ***************************************************************************/
 
+#define AM_AV_VIDEO_CONTRAST_MIN   -1024  /**< 最小对比度值*/
+#define AM_AV_VIDEO_CONTRAST_MAX   1024   /**< 最大对比度值*/
+#define AM_AV_VIDEO_SATURATION_MIN -1024  /**< 最小色度值*/
+#define AM_AV_VIDEO_SATURATION_MAX 1024   /**< 最大色度值*/
+#define AM_AV_VIDEO_BRIGHTNESS_MIN -1024  /**< 最小对比度值*/
+#define AM_AV_VIDEO_BRIGHTNESS_MAX 1024   /**< 最大对比度值*/
+
 /****************************************************************************
  * Error code definitions
  ****************************************************************************/
@@ -68,8 +75,10 @@ enum AM_AV_EventType
 	AM_AV_EVT_VIDEO_DISABLED,          /**< 视频曾隐藏*/
 	AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED, /**< 视频长宽比变化，参数为新的长宽比(AM_AV_VideoAspectRatio_t)*/
 	AM_AV_EVT_VIDEO_DISPLAY_MODE_CHANGED, /**< 视频显示模式变化，参数为新的显示模式(AM_AV_VideoDisplayMode_t)*/
-	AM_AV_EVT_AV_NO_DATA,		/**< 播放过程中检测到Audio PTS 和 Video PTS 一段时间未变化，通知无数据*/
+	AM_AV_EVT_AV_NO_DATA,		   /**< 播放过程中检测到Audio PTS 和 Video PTS 一段时间未变化，通知无数据*/
 	AM_AV_EVT_AV_DATA_RESUME,	/**< 在AM_AV_EVT_AV_NO_DATA后，检测到Audio or Video PTS有变化，通知有数据*/
+	AM_AV_EVT_VIDEO_ES_END,     /**< 注入视频ES数据结束*/
+	AM_AV_EVT_AUDIO_ES_END,     /**< 注入音频ES数据结束*/
 	AM_AV_EVT_END
 };
 
@@ -124,8 +133,7 @@ typedef enum
 } AM_AV_TSSource_t;
 
 /**\brief 音频压缩格式*/
-typedef enum
-{
+typedef enum {
 	AFORMAT_MPEG   = 0,
 	AFORMAT_PCM_S16LE = 1,
 	AFORMAT_AAC   = 2,
@@ -140,7 +148,14 @@ typedef enum
 	AFORMAT_ADPCM = 11,
 	AFORMAT_AMR  = 12,
 	AFORMAT_RAAC  = 13,
-	AFORMAT_MAX    = 14
+	AFORMAT_WMA  = 14,
+	AFORMAT_WMAPRO    = 15,
+	AFORMAT_PCM_BLURAY	= 16,
+	AFORMAT_ALAC  = 17,
+	AFORMAT_VORBIS    = 18,
+	AFORMAT_AAC_LATM   = 19,
+	AFORMAT_UNSUPPORT = 20,
+	AFORMAT_MAX    = 21
 } AM_AV_AFormat_t;
 
 /**\brief 视频压缩格式*/
@@ -153,6 +168,9 @@ typedef enum
 	VFORMAT_REAL,
 	VFORMAT_JPEG,
 	VFORMAT_VC1,
+	VFORMAT_AVS,
+	VFORMAT_YUV,    // Use SW decoder
+	VFORMAT_H264MVC,
 	VFORMAT_MAX
 } AM_AV_VFormat_t;
 
@@ -264,29 +282,31 @@ typedef struct
 	int              data_width;  /**< 音频采样数据位数(播放PCM音频时使用)*/
 } AM_AV_InjectPara_t;
 
+/**\brief 视频解码状态*/
 typedef struct
 {
 	AM_AV_VFormat_t  vid_fmt;     /**< 视频格式*/
-	int              SourceWidth;         
-	int              SourceHight;                 
-	int              FrameRate;                   
-	char             bInterlaced;                  
-	int              FrameCount;
-	int              vb_size;
-	int              vb_data;
-	int              vb_free;
+	int              src_w;       /**< 视频源宽度*/ 
+	int              src_h;       /**< 视频源高度*/
+	int              fps;         /**< 视频帧率*/
+	char             interlaced;  /**< 是否隔行*/
+	int              frames;      /**< 已经解码的帧数目*/
+	int              vb_size;     /**< 视频缓冲区大小*/
+	int              vb_data;     /**< 视频缓冲区中数据占用空间大小*/
+	int              vb_free;     /**< 视频缓冲区中空闲空间大小*/
 }AM_AV_VideoStatus_t;
 
+/**\brief 音频解码状态*/
 typedef struct
 {
-	AM_AV_AFormat_t  	aud_fmt;     /**< 音频格式*/
-	int              	SampleRate;  
-	int     			BitWidth;    
-	int 				Channels;    
-	unsigned int    	FrameCount;
-	int              ab_size;
-	int              ab_data;
-	int              ab_free;
+	AM_AV_AFormat_t  aud_fmt;     /**< 音频格式*/
+	int              sample_rate; /**< 采样率*/
+	int              resolution;  /**< 数据精度(8/16bits)*/
+	int              channels;    /**< 声道数目*/
+	unsigned int     frames;      /**< 已解码的采样数目*/
+	int              ab_size;     /**< 音频缓冲区大小*/
+	int              ab_data;     /**< 音频缓冲区中数据占用大小*/
+	int              ab_free;     /**< 音频缓冲区中空闲空间大小*/
 }AM_AV_AudioStatus_t;
 
 /**\brief Timeshift播放参数*/
@@ -320,8 +340,8 @@ typedef struct player_info
 	long curtime_old_time;    
 	unsigned int video_error_cnt;
 	unsigned int audio_error_cnt;
-	float		    audio_bufferlevel;
-	float		    video_bufferlevel;
+	float audio_bufferlevel;
+	float video_bufferlevel;
 }player_info_t;
 
 /****************************************************************************
@@ -859,9 +879,23 @@ extern AM_ErrorCode_t AM_AV_ClearVideoBuffer(int dev_no);
  */
 extern AM_ErrorCode_t AM_AV_GetVideoFrame(int dev_no, const AM_AV_SurfacePara_t *para, AM_OSD_Surface_t **s);
 
-extern AM_ErrorCode_t AM_AV_GetVideoStatus(int dev_no,AM_AV_VideoStatus_t *status);
+/**\brief 取得当前视频解码状态
+ * \param dev_no 音视频设备号
+ * \param[out] status 返回视频解码状态
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+extern AM_ErrorCode_t AM_AV_GetVideoStatus(int dev_no, AM_AV_VideoStatus_t *status);
 
-extern AM_ErrorCode_t AM_AV_GetAudioStatus(int dev_no,AM_AV_AudioStatus_t *status);
+/**\brief 取得当前音频解码状态
+ * \param dev_no 音视频设备号
+ * \param[out] status 返回视频解码状态
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+extern AM_ErrorCode_t AM_AV_GetAudioStatus(int dev_no, AM_AV_AudioStatus_t *status);
 
 
 /**\brief 开始进入Timeshift模式

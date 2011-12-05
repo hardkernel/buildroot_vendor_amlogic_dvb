@@ -57,6 +57,18 @@ extern int audio_decode_release(void **handle);
 extern int audio_decode_basic_init(void);
 extern void audio_set_av_sync_threshold(void *handle, int threshold);
 
+extern int audio_decode_set_mute(void *handle, int);
+#ifdef CHIP_8626X
+extern int audio_decode_set_volume( int);
+#else
+extern int audio_decode_set_volume(void *, float);
+#endif
+extern int audio_channels_swap(void *);
+extern int audio_channel_left_mono(void *);
+extern int audio_channel_right_mono(void *);
+extern int audio_channel_stereo(void *);
+extern int audio_output_muted(void *handle);
+
 void *adec_handle;
 #endif
 
@@ -90,7 +102,7 @@ void *adec_handle;
 #define PCR_RECOVER_FILE	"/sys/class/tsync/pcr_recover"
 #endif
 
-#define PCR_NOT_RECOVER
+//#define PCR_NOT_RECOVER
 #define AUDIO_CACHE_TIME        200
 
 #define AUDIO_DMX_PTS_FILE	"/sys/class/stb/audio_pts"
@@ -102,7 +114,7 @@ void *adec_handle;
 #define JPEG_WRTIE_UNIT    (32*1024)
 #define AUDIO_START_LEN (0*1024)
 #define AUDIO_LOW_LEN (1*1024)
-#define AV_SYNC_THRESHOLD	500
+#define AV_SYNC_THRESHOLD	300
 
 /****************************************************************************
  * Type definitions
@@ -120,6 +132,8 @@ typedef struct
 	int             len;
 	int             times;
 	int             pos;
+	int             dev_no;
+	AM_Bool_t       is_audio;
 	AM_Bool_t       running;
 } AV_DataSource_t;
 
@@ -413,8 +427,11 @@ static AM_ErrorCode_t adec_set_volume(AM_AOUT_Device_t *dev, int vol)
 	return adec_cmd(buf);
 #else
 	int ret=0;
-	ret = audio_decode_set_volume(adec_handle,vol);
-
+#ifdef CHIP_8626X
+	ret = audio_decode_set_volume(vol);
+#else
+	ret = audio_decode_set_volume(adec_handle,((float)vol)/100);
+#endif
 	if(ret==-1)
 		return AM_FAILURE;
 	else
@@ -430,7 +447,7 @@ static AM_ErrorCode_t adec_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 	return adec_cmd(cmd);
 #else
 	int ret=0;
-	ret = audio_decode_set_mute(adec_handle);
+	ret = audio_decode_set_mute(adec_handle, mute?1:0);
 
 	if(ret==-1)
 		return AM_FAILURE;
@@ -509,7 +526,16 @@ static AM_ErrorCode_t amp_set_volume(AM_AOUT_Device_t *dev, int vol)
 		AM_DEBUG(1, "MP_SetVolume failed");
 		return AM_AV_ERR_SYS;
 	}
-#endif	
+#endif
+#ifdef PLAYER_API_NEW
+	int media_id = (int)dev->drv_data;
+
+	if(audio_set_volume(media_id, vol)==-1)
+	{
+		AM_DEBUG(1, "audio_set_volume failed");
+		return AM_AV_ERR_SYS;
+	}
+#endif
 	return AM_SUCCESS;
 }
 
@@ -523,7 +549,17 @@ static AM_ErrorCode_t amp_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 		AM_DEBUG(1, "MP_SetVolume failed");
 		return AM_AV_ERR_SYS;
 	}
-#endif	
+#endif
+#ifdef PLAYER_API_NEW
+	int media_id = (int)dev->drv_data;
+
+	printf("audio_set_mute %d\n", mute);
+	if(audio_set_mute(media_id, mute?0:1)==-1)
+	{
+		AM_DEBUG(1, "audio_set_mute failed");
+		return AM_AV_ERR_SYS;
+	}
+#endif
 	return AM_SUCCESS;
 }
 
@@ -556,7 +592,34 @@ static AM_ErrorCode_t amp_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_OutputM
 		AM_DEBUG(1, "MP_SetTone failed");
 		return AM_AV_ERR_SYS;
 	}
-#endif	
+#endif
+#ifdef PLAYER_API_NEW
+	int media_id = (int)dev->drv_data;
+	int ret=0;
+	
+	switch(mode)
+	{
+		case AM_AOUT_OUTPUT_STEREO:
+		default:
+			ret = audio_stereo(media_id);
+		break;
+		case AM_AOUT_OUTPUT_DUAL_LEFT:
+			ret = audio_left_mono(media_id);
+		break;
+		case AM_AOUT_OUTPUT_DUAL_RIGHT:
+			ret = audio_right_mono(media_id);
+		break;
+		case AM_AOUT_OUTPUT_SWAP:
+			ret = audio_swap_left_right(media_id);
+		break;
+	}
+	if(ret==-1)
+	{
+		AM_DEBUG(1, "audio_set_mode failed");
+		return AM_AV_ERR_SYS;
+	}
+#endif
+
 	return AM_SUCCESS;
 }
 
@@ -604,6 +667,7 @@ static void* aml_data_source_thread(void *arg)
 					if(src->times)
 					{
 						src->pos = 0;
+						AM_EVT_Signal(src->dev_no, src->is_audio?AM_AV_EVT_AUDIO_ES_END:AM_AV_EVT_VIDEO_ES_END, NULL);
 					}
 					else
 					{
@@ -628,7 +692,7 @@ static void* aml_data_source_thread(void *arg)
 }
 
 /**\brief 创建一个音视频数据注入数据*/
-static AV_DataSource_t* aml_create_data_source(const char *fname)
+static AV_DataSource_t* aml_create_data_source(const char *fname, int dev_no, AM_Bool_t is_audio)
 {
 	AV_DataSource_t *src;
 	
@@ -648,6 +712,9 @@ static AV_DataSource_t* aml_create_data_source(const char *fname)
 		free(src);
 		return NULL;
 	}
+
+	src->dev_no   = dev_no;
+	src->is_audio = is_audio;
 	
 	pthread_mutex_init(&src->lock, NULL);
 	pthread_cond_init(&src->cond, NULL);
@@ -1126,14 +1193,18 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 	
 	if(para->aud_id>=0)
 	{
-		AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
-
 #if !defined(ADEC_API_NEW)
 		adec_cmd("start");
 #else
 		audio_decode_init(&adec_handle);
+
+#ifdef CHIP_8626X
+		audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
+#endif
+		
 		audio_decode_start(adec_handle);
 #endif
+		AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
 	}
 	
 	return AM_SUCCESS;
@@ -1623,11 +1694,22 @@ static int aml_timeshift_get_trick_stat(AV_TimeshiftData_t *tshift)
 
 static AM_ErrorCode_t aml_set_deinterlace(int val)
 {
+	AM_ErrorCode_t ret;
 	char buf[16];
-
-	snprintf(buf, sizeof(buf), "%d", val);
 	
-	return AM_FileEcho("/sys/module/deinterlace/parameters/deinterlace_mode", buf);
+	snprintf(buf, sizeof(buf), "%d", val);
+
+#ifdef DEINTERLACE_OLD
+	return AM_FileEcho("/sys/module/deinterlace/parameters/deinterlace_mode", buf);		
+	
+#else
+	ret = AM_FileEcho("/sys/class/vfm/map","rm all");
+	if(ret == AM_SUCCESS)
+		ret = AM_FileEcho("/sys/class/vfm/map", (val)?"add default decoder deinterlace amvideo":"add default decoder amvideo");
+	return ret;
+#endif
+	
+	
 }
 
 /**\brief 设置Timeshift参数*/
@@ -1719,8 +1801,6 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 
 	if(para->aud_id>=0 && start_audio)
 	{
-		AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
-
 #if !defined(ADEC_API_NEW)
 		adec_cmd("start");
 #else
@@ -1736,8 +1816,14 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 			}
 		}
 		audio_decode_init(&adec_handle);
+
+#ifdef CHIP_8626X
+		audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
+#endif
+		
 		audio_decode_start(adec_handle);
 #endif
+		AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
 	}
 	
 	if (create_thread)
@@ -2534,7 +2620,7 @@ static AM_ErrorCode_t aml_decode_jpeg(AV_JPEGData_t *jpeg, const uint8_t *data, 
 
 static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para)
 {
-#ifndef ANDROID
+//#ifndef ANDROID
 	char buf[32];
 	int v;
 	
@@ -2590,6 +2676,22 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 		if(sscanf(buf, "%d", &v)==1)
 		{
 			dev->video_mode = v;
+#ifndef 	CHIP_8226H
+			switch(v) {
+				case 0:
+				case 1:
+					dev->video_ratio = AM_AV_VIDEO_ASPECT_AUTO;
+					dev->video_mode = v;
+					break;
+				case 2:
+					dev->video_ratio = AM_AV_VIDEO_ASPECT_4_3;
+				case 3:
+					dev->video_ratio = AM_AV_VIDEO_ASPECT_16_9;
+					dev->video_mode = AM_AV_VIDEO_DISPLAY_FULL_SCREEN;
+					break;
+			}
+			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_IGNORE;
+ #endif		
 		}
 	}
 	if(AM_FileRead(DISP_MODE_FILE, buf, sizeof(buf))==AM_SUCCESS)
@@ -2649,7 +2751,7 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_COMBINED;
 		}
 	}
-#endif
+//#endif
 
 #if !defined(ADEC_API_NEW)
 	adec_cmd("stop");
@@ -2665,13 +2767,25 @@ static AM_ErrorCode_t aml_close(AM_AV_Device_t *dev)
 	return AM_SUCCESS;
 }
 
+typedef struct {
+    unsigned int    format;  ///< video format, such as H264, MPEG2...
+    unsigned int    width;   ///< video source width
+    unsigned int    height;  ///< video source height
+    unsigned int    rate;    ///< video source frame duration
+    unsigned int    extra;   ///< extra data information of video stream
+    unsigned int    status;  ///< status of video stream
+    float		    ratio;   ///< aspect ratio of video source
+    void *          param;   ///< other parameters for video decoder
+} dec_sysinfo_t;
+dec_sysinfo_t am_sysinfo;
+
 static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp, AM_Bool_t create_thread)
 {
 	int fd, val;
 	
 	fd = (int)dev->ts_player.drv_data;
 	
-	AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
+//	AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
 
 #if defined(ANDROID) || defined(CHIP_8626X)
 	/*Set tsync enable/disable*/
@@ -2686,31 +2800,49 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 		aml_set_tsync_enable(1);
 	}
 #endif
+
 	
-	val = tp->vfmt;
-	if(ioctl(fd, AMSTREAM_IOC_VFORMAT, val)==-1)
-	{
-		AM_DEBUG(1, "set video format failed");
-		return AM_AV_ERR_SYS;
+
+	if(tp->vpid && (tp->vpid<0x1fff)){
+		val = tp->vfmt;
+		if(ioctl(fd, AMSTREAM_IOC_VFORMAT, val)==-1)
+		{
+			AM_DEBUG(1, "set video format failed");
+			return AM_AV_ERR_SYS;
+		}
+		val = tp->vpid;
+		if(ioctl(fd, AMSTREAM_IOC_VID, val)==-1)
+		{
+			AM_DEBUG(1, "set video PID failed");
+			return AM_AV_ERR_SYS;
+		}
 	}
-	val = tp->vpid;
-	if(ioctl(fd, AMSTREAM_IOC_VID, val)==-1)
-	{
-		AM_DEBUG(1, "set video PID failed");
-		return AM_AV_ERR_SYS;
+
+	if ((tp->vfmt == VFORMAT_H264) || (tp->vfmt == VFORMAT_VC1)) {
+
+		memset(&am_sysinfo,0,sizeof(dec_sysinfo_t));
+		if(ioctl(fd, AMSTREAM_IOC_SYSINFO, (unsigned long)&am_sysinfo)==-1)
+		{
+			AM_DEBUG(1, "set AMSTREAM_IOC_SYSINFO");
+			return AM_AV_ERR_SYS;
+		}
+	}	
+
+	if(tp->apid && (tp->apid<0x1fff)){
+		val = tp->afmt;
+		if(ioctl(fd, AMSTREAM_IOC_AFORMAT, val)==-1)
+		{
+			AM_DEBUG(1, "set audio format failed");
+			return AM_AV_ERR_SYS;
+		}
+		val = tp->apid;
+		if(ioctl(fd, AMSTREAM_IOC_AID, val)==-1)
+		{
+			AM_DEBUG(1, "set audio PID failed");
+			return AM_AV_ERR_SYS;
+		}
 	}
-	val = tp->afmt;
-	if(ioctl(fd, AMSTREAM_IOC_AFORMAT, val)==-1)
-	{
-		AM_DEBUG(1, "set audio format failed");
-		return AM_AV_ERR_SYS;
-	}
-	val = tp->apid;
-	if(ioctl(fd, AMSTREAM_IOC_AID, val)==-1)
-	{
-		AM_DEBUG(1, "set audio PID failed");
-		return AM_AV_ERR_SYS;
-	}
+
 	if(ioctl(fd, AMSTREAM_IOC_PORT_INIT, 0)==-1)
 	{
 		AM_DEBUG(1, "amport init failed");
@@ -2850,7 +2982,14 @@ static void* aml_av_monitor_thread(void *arg)
 				}
 
 				audio_decode_init(&adec_handle);
+
+#ifdef CHIP_8626X
+				audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
+#endif
+
 				audio_decode_start(adec_handle);
+
+				AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
 #endif
 				av_playing = AM_TRUE;
 				adec_start = AM_FALSE;
@@ -2963,7 +3102,7 @@ static AM_ErrorCode_t aml_open_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 	switch(mode)
 	{
 		case AV_PLAY_VIDEO_ES:
-			src = aml_create_data_source(STREAM_VBUF_FILE);
+			src = aml_create_data_source(STREAM_VBUF_FILE, dev->dev_no, AM_FALSE);
 			if(!src)
 			{
 				AM_DEBUG(1, "cannot create data source \"/dev/amstream_vbuf\"");
@@ -2982,7 +3121,7 @@ static AM_ErrorCode_t aml_open_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 
 		break;
 		case AV_PLAY_AUDIO_ES:
-			src = aml_create_data_source(STREAM_ABUF_FILE);
+			src = aml_create_data_source(STREAM_ABUF_FILE, dev->dev_no, AM_TRUE);
 			if(!src)
 			{
 				AM_DEBUG(1, "cannot create data source \"/dev/amstream_abuf\"");
@@ -3077,13 +3216,18 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 				return AM_AV_ERR_SYS;
 			}
 			aml_start_data_source(src, dev->aud_player.para.data, dev->aud_player.para.len, dev->aud_player.para.times);
-			AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
 #ifndef ADEC_API_NEW
 			adec_cmd("start");
 #else
 			audio_decode_init(&adec_handle);
+
+#ifdef CHIP_8626X
+			audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
+#endif
+
 			audio_decode_start(adec_handle);
 #endif
+			AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
 		break;
 		case AV_PLAY_TS:
 			tp = (AV_TSPlayPara_t *)para;
@@ -3092,6 +3236,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 			AM_FileEcho(PCR_RECOVER_FILE, "1");
 #endif
 #endif
+			aml_set_deinterlace(2);
 			AM_TRY(aml_start_ts_mode(dev, tp, AM_TRUE));
 		break;
 		case AV_PLAY_FILE:
@@ -3146,6 +3291,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 				}
 
 				player_start_play(data->media_id);
+				AM_AOUT_SetDriver(AOUT_DEV_NO, &amplayer_aout_drv, (void*)data->media_id);
 			}
 #endif
 		break;
@@ -3207,7 +3353,8 @@ static AM_ErrorCode_t aml_close_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 			AM_FileEcho(PCR_RECOVER_FILE, "0");
 #endif
 #endif
-			ret = aml_close_ts_mode(dev, AM_TRUE);
+		aml_set_deinterlace(0);
+		ret = aml_close_ts_mode(dev, AM_TRUE);
 		break;
 		case AV_PLAY_FILE:
 			data = (AV_FilePlayerData_t*)dev->file_player.drv_data;
@@ -3569,6 +3716,21 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 					cmd = "4x3";
 				break;
 			}
+#ifndef 	CHIP_8226H
+			name = VID_SCREEN_MODE_FILE;
+			switch((int)val)
+			{
+				case AM_AV_VIDEO_ASPECT_AUTO:
+					cmd = "0";
+				break;
+				case AM_AV_VIDEO_ASPECT_16_9:
+					cmd = "3";
+				break;
+				case AM_AV_VIDEO_ASPECT_4_3:
+					cmd = "2";
+				break;
+			}
+ #endif
 		break;
 		case AV_VIDEO_PARA_RATIO_MATCH:
 			name = VID_ASPECT_MATCH_FILE;
@@ -3741,11 +3903,11 @@ static AM_ErrorCode_t aml_get_astatus(AM_AV_Device_t *dev, AM_AV_AudioStatus_t *
 		goto get_fail;
 	}
 	
-	para->Channels  = astatus.astatus.channels;
-	para->SampleRate = astatus.astatus.sample_rate;
-	para->BitWidth = 0;
-	para->FrameCount = 18;
-	para->aud_fmt = -1;
+	para->channels    = astatus.astatus.channels;
+	para->sample_rate = astatus.astatus.sample_rate;
+	para->resolution  = astatus.astatus.resolution;
+	para->frames      = 1;
+	para->aud_fmt     = -1;
 	
 	if(AM_FileRead(ASTREAM_FORMAT_FILE, buf, sizeof(buf))==AM_SUCCESS)
 	{
@@ -3777,10 +3939,8 @@ static AM_ErrorCode_t aml_get_astatus(AM_AV_Device_t *dev, AM_AV_AudioStatus_t *
 			para->aud_fmt = AFORMAT_AMR;
 		else if(!strncmp(buf, "amadec_raac", 11))
 			para->aud_fmt = AFORMAT_RAAC;
-#if 0
 		else if(!strncmp(buf, "amadec_wma", 10))
 			para->aud_fmt = AFORMAT_WMA;
-#endif
 	}
 	
 	rc = ioctl(fd, AMSTREAM_IOC_AB_STATUS, (int)&astatus);
@@ -3805,6 +3965,7 @@ get_fail:
 static AM_ErrorCode_t aml_get_vstatus(AM_AV_Device_t *dev, AM_AV_VideoStatus_t *para)
 {
 	struct am_io_param vstatus;
+	char buf[32];
 	int fd, rc;
 
 	pthread_mutex_lock(&gAVMonLock);
@@ -3824,14 +3985,20 @@ static AM_ErrorCode_t aml_get_vstatus(AM_AV_Device_t *dev, AM_AV_VideoStatus_t *
 	}
 	
 	para->vid_fmt   = dev->ts_player.vid_fmt;
-	para->SourceWidth   = vstatus.vstatus.width;
-	para->SourceHight   = vstatus.vstatus.height;
-	para->FrameRate   	= vstatus.vstatus.fps;
+	para->src_w     = vstatus.vstatus.width;
+	para->src_h     = vstatus.vstatus.height;
+	para->fps       = vstatus.vstatus.fps;
+	para->frames    = 1;
+	para->interlaced  = 1;
 
-#ifndef PLAYER_API_NEW
-	para->FrameCount   = vstatus.vstatus.frame_count;
-#endif
-	para->bInterlaced  = 1;
+	if(AM_FileRead("/sys/class/video/frame_format", buf, sizeof(buf))>=0){
+		char *ptr = strstr(buf, "interlace");
+		if(ptr){
+			para->interlaced = 1;
+		}else{
+			para->interlaced = 0;
+		}
+	}
 	
 	rc = ioctl(fd, AMSTREAM_IOC_VB_STATUS, (int)&vstatus);
 	if(rc==-1)

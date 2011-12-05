@@ -81,7 +81,7 @@ static AM_INLINE AM_ErrorCode_t smc_get_openned_dev(int dev_no, AM_SMC_Device_t 
 }
 
 /**\brief 从智能卡读取数据*/
-static AM_ErrorCode_t smc_read(AM_SMC_Device_t *dev, uint8_t *buf, int len, int timeout)
+static AM_ErrorCode_t smc_read(AM_SMC_Device_t *dev, uint8_t *buf, int len, int *act_len, int timeout)
 {
 	uint8_t *ptr = buf;
 	int left = len;
@@ -129,11 +129,14 @@ static AM_ErrorCode_t smc_read(AM_SMC_Device_t *dev, uint8_t *buf, int len, int 
 		}
 	}
 	
+	if(act_len)
+		*act_len = cnt;
+
 	return ret;
 }
 
 /**\brief 向智能卡发送数据*/
-static AM_ErrorCode_t smc_write(AM_SMC_Device_t *dev, const uint8_t *buf, int len, int timeout)
+static AM_ErrorCode_t smc_write(AM_SMC_Device_t *dev, const uint8_t *buf, int len, int *act_len, int timeout)
 {
 	const uint8_t *ptr = buf;
 	int left = len;
@@ -181,6 +184,9 @@ static AM_ErrorCode_t smc_write(AM_SMC_Device_t *dev, const uint8_t *buf, int le
 		}
 	}
 	
+	if(act_len)
+		*act_len = cnt;
+
 	return ret;
 }
 
@@ -434,7 +440,7 @@ AM_ErrorCode_t AM_SMC_Read(int dev_no, uint8_t *data, int len, int timeout)
 	
 	pthread_mutex_lock(&dev->lock);
 	
-	ret = smc_read(dev, data, len, timeout);
+	ret = smc_read(dev, data, len, NULL, timeout);
 	
 	pthread_mutex_unlock(&dev->lock);
 	
@@ -462,9 +468,76 @@ AM_ErrorCode_t AM_SMC_Write(int dev_no, const uint8_t *data, int len, int timeou
 	
 	pthread_mutex_lock(&dev->lock);
 	
-	ret = smc_write(dev, data, len, timeout);
+	ret = smc_write(dev, data, len, NULL, timeout);
 	
 	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
+
+/**\brief 从智能卡读取数据
+ *直接从智能卡读取数据，调用函数的线程会阻塞，直到读取到期望数目的数据，或到达超时时间。
+ * \param dev_no 智能卡设备号
+ * \param[out] data 数据缓冲区
+ * \param[in] len 希望读取的数据长度
+ * \param timeout 读取超时时间，以毫秒为单位，<0表示永久等待。
+ * \return
+ *   - >=0 实际读取的数据长度
+ *   - 其他值 错误代码(见am_smc.h)
+ */
+AM_ErrorCode_t
+AM_SMC_ReadEx(int dev_no, uint8_t *data, int len, int timeout)
+{
+	AM_SMC_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	int act_len;
+	
+	assert(data);
+	
+	AM_TRY(smc_get_openned_dev(dev_no, &dev));
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	ret = smc_read(dev, data, len, &act_len, timeout);
+	
+	pthread_mutex_unlock(&dev->lock);
+
+	if((ret >= 0) || (ret == AM_SMC_ERR_TIMEOUT))
+		return act_len;
+	
+	return ret;
+
+}
+
+/**\brief 向智能卡发送数据
+ *直接向智能卡发送数据，调用函数的线程会阻塞，直到全部数据被写入，或到达超时时间。
+ * \param dev_no 智能卡设备号
+ * \param[in] data 数据缓冲区
+ * \param[in] len 希望发送的数据长度
+ * \param timeout 读取超时时间，以毫秒为单位，<0表示永久等待。
+ * \return
+ *   - >=0 实际写入的数据长度
+ *   - 其他值 错误代码(见am_smc.h)
+ */
+AM_ErrorCode_t
+AM_SMC_WriteEx(int dev_no, const uint8_t *data, int len, int timeout)
+{
+	AM_SMC_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	int act_len;
+	
+	assert(data);
+	
+	AM_TRY(smc_get_openned_dev(dev_no, &dev));
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	ret = smc_write(dev, data, len, &act_len, timeout);
+	
+	pthread_mutex_unlock(&dev->lock);
+
+	if((ret >= 0) || (ret == AM_SMC_ERR_TIMEOUT))
+		return act_len;
 	
 	return ret;
 }
@@ -497,11 +570,11 @@ AM_ErrorCode_t AM_SMC_TransferT0(int dev_no, const uint8_t *send, int slen, uint
 	
 	pthread_mutex_lock(&dev->lock);
 	
-	AM_TRY_FINAL(smc_write(dev, send, 5, 1000));
+	AM_TRY_FINAL(smc_write(dev, send, 5, NULL, 1000));
 	
 	while(1)
 	{
-		AM_TRY_FINAL(smc_read(dev, &byte, 1, 1000));
+		AM_TRY_FINAL(smc_read(dev, &byte, 1, NULL, 1000));
 		if(byte==0x60)
 		{
 			continue;
@@ -515,7 +588,7 @@ AM_ErrorCode_t AM_SMC_TransferT0(int dev_no, const uint8_t *send, int slen, uint
 				goto final;
 			}
 			dst[0] = byte;
-			AM_TRY_FINAL(smc_read(dev, &dst[1], 1, 1000));
+			AM_TRY_FINAL(smc_read(dev, &dst[1], 1, NULL, 1000));
 			dst += 2;
 			left -= 2;
 			break;
@@ -528,7 +601,7 @@ AM_ErrorCode_t AM_SMC_TransferT0(int dev_no, const uint8_t *send, int slen, uint
 			
 				if(cnt)
 				{
-					AM_TRY_FINAL(smc_write(dev, send+5, cnt, 5000));
+					AM_TRY_FINAL(smc_write(dev, send+5, cnt, NULL, 5000));
 				}
 				else
 				{
@@ -542,7 +615,7 @@ AM_ErrorCode_t AM_SMC_TransferT0(int dev_no, const uint8_t *send, int slen, uint
 						goto final;
 					}
 					
-					AM_TRY_FINAL(smc_read(dev, dst, cnt, 5000));
+					AM_TRY_FINAL(smc_read(dev, dst, cnt, NULL, 5000));
 					dst  += cnt;
 					left -= cnt;
 				}

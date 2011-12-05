@@ -55,8 +55,9 @@ typedef enum {
     AFORMAT_PCM_BLURAY  = 16,
     AFORMAT_ALAC  = 17,
     AFORMAT_VORBIS    = 18,
-    AFORMAT_UNSUPPORT ,
-    AFORMAT_MAX    
+    AFORMAT_AAC_LATM   = 19,
+    AFORMAT_UNSUPPORT = 20,
+    AFORMAT_MAX    = 21
 
 } aformat_t;
 

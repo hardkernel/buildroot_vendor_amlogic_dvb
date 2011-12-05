@@ -189,7 +189,7 @@ typedef struct
 {
 	int 		 src;	/**< 源标识*/
 	int 		 mode;	/**< 搜索模式*/
-	int			 standard;/**< ATSC or DVB*/
+	int		 standard; /**< ATSC or DVB*/
 	sqlite3		 *hdb;	/**< 数据库句柄*/
 	dvbpsi_nit_t *nits;	/**< 搜索到的NIT表*/
 	dvbpsi_bat_t *bats;	/**< 搜索到的BAT表*/
@@ -197,6 +197,9 @@ typedef struct
 	
 	cvct_channel_info_t *cvcs;	/**<ATSC C virtual channels*/
 	tvct_channel_info_t *tvcs;	/**<ATSC T virtual channels*/
+
+	AM_Bool_t     enable_lcn; /**< 使用LCN排序*/
+	AM_Bool_t     resort_all; /**< 重新排列数据库中的所有service*/
 }AM_SCAN_Result_t;
 
 
@@ -223,6 +226,8 @@ typedef struct
 
 	AM_SCAN_StoreCb store_cb;	/**< 搜索完成时存储回调函数*/
 	sqlite3 *hdb;				/**< 数据库句柄*/
+	AM_Bool_t enable_lcn;           /**< 根据逻辑频道号进行排序*/
+	AM_Bool_t resort_all;           /**< 重新排列数据库中的所有service*/
 }AM_SCAN_CreatePara_t;
 
 

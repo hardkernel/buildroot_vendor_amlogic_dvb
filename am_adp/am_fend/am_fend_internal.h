@@ -45,6 +45,13 @@ typedef struct
 	AM_ErrorCode_t (*get_strength) (AM_FEND_Device_t *dev, int *strength);
 	AM_ErrorCode_t (*wait_event) (AM_FEND_Device_t *dev, struct dvb_frontend_event *evt, int timeout);
 	AM_ErrorCode_t (*set_delay) (AM_FEND_Device_t *dev, int delay);
+	AM_ErrorCode_t (*diseqc_reset_overload)(AM_FEND_Device_t *dev);
+	AM_ErrorCode_t (*diseqc_send_master_cmd)(AM_FEND_Device_t *dev, struct dvb_diseqc_master_cmd* cmd);
+	AM_ErrorCode_t (*diseqc_recv_slave_reply)(AM_FEND_Device_t *dev, struct dvb_diseqc_slave_reply* reply);
+	AM_ErrorCode_t (*diseqc_send_burst)(AM_FEND_Device_t *dev, fe_sec_mini_cmd_t minicmd);
+	AM_ErrorCode_t (*set_tone)(AM_FEND_Device_t *dev, fe_sec_tone_mode_t tone);
+	AM_ErrorCode_t (*set_voltage)(AM_FEND_Device_t *dev, fe_sec_voltage_t voltage);
+	AM_ErrorCode_t (*enable_high_lnb_voltage)(AM_FEND_Device_t *dev, long arg);	
 	AM_ErrorCode_t (*close) (AM_FEND_Device_t *dev);
 } AM_FEND_Driver_t;
 

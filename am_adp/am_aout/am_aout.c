@@ -180,6 +180,9 @@ AM_ErrorCode_t AM_AOUT_SetVolume(int dev_no, int vol)
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
 	AM_TRY(aout_get_openned_dev(dev_no, &dev));
+
+	vol = AM_MAX(vol, AM_AOUT_VOLUME_MIN);
+	vol = AM_MIN(vol, AM_AOUT_VOLUME_MAX);
 	
 	pthread_mutex_lock(&dev->lock);
 	
@@ -298,8 +301,9 @@ AM_ErrorCode_t AM_AOUT_SetOutputMode(int dev_no, AM_AOUT_OutputMode_t mode)
 	AM_TRY(aout_get_openned_dev(dev_no, &dev));
 	
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->mode!=mode)
+
+	/*do not check, for SWAP is a toggle operation*/
+	//if(dev->mode!=mode)
 	{
 		if(dev->drv && dev->drv->set_output_mode)
 			ret = dev->drv->set_output_mode(dev, mode);

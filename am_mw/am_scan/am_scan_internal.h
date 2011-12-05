@@ -93,6 +93,10 @@ enum
 	INSERT_TELETEXT,
 	DELETE_TS_SUBTITLES,
 	DELETE_TS_TELETEXTS,
+	QUERY_SRV_TS_NET_ID,
+	UPDATE_CHAN_SKIP,
+	QUERY_MAX_CHAN_NUM_BY_TYPE,
+	QUERY_MAX_CHAN_NUM,
 	MAX_STMT
 };
 
@@ -129,6 +133,7 @@ typedef struct
 	int				data_arrive_time;	/**< 数据到达时间，用于多子表时收齐判断*/
 	int				repeat_distance;/**< 多子表时允许的最小数据重复间隔，用于多子表时收齐判断*/
 	uint16_t		pid;
+	uint16_t		ext;
 	uint8_t 		tid;
 	char			tname[10];
 	void 			(*done)(struct AM_SCAN_Scanner_s *);

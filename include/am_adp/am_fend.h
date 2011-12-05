@@ -66,6 +66,7 @@ typedef enum
 	AM_FEND_DEMOD_AUTO,  /**< AUTO */
 	AM_FEND_DEMOD_DVBC,  /**< DVB-C*/
 	AM_FEND_DEMOD_DVBT,  /**< DVB-T*/
+	AM_FEND_DEMOD_DVBS,  /**< DVB-S*/	
 	AM_FEND_DEMOD_COUNT
 } AM_FEND_DemodMode_t;
 
@@ -200,6 +201,68 @@ extern AM_ErrorCode_t AM_FEND_Lock(int dev_no, const struct dvb_frontend_paramet
  *   - 其他值 错误代码(见am_fend.h)
  */
 extern AM_ErrorCode_t AM_FEND_SetThreadDelay(int dev_no, int delay);
+
+/**\brief 重置数字卫星设备控制
+ * \param dev_no 前端设备号
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_DiseqcResetOverload(int dev_no); 
+
+/**\brief 发送数字卫星设备控制命令
+ * \param dev_no 前端设备号 
+ * \param[in] cmd 数字卫星设备控制命令
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_DiseqcSendMasterCmd(int dev_no, struct dvb_diseqc_master_cmd* cmd); 
+
+/**\brief 接收数字卫星设备控制2.0命令回应
+ * \param dev_no 前端设备号 
+ * \param[out] reply 数字卫星设备控制回应
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_DiseqcRecvSlaveReply(int dev_no, struct dvb_diseqc_slave_reply* reply); 
+
+/**\brief 发送数字卫星设备控制tone burst
+ * \param dev_no 前端设备号 
+ * \param tone burst控制方式
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_DiseqcSendBurst(int dev_no, fe_sec_mini_cmd_t minicmd); 
+
+/**\brief 设置卫星设备tone模式
+ * \param dev_no 前端设备号 
+ * \param tone 卫星设备tone模式
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_SetTone(int dev_no, fe_sec_tone_mode_t tone); 
+
+/**\brief 设置卫星设备控制电压
+ * \param dev_no 前端设备号 
+ * \param voltage 卫星设备控制电压 
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_SetVoltage(int dev_no, fe_sec_voltage_t voltage); 
+
+/**\brief 控制卫星设备LNB高电压
+ * \param dev_no 前端设备号 
+ * \param arg 0表示禁止，!=0表示允许
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_EnableHighLnbVoltage(int dev_no, long arg);
 
 /**\brief 转化信号强度dBm值为百分比(NorDig)
  * \param rf_power_dbm dBm值

@@ -2,8 +2,7 @@
 
 #include "am_mw_subtitle.h"
 #include "includes.h"
-#include "linux/kernel.h"
-#include "linux/list.h"
+#include "list.h"
 #include "dvb_sub.h"
 #include "string.h"
 #include "stdio.h"

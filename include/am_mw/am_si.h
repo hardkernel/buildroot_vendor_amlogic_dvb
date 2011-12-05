@@ -137,6 +137,8 @@ extern "C"
 #define AM_SI_DESCR_ENHANCED_AC3			(0x7A)
 #define AM_SI_DESCR_DTS						(0x7B)
 #define AM_SI_DESCR_AAC						(0x7C)
+#define AM_SI_DESCR_LCN_83                      (0x83)
+#define AM_SI_DESCR_LCN_87                      (0x87)
 
 /*ATSC descriptor*/
 #define AM_SI_DESCR_SERVICE_LOCATION		(0xA1)
