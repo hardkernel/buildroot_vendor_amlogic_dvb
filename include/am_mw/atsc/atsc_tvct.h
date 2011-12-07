@@ -131,7 +131,7 @@ typedef struct tvct_channel_info
     INT16U source_id;
     INT8U hidden;
     INT8U hide_guide;
-    struct descriptor *desc;                // --
+    atsc_descriptor_t *desc;                // --
     struct tvct_channel_info *p_next;
 }tvct_channel_info_t;
 

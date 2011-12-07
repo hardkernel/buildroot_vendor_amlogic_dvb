@@ -243,7 +243,7 @@ void atsc_psip_clear_rrt_info(rrt_section_info_t *info)
 		}
 		if(info->desc)
 		{
-			AMMem_free(info->desc);
+			atsc_DeleteDescriptors(info->desc);
 		}
 		info->rating_region = 0;
 		info->version_number = DVB_INVALID_VERSION;
@@ -291,7 +291,7 @@ void atsc_psip_free_rrt_info(rrt_section_info_t *info)
 			}
 			if (sect_info->desc)
 			{
-				AMMem_free(sect_info->desc);	 // --
+				atsc_DeleteDescriptors(sect_info->desc);	 // --
 			}
 			sect_info = tmp_sect_info->p_next;
 			AMMem_free(tmp_sect_info);

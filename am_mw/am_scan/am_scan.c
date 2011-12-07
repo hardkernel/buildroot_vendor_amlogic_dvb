@@ -240,6 +240,8 @@ const char *sql_stmts[MAX_STMT] =
 	"update srv_table set skip=? where db_id=?",
 	"select max(chan_num) from srv_table where service_type=?",
 	"select max(chan_num) from srv_table",
+	"select max(major_chan_num) from srv_table",
+	"update srv_table set major_chan_num=? where db_id=(select db_id from srv_table where db_ts_id=?)",
 };
 
 /****************************************************************************
@@ -250,9 +252,9 @@ static AM_ErrorCode_t am_scan_request_section(AM_SCAN_Scanner_t *scanner, AM_SCA
 static AM_ErrorCode_t am_scan_request_next_pmt(AM_SCAN_Scanner_t *scanner);
 static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner);
 extern AM_ErrorCode_t AM_EPG_ConvertCode(char *in_code,int in_len,char *out_code,int out_len);
-extern int am_scan_start_atv_search();
+extern int am_scan_start_atv_search(void *dtv_para);
 extern int am_scan_stop_atv_search();
-extern int am_scan_atv_detect_frequency(int freq, void *dtv_para);
+extern int am_scan_atv_detect_frequency(int freq);
 
 void am_scan_notify_from_atv(const int *msg_pdu, void *para)
 {
@@ -264,28 +266,50 @@ void am_scan_notify_from_atv(const int *msg_pdu, void *para)
 	if (msg_pdu[0] == CC_ATV_MSG_DETECT_FREQUENCY_FINISHED)
 	{
 		AM_DEBUG(1, "CC_ATV_MSG_DETECT_FREQUENCY_FINISHED notified");
+		
 		pthread_mutex_lock(&scanner->lock);
 		scanner->evt_flag |= AM_SCAN_EVT_ATV_SEARCH_DONE;
-		scanner->curr_ts->analog_channel = (AM_SCAN_ATVChannelInfo_t*)malloc(sizeof(AM_SCAN_ATVChannelInfo_t));
-		if (scanner->curr_ts->analog_channel != NULL)
+		if (msg_pdu[2] > 0)
 		{
-			scanner->curr_ts->analog_channel->detect_freq = msg_pdu[1];
-			scanner->curr_ts->analog_channel->freq = msg_pdu[2];
-			scanner->curr_ts->analog_channel->min_freq = msg_pdu[3];
-			scanner->curr_ts->analog_channel->max_freq = msg_pdu[4];
-			scanner->curr_ts->analog_channel->band = msg_pdu[5];
-			scanner->curr_ts->analog_channel->audio_std = msg_pdu[6];
-			scanner->curr_ts->analog_channel->video_std = msg_pdu[7];
-			scanner->curr_ts->analog_channel->vol_comp = msg_pdu[8];
-			scanner->curr_ts->analog_channel->chan_jump = msg_pdu[9];
-			scanner->curr_ts->analog_channel->fine_tune_flag = msg_pdu[10];
-			AM_DEBUG(1, ">>>Notify from ATV, freq %d, video_std %d, audio_std %d",
-				scanner->curr_ts->analog_channel->freq, scanner->curr_ts->analog_channel->video_std, 
-				scanner->curr_ts->analog_channel->audio_std);
+			if ((int)scanner->curr_ts->fend_para.frequency == msg_pdu[1])
+			{
+				if (scanner->end_code == AM_SCAN_RESULT_UNLOCKED)
+				{
+					scanner->end_code = AM_SCAN_RESULT_OK;
+				}
+				scanner->curr_ts->analog_channel = (AM_SCAN_ATVChannelInfo_t*)malloc(sizeof(AM_SCAN_ATVChannelInfo_t));
+				if (scanner->curr_ts->analog_channel != NULL)
+				{
+					scanner->curr_ts->analog_channel->TSID = 0xffff;
+					scanner->curr_ts->analog_channel->detect_freq = msg_pdu[1];
+					scanner->curr_ts->analog_channel->freq = msg_pdu[2];
+					scanner->curr_ts->analog_channel->min_freq = msg_pdu[3];
+					scanner->curr_ts->analog_channel->max_freq = msg_pdu[4];
+					scanner->curr_ts->analog_channel->band = msg_pdu[5];
+					scanner->curr_ts->analog_channel->audio_std = msg_pdu[6];
+					scanner->curr_ts->analog_channel->video_std = msg_pdu[7];
+					scanner->curr_ts->analog_channel->vol_comp = msg_pdu[8];
+					scanner->curr_ts->analog_channel->chan_jump = msg_pdu[9];
+					scanner->curr_ts->analog_channel->fine_tune_flag = msg_pdu[10];
+					AM_DEBUG(1, ">>>Notify from ATV, detect_freq %d, freq %d, video_std %d, audio_std %d",
+						scanner->curr_ts->analog_channel->detect_freq,
+						scanner->curr_ts->analog_channel->freq, scanner->curr_ts->analog_channel->video_std, 
+						scanner->curr_ts->analog_channel->audio_std);
+				}
+				else
+				{
+					AM_DEBUG(1, "Error, No memory for adding new analog channel");
+				}
+			}
+			else
+			{
+				AM_DEBUG(1, ">>>Notify from ATV, cur_freq=%d is not the frequency we expeceted",  msg_pdu[1]);
+			}
 		}
 		else
 		{
-			AM_DEBUG(1, "Error, No memory for adding new analog channel");
+			scanner->curr_ts->analog_channel = NULL;
+			AM_DEBUG(1, ">>>Notify from ATV, cur_freq=-1, nothing searched");
 		}
 		pthread_cond_signal(&scanner->cond);
 		pthread_mutex_unlock(&scanner->lock);
@@ -541,7 +565,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	AM_Bool_t stream_found_in_vct = AM_FALSE;
 	AM_Bool_t program_found_in_vct = AM_FALSE;
 	
-	if (ts->tvcts == NULL && ts->cvcts == NULL && ts->pats == NULL)
+	if (ts->type != AM_SCAN_TS_ANALOG && ts->tvcts == NULL && ts->cvcts == NULL && ts->pats == NULL)
 	{
 		AM_DEBUG(1,  ">>>There is no VCT and PAT found in this TS, skip this TS");
 		return;
@@ -1057,7 +1081,7 @@ VCT_END:
 }
 
 /**\brief 存储一个TS到数据库, DVB*/
-static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_t *ts)
+static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_t *ts, ScanRecTab_t *tab)
 {
 	dvbpsi_pmt_t *pmt;
 	dvbpsi_sdt_t *sdt;
@@ -1396,14 +1420,31 @@ SDT_END:
 	AM_SI_LIST_END()
 }
 
-
-/**\brief 存储一个TS到数据库*/
-static void store_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_t *ts)
+/**\brief 清除数据库中某个源的所有数据*/
+static void am_scan_clear_source(sqlite3 *hdb, int src)
 {
-	if (result->standard != AM_SCAN_STANDARD_ATSC)
-		store_dvb_ts(stmts, result, ts);
-	else
-		store_atsc_ts(stmts, result, ts);
+	char sqlstr[128];
+	
+	/*删除network记录*/
+	snprintf(sqlstr, sizeof(sqlstr), "delete from net_table where src=%d",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+	/*清空TS记录*/
+	snprintf(sqlstr, sizeof(sqlstr), "delete from ts_table where src=%d",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+	/*清空service group记录*/
+	snprintf(sqlstr, sizeof(sqlstr), "delete from grp_map_table where db_srv_id in (select db_id from srv_table where src=%d)",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+	/*清空subtitle teletext记录*/
+	snprintf(sqlstr, sizeof(sqlstr), "delete from subtitle_table where db_srv_id in (select db_id from srv_table where src=%d)",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+	snprintf(sqlstr, sizeof(sqlstr), "delete from teletext_table where db_srv_id in (select db_id from srv_table where src=%d)",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+	/*清空SRV记录*/
+	snprintf(sqlstr, sizeof(sqlstr), "delete from srv_table where src=%d",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+	/*清空event记录*/
+	snprintf(sqlstr, sizeof(sqlstr), "delete from evt_table where src=%d",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
 }
 
 /**\brief 默认搜索完毕存储函数*/
@@ -1436,33 +1477,50 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 	/*自动搜索和全频段搜索时删除该源下的所有信息*/
 	if (!(result->mode & AM_SCAN_MODE_MANUAL) && result->tses)
 	{
-		/*删除network记录*/
-		snprintf(sqlstr, sizeof(sqlstr), "delete from net_table where src=%d",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-		/*清空TS记录*/
-		snprintf(sqlstr, sizeof(sqlstr), "delete from ts_table where src=%d",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-		/*清空service group记录*/
-		snprintf(sqlstr, sizeof(sqlstr), "delete from grp_map_table where db_srv_id in (select db_id from srv_table where src=%d)",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-		/*清空subtitle teletext记录*/
-		snprintf(sqlstr, sizeof(sqlstr), "delete from subtitle_table where db_srv_id in (select db_id from srv_table where src=%d)",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-		snprintf(sqlstr, sizeof(sqlstr), "delete from teletext_table where db_srv_id in (select db_id from srv_table where src=%d)",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-		/*清空SRV记录*/
-		snprintf(sqlstr, sizeof(sqlstr), "delete from srv_table where src=%d",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-		/*清空event记录*/
-		snprintf(sqlstr, sizeof(sqlstr), "delete from evt_table where src=%d",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+		am_scan_clear_source(hdb, result->src);
+		/*ATSC搜索时需要清除模拟源数据*/
+		if (result->standard == AM_SCAN_STANDARD_ATSC)
+			am_scan_clear_source(hdb, AM_SCAN_SRC_ANALOG);
 	}
 	
 	AM_DEBUG(1, "Store tses, %p", result->tses);
 	/*依次存储每个TS*/
 	AM_SI_LIST_BEGIN(result->tses, ts)
-		store_ts(stmts, result, ts, &srv_tab);
+		if (result->standard != AM_SCAN_STANDARD_ATSC)
+			store_dvb_ts(stmts, result, ts, &srv_tab);
+		else
+			store_atsc_ts(stmts, result, ts);
 	AM_SI_LIST_END()
+	
+	/*为ATSC未在VCT里描述的模拟频道分配频道号，规则为找到最大的major_chan_num，按模拟频点值大小从
+	 *该值开始+1连续赋值*/
+	if (result->standard == AM_SCAN_STANDARD_ATSC)
+	{
+		int max_major_num = 0;
+		int r, db_ts_id;
+		
+		r = sqlite3_step(stmts[QUERY_MAX_MAJOR_CHAN_NUM]);
+		if(r==SQLITE_ROW)
+		{
+			max_major_num = sqlite3_column_int(stmts[QUERY_MAX_MAJOR_CHAN_NUM], 0)+1;
+		}
+		sqlite3_reset(stmts[QUERY_MAX_MAJOR_CHAN_NUM]);
+		
+		sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, AM_SCAN_SRC_ANALOG);
+		r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+
+		while (r == SQLITE_ROW)
+		{
+			db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
+			sqlite3_bind_int(stmts[UPDATE_MAJOR_CHAN_NUM], 1, max_major_num);
+			sqlite3_bind_int(stmts[UPDATE_MAJOR_CHAN_NUM], 2, db_ts_id);
+			sqlite3_step(stmts[UPDATE_MAJOR_CHAN_NUM]);
+			sqlite3_reset(stmts[UPDATE_MAJOR_CHAN_NUM]);
+			
+			max_major_num++;
+		}
+		sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
+	}
 
 	/*根据LCN排序*/
 	if (!sorted && result->tses && result->standard != AM_SCAN_STANDARD_ATSC && result->enable_lcn)
@@ -2582,6 +2640,8 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 			memset(scanner->curr_ts, 0, sizeof(AM_SCAN_TS_t));
 
 			scanner->curr_ts->fend_para = scanner->start_freqs[scanner->curr_freq];
+			scanner->curr_ts->type = AM_SCAN_TS_ANALOG;
+			
 			/*添加到搜索结果列表*/
 			ADD_TO_LIST(scanner->curr_ts, scanner->result.tses);
 			
@@ -2589,11 +2649,11 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 			{
 				/*开始模拟搜索时关闭前端设备*/
 				AM_FEND_Close(scanner->fend_dev);
-				am_scan_start_atv_search();
+				am_scan_start_atv_search((void*)scanner);
 			}
 			
 			/*开始模拟搜索*/
-			if (am_scan_atv_detect_frequency(scanner->curr_ts->fend_para.frequency, (void *)scanner) == 0)
+			if (am_scan_atv_detect_frequency(scanner->curr_ts->fend_para.frequency) == 0)
 			{
 				ret = AM_SUCCESS;
 				scanner->recv_status |= AM_SCAN_SEARCHING_ATV;
@@ -2705,7 +2765,7 @@ static void am_scan_solve_atv_search_done_evt(AM_SCAN_Scanner_t *scanner)
 	{
 		goto done;
 	}
-	
+	scanner->curr_ts->fend_para.frequency = scanner->curr_ts->analog_channel->freq;
 	if (scanner->curr_ts->analog_channel->TSID != 0xffff)
 	{
 		AM_SCAN_TS_t *ts;
@@ -2804,6 +2864,7 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 				goto try_next;
 			}
 			memset(scanner->curr_ts, 0, sizeof(AM_SCAN_TS_t));
+			scanner->curr_ts->type = AM_SCAN_TS_DIGITAL;
 
 			/*存储信号信息*/
 			scanner->curr_ts->snr = si.snr;
@@ -3021,8 +3082,11 @@ handle_events:
 		}
 	}
 	
-	if (scanner->atv_freq_start != -1)
+	if (scanner->analog_freq_start != -1)
+	{
 		am_scan_stop_atv_search();
+		AM_DEBUG(1, "am_scan_stop_atv_search end");
+	}
 
 	/*反注册前端事件*/
 	AM_EVT_Unsubscribe(scanner->fend_dev, AM_FEND_EVT_STATUS_CHANGED, am_scan_fend_callback, (void*)scanner);

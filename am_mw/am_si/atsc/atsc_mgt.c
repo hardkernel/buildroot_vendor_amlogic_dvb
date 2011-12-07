@@ -1,4 +1,5 @@
 #include "atsc_types.h"
+#include "atsc_descriptor.h"
 #include "atsc_mgt.h"
 
 #define MAKE_SHORT_HL(exp)		            ((INT16U)((exp##_hi<<8)|exp##_lo))
@@ -14,7 +15,7 @@ static mgt_section_info_t *new_mgt_section_info(void)
 	 tmp->tables_defined = 0;
 	 tmp->is_cable = 0;
         tmp->com_table_info = NULL;
-	 tmp->mgt_table_desc = NULL;
+	 tmp->desc = NULL;
         tmp->p_next = NULL;
     }
 
@@ -142,7 +143,7 @@ INT32S atsc_psip_parse_mgt(INT8U* data, INT32U length, mgt_section_info_t *info)
                 {
                         tmp_table_info->table_type = MAKE_SHORT_HL(table_info->table_type);
                         tmp_table_info->table_type_pid = MAKE_SHORT_HL(table_info->table_type_pid);
-			   tmp_table_info->com_table_desc = NULL;
+			   tmp_table_info->desc = NULL;
 			   tmp_table_info->p_next = NULL;
                        
 			   
@@ -201,10 +202,10 @@ void mgt_psip_clear_mgt_info(mgt_section_info_t *info)
 			tmp_table_info = tmp_mgt_sect_info->com_table_info;
 			while(tmp_table_info)
 			{
-				if(tmp_table_info->com_table_desc)
+				if(tmp_table_info->desc)
 				{
-					AMMem_free(tmp_table_info->com_table_desc);
-					tmp_table_info->com_table_desc = NULL;
+					atsc_DeleteDescriptors(tmp_table_info->desc);
+					tmp_table_info->desc = NULL;
 				}
 				table_info = tmp_table_info->p_next;
 				AMMem_free(tmp_table_info);
@@ -218,16 +219,16 @@ void mgt_psip_clear_mgt_info(mgt_section_info_t *info)
 		{
 			AMMem_free(info->com_table_info);
 		}
-		if(info->mgt_table_desc)
+		if(info->desc)
 		{
-			AMMem_free(info->mgt_table_desc);
+			atsc_DeleteDescriptors(info->desc);
 		}
 		
 		info->tables_defined = DVB_INVALID_ID;
 		info->version_number = DVB_INVALID_VERSION;
 		info->is_cable = 0;
 		info->com_table_info = NULL;
-		info->mgt_table_desc= NULL;
+		info->desc= NULL;
 		info->p_next = NULL;
 	}
 	return ;
@@ -256,10 +257,10 @@ void atsc_psip_free_mgt_info(mgt_section_info_t *info)
 			{
 				tmp_table_info->table_type = 0;
 				tmp_table_info->table_type_pid = 0;
-				if (tmp_table_info->com_table_desc)
+				if (tmp_table_info->desc)
 				{
-					AMMem_free(tmp_table_info->com_table_desc);
-					tmp_table_info->com_table_desc = NULL;
+					atsc_DeleteDescriptors(tmp_table_info->desc);
+					tmp_table_info->desc = NULL;
 				}
 				table_info = tmp_table_info->p_next;
 				AMMem_free(tmp_table_info);
@@ -268,10 +269,10 @@ void atsc_psip_free_mgt_info(mgt_section_info_t *info)
 
 			tmp_sec_info->com_table_info = NULL;
 
-			if(tmp_sec_info->mgt_table_desc) //
+			if(tmp_sec_info->desc) //
 			{
-				AMMem_free(tmp_sec_info->mgt_table_desc);
-				tmp_sec_info->mgt_table_desc= NULL;
+				atsc_DeleteDescriptors(tmp_sec_info->desc);
+				tmp_sec_info->desc= NULL;
 			}
 
 			tmp_sec_info->version_number = DVB_INVALID_VERSION;

@@ -144,3 +144,116 @@ INT8U *content_advisory_desc_parse(INT8U *ptrData)
 	return NULL;
 }
 
+
+static atsc_service_location_dr_t* atsc_DecodeServiceLocationDr(atsc_descriptor_t * p_descriptor)
+{
+	atsc_service_location_dr_t * p_decoded;
+	int i;
+
+	/* Check the tag */
+	if(p_descriptor->i_tag != 0xa1)
+	{
+		AM_TRACE("dr_service_location decoder,bad tag (0x%x)", p_descriptor->i_tag);
+		return NULL;
+	}
+
+	/* Don't decode twice */
+	if(p_descriptor->p_decoded)
+		return p_descriptor->p_decoded;
+
+	/* Allocate memory */
+	p_decoded = (atsc_service_location_dr_t*)malloc(sizeof(atsc_service_location_dr_t));
+	if(!p_decoded)
+	{
+		AM_TRACE("dr_service_location decoder,out of memory");
+		return NULL;
+	}
+
+	/* Decode data and check the length */
+	if((p_descriptor->i_length < 3))
+	{
+		AM_TRACE("dr_service_location decoder,bad length (%d)",
+				         p_descriptor->i_length);
+		free(p_decoded);
+		return NULL;
+	}
+	
+	p_decoded->i_elem_count = p_descriptor->p_data[2];
+	p_decoded->i_pcr_pid = ((uint16_t)(p_descriptor->p_data[0] & 0x1f) << 8) | p_descriptor->p_data[1];
+	i = 0;
+	while( i < p_decoded->i_elem_count) 
+	{
+		p_decoded->elem[i].i_stream_type = p_descriptor->p_data[i*6+3];
+		p_decoded->elem[i].i_pid = ((uint16_t)(p_descriptor->p_data[i*6+1] & 0x1f) << 8) | p_descriptor->p_data[i*6+2];
+		p_decoded->elem[i].iso_639_code[0] = p_descriptor->p_data[i*6+3];
+		p_decoded->elem[i].iso_639_code[1] = p_descriptor->p_data[i*6+4];
+		p_decoded->elem[i].iso_639_code[2] = p_descriptor->p_data[i*6+5];
+		i++;
+	}
+	p_descriptor->p_decoded = (void*)p_decoded;
+
+	return p_decoded;
+}
+
+static void atsc_decode_descriptor(atsc_descriptor_t *p_descriptor)
+{
+	switch (p_descriptor->i_tag)
+	{
+		case 0xA1:
+			/*service location descriptor*/
+			atsc_DecodeServiceLocationDr(p_descriptor);
+			break;
+		default:
+			break;
+	}
+}
+
+
+atsc_descriptor_t* atsc_NewDescriptor(uint8_t i_tag, uint8_t i_length, uint8_t* p_data)
+{
+	atsc_descriptor_t* p_descriptor
+                = (atsc_descriptor_t*)malloc(sizeof(atsc_descriptor_t));
+
+	if(p_descriptor)
+	{
+		p_descriptor->p_data = (uint8_t*)malloc(i_length * sizeof(uint8_t));
+
+		if(p_descriptor->p_data)
+		{
+			p_descriptor->i_tag = i_tag;
+			p_descriptor->i_length = i_length;
+			if(p_data)
+				memcpy(p_descriptor->p_data, p_data, i_length);
+			p_descriptor->p_decoded = NULL;
+			p_descriptor->p_next = NULL;
+
+			/*Decode it*/
+			atsc_decode_descriptor(p_descriptor);
+		}
+		else
+		{
+			free(p_descriptor);
+			p_descriptor = NULL;
+		}
+	}
+
+	return p_descriptor;
+}
+
+void atsc_DeleteDescriptors(atsc_descriptor_t* p_descriptor)
+{
+	while(p_descriptor != NULL)
+	{ 
+		atsc_descriptor_t* p_next = p_descriptor->p_next;
+
+		if(p_descriptor->p_data != NULL)
+			free(p_descriptor->p_data);
+
+		if(p_descriptor->p_decoded != NULL)
+			free(p_descriptor->p_decoded);
+
+		free(p_descriptor);
+		p_descriptor = p_next;
+	}
+}
+

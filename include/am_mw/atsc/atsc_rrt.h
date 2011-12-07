@@ -77,7 +77,7 @@ typedef struct rrt_section_info
     INT8U  dimensions_defined;
     INT8U  rating_region_name[32];
     struct rrt_dimensions_info  *dimensions_info;
-    struct descriptor *desc;          
+    atsc_descriptor_t *desc;          
 }rrt_section_info_t;
 
 /*****************************************************************************

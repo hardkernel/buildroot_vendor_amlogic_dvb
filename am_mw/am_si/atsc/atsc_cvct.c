@@ -102,6 +102,8 @@ INT32S atsc_psip_parse_cvct(INT8U* data, INT32U length, cvct_section_info_t *inf
 	cvct_channel_info_t *tmp_chan_info = NULL;
 	INT8U num_channels_in_section = 0;
 	INT8U *ptr = NULL;
+	INT16U desc_len;
+	INT8U *desc_ptr;
 
 	if(data && length && info)
 	{
@@ -158,10 +160,34 @@ INT32S atsc_psip_parse_cvct(INT8U* data, INT32U length, cvct_section_info_t *inf
 					tmp_chan_info->access_controlled = vct_sect_chan->access_controlled;
 					tmp_chan_info->hidden = vct_sect_chan->hidden;
 					tmp_chan_info->hide_guide = vct_sect_chan->hide_guide;
+					tmp_chan_info->channel_TSID = MAKE_SHORT_HL(vct_sect_chan->channel_TSID);
 					tmp_chan_info->desc = NULL;
 					tmp_chan_info->p_next = NULL;
 
 					add_cvct_channel_info(&sect_info->vct_chan_info, tmp_chan_info);
+					desc_len = MAKE_SHORT_HL(vct_sect_chan->descriptors_length);
+					desc_ptr = ptr + 32;
+					while (desc_len > 0)
+					{
+						atsc_descriptor_t* p_descriptor = atsc_NewDescriptor(desc_ptr[0], desc_ptr[1], desc_ptr + 2);
+
+						if(p_descriptor)
+						{
+							if(sect_info->vct_chan_info->desc == NULL)
+							{
+								sect_info->vct_chan_info->desc = p_descriptor;
+							}
+							else
+							{
+								atsc_descriptor_t* p_last_descriptor = sect_info->vct_chan_info->desc;
+								while(p_last_descriptor->p_next != NULL)
+									p_last_descriptor = p_last_descriptor->p_next;
+								p_last_descriptor->p_next = p_descriptor;
+							}
+						}
+						desc_len -= desc_ptr[1] + 2;
+						desc_ptr += desc_ptr[1] + 2;
+					}
 				}
 				else
 				{
@@ -205,7 +231,7 @@ void atsc_psip_clear_cvct_info(cvct_section_info_t *info)
 			{
 				if(tmp_chan_info->desc)
 				{
-					AMMem_free(tmp_chan_info->desc);
+					atsc_DeleteDescriptors(tmp_chan_info->desc);
 					tmp_chan_info->desc = NULL;
 				}
 				chan_info = tmp_chan_info->p_next;
@@ -251,7 +277,7 @@ void atsc_psip_free_cvct_info(cvct_section_info_t *info)
 			{
 				if (tmp_vct_chan_info->desc)
 				{
-					AMMem_free(tmp_vct_chan_info->desc);
+					atsc_DeleteDescriptors(tmp_vct_chan_info->desc);
 					tmp_vct_chan_info->desc = NULL;
 				}
 				vct_chan_info = tmp_vct_chan_info->p_next;

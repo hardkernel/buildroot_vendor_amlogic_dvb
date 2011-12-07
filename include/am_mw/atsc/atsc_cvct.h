@@ -133,7 +133,7 @@ typedef struct cvct_channel_info
     INT16U source_id;
     INT8U hidden;
     INT8U hide_guide;
-    struct descriptor *desc;                // --
+    atsc_descriptor_t *desc;                // --
     struct cvct_channel_info *p_next;
 }cvct_channel_info_t;
 
