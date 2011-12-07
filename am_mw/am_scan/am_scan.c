@@ -573,6 +573,8 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	
 	if (ts->type == AM_SCAN_TS_ANALOG)
 	{
+		if (ts->analog_channel == NULL)
+			return;
 		src = AM_SCAN_SRC_ANALOG;
 		ts_id = ts->analog_channel->TSID;
 	}
@@ -1505,18 +1507,18 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 			max_major_num = sqlite3_column_int(stmts[QUERY_MAX_MAJOR_CHAN_NUM], 0)+1;
 		}
 		sqlite3_reset(stmts[QUERY_MAX_MAJOR_CHAN_NUM]);
-		
+		AM_DEBUG(1, "get max major channel num is %d", max_major_num);
 		sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, AM_SCAN_SRC_ANALOG);
 		r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
-
 		while (r == SQLITE_ROW)
 		{
 			db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
+			AM_DEBUG(1, "get analog db_ts_id is %d", db_ts_id);
 			sqlite3_bind_int(stmts[UPDATE_MAJOR_CHAN_NUM], 1, max_major_num);
 			sqlite3_bind_int(stmts[UPDATE_MAJOR_CHAN_NUM], 2, db_ts_id);
 			sqlite3_step(stmts[UPDATE_MAJOR_CHAN_NUM]);
 			sqlite3_reset(stmts[UPDATE_MAJOR_CHAN_NUM]);
-			
+			r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
 			max_major_num++;
 		}
 		sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
