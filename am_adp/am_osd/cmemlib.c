@@ -45,7 +45,11 @@
 #include <errno.h>
 #include <string.h>
 
+#ifdef CHIP_8226H
 #include "cmemlib.h"
+#else
+#include <linux/cmem.h>
+#endif
 
 CMEM_AllocParams CMEM_DEFAULTPARAMS = {
     CMEM_POOL,          /* type */
@@ -377,7 +381,7 @@ int CMEM_free(void *ptr, CMEM_AllocParams *params)
         params->type == CMEM_POOL ? "POOL" : "HEAP", size);
 
     if (munmap(ptr, size) == -1) {
-        __E("free: failed to munmap %#x\n", (unsigned int) ptr);
+        __E("free: failed to munmap %#x size:%d\n", (unsigned int) ptr, size);
         return -1;
     }
 

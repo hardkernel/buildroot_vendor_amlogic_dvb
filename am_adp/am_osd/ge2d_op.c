@@ -22,7 +22,12 @@
 #include <sys/ioctl.h>
 #include <fcntl.h>
 
+#ifdef CHIP_8226H
 #include "cmemlib.h"
+#else
+#include <linux/cmem.h>
+#endif
+
 
 /****************************************************************************
  * Macro definitions
@@ -321,6 +326,7 @@ const AM_OSD_SurfaceOp_t ge2d_draw_op = {
 };
 
 static CMEM_AllocParams cmem_params = {CMEM_HEAP, CMEM_NONCACHED, 8};
+
 
 /****************************************************************************
  * Functions
