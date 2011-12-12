@@ -2398,7 +2398,7 @@ extern unsigned long CMEM_getPhys(unsigned long virts);
 static AM_ErrorCode_t aml_decode_jpeg(AV_JPEGData_t *jpeg, const uint8_t *data, int len, int mode, void *para)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
-#if !defined(ANDROID) && !defined(CHIP_8626X)
+#if !defined(ANDROID)
 	AV_JPEGDecodePara_t *dec_para = (AV_JPEGDecodePara_t*)para;
 	AV_JPEGDecState_t s;
 	AM_Bool_t decLoop = AM_TRUE;
@@ -2414,7 +2414,7 @@ static AM_ErrorCode_t aml_decode_jpeg(AV_JPEGData_t *jpeg, const uint8_t *data, 
 #endif
 
 	char tmp_buf[64];
-	
+
 	s = AV_JPEG_DEC_STAT_INFOCONFIG;
 	while(decLoop)
 	{
