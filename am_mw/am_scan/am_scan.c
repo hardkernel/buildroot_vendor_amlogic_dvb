@@ -241,7 +241,7 @@ const char *sql_stmts[MAX_STMT] =
 	"select max(chan_num) from srv_table where service_type=?",
 	"select max(chan_num) from srv_table",
 	"select max(major_chan_num) from srv_table",
-	"update srv_table set major_chan_num=? where db_id=(select db_id from srv_table where db_ts_id=?)",
+	"update srv_table set major_chan_num=?, chan_num=? where db_id=(select db_id from srv_table where db_ts_id=?)",
 };
 
 /****************************************************************************
@@ -672,6 +672,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 		afmt1 = ts->analog_channel->audio_std;
 		major_chan_num = ts->analog_channel->major_chan_num;
 		minor_chan_num = ts->analog_channel->minor_chan_num;
+		chan_num = (major_chan_num<<16) | (minor_chan_num&0xffff);
 		srv_type = 0x1; /*ATSC Analog program*/
 		if (ts->analog_channel->TSID != 0xffff)
 			strcpy(name, ts->analog_channel->name);
@@ -697,7 +698,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 				continue;
 			
 			/*从VCT表中查找该service并获取信息*/
-			if (ccinfo->channel_TSID == cvct->transport_stream_id)
+			if (cvct->transport_stream_id == 0 || ccinfo->channel_TSID == cvct->transport_stream_id)
 			{	
 				name[0] = '\0';
 				vid = aid1 = aid2 = 0x1fff;
@@ -800,11 +801,11 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 		AM_SI_LIST_BEGIN(ts->tvcts, tvct)
 		AM_SI_LIST_BEGIN(tvct->vct_chan_info, tcinfo)
 			/*Skip inactive program*/
-			if (tcinfo->program_number == 0)
+			if (tcinfo->program_number == 0 || tcinfo->program_number == 0xffff)
 				continue;
 			
 			/*从VCT表中查找该service并获取信息*/
-			if (tcinfo->channel_TSID == tvct->transport_stream_id)
+			if (tvct->transport_stream_id == 0 || tcinfo->channel_TSID == tvct->transport_stream_id)
 			{	
 				name[0] = '\0';
 				vid = aid1 = aid2 = 0x1fff;
@@ -832,7 +833,9 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 				AM_SI_LIST_BEGIN(tcinfo->desc, descr)			
 					if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE_LOCATION)
 					{
+						AM_DEBUG(1, "Service location descr found");
 						atsc_service_location_dr_t *asld = (atsc_service_location_dr_t*)descr->p_decoded;
+						AM_DEBUG(1, "Service location descr stream count %d", asld->i_elem_count);
 						for (i=0; i<asld->i_elem_count; i++)
 						{
 							avfmt = -1;
@@ -840,6 +843,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 							{
 								/*video pid and video format*/
 								case 0x02:
+									AM_DEBUG(1, "found video, pid %d", asld->elem[i].i_pid);
 									if (avfmt == -1)
 										avfmt = VFORMAT_MPEG12;
 									if (vid == 0x1fff)
@@ -850,6 +854,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 									break;
 								/*audio pid and audio format*/
 								case 0x81:
+									AM_DEBUG(1, "found audio, pid %d", asld->elem[i].i_pid);
 									if (avfmt == -1)
 										avfmt = AFORMAT_AC3;
 									if (aid1 == 0x1fff)
@@ -1053,8 +1058,8 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 					}
 					else
 					{
-						AM_DEBUG(1, ">>>>>>(TVCT) program(%d) in other TSID(%d) found!", 
-							tcinfo->program_number, tcinfo->channel_TSID);			
+						AM_DEBUG(1, ">>>>>>(TVCT) program(%d) in other TSID(%d) found!, this TSID(%d)", 
+							tcinfo->program_number, tcinfo->channel_TSID, tvct->transport_stream_id);			
 						continue;
 					}
 				AM_SI_LIST_END()
@@ -1515,7 +1520,8 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 			db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
 			AM_DEBUG(1, "get analog db_ts_id is %d", db_ts_id);
 			sqlite3_bind_int(stmts[UPDATE_MAJOR_CHAN_NUM], 1, max_major_num);
-			sqlite3_bind_int(stmts[UPDATE_MAJOR_CHAN_NUM], 2, db_ts_id);
+			sqlite3_bind_int(stmts[UPDATE_MAJOR_CHAN_NUM], 2, max_major_num<<16);
+			sqlite3_bind_int(stmts[UPDATE_MAJOR_CHAN_NUM], 3, db_ts_id);
 			sqlite3_step(stmts[UPDATE_MAJOR_CHAN_NUM]);
 			sqlite3_reset(stmts[UPDATE_MAJOR_CHAN_NUM]);
 			r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
@@ -2791,6 +2797,25 @@ static void am_scan_solve_atv_search_done_evt(AM_SCAN_Scanner_t *scanner)
 							 scanner->curr_ts->analog_channel->name, ccinfo->channel_TSID);
 						scanner->curr_ts->analog_channel->major_chan_num = ccinfo->major_channel_number;
 						scanner->curr_ts->analog_channel->minor_chan_num = ccinfo->minor_channel_number;
+						
+						goto done;
+					}
+				AM_SI_LIST_END()
+				AM_SI_LIST_END()
+			}
+			else if (ts->tvcts != NULL)
+			{
+				AM_SI_LIST_BEGIN(ts->tvcts, tvct)
+				AM_SI_LIST_BEGIN(tvct->vct_chan_info, tcinfo)
+					if (tcinfo->channel_TSID == scanner->curr_ts->analog_channel->TSID && 
+						tcinfo->service_type == 0x1)
+					{
+						memcpy(scanner->curr_ts->analog_channel->name, tcinfo->short_name, 14);
+						scanner->curr_ts->analog_channel->name[14] = 0;
+						AM_DEBUG(1, "Analog TV program '%s' (TSID=%d) found in TVCT", 
+							 scanner->curr_ts->analog_channel->name, tcinfo->channel_TSID);
+						scanner->curr_ts->analog_channel->major_chan_num = tcinfo->major_channel_number;
+						scanner->curr_ts->analog_channel->minor_chan_num = tcinfo->minor_channel_number;
 						
 						goto done;
 					}

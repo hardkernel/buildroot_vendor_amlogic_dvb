@@ -173,13 +173,13 @@ INT32S atsc_psip_parse_tvct(INT8U* data, INT32U length, tvct_section_info_t *inf
 
 						if(p_descriptor)
 						{
-							if(sect_info->vct_chan_info->desc == NULL)
+							if(tmp_chan_info->desc == NULL)
 							{
-								sect_info->vct_chan_info->desc = p_descriptor;
+								tmp_chan_info->desc = p_descriptor;
 							}
 							else
 							{
-								atsc_descriptor_t* p_last_descriptor = sect_info->vct_chan_info->desc;
+								atsc_descriptor_t* p_last_descriptor = tmp_chan_info->desc;
 								while(p_last_descriptor->p_next != NULL)
 									p_last_descriptor = p_last_descriptor->p_next;
 								p_last_descriptor->p_next = p_descriptor;

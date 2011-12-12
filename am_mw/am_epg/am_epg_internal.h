@@ -49,6 +49,8 @@ enum
 	AM_EPG_EVT_QUIT			= 0x10000, /**< 退出搜索事件*/
 	AM_EPG_EVT_SET_MON_SRV	= 0x20000, /**< 设置当前监控的service*/
 	AM_EPG_EVT_STT_DONE		= 0x40000, /**< STT接收完毕*/
+	AM_EPG_EVT_MGT_DONE		= 0x80000,	/**< MGT接收完毕*/
+	AM_EPG_EVT_PSIP_EIT_DONE	= 0x100000, /**< ATSC 某个 EIT 接收完毕*/
 };
 
 typedef struct AM_EPG_Monitor_s AM_EPG_Monitor_t ;
@@ -98,6 +100,8 @@ struct AM_EPG_Monitor_s
 	AM_EPG_TableCtl_t 	eit60ctl;
 	AM_EPG_TableCtl_t 	eit61ctl;
 	AM_EPG_TableCtl_t	sttctl;
+	AM_EPG_TableCtl_t	mgtctl;
+	AM_EPG_TableCtl_t	psip_eitctl[128]; /**< ATSC PSIP supports up to 128 EITs*/
 
 	int					src;			/**< 源标识*/
 	int					fend_dev;		/**< FEND 设备号*/
@@ -112,6 +116,7 @@ struct AM_EPG_Monitor_s
 	int					eitsche_check_time; /**< EIT Schedule自动检查更新间隔，ms*/
 	int					new_eit_check_time; /**< EIT数据更新检查时间*/
 	int					sub_check_time;	/**< 预约播放检查时间*/
+	int					psip_eit_count;	/**<ATSC EIT 最大个数*/
 	AM_Bool_t			eit_has_data;		/**< 是否有需要通知更新的EIT数据*/
 	
 	dvbpsi_pat_t		*pats;
@@ -122,6 +127,8 @@ struct AM_EPG_Monitor_s
 	dvbpsi_eit_t		*eits;
 	dvbpsi_tot_t		*tots;
 	stt_section_info_t	*stts;
+	mgt_section_info_t	*mgts;
+	eit_section_info_t	*psip_eits;
 
 	struct dvb_frontend_event 		fe_evt;			/**< 前端事件*/
 	struct dvb_frontend_parameters 	curr_param;		/**< 当前正在监控的频点*/ 

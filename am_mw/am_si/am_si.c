@@ -617,6 +617,8 @@ AM_ErrorCode_t AM_SI_DecodeSection(int handle, uint16_t pid, uint8_t *buf, uint1
 			else
 				si_decode_psip_table(*sec, stt, stt_section_info_t, buf, len);
 			break;
+		case AM_SI_TID_PSIP_EIT:
+			si_decode_psip_table(*sec, eit, eit_section_info_t, buf, len);
 		default:
 			ret = AM_SI_ERR_NOT_SUPPORTED;
 			break;
@@ -690,6 +692,9 @@ AM_ErrorCode_t AM_SI_ReleaseSection(int handle, void *sec)
 			break;
 		case AM_SI_TID_PSIP_STT:
 			atsc_psip_free_stt_info((stt_section_info_t*)sec);
+			break;
+		case AM_SI_TID_PSIP_EIT:
+			atsc_psip_free_eit_info((eit_section_info_t*)sec);
 			break;
 		default:
 			ret = AM_SI_ERR_INVALID_SECTION_DATA;

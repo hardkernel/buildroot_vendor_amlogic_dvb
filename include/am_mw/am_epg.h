@@ -71,6 +71,7 @@ enum AM_EPG_Mode
 	AM_EPG_SCAN_VCT	= 0x800,	/**< 监控VCT*/
 	AM_EPG_SCAN_STT	= 0x1000,	/**< 监控STT*/
 	AM_EPG_SCAN_RRT	= 0x2000,	/**< 监控RRT*/
+	AM_EPG_SCAN_PSIP_EIT = 0x4000,	/**< 监控ATSC EIT*/
 	
 	/*Composed mode*/
 	AM_EPG_SCAN_EIT_PF_ALL		= AM_EPG_SCAN_EIT_PF_ACT | AM_EPG_SCAN_EIT_PF_OTH,/**< 监控所有eit pf*/
@@ -92,6 +93,8 @@ enum AM_EPG_EventType
 	AM_EPG_EVT_NEW_TDT,    /**< 发现新版本NIT，参数为dvbpsi_tot_t*/
 	AM_EPG_EVT_NEW_EIT,	   /**< 接收到新的EIT单个section，参数为dvbpsi_eit_t*/
 	AM_EPG_EVT_NEW_STT,		/**< 发新新版本STT， 参数为stt_section_info_t*/
+	AM_EPG_EVT_NEW_MGT,		/**< 发新新版本STT， 参数为mgt_section_info_t*/
+	AM_EPG_EVT_NEW_PSIP_EIT,/**< 发新新版本ATSC EIT， 参数为eit_section_info_t*/
 	AM_EPG_EVT_EIT_DONE,   /**< 所有EIT接收完毕*/
 	AM_EPG_EVT_EIT_UPDATE,	/**< 通知接收到新的EIT数据，用于上层实现更新*/
 	AM_EPG_EVT_NEW_SUB_PLAY,	/**< 提前通知有将开始的预约节目要播放,参数为db_evt_id*/

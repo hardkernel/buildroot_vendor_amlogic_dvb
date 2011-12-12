@@ -66,6 +66,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/atsc/atsc_mgt.c\
 		   am_si/atsc/atsc_rrt.c\
 		   am_si/atsc/atsc_stt.c\
+		   am_si/atsc/atsc_eit.c\
 		   am_si/atsc/atsc_descriptor.c\
 		   am_si/atsc/huffman_decode.c
 

@@ -93,6 +93,7 @@ typedef struct com_table_info
 {
     INT16U  table_type;
     INT16U  table_type_pid;
+    INT8U	table_type_version;
     struct   atsc_descriptor_s *desc;
     struct   com_table_info *p_next;
 }com_table_info_t;
