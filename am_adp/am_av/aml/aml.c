@@ -1703,7 +1703,7 @@ static AM_ErrorCode_t aml_set_deinterlace(int val)
 	return AM_FileEcho("/sys/module/deinterlace/parameters/deinterlace_mode", buf);		
 	
 #else
-	ret = AM_FileEcho("/sys/class/vfm/map","rm all");
+	ret = AM_FileEcho("/sys/class/vfm/map",(val)?"rm default decoder amvideo":"rm default decoder deinterlace amvideo");
 	if(ret == AM_SUCCESS)
 		ret = AM_FileEcho("/sys/class/vfm/map", (val)?"add default decoder deinterlace amvideo":"add default decoder amvideo");
 	return ret;
