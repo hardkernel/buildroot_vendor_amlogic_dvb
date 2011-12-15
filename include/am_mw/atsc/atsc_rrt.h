@@ -63,6 +63,7 @@ typedef struct rrt_rating_value
 typedef struct rrt_dimensions_info
 {
     atsc_multiple_string_t dimensions_name;
+    INT8U graduated_scale;
     INT8U values_defined;
     struct rrt_rating_value rating_value[16];	
     struct rrt_dimensions_info *p_next;

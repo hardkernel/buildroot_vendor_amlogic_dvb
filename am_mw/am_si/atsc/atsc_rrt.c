@@ -157,6 +157,7 @@ INT32S atsc_psip_parse_rrt(INT8U* data, INT32U length, rrt_section_info_t *info)
 					if (dimensions_name_len > 0)
 						atsc_decode_multiple_string_structure(ptr, &tmp_dimensions_info->dimensions_name); //
 					ptr += dimensions_name_len;
+					tmp_dimensions_info->graduated_scale = ((*ptr)&0x10) >> 4;
 					values_defined = (*ptr++) & 0x0F;
 					tmp_dimensions_info->values_defined = values_defined;
 					for (i = 0; i < values_defined; i++)
