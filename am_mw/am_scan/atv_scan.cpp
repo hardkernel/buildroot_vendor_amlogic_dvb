@@ -128,13 +128,14 @@ extern "C" int am_scan_stop_atv_search()
 
 		//to avoid notify
 		tvListener->setDtvPara(NULL);
-		tvListener->sendTvCmd(STOP_TV,  0);
-		
+
 		// clear callbacks
 		if (tv != NULL) 
 		{
 			//tv.clear();
+			tvListener->sendTvCmd(STOP_TV,  0);
 			tv->disconnect();
+			tvListener->setTv(NULL);
 		}
 	}
 	

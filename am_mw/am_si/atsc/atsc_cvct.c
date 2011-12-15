@@ -104,6 +104,7 @@ INT32S atsc_psip_parse_cvct(INT8U* data, INT32U length, cvct_section_info_t *inf
 	INT8U *ptr = NULL;
 	INT16U desc_len;
 	INT8U *desc_ptr;
+	int chan_name_len;
 
 	if(data && length && info)
 	{
@@ -149,7 +150,9 @@ INT32S atsc_psip_parse_cvct(INT8U* data, INT32U length, cvct_section_info_t *inf
 				if (tmp_chan_info)
 				{
 					memset(tmp_chan_info, 0, sizeof(cvct_channel_info_t));
-					short_channel_name_parse(ptr, tmp_chan_info->short_name);
+					chan_name_len = sizeof(tmp_chan_info->short_name);
+					atsc_convert_code_from_utf16_to_utf8((char*)ptr, 14, (char*)tmp_chan_info->short_name, &chan_name_len);
+					//short_channel_name_parse(ptr, tmp_chan_info->short_name);
 					tmp_chan_info->major_channel_number = MAJOR_CHANNEL_NUM(vct_sect_chan->major_channel_number);
 					tmp_chan_info->minor_channel_number = MINOR_CHANNEL_NUM(vct_sect_chan->minor_channel_number);
 					tmp_chan_info->program_number = MAKE_SHORT_HL(vct_sect_chan->program_number);

@@ -137,38 +137,39 @@ INT32S atsc_psip_parse_mgt(INT8U* data, INT32U length, mgt_section_info_t *info)
             tables_num = sect_info->tables_defined;
             while(tables_num > 0)
             {
-                table_info = (mgt_table_info_t *)ptr;
-                tmp_table_info = (com_table_info_t*)AMMem_malloc(sizeof(com_table_info_t));
-                if(tmp_table_info)
-                {
-                        tmp_table_info->table_type = MAKE_SHORT_HL(table_info->table_type);
-                        tmp_table_info->table_type_pid = MAKE_SHORT_HL(table_info->table_type_pid);
-			   tmp_table_info->desc = NULL;
-			   tmp_table_info->p_next = NULL;
-                       
-			   
-			   if ((tmp_table_info->table_type == 0) | (tmp_table_info->table_type == 1))
-			   {
-				sect_info->is_cable = 0;
-			   }
-			   else if ((tmp_table_info->table_type == 2) | (tmp_table_info->table_type == 3))
-			   {
-			   	sect_info->is_cable = 1;
-			   }
-			   else 
-			   {
-				// do nothing
-			   }
-			   add_mgt_table_info(&sect_info->com_table_info, tmp_table_info);
-                }
-                else
-                {
-                    AM_TRACE("[%s] error out of memory !!\n", __FUNC__);
-                    break;
-                } 
-				
-		  ptr += 11 + MAKE_SHORT_HL(table_info->table_type_desc_len);
-		  tables_num--;
+				table_info = (mgt_table_info_t *)ptr;
+				tmp_table_info = (com_table_info_t*)AMMem_malloc(sizeof(com_table_info_t));
+				if(tmp_table_info)
+				{
+					tmp_table_info->table_type = MAKE_SHORT_HL(table_info->table_type);
+					tmp_table_info->table_type_pid = MAKE_SHORT_HL(table_info->table_type_pid);
+					tmp_table_info->table_type_version = table_info->table_type_version;
+					tmp_table_info->desc = NULL;
+					tmp_table_info->p_next = NULL;
+						   
+
+					if ((tmp_table_info->table_type == 0) | (tmp_table_info->table_type == 1))
+					{
+					sect_info->is_cable = 0;
+					}
+					else if ((tmp_table_info->table_type == 2) | (tmp_table_info->table_type == 3))
+					{
+					sect_info->is_cable = 1;
+					}
+					else 
+					{
+					// do nothing
+					}
+					add_mgt_table_info(&sect_info->com_table_info, tmp_table_info);
+				}
+				else
+				{
+					AM_TRACE("[%s] error out of memory !!\n", __FUNC__);
+					break;
+				} 
+
+				ptr += 11 + MAKE_SHORT_HL(table_info->table_type_desc_len);
+				tables_num--;
             }
 
             sect_len -= 3;

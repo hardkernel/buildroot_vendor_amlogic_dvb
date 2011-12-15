@@ -56,13 +56,13 @@ typedef struct rrt_section_header
 
 typedef struct rrt_rating_value
 {
-    INT8U abbrev_rating_value_text[8];
-    INT8U *rating_value_text;
+    atsc_multiple_string_t abbrev_rating_value_text;
+    atsc_multiple_string_t rating_value_text;
 }rrt_rating_value_t;
 
 typedef struct rrt_dimensions_info
 {
-    INT8U dimensions_name[20];
+    atsc_multiple_string_t dimensions_name;
     INT8U values_defined;
     struct rrt_rating_value rating_value[16];	
     struct rrt_dimensions_info *p_next;
@@ -75,7 +75,7 @@ typedef struct rrt_section_info
     INT16U rating_region;
     INT8U  version_number;
     INT8U  dimensions_defined;
-    INT8U  rating_region_name[32];
+    atsc_multiple_string_t rating_region_name;
     struct rrt_dimensions_info  *dimensions_info;
     atsc_descriptor_t *desc;          
 }rrt_section_info_t;

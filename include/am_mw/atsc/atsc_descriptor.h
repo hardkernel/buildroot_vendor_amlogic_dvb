@@ -10,8 +10,8 @@ typedef struct
 	struct
 	{
 		uint8_t		iso_639_code[3];
-		uint8_t		string[256];
-	}string[90];
+		uint8_t		string[2048];
+	}string[10]; /* Up to 10 langs */
 }atsc_multiple_string_t;
 
 typedef struct atsc_descriptor_s
@@ -45,14 +45,30 @@ typedef struct
 
 } atsc_service_location_dr_t;
 
+/* Content Advisory*/
+typedef struct
+{
+	uint8_t	 i_region_count;
+	struct
+	{
+		uint8_t i_rating_region;
+		uint8_t	 i_dimension_count;
+		struct
+		{
+			uint8_t	 i_dimension_j;
+			uint8_t	 i_rating_value; 
+		}dimension[126];
+		atsc_multiple_string_t rating_description;
+	}region[64];
+}atsc_content_advisory_dr_t;
+
 
 
 atsc_descriptor_t* atsc_NewDescriptor(uint8_t i_tag, uint8_t i_length,
                                           uint8_t* p_data);
 void atsc_DeleteDescriptors(atsc_descriptor_t* p_descriptor);
 
-INT32S short_channel_name_parse(INT8U* pstr, INT8U *out_str);
-void parse_multiple_string(unsigned char *buffer_data ,unsigned char *p_out_buffer);
 void atsc_decode_multiple_string_structure(INT8U *buffer_data, atsc_multiple_string_t *out);
+int atsc_convert_code_from_utf16_to_utf8(char *in_code,int in_len,char *out_code,int *out_len);
 
 #endif /* end */

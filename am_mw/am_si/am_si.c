@@ -619,6 +619,7 @@ AM_ErrorCode_t AM_SI_DecodeSection(int handle, uint16_t pid, uint8_t *buf, uint1
 			break;
 		case AM_SI_TID_PSIP_EIT:
 			si_decode_psip_table(*sec, eit, eit_section_info_t, buf, len);
+			break;
 		default:
 			ret = AM_SI_ERR_NOT_SUPPORTED;
 			break;

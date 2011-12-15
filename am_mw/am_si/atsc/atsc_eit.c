@@ -112,7 +112,7 @@ INT32S atsc_psip_parse_eit(INT8U* data, INT32U length, eit_section_info_t *info)
 		{
 			sect_head = (eit_section_header_t*)sect_data;
 
-			if(sect_head->table_id != ATSC_PSIP_TVCT_TID)
+			if(sect_head->table_id != ATSC_PSIP_EIT_TID)
 			{
 				sect_len -= 3;
 				sect_len -= MAKE_SHORT_HL(sect_head->section_length);
@@ -143,6 +143,7 @@ INT32S atsc_psip_parse_eit(INT8U* data, INT32U length, eit_section_info_t *info)
 			num_events_in_section = sect_head->num_events_in_section;
 			sect_info->num_events_in_section= num_events_in_section;
 			ptr = sect_data+EIT_SECTION_HEADER_LEN;
+			AM_TRACE("num_events_in_section %d", num_events_in_section);
 			while (num_events_in_section)
 			{
 				eit_sect_evt = (event_sect_info_t *)ptr;
@@ -150,14 +151,15 @@ INT32S atsc_psip_parse_eit(INT8U* data, INT32U length, eit_section_info_t *info)
 				if (tmp_evt_info)
 				{
 					memset(tmp_evt_info, 0, sizeof(eit_event_info_t));
-					
-	
+
 					tmp_evt_info->start_time = MAKE_WORD_HML(eit_sect_evt->start_time);
 					tmp_evt_info->start_time += 315964800; /* secs_Between_1Jan1970_6Jan1980*/
 					
 					tmp_evt_info->ETM_location = eit_sect_evt->ETM_location;
 					tmp_evt_info->length_in_seconds = MAKE_WORD_HML24(eit_sect_evt->length_in_seconds);
-					atsc_decode_multiple_string_structure(ptr+10, &tmp_evt_info->title);
+					
+					if (eit_sect_evt->title_length > 0)
+						atsc_decode_multiple_string_structure(ptr+10, &tmp_evt_info->title);
 					tmp_evt_info->desc = NULL;
 					tmp_evt_info->p_next = NULL;
 
@@ -173,13 +175,13 @@ INT32S atsc_psip_parse_eit(INT8U* data, INT32U length, eit_section_info_t *info)
 
 						if(p_descriptor)
 						{
-							if(sect_info->eit_event_info->desc == NULL)
+							if(tmp_evt_info->desc == NULL)
 							{
-								sect_info->eit_event_info->desc = p_descriptor;
+								tmp_evt_info->desc = p_descriptor;
 							}
 							else
 							{
-								atsc_descriptor_t* p_last_descriptor = sect_info->eit_event_info->desc;
+								atsc_descriptor_t* p_last_descriptor = tmp_evt_info->desc;
 								while(p_last_descriptor->p_next != NULL)
 									p_last_descriptor = p_last_descriptor->p_next;
 								p_last_descriptor->p_next = p_descriptor;

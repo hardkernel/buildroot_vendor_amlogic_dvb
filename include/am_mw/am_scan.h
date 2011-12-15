@@ -78,11 +78,10 @@ enum AM_SCAN_EventType
 /**\brief 信号源类型 */
 enum AM_SCAN_Source
 {
-	AM_SCAN_SRC_AUTO       = 0x00, /**< 自动判断 */
-	AM_SCAN_SRC_DVBC       = 0x01, /**< DVBC搜索 */
-	AM_SCAN_SRC_DVBT       = 0x02, /**< DVBT搜索 */
-	AM_SCAN_SRC_DVBS       = 0x03, /**< DVBS搜索 */
-	AM_SCAN_SRC_ANALOG	   = 0x04, /**< 模拟信号源*/
+	AM_SCAN_SRC_AUTO       	= 0x00, /**< 自动判断 */
+	AM_SCAN_SRC_CABLE       = 0x01, /**< Cable搜索 */
+	AM_SCAN_SRC_TERRISTRIAL = 0x02, /**< Terristrial(Air in ATSC)搜索 */
+	AM_SCAN_SRC_SATELLITE   = 0x03, /**< Satellite搜索 */
 };
 
 /**\brief 标准定义*/

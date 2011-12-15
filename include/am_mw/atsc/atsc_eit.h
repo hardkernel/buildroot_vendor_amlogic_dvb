@@ -71,15 +71,13 @@ typedef struct event_sect_info_s
     INT8U                       :2;
     INT8U ETM_location         	:2;
     INT8U length_in_seconds_mh			:4;
-	INT8U length_in_seconds_ml			:8;
-	INT8U length_in_seconds_lo			:8;
 #else
-	INT8U length_in_seconds_lo			:8;
-    INT8U length_in_seconds_ml			:8;
     INT8U length_in_seconds_mh			:4;
     INT8U ETM_location         	:2;
     INT8U                       :2;
 #endif
+	INT8U length_in_seconds_ml			:8;
+	INT8U length_in_seconds_lo			:8;
 	INT8U title_length		:8;
 }event_sect_info_t;
 

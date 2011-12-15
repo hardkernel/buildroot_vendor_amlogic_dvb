@@ -114,6 +114,14 @@ enum CC_ATV_MSG_ID
     CC_ATV_MSG_DETECT_FREQUENCY_FINISHED,
 };
 
+/**\brief 频点搜索状态*/
+enum
+{
+	AM_SCAN_FE_DONE,/**< ATV/DTV均搜索完毕*/
+	AM_SCAN_FE_ATV,	/**< ATV正在搜索*/
+	AM_SCAN_FE_DTV,	/**< DTV正在搜索*/
+};
+
 /**\brief 子表接收控制*/
 typedef struct
 {
@@ -144,6 +152,15 @@ typedef struct
 	AM_SCAN_SubCtl_t *subctl; 	/**< 子表控制数据*/
 }AM_SCAN_TableCtl_t;
 
+/**\brief 搜索频点数据*/
+typedef struct
+{
+	int status;		/**< 搜索状态, AM_SCAN_FE_ATV等*/
+	AM_Bool_t dtv_locked;	/**< 数字是否以锁住频点，用于ATSC，避免重复设置数字和模拟频率*/
+	int atv_freq;	/**< 模拟频率*/
+	struct dvb_frontend_parameters dtv_para /**< 数字参数*/;
+}AM_SCAN_FrontEndPara_t;
+
 
 /**\brief 搜索中间数据*/
 struct AM_SCAN_Scanner_s
@@ -170,9 +187,8 @@ struct AM_SCAN_Scanner_s
 	int								hsi;			/**< SI解析句柄*/
 	int								curr_freq;		/**< 当前正在搜索的频点*/ 
 	int								start_freqs_cnt;/**< 需要搜索的频点个数*/
-	int								analog_freq_start;	/**< 第一个模拟频点索引，数字频点在前，模拟频点在后*/
 	struct dvb_frontend_event		fe_evt;			/**< 前段事件*/
-	struct dvb_frontend_parameters 	*start_freqs;	/**< 需要搜索的频点列表*/ 
+	AM_SCAN_FrontEndPara_t		 	*start_freqs;	/**< 需要搜索的频点列表*/ 
 	AM_SCAN_TS_t					*curr_ts;		/**< 当前正在搜索的TS数据*/
 	dvbpsi_pat_program_t			*cur_prog;		/**< 当前正在接收PMT的Program*/
 	AM_SCAN_StoreCb 				store_cb;		/**< 存储回调*/
