@@ -74,7 +74,12 @@ typedef struct pes_buffer
 #define TELETEXT_BUFFER_SIZE 0x8000
 #define TELETEXT_MAX_PAGEHISTORY            (64)
 
-
+#define TELETEXT_DRAW(ctx, doit)\
+	AM_MACRO_BEGIN\
+	if((ctx)->draw_begin) (ctx)->draw_begin();\
+	doit;\
+	if((ctx)->update_display) (ctx)->update_display();\
+	AM_MACRO_END
 
 
 typedef struct am_mw_teletext_context_s
@@ -95,6 +100,7 @@ typedef struct am_mw_teletext_context_s
 	convert_color cc;
 	get_font_height gfh;
 	get_font_max_width gfw;
+	draw_begin draw_begin;
 	display_update update_display;
 	mosaic_convert_color mcc;
 	clean_osd co;
@@ -721,8 +727,9 @@ static void teletext_draw_display_message(INT8U uType)
             VTDisplayMessage[24]=0x0;VTDisplayMessage[25]='.';
             VTDisplayMessage[26]=0x0;VTDisplayMessage[27]='.';
  
-            context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (INT16U *)VTDisplayMessage, 28, context_tele.mcc(0xff, 255, 255, 255), 1, 1);
-            context_tele.update_display();
+	    TELETEXT_DRAW(&context_tele, ({
+            	context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (INT16U *)VTDisplayMessage, 28, context_tele.mcc(0xff, 255, 255, 255), 1, 1);
+	    }));
             break;
 
         case VT_INVALIDPAGENUM:
@@ -750,8 +757,9 @@ static void teletext_draw_display_message(INT8U uType)
             VTDisplayMessage[40]=0x0;VTDisplayMessage[41]='8';
             VTDisplayMessage[42]=0x0;VTDisplayMessage[43]='9';
             VTDisplayMessage[44]=0x0;VTDisplayMessage[45]='9';
+	    TELETEXT_DRAW(&context_tele, ({
             context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (INT16U *)VTDisplayMessage, 46, context_tele.mcc(0xff, 255, 255, 255), 1, 1);
-            context_tele.update_display();
+	    }));
             break;
         default:
             break;
@@ -838,8 +846,9 @@ static int teletext_header_update(unsigned int dwPageCode)
 		        SetCodepage(context_tele.TtxCodepage);
 		    }
 		}
+		TELETEXT_DRAW(&context_tele, ({
         	DrawPage(&context_tele.sCurrPage, VTDF_HEADERONLY, VTDoubleProfile);
-        	context_tele.update_display();
+		}));
     	}
     	else
     	{
@@ -891,8 +900,9 @@ static int teletext_page_update(INT32U dwPageCode)
                     			}
                 		}
             		}
+			TELETEXT_DRAW(&context_tele, ({
             		DrawPage(&context_tele.sCurrPage, VTDF_UPDATEDONLY, VTDoubleProfile);
-            		context_tele.update_display();
+			}));
        		}
        		return AM_SUCCESS;
 
@@ -925,8 +935,9 @@ static int teletext_page_refresh(INT32U dwPageCode)
 			    }
 			}
 
+			TELETEXT_DRAW(&context_tele, ({
             		DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
-            		context_tele.update_display();
+			}));
 
             		return AM_SUCCESS;
         	}
@@ -1014,8 +1025,10 @@ int am_mw_teletext_set_cur_page_code(unsigned short wPageCode, unsigned short wS
 
 
     	GetDisplayHeader(&context_tele.sCurrPage, TRUE);
+
+	TELETEXT_DRAW(&context_tele, ({
     	DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
-    	context_tele.update_display();
+	}));
 
     	context_tele.wPageIndex =  wPageCode ;
     	context_tele.wPageSubCode = wSubPageCode ;
@@ -1106,6 +1119,7 @@ int am_mw_teletext_init(int buffer_size)
 	context_tele.gfw=NULL;
 	context_tele.mcc=NULL;
 	context_tele.co=NULL;
+	context_tele.draw_begin=NULL;
 	context_tele.update_display=NULL;
 
 	context_tele.auto_page_status=TRUE;
@@ -1520,7 +1534,7 @@ static void teletext_clean_osd()
 
 
 
-int am_mw_teletext_register_display_fn(fill_rectangle fr,draw_text dt,convert_color cc,get_font_height gfh,get_font_max_width gfw,display_update du,mosaic_convert_color mcc,clean_osd co)
+int am_mw_teletext_register_display_fn(fill_rectangle fr,draw_text dt,convert_color cc,get_font_height gfh,get_font_max_width gfw,draw_begin db,display_update du,mosaic_convert_color mcc,clean_osd co)
 
 {
 	context_tele.fr=fr;
@@ -1528,6 +1542,7 @@ int am_mw_teletext_register_display_fn(fill_rectangle fr,draw_text dt,convert_co
 	context_tele.cc=cc;
 	context_tele.gfh=gfh;
 	context_tele.gfw=gfw;
+	context_tele.draw_begin = db;
 	context_tele.update_display=du;
 	context_tele.mcc=mcc;
 	context_tele.co=co;

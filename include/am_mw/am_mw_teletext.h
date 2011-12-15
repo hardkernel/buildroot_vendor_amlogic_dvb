@@ -93,6 +93,12 @@ typedef unsigned int (*get_font_height)(void);
  * (无参数)
  */
 typedef unsigned int (*get_font_max_width)(void);
+
+/**\brief 开始绘图
+ * (无参数)
+ */
+typedef unsigned int (*draw_begin)(void);
+
 /**\brief 更新屏幕
  * (无参数)
  */
@@ -194,7 +200,7 @@ int am_mw_teletext_perform_color_link(unsigned char color);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_mw_teletext.h)
  */
-int am_mw_teletext_register_display_fn(fill_rectangle fr,draw_text dt,convert_color cc,get_font_height gfh,get_font_max_width gfw,display_update du,mosaic_convert_color mcc,clean_osd co);
+int am_mw_teletext_register_display_fn(fill_rectangle fr,draw_text dt,convert_color cc,get_font_height gfh,get_font_max_width gfw,draw_begin db,display_update du,mosaic_convert_color mcc,clean_osd co);
 
 /**\brief 注册事件回调函数
  * \param  cb 函数指针

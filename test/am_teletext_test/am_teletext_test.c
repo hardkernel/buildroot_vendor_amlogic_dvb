@@ -429,6 +429,7 @@ int main(int argc,char **argv)
 	am_mw_teletext_register_display_fn(teletext_display_fill_rectangle, \
 			teletext_display_draw_text,teletext_display_convert_color, \
 			teletext_display_get_font_height,teletext_display_get_font_max_width, \
+			NULL,
 			teletext_display_update,teletext_mosaic_convert_color,0);
 	printf("*****************\n");
 	am_mw_teletext_start(s_pid,0);
