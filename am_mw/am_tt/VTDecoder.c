@@ -23,6 +23,7 @@
 #include "string.h"
 #include <stdio.h>
 #include <pthread.h>
+#include <am_tt.h>
 
 #ifndef AM_SUCCESS
 #define AM_SUCCESS			(0)
@@ -313,7 +314,7 @@ void VTDecodeLine(INT8U *data)
                         pthread_mutex_lock(&m_CommonHeaderMutex);
                         memcpy(m_CommonHeader, data + 10, 32);
                         pthread_mutex_unlock(&m_CommonHeaderMutex);
-                        m_CurrPageCode = am_mw_get_cur_page_code();
+                        m_CurrPageCode = AM_TT_GetCurrentPageCode();
                         if (uPageHex == LOWWORD(m_CurrPageCode))
                         {
                             NotifyDecoderEvent(DECODEREVENT_HEADERUPDATE, MAKELONG(uPageHex, uPageSubCode));
@@ -784,7 +785,7 @@ void VTCompleteMagazine(TMagazineState* magazineState)
 
     //M_TELETEXT_DIAG(("received page [0x%x] \n",wPageHex));
 
-    m_CurrPageCode = am_mw_get_cur_page_code();
+    m_CurrPageCode = AM_TT_GetCurrentPageCode();
     if (bLinesAdded != FALSE || bPageChanged != FALSE)
     {
         if (LOWWORD(m_CurrPageCode) == LOWWORD(magazineState->dwPageCode))
@@ -1783,7 +1784,7 @@ BOOLEAN CheckTeletextPageInRange(INT16U uPageCode)
     INT16U uMaxPageNum;
     INT16S nTemp;
 
-    uCurrPagecode = am_mw_get_cur_page_code();
+    uCurrPagecode = AM_TT_GetCurrentPageCode();
     uCurrPageDec = PageHex2ArrayIndex(LOWWORD(uCurrPagecode));
     uCheckPageDec = PageHex2ArrayIndex(uPageCode);
     uMaxPageNum = uTtxMaxPageNum / 2;

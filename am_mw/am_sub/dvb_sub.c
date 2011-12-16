@@ -744,7 +744,7 @@ static void sub_parse_object(dvbsub_decoder_t* decoder, bs_t* s)
 
         INT8U number_of_codes = bs_read(s, 8);
         INT8U *p_start = s->p_start + bs_pos(s) / 8;
-        bs_t bs = {0};
+        bs_t bs = {NULL,NULL,NULL,0};
 
         bs_skip(s, 8 * (segment_length - 4));
 
@@ -1019,7 +1019,7 @@ static void sub_parse_pdata(dvbsub_decoder_t* decoder, dvbsub_region_t* region,
                              };
     INT32S offset = 0;
     INT32U i = 0;
-    bs_t bs = {0};
+    bs_t bs = {NULL,NULL,NULL,0};
 
     /* sanity check */
     if (!p_region->p_pixbuf)
@@ -1727,10 +1727,10 @@ static void sub_update_display(dvbsub_decoder_t* decoder)
 
             for (j = 0; j < p_pic_region->entry; j++)
             {
-                p_pic_region->clut[j].red    = YCbCr_TO_R(p_color[j].Y, p_color[j].Cb, p_color[j].Cr);
-                p_pic_region->clut[j].green  = YCbCr_TO_G(p_color[j].Y, p_color[j].Cb, p_color[j].Cr);
-                p_pic_region->clut[j].blue   = YCbCr_TO_B(p_color[j].Y, p_color[j].Cb, p_color[j].Cr);
-                p_pic_region->clut[j].alpha  = 0xff - p_color[j].T;
+                p_pic_region->clut[j].r  = YCbCr_TO_R(p_color[j].Y, p_color[j].Cb, p_color[j].Cr);
+                p_pic_region->clut[j].g  = YCbCr_TO_G(p_color[j].Y, p_color[j].Cb, p_color[j].Cr);
+                p_pic_region->clut[j].b  = YCbCr_TO_B(p_color[j].Y, p_color[j].Cb, p_color[j].Cr);
+                p_pic_region->clut[j].a  = 0xff - p_color[j].T;
             }
 
             p_region->background = p_region->background;
@@ -1786,10 +1786,10 @@ static void sub_update_display(dvbsub_decoder_t* decoder)
 
             for (j = 0; j < p_pic_region->entry; j++)
             {
-                p_pic_region->clut[j].red    = YCbCr_TO_R(p_color[j].Y, p_color[j].Cb, p_color[j].Cr);
-                p_pic_region->clut[j].green  = YCbCr_TO_G(p_color[j].Y, p_color[j].Cb, p_color[j].Cr);
-                p_pic_region->clut[j].blue   = YCbCr_TO_B(p_color[j].Y, p_color[j].Cb, p_color[j].Cr);
-                p_pic_region->clut[j].alpha  = 0xff - p_color[j].T;
+                p_pic_region->clut[j].r  = YCbCr_TO_R(p_color[j].Y, p_color[j].Cb, p_color[j].Cr);
+                p_pic_region->clut[j].g  = YCbCr_TO_G(p_color[j].Y, p_color[j].Cb, p_color[j].Cr);
+                p_pic_region->clut[j].b  = YCbCr_TO_B(p_color[j].Y, p_color[j].Cb, p_color[j].Cr);
+                p_pic_region->clut[j].a  = 0xff - p_color[j].T;
             }
 
             p_pic_region->fg = p_object_def->fg_pc;

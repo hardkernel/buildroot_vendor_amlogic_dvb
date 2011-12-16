@@ -14,7 +14,7 @@
 #include <unistd.h>
 #include "am_debug.h"
 
-#include "am_mw_teletext.h"
+#include "am_tt.h"
 #include "am_dmx.h"
 
 #define LINUX_PES_FILTER
@@ -95,20 +95,20 @@ typedef struct am_mw_teletext_context_s
     	unsigned short  wPageIndex;
     	unsigned short  wPageSubCode;
     	struct  TVTPage sCurrPage;
-	fill_rectangle fr;
-	draw_text dt;
-	convert_color cc;
-	get_font_height gfh;
-	get_font_max_width gfw;
-	draw_begin draw_begin;
-	display_update update_display;
-	mosaic_convert_color mcc;
-	clean_osd co;
+	AM_TT_FillRectCb_t fr;
+	AM_TT_DrawTextCb_t dt;
+	AM_TT_ConvertColorCb_t    cc;
+	AM_TT_GetFontHeightCb_t   gfh;
+	AM_TT_GetFontMaxWidthCb_t gfw;
+	AM_TT_DrawBeginCb_t       draw_begin;
+	AM_TT_DisplayUpdateCb_t   update_display;
+	AM_TT_MosaicConvertColorCb_t mcc;
+	AM_TT_ClearDisplayCb_t       co;
 	int fhandle;
 	pthread_mutex_t rd_wr_Mutex;
 	char auto_page_status ;
 	char TtxCodepage;
-	evt_callback ecb;
+	AM_TT_EventCb_t ecb;
 	
 }am_mw_teletext_context_t;
 
@@ -674,7 +674,7 @@ static void* teletext_thread(void *para)
 #endif
 			packet_head=pbt->pBuffer[8]+9;
 			//AM_DEBUG(1, "@@@1 %d\n",*(pbt->pBuffer+packet_head),*(pbt->pBuffer+packet_head+1),*(pbt->pBuffer+packet_head+2));
-			teletext_parse_data(pbt->pBuffer+packet_head+1,pbt->length-packet_head-1);
+			teletext_parse_data((unsigned char*)pbt->pBuffer+packet_head+1,pbt->length-packet_head-1);
 			//AM_DEBUG(1,"@@@2 %x %x",pbt->pBuffer,pbt);
 			free(pbt->pBuffer);
 			free(pbt);
@@ -728,7 +728,7 @@ static void teletext_draw_display_message(INT8U uType)
             VTDisplayMessage[26]=0x0;VTDisplayMessage[27]='.';
  
 	    TELETEXT_DRAW(&context_tele, ({
-            	context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (INT16U *)VTDisplayMessage, 28, context_tele.mcc(0xff, 255, 255, 255), 1, 1);
+            	context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (unsigned short*)VTDisplayMessage, 28, context_tele.mcc(0xff, 255, 255, 255), 1, 1);
 	    }));
             break;
 
@@ -831,7 +831,7 @@ static int teletext_header_update(unsigned int dwPageCode)
 	char szOldClock[8];
     	if (context_tele.status != TELETEXT_STARTED)
     	{
-        	return AM_MW_TELETEXT_ERR_NOT_START;
+        	return AM_TT_ERR_NOT_START;
     	}
 
     	if (LOWWORD(dwPageCode) == context_tele.wPageIndex)
@@ -868,7 +868,7 @@ static int teletext_page_update(INT32U dwPageCode)
 
     	if (context_tele.status != TELETEXT_STARTED)
     	{
-        	return AM_MW_TELETEXT_ERR_NOT_START;
+        	return AM_TT_ERR_NOT_START;
     	}
 
     	if (LOWWORD(dwPageCode) == context_tele.wPageIndex)
@@ -917,7 +917,7 @@ static int teletext_page_refresh(INT32U dwPageCode)
     	INT32U LoadedPageCode;
     	if (context_tele.status != TELETEXT_STARTED)
     	{
-        	return AM_MW_TELETEXT_ERR_NOT_START;
+        	return AM_TT_ERR_NOT_START;
     	}
 
     	if (LOWWORD(dwPageCode) == context_tele.wPageIndex)
@@ -981,7 +981,7 @@ static BOOLEAN teletext_set_codepage(int Codepage)
 
 
 
-int am_mw_teletext_set_cur_page_code(unsigned short wPageCode, unsigned short wSubPageCode)
+AM_ErrorCode_t AM_TT_SetCurrentPageCode(unsigned short wPageCode, unsigned short wSubPageCode)
 {
     	INT32U dwPageCode;
     	INT32S nRetCode = 0;
@@ -990,14 +990,14 @@ int am_mw_teletext_set_cur_page_code(unsigned short wPageCode, unsigned short wS
 
     	if (context_tele.status != TELETEXT_STARTED)
     	{
-        	return AM_MW_TELETEXT_ERR_NOT_START;
+        	return AM_TT_ERR_NOT_START;
     	}
     	if (PageHex2ArrayIndex(wPageCode) == 0xFFFF)
     	{
         	//teletext_draw_display_message(VT_INVALIDPAGENUM);
 		if(context_tele.ecb!=0)
 		{
-			context_tele.ecb(TT_EVENT_ERRORPAGE);
+			context_tele.ecb(AM_TT_EVT_PAGE_ERROR);
         		return AM_FAILURE;
 		}
     	}
@@ -1011,7 +1011,7 @@ int am_mw_teletext_set_cur_page_code(unsigned short wPageCode, unsigned short wS
         	SetWaitingPage(wPageCode, TRUE);
         	teletext_draw_display_message(VT_PAGENOTFIND);
 
-        	return AM_MW_TELETEXT_ERR_PAGE_NOT_EXSIT;
+        	return AM_TT_ERR_PAGE_NOT_EXSIT;
     	}
 	    if (context_tele.auto_page_status == TRUE)
 	    {
@@ -1053,7 +1053,7 @@ static void teletext_page_process_callback(INT32U event, INT32U index)
 
 		if(context_tele.ecb)
 		{
-			context_tele.ecb(TT_EVENT_PAGEUPDATE);
+			context_tele.ecb(AM_TT_EVT_PAGE_UPDATE);
 		}
 		teletext_page_update(context_tele.cb_parameter);
 
@@ -1065,7 +1065,7 @@ static void teletext_page_process_callback(INT32U event, INT32U index)
 
 		case DECODEREVENT_GETWAITINGPAGE:
 	
-		am_mw_teletext_set_cur_page_code(LOWWORD(context_tele.cb_parameter), HIGHWORD(context_tele.cb_parameter));
+		AM_TT_SetCurrentPageCode(LOWWORD(context_tele.cb_parameter), HIGHWORD(context_tele.cb_parameter));
 		break;
 		default:
 		break;
@@ -1075,8 +1075,7 @@ static void teletext_page_process_callback(INT32U event, INT32U index)
 }
 
 
-
-unsigned int am_mw_get_cur_page_code()
+unsigned int AM_TT_GetCurrentPageCode()
 {
     	if (context_tele.status != TELETEXT_STARTED)
     	{
@@ -1087,7 +1086,7 @@ unsigned int am_mw_get_cur_page_code()
 
 }
 
-int am_mw_teletext_init(int buffer_size)
+AM_ErrorCode_t AM_TT_Init(int buffer_size)
 {
 	int ret=AM_SUCCESS;
 	if(buffer_size<=0)
@@ -1100,7 +1099,7 @@ int am_mw_teletext_init(int buffer_size)
 	context_tele.pwb.length=buffer_size;
 	if(!context_tele.pwb.start_ptr)
 	{
-		ret=AM_MW_TELETEXT_ERR_NO_MEM;
+		ret=AM_TT_ERR_NO_MEM;
 		goto exit;
 	}
 	Vtdrawer_init();
@@ -1303,26 +1302,26 @@ static int open_demux_pes_filter(int dev_no,int pid,int type)
 	struct dmx_pes_filter_params  param;
 	if(dev_no>MAX_DMX_COUNT)
 	{
-		ret=AM_MW_TELETEXT_ERR_OPEN_PES;
+		ret=AM_TT_ERR_OPEN_PES;
 		goto exit;
 	}
 	ret=AM_DMX_AllocateFilter(dev_no,&fhandle);
 	if(ret)
 	{
-		ret=AM_MW_TELETEXT_ERR_OPEN_PES;
+		ret=AM_TT_ERR_OPEN_PES;
 		goto exit;
 
 	}
 	ret=AM_DMX_SetCallback(dev_no,fhandle,pes_filter_callback,0);
 	if(ret)
 	{
-		ret=AM_MW_TELETEXT_ERR_OPEN_PES;
+		ret=AM_TT_ERR_OPEN_PES;
 		goto error;
 	}
 	ret=AM_DMX_SetBufferSize(dev_no,fhandle,0x80000);
 	if(ret)
 	{
-		ret=AM_MW_TELETEXT_ERR_OPEN_PES;
+		ret=AM_TT_ERR_OPEN_PES;
 		goto error;
 	}
 	param.pid=pid;
@@ -1332,7 +1331,7 @@ static int open_demux_pes_filter(int dev_no,int pid,int type)
 
 	if(ret)
 	{
-		ret=AM_MW_TELETEXT_ERR_OPEN_PES;
+		ret=AM_TT_ERR_OPEN_PES;
 		goto error;
 	}
 
@@ -1340,7 +1339,7 @@ static int open_demux_pes_filter(int dev_no,int pid,int type)
 
 	if(ret)
 	{
-		ret=AM_MW_TELETEXT_ERR_OPEN_PES;
+		ret=AM_TT_ERR_OPEN_PES;
 		goto error;
 	}
 	context_tele.fhandle=fhandle;
@@ -1372,7 +1371,7 @@ static int close_demux_pes_filter()
 #endif
 
 
-int am_mw_teletext_start(int pid,int dmx_id)
+AM_ErrorCode_t AM_TT_Start(int dmx_id, int pid)
 {
 	int ret=AM_SUCCESS;
 	ret=AM_VT_Init();
@@ -1384,7 +1383,7 @@ int am_mw_teletext_start(int pid,int dmx_id)
 #endif
 	if(ret)
 	{
-		ret=AM_MW_TELETEXT_ERR_OPEN_PES;
+		ret=AM_TT_ERR_OPEN_PES;
 		goto error_open;
 
 	}
@@ -1397,7 +1396,7 @@ int am_mw_teletext_start(int pid,int dmx_id)
 	ret=AM_PesFilter_Buffer(dmx_id,&context_tele.pwb);
 	if(ret)
 	{
-		ret=AM_MW_TELETEXT_ERR_SET_BUFFER;
+		ret=AM_TT_ERR_SET_BUFFER;
 		goto error_set_buffer;
 	}
 #endif
@@ -1433,7 +1432,7 @@ exit:
 
 }
 
-int am_mw_teletext_deinit()
+AM_ErrorCode_t AM_TT_Quit()
 {
 	Vtdrawer_deinit();
 	Mosaic_deinit();
@@ -1442,7 +1441,7 @@ int am_mw_teletext_deinit()
 	return 0;
 }
 
-int am_mw_teletext_stop()
+AM_ErrorCode_t AM_TT_Stop()
 {
 #ifdef LINUX_PES_FILTER
 	close_demux_pes_filter();
@@ -1469,7 +1468,7 @@ static INT32S teletext_fill_rectangle(INT32S left, INT32S top, INT32U width, INT
 {
 	if(context_tele.fr)
 	{
-		return context_tele.fr(left,top,width,height,color);
+		context_tele.fr(left,top,width,height,color);
 	}
 	return 0;
 }
@@ -1478,7 +1477,7 @@ static INT32S teletext_draw_text(INT32S x, INT32S y, INT32U width, INT32U height
 {
 	if(context_tele.dt)
 	{
-		return context_tele.dt(x,y,width,height,text,len,color,w_scale,h_scale);
+		context_tele.dt(x,y,width,height,text,len,color,w_scale,h_scale);
 	}
 	return 0;
 
@@ -1534,30 +1533,29 @@ static void teletext_clean_osd()
 
 
 
-int am_mw_teletext_register_display_fn(fill_rectangle fr,draw_text dt,convert_color cc,get_font_height gfh,get_font_max_width gfw,draw_begin db,display_update du,mosaic_convert_color mcc,clean_osd co)
-
+AM_ErrorCode_t AM_TT_RegisterDrawOps(AM_TT_DrawOps_t *ops)
 {
-	context_tele.fr=fr;
-	context_tele.dt=dt;
-	context_tele.cc=cc;
-	context_tele.gfh=gfh;
-	context_tele.gfw=gfw;
-	context_tele.draw_begin = db;
-	context_tele.update_display=du;
-	context_tele.mcc=mcc;
-	context_tele.co=co;
+	context_tele.fr=ops->fill_rect;
+	context_tele.dt=ops->draw_text;
+	context_tele.cc=ops->conv_color;
+	context_tele.gfh=ops->font_height;
+	context_tele.gfw=ops->font_width;
+	context_tele.draw_begin = ops->draw_begin;
+	context_tele.update_display=ops->disp_update;
+	context_tele.mcc=ops->mosaic_conv;
+	context_tele.co=ops->clear_disp;
 
 	return 0;
 }
 
-int am_mw_teletext_get_next_sub_page()
+AM_ErrorCode_t AM_TT_NextSubPage()
 {
     INT32U dwPageCode;
     INT32S nRetCode = 0;
 
     if (context_tele.status != TELETEXT_STARTED)
     {
-        return AM_MW_TELETEXT_ERR_NOT_START;
+        return AM_TT_ERR_NOT_START;
     }
 
     dwPageCode = MAKELONG(context_tele.wPageIndex, context_tele.wPageSubCode);
@@ -1565,7 +1563,7 @@ int am_mw_teletext_get_next_sub_page()
     nRetCode = GetNextDisplaySubPage(dwPageCode, &context_tele.sCurrPage, FALSE);
     if (nRetCode == 0)
     {
-        return AM_MW_TELETEXT_ERR_PAGE_NOT_EXSIT;
+        return AM_TT_ERR_PAGE_NOT_EXSIT;
     }
 
     GetDisplayHeader(&context_tele.sCurrPage, TRUE);
@@ -1577,14 +1575,14 @@ int am_mw_teletext_get_next_sub_page()
     return AM_SUCCESS;
 }
 
-int am_mw_teletext_get_pre_sub_page()
+AM_ErrorCode_t AM_TT_PreviousSubPage()
 {
     INT32U dwPageCode;
     INT32S nRetCode = 0;
 
     if (context_tele.status != TELETEXT_STARTED)
     {
-        return AM_MW_TELETEXT_ERR_NOT_START;
+        return AM_TT_ERR_NOT_START;
     }
 
     dwPageCode = MAKELONG(context_tele.wPageIndex, context_tele.wPageSubCode);
@@ -1592,7 +1590,7 @@ int am_mw_teletext_get_pre_sub_page()
     nRetCode = GetNextDisplaySubPage(dwPageCode, &context_tele.sCurrPage, TRUE);
     if (nRetCode == 0)
     {
-        return AM_MW_TELETEXT_ERR_PAGE_NOT_EXSIT;
+        return AM_TT_ERR_PAGE_NOT_EXSIT;
     }
 
     GetDisplayHeader(&context_tele.sCurrPage, TRUE);
@@ -1606,15 +1604,14 @@ int am_mw_teletext_get_pre_sub_page()
 }
 
 
-
-int am_mw_teletext_get_next_page()
+AM_ErrorCode_t AM_TT_NextPage()
 {
     INT32U dwPageCode;
     INT32S nRetCode = 0;
 
     if (context_tele.status != TELETEXT_STARTED)
     {
-        return AM_MW_TELETEXT_ERR_NOT_START;
+        return AM_TT_ERR_NOT_START;
 
     }
 
@@ -1625,7 +1622,7 @@ int am_mw_teletext_get_next_page()
 
     if (nRetCode == 0)
     {
-        return AM_MW_TELETEXT_ERR_PAGE_NOT_EXSIT;;
+        return AM_TT_ERR_PAGE_NOT_EXSIT;;
     }
     if (context_tele.auto_page_status == TRUE)
     {
@@ -1652,14 +1649,14 @@ int am_mw_teletext_get_next_page()
 
 }
 
-int am_mw_teletext_get_pre_page()
+AM_ErrorCode_t AM_TT_PreviousPage()
 {
     INT32U dwPageCode;
     INT32S nRetCode = 0;
 
     if (context_tele.status != TELETEXT_STARTED)
     {
-        return AM_MW_TELETEXT_ERR_NOT_START;
+        return AM_TT_ERR_NOT_START;
 
     }
     
@@ -1670,7 +1667,7 @@ int am_mw_teletext_get_pre_page()
 
     if (nRetCode == 0)
     {
-        return AM_MW_TELETEXT_ERR_PAGE_NOT_EXSIT;
+        return AM_TT_ERR_PAGE_NOT_EXSIT;
     }
 
 
@@ -1697,7 +1694,7 @@ int am_mw_teletext_get_pre_page()
 
 }
 
-int am_mw_teletext_perform_color_link(unsigned char color)
+AM_ErrorCode_t AM_TT_PerformColorLink(unsigned char color)
 {
     INT32U dwPageCode = 0;
     INT16U wPageHex = 0;
@@ -1707,7 +1704,7 @@ int am_mw_teletext_perform_color_link(unsigned char color)
 
     if (context_tele.status != TELETEXT_STARTED)
     {
-        return AM_MW_TELETEXT_ERR_NOT_START;
+        return AM_TT_ERR_NOT_START;
     }
 
     dwPageCode = context_tele.sCurrPage.EditorialLink[color];
@@ -1767,7 +1764,7 @@ int am_mw_teletext_perform_color_link(unsigned char color)
     return AM_SUCCESS;
 }
 
-int am_mw_register_cb(evt_callback cb)
+AM_ErrorCode_t AM_TT_RegisterEventCb(AM_TT_EventCb_t cb)
 {
 	context_tele.ecb=cb;
 	return AM_SUCCESS;
