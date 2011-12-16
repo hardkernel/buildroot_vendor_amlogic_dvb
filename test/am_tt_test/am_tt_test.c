@@ -6,7 +6,7 @@
 #include "am_osd.h"
 #include "am_misc.h"
 #include "am_font.h"
-#include "am_mw_teletext.h"
+#include "am_tt.h"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -50,7 +50,7 @@ enum
 
 static teletext_app_t tat;
 
-static unsigned int teletext_display_update()
+static void teletext_display_update()
 {
 	AM_OSD_Surface_t *s1,*s2;
 	AM_OSD_Rect_t r1,r2;
@@ -67,10 +67,9 @@ static unsigned int teletext_display_update()
 	r2.w=720;
 	r2.h=576;
 	AM_OSD_Blit(s1,&r1,s2,&r2,0);
-	return 0;
 }
 
-static int teletext_display_fill_rectangle(int left, int top, unsigned int width, unsigned int height, unsigned int color)
+static void teletext_display_fill_rectangle(int left, int top, unsigned int width, unsigned int height, unsigned int color)
 {
 	AM_OSD_Rect_t r;
 	if(tat.s)
@@ -81,11 +80,9 @@ static int teletext_display_fill_rectangle(int left, int top, unsigned int width
 		r.h = height;
 		AM_OSD_DrawFilledRect(tat.s, &r, color);
 	}
-
-	return 0;
 }
 
-static int teletext_display_draw_text(int x, int y, unsigned int width, unsigned int height, unsigned short *text, int len, unsigned int color, unsigned int w_scale, unsigned int h_scale)
+static void teletext_display_draw_text(int x, int y, unsigned int width, unsigned int height, unsigned short *text, int len, unsigned int color, unsigned int w_scale, unsigned int h_scale)
 {
 	AM_FONT_TextPos_t pos;
 	char *tmp=(char *)text;
@@ -138,9 +135,6 @@ static int teletext_display_draw_text(int x, int y, unsigned int width, unsigned
 		pos.base   = 0;
 		AM_FONT_Draw(tat.fid, tat.s, (char*)text, len, &pos, color);
 	}
-
-
-	return 0;
 
 }
 
@@ -304,6 +298,7 @@ int main(int argc,char **argv)
 	AM_OSD_Rect_t r;
 	uint32_t pixel;
 	int link_color;
+	AM_TT_DrawOps_t ops;
 
 	struct pollfd fds[1];
 
@@ -424,14 +419,20 @@ int main(int argc,char **argv)
 	AM_AV_StartTS(AV_DEV_NO,v_pid,a_pid,v_format,a_format);
 	printf("*****************\n");
 
-	am_mw_teletext_init(0x20000);
+	AM_TT_Init(0x20000);
 	printf("*****************\n");
-	am_mw_teletext_register_display_fn(teletext_display_fill_rectangle, \
-			teletext_display_draw_text,teletext_display_convert_color, \
-			teletext_display_get_font_height,teletext_display_get_font_max_width, \
-			teletext_display_update,teletext_mosaic_convert_color,0);
+
+	memset(&ops, 0, sizeof(ops));
+	ops.fill_rect  = teletext_display_fill_rectangle;
+	ops.conv_color = teletext_display_convert_color;
+	ops.draw_text  = teletext_display_draw_text;
+	ops.font_height = teletext_display_get_font_height;
+	ops.font_width  = teletext_display_get_font_max_width;
+	ops.disp_update = teletext_display_update;
+	ops.mosaic_conv = teletext_mosaic_convert_color;
+	AM_TT_RegisterDrawOps(&ops);
 	printf("*****************\n");
-	am_mw_teletext_start(s_pid,0);
+	AM_TT_Start(0,s_pid);
 	printf("*****************\n");
 
 
@@ -447,7 +448,7 @@ int main(int argc,char **argv)
 		if(ret<=0)
 		{
 			if(auto_play)
-				am_mw_teletext_get_next_page();
+				AM_TT_NextPage();
 			continue;
 		}
 
@@ -466,8 +467,8 @@ int main(int argc,char **argv)
 		
 		if(!strncmp(buf, "quit", 4))
 		{
-			am_mw_teletext_stop();
-			am_mw_teletext_deinit();
+			AM_TT_Stop();
+			AM_TT_Quit();
 			AM_FONT_Destroy(tat.fid);
 			AM_FONT_Quit();
 			AM_OSD_Close(tat.osd_id);
@@ -476,19 +477,19 @@ int main(int argc,char **argv)
 		}
 		if(!strncmp(buf, "subnext", 7))
 		{
-			am_mw_teletext_get_next_sub_page();
+			AM_TT_NextSubPage();
 		}
 		if(!strncmp(buf, "next", 4))
 		{
-			am_mw_teletext_get_next_page();
+			AM_TT_NextPage();
 		}
 		if(!strncmp(buf, "pre", 3))
 		{
-			am_mw_teletext_get_pre_page();
+			AM_TT_PreviousPage();
 		}
 		if(!strncmp(buf, "subpre", 6))
 		{
-			am_mw_teletext_get_pre_sub_page();
+			AM_TT_PreviousSubPage();
 		}
 		if(!strncmp(buf, "page:", 5))
 		{
@@ -496,13 +497,13 @@ int main(int argc,char **argv)
 			scanf("%x",&page_code);
 			printf("sub code:0x");
 			scanf("%x",&sub_code);
-			am_mw_teletext_set_cur_page_code(page_code,sub_code);
+			AM_TT_SetCurrentPageCode(page_code,sub_code);
 		}
 		if(!strncmp(buf, "link color", 10))
 		{
 			printf("link color(0~5):");
 			scanf("%d",&link_color);
-			am_mw_teletext_perform_color_link(link_color);
+			AM_TT_PerformColorLink(link_color);
 		}
 
 

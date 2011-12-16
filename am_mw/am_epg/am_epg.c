@@ -1014,7 +1014,7 @@ static void am_epg_tablectl_data_init(AM_EPG_Monitor_t *mon)
 	am_epg_tablectl_init(&mon->nitctl, AM_EPG_EVT_NIT_DONE, AM_SI_PID_NIT, AM_SI_TID_NIT_ACT,
 							 0xff, "NIT", 1, am_epg_nit_done, 0);
 	am_epg_tablectl_init(&mon->totctl, AM_EPG_EVT_TDT_DONE, AM_SI_PID_TDT, AM_SI_TID_TOT,
-							 0xff, "TDT/TOT", 1, am_epg_tdt_done, 0);
+							 0x70, "TDT/TOT", 1, am_epg_tdt_done, 0);
 	am_epg_tablectl_init(&mon->eit4ectl, AM_EPG_EVT_EIT4E_DONE, AM_SI_PID_EIT, AM_SI_TID_EIT_PF_ACT,
 							 0xff, "EIT pf actual", MAX_EIT4E_SUBTABLE_CNT, am_epg_eit4e_done, EIT4E_REPEAT_DISTANCE);
 	am_epg_tablectl_init(&mon->eit4fctl, AM_EPG_EVT_EIT4F_DONE, AM_SI_PID_EIT, AM_SI_TID_EIT_PF_OTH,

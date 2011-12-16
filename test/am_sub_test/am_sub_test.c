@@ -7,7 +7,7 @@
 #include "am_misc.h"
 #include <stdlib.h>
 
-#include "am_mw_subtitle.h"
+#include "am_sub.h"
 #define FEND_DEV_NO 0
 #define DMX_DEV_NO  0
 #define AV_DEV_NO   0
@@ -29,7 +29,7 @@ static void update_display()
 	AM_OSD_Update(spt.osd_id,0);
 }
 
-void show_subtitle(SUB_Screen_t* screen)
+void show_subtitle(AM_SUB_Screen_t* screen)
 {
 #ifdef PAL_256
 	unsigned int i=0;
@@ -42,7 +42,7 @@ void show_subtitle(SUB_Screen_t* screen)
 		for(i=0;i<screen->region_num;i++)
 		{
 			palette.color_count=screen->region[i].entry;
-			AM_OSD_SetPalette(spt.surf,(AM_OSD_Color_t*)screen->region[i].palette,0,screen->region[i].entry);
+			AM_OSD_SetPalette(spt.surf,(AM_OSD_Color_t*)screen->region[i].palette.colors,0,screen->region[i].palette.color_count);
 			x=screen->region[i].left;
 			y=screen->region[i].top;
 			x_off=(spt.output_width-screen->width)/2+x;
@@ -68,7 +68,7 @@ void show_subtitle(SUB_Screen_t* screen)
 	unsigned int j=0,k=0;
 	int x=0,y=0;
 	int color_index=0;
-	int pixel=0;
+	unsigned int pixel=0;
 	AM_OSD_Color_t col;
 
 	if(screen)
@@ -82,12 +82,9 @@ void show_subtitle(SUB_Screen_t* screen)
 				for(k=0;k<screen->region[i].width;k++)
 				{
 					color_index=screen->region[i].buffer[j*screen->region[i].width+k];
-					if(color_index<screen->region[i].entry)
+					if(color_index<screen->region[i].palette.color_count)
 					{
-						col.r=screen->region[i].palette[color_index].red;
-						col.g=screen->region[i].palette[color_index].green;
-						col.b=screen->region[i].palette[color_index].blue;
-						col.a=screen->region[i].palette[color_index].alpha;
+						col=screen->region[i].palette.colors[color_index];
 					}
 					AM_OSD_MapColor(spt.surf->format, &col, &pixel);
 
@@ -103,7 +100,7 @@ void show_subtitle(SUB_Screen_t* screen)
 #endif
 }
 
-void clean_subtitle(SUB_Screen_t* screen)
+void clean_subtitle(AM_SUB_Screen_t* screen)
 {
 #ifdef PAL_256
 	unsigned int i=0;
@@ -118,7 +115,7 @@ void clean_subtitle(SUB_Screen_t* screen)
 		for(i=0;i<screen->region_num;i++)
 		{
 			palette.color_count=screen->region[i].entry;
-			AM_OSD_SetPalette(spt.surf,(AM_OSD_Color_t*)screen->region[i].palette,0,screen->region[i].entry);
+			AM_OSD_SetPalette(spt.surf,(AM_OSD_Color_t*)screen->region[i].palette.colors,0,screen->region[i].palette.color_count);
 			x=screen->region[i].left;
 			y=screen->region[i].top;
 			x_off=(spt.output_width-screen->width)/2+x;
@@ -143,7 +140,7 @@ void clean_subtitle(SUB_Screen_t* screen)
 	unsigned int j=0,k=0;
 	int x=0,y=0;
 	int color_index=0;
-	int pixel=0;
+	unsigned int pixel=0;
 	AM_OSD_Color_t col;
 
 	if(screen)
@@ -157,12 +154,9 @@ void clean_subtitle(SUB_Screen_t* screen)
 				for(k=0;k<screen->region[i].width;k++)
 				{
 					color_index=0;
-					if(color_index<screen->region[i].entry)
+					if(color_index<screen->region[i].palette.color_count)
 					{
-						col.r=screen->region[i].palette[color_index].red;
-						col.g=screen->region[i].palette[color_index].green;
-						col.b=screen->region[i].palette[color_index].blue;
-						col.a=screen->region[i].palette[color_index].alpha;
+						col=screen->region[i].palette.colors[color_index];
 					}
 					AM_OSD_MapColor(spt.surf->format, &col, &pixel);
 
@@ -240,9 +234,9 @@ static int clean_osd()
 
 	return 0;
 #else
-	unsigned int i=0;
-	unsigned int j=0;
-	int pixel=0;
+	int i=0;
+	int j=0;
+	unsigned int pixel=0;
 	AM_OSD_Color_t col;
 	col.r=0;
 	col.g=0;
@@ -358,9 +352,9 @@ int main(int argc,char **argv)
 	}
 
 	AM_AV_StartTS(AV_DEV_NO,v_pid,a_pid,v_format,a_format);
-	am_mw_subtitle_init(0x20000);	
-	am_mw_set_update_cb(show_subtitle,clean_subtitle);
-	am_mw_start_subtitle(page_id,1,0,s_pid);
+	AM_SUB_Init(0x20000);	
+	AM_SUB_RegisterUpdateCbs(show_subtitle,clean_subtitle);
+	AM_SUB_Start(0,s_pid,page_id,1);
 
 	while(1)
 	{
@@ -369,18 +363,18 @@ int main(int argc,char **argv)
 		{
 			if(!strncmp(buf, "quit", 4))
 			{
-				am_mw_stop_subtitle();
-				am_mw_subtitle_deinit();
+				AM_SUB_Stop();
+				AM_SUB_Quit();
 				clean_osd();
 				return 0;
 			}
 			if(!strncmp(buf, "show", 4))
 			{
-				am_mw_subtitle_show(1);
+				AM_SUB_Show(AM_TRUE);
 			}
 			if(!strncmp(buf, "hide", 4))
 			{
-				am_mw_subtitle_show(0);
+				AM_SUB_Show(AM_FALSE);
 			}
 			if(!strncmp(buf, "change", 4))
 			{
@@ -394,9 +388,9 @@ int main(int argc,char **argv)
 				scanf("%d",&v_format);
 				printf("a_format");
 				scanf("%d",&a_format);
-				am_mw_stop_subtitle();
+				AM_SUB_Stop();
 				AM_AV_StartTS(AV_DEV_NO,v_pid,a_pid,v_format,a_format);
-				am_mw_start_subtitle(page_id,1,0,s_pid);
+				AM_SUB_Start(0,s_pid,page_id,1);
 
 
 

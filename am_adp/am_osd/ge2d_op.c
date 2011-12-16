@@ -22,18 +22,19 @@
 #include <sys/ioctl.h>
 #include <fcntl.h>
 
+#ifdef CHIP_8226H
 #include "cmemlib.h"
+#else
+#include <linux/cmem.h>
+#endif
+
 
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
 
-#define AML_A1H
-
-/*GE2D 定义*/
 #ifdef CHIP_8226H
-  #error Please double check the GE2D_XXX definitions value below.
-#endif
+/*GE2D 定义*/
 #define GE2D_BLIT_WITHOUTKEY_NOBLOCK		0x4709
 #define GE2D_STRETCHBLIT_NOALPHA_NOBLOCK   	0x4708
 #define GE2D_BLIT_NOALPHA_NOBLOCK 			0x4707
@@ -49,12 +50,7 @@
 #define GE2D_STRETCHBLIT   						0x46fe
 #define GE2D_FILLRECTANGLE   					0x46fd
 #define GE2D_SRCCOLORKEY   					0x46fc
-#ifndef CHIP_8626X
 #define GE2D_SET_COEF							0x46fa
-#else
-#define GE2D_SET_COEF							0x46fb
-#define GE2D_CONFIG_EX  			       			0x46fa
-#endif
 #define GE2D_CONFIG							0x46f9
 #define GE2D_ANTIFLICKER_ENABLE				0x46f8
 #define GE2D_BLIT_WITHOUTKEY				       0x46f7
@@ -83,7 +79,6 @@
 #define BLENDOP_LOGIC_AND_INVERT  (BLENDOP_LOGIC+14)
 #define BLENDOP_LOGIC_OR_INVERT   (BLENDOP_LOGIC+15)
 
-#if defined(AML_A1H)
 #define GE2D_ENDIAN_SHIFT               24
 #define GE2D_ENDIAN_MASK            (0x1 << GE2D_ENDIAN_SHIFT)
 #define GE2D_BIG_ENDIAN             (0 << GE2D_ENDIAN_SHIFT)
@@ -131,9 +126,7 @@
 #define GE2D_COLOR_MAP_AVUY8888     (2 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_BGRA8888     (3 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_VUYA8888     (3 << GE2D_COLOR_MAP_SHIFT)
-#endif
 
-#if defined(AML_A1H)
 #define GE2D_FMT_S8_Y                   0x00000 /* 00_00_0_00_0_00 */
 #define GE2D_FMT_S8_CB                  0x00040 /* 00_01_0_00_0_00 */
 #define GE2D_FMT_S8_CR                  0x00080 /* 00_10_0_00_0_00 */
@@ -204,38 +197,6 @@
 #define GE2D_FORMAT_S32_ABGR        (GE2D_FMT_S32_RGBA    | GE2D_COLOR_MAP_ABGR8888) 
 #define GE2D_FORMAT_S32_BGRA        (GE2D_FMT_S32_RGBA    | GE2D_COLOR_MAP_BGRA8888) 
 
-#else
-#define GE2D_FORMAT_MASK            0x0ffff
-#define GE2D_FORMAT_YUV             0x20000
-#define GE2D_FORMAT_COMP_RANGE      0x10000
-#define GE2D_FORMAT_S8_Y            0x00000 /* 00_00_0_00_0_00 */
-#define GE2D_FORMAT_S8_CB           0x00400 /* 00_01_0_00_0_00 */
-#define GE2D_FORMAT_S8_CR           0x00800 /* 00_10_0_00_0_00 */
-#define GE2D_FORMAT_S8_R            0x00000 /* 00_00_0_00_0_00 */
-#define GE2D_FORMAT_S8_G            0x00400 /* 00_01_0_00_0_00 */
-#define GE2D_FORMAT_S8_B            0x00800 /* 00_10_0_00_0_00 */
-#define GE2D_FORMAT_S8_A            0x00c00 /* 00_11_0_00_0_00 */
-#define GE2D_FORMAT_S8_LUT          0x00020 /* 00_00_1_00_0_00 */
-#define GE2D_FORMAT_S16_YUV422      0x20100 /* 01_00_0_00_0_00 */
-#define GE2D_FORMAT_S16_RGB         0x00100 /* 01_00_0_00_0_00 */
-#define GE2D_FORMAT_S24_YUV444      0x20200 /* 10_00_0_00_0_00 */
-#define GE2D_FORMAT_S24_RGB         0x00200 /* 10_00_0_00_0_00 */
-#define GE2D_FORMAT_S32_YUVA444     0x20300 /* 11_00_0_00_0_00 */
-#define GE2D_FORMAT_S32_RGBA        0x00300 /* 11_00_0_00_0_00 */
-#define GE2D_FORMAT_M24_YUV420      0x20007 /* 00_00_0_00_1_11 */
-#define GE2D_FORMAT_M24_YUV422      0x20006 /* 00_00_0_00_1_10 */
-#define GE2D_FORMAT_M24_YUV444      0x20004 /* 00_00_0_00_1_00 */
-#define GE2D_FORMAT_M24_RGB         0x00004 /* 00_00_0_00_1_00 */
-#define GE2D_FORMAT_M24_YUV420T     0x20017 /* 00_00_0_10_1_11 */
-#define GE2D_FORMAT_M24_YUV420B     0x2001f /* 00_00_0_11_1_11 */
-#define GE2D_FORMAT_S16_YUV422T     0x20110 /* 01_00_0_10_0_00 */
-#define GE2D_FORMAT_S16_YUV422B     0x20138 /* 01_00_0_11_0_00 */
-#define GE2D_FORMAT_S24_YUV444T     0x20210 /* 10_00_0_10_0_00 */
-#define GE2D_FORMAT_S24_YUV444B     0x20218 /* 10_00_0_11_0_00 */
-#endif
-
-#define CANVAS_ALIGN(x)    (((x)+7)&~7)
-
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
@@ -291,6 +252,10 @@ typedef    struct {
        src_key_ctrl_t  src2_key;
 }config_para_t;
 
+#else  //!defined(CHIP_8226H)
+#include <linux/ge2d/ge2d_main.h>
+#endif //CHIP_8226H
+
 /****************************************************************************
  * Static data
  ***************************************************************************/
@@ -300,6 +265,8 @@ OSD0_OSD0,OSD0_OSD1,TYPE_INVALID,
 OSD1_OSD0,OSD1_OSD1,TYPE_INVALID,
 ALLOC_OSD0,ALLOC_OSD1,ALLOC_ALLOC
 };
+
+#define CANVAS_ALIGN(x)    (((x)+7)&~7)
 
 /**\brief GE2D设备文件句柄*/
 static int ge2d_fd;
@@ -321,6 +288,7 @@ const AM_OSD_SurfaceOp_t ge2d_draw_op = {
 };
 
 static CMEM_AllocParams cmem_params = {CMEM_HEAP, CMEM_NONCACHED, 8};
+
 
 /****************************************************************************
  * Functions
@@ -674,10 +642,6 @@ static AM_ErrorCode_t ge2d_blit (AM_OSD_Surface_t *src, AM_OSD_Rect_t *sr, AM_OS
 	op.dst_rect.w = ddr.w;
 	op.dst_rect.h = ddr.h;
 	
-	/*AM_DEBUG(1, "GE2D BLIT %d %d %d %d -> %d %d %d %d",
-			dsr.x, dsr.y, dsr.w, dsr.h,
-			ddr.x, ddr.y, ddr.w, ddr.h);*/
-	
 	if((dsr.w==ddr.w) && (dsr.h==ddr.h))
 	{
 		if(AM_OSD_PIXEL_FORMAT_TYPE_IS_YUV(src->format->type))
@@ -724,13 +688,15 @@ static AM_ErrorCode_t ge2d_blit (AM_OSD_Surface_t *src, AM_OSD_Rect_t *sr, AM_OS
 		else if(para->enable_op)
 		{
 			cmd = GE2D_BLEND;
+			//cmd = GE2D_STRETCHBLIT_NOALPHA;
 			op.op = ((BLENDOP_LOGIC+para->op)<<24)|(2<<20)|(4<<16)|((BLENDOP_LOGIC+para->op)<<8)|(2<<4)|(4);
 			op.src2_rect = op.dst_rect;
 		}
 		else if(para->enable_alpha || para->enable_global_alpha)
 		{
 			cmd = GE2D_BLEND;
-			
+			//cmd = GE2D_STRETCHBLIT_NOALPHA;
+
 			op.src2_rect = op.dst_rect;
 			if(para->enable_global_alpha)
 			{
@@ -758,8 +724,14 @@ static AM_ErrorCode_t ge2d_blit (AM_OSD_Surface_t *src, AM_OSD_Rect_t *sr, AM_OS
 		color = (c.r<<24)|(c.g<<16)|(c.b<<8)|c.a;
 		conf.src_key.key_enable = 1;
 		conf.src_key.key_color  = color;
-		conf.src_key.key_mask   = 0;
+		conf.src_key.key_mask   = 0xffffffff;
 	}
+
+	/*AM_DEBUG(1, "GE2D BLIT(%d) %d %d %d %d ->(%d) %d %d %d %d, cmd:0x%x, op:0x%x",
+			src->format->type, dsr.x, dsr.y, dsr.w, dsr.h,
+			dst->format->type, ddr.x, ddr.y, ddr.w, ddr.h,
+			cmd, op.op);*/
+
 	
 	if(ioctl(ge2d_fd, GE2D_CONFIG, &conf)==-1)
 	{

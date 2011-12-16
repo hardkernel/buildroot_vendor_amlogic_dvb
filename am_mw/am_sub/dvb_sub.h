@@ -3,18 +3,13 @@
 #define DVB_SUB_H
 
 #include "includes.h"
+#include "am_osd.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct sub_clut_s
-{
-    INT8U                   red;
-    INT8U                   green;
-    INT8U                   blue;
-    INT8U                   alpha;
-} sub_clut_t;
+typedef AM_OSD_Color_t sub_clut_t;
 
 typedef struct sub_pic_region_s
 {
@@ -24,7 +19,7 @@ typedef struct sub_pic_region_s
     INT32U                  height;             /* region height (pixels)       */
 
     INT32U                  entry;              /* region clut entry number  */
-    struct sub_clut_s       clut[256];          /* region clut               */
+    sub_clut_t              clut[256];          /* region clut               */
 
     /* for background */
     INT32U                  background;         /* region background color      */

@@ -64,7 +64,9 @@ int main(int argc, char **argv)
 			AM_OSD_BlitPara_t bp;
 			AM_OSD_Surface_t *screen;
 			AM_OSD_Rect_t sr, dr;
-			
+	
+			memset(&bp, 0, sizeof(bp));
+
 			bp.enable_alpha = AM_FALSE;
 			bp.enable_key   = AM_FALSE;
 			
@@ -83,7 +85,9 @@ int main(int argc, char **argv)
 			printf("open image \"%s\" width %d height %d BPP %d\n", name, img->width, img->height, img->format->bytes_per_pixel);
 			
 			AM_OSD_DrawFilledRect(screen, &dr, 0);
-			
+			//AM_OSD_DrawFilledRect(img, &sr, 0xff00ff00);
+
+			dr = sr;
 			AM_OSD_Blit(img, &sr, screen, &dr, &bp);
 			
 			AM_OSD_Update(OSD_DEV_NO, NULL);

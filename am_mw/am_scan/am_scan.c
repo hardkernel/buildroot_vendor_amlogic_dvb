@@ -1631,7 +1631,7 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 						AM_SI_LIST_END()
 					AM_SI_LIST_END()
 lcn_found:
-					if(visible){
+					if(!visible){
 						sqlite3_bind_int(stmts[UPDATE_CHAN_SKIP], 1, 1);
 						sqlite3_bind_int(stmts[UPDATE_CHAN_SKIP], 2, srv_tab.srv_ids[i]);
 						sqlite3_step(stmts[UPDATE_CHAN_SKIP]);
@@ -2064,6 +2064,17 @@ NIT_END:
 		scanner->stage = AM_SCAN_STAGE_TS;
 		am_scan_start_next_ts(scanner);
 	}
+}
+
+/**\brief NIT搜索完毕(包括超时)处理 目的在于manual与allband模式需要使用NIT的描述子信息*/
+static void am_scan_nit_done_nousefreqinfo(AM_SCAN_Scanner_t *scanner)
+{
+	am_scan_free_filter(scanner, &scanner->nitctl.fid);
+	/*清除事件标志*/
+	//scanner->evt_flag &= ~scanner->nitctl.evt_flag;
+AM_DEBUG(1, "$$$$$$$$$$$$$$ am_scan_nit_done_nousefreqinfo %p", scanner->result.nits);
+	/*清除搜索标识*/
+	scanner->recv_status &= ~scanner->nitctl.recv_flag;
 }
 
 /**\brief BAT搜索完毕(包括超时)处理*/
@@ -2813,8 +2824,21 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 	{
 		am_scan_tablectl_init(&scanner->sdtctl, AM_SCAN_RECVING_SDT, AM_SCAN_EVT_SDT_DONE, SDT_TIMEOUT, 
 							AM_SI_PID_SDT, AM_SI_TID_SDT_ACT, "SDT", 1, am_scan_sdt_done, 0);
-		am_scan_tablectl_init(&scanner->nitctl, AM_SCAN_RECVING_NIT, AM_SCAN_EVT_NIT_DONE, NIT_TIMEOUT, 
-							AM_SI_PID_NIT, AM_SI_TID_NIT_ACT, "NIT", 1, am_scan_nit_done, 0);
+
+		/*In order to support lcn, add nit info support in manual and allband scan mode*/
+		if ((scanner->result.enable_lcn)
+			&& (scanner->result.mode & AM_SCAN_MODE_MANUAL) || (scanner->result.mode & AM_SCAN_MODE_ALLBAND))
+		{
+			am_scan_tablectl_init(&scanner->nitctl, AM_SCAN_RECVING_NIT, AM_SCAN_EVT_NIT_DONE, NIT_TIMEOUT, 
+								AM_SI_PID_NIT, AM_SI_TID_NIT_ACT, "NIT", 1, am_scan_nit_done_nousefreqinfo, 0);		
+		}
+		else
+		{
+			am_scan_tablectl_init(&scanner->nitctl, AM_SCAN_RECVING_NIT, AM_SCAN_EVT_NIT_DONE, NIT_TIMEOUT, 
+								AM_SI_PID_NIT, AM_SI_TID_NIT_ACT, "NIT", 1, am_scan_nit_done, 0);
+		}
+
+		
 		am_scan_tablectl_init(&scanner->batctl, AM_SCAN_RECVING_BAT, AM_SCAN_EVT_BAT_DONE, BAT_TIMEOUT, 
 							AM_SI_PID_BAT, AM_SI_TID_BAT, "BAT", MAX_BAT_SUBTABLE_CNT, 
 							am_scan_bat_done, BAT_REPEAT_DISTANCE);
@@ -2938,6 +2962,14 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 				am_scan_request_section(scanner, &scanner->patctl);
 				am_scan_request_section(scanner, &scanner->catctl);
 				am_scan_request_section(scanner, &scanner->sdtctl);
+
+				/*In order to support lcn, add nit info support in manual and allband scan mode*/
+				if ((!scanner->result.nits) && (scanner->result.enable_lcn)
+					&& ((scanner->result.mode & AM_SCAN_MODE_MANUAL) || (scanner->result.mode & AM_SCAN_MODE_ALLBAND)))
+				{
+					am_scan_tablectl_clear(&scanner->nitctl);
+					am_scan_request_section(scanner, &scanner->nitctl);
+				}
 			}
 			
 

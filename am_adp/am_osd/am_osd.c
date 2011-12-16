@@ -327,6 +327,34 @@ static AM_INLINE AM_ErrorCode_t osd_get_openned_dev(int dev_no, AM_OSD_Device_t 
  * API functions
  ***************************************************************************/
 
+/**\brief 初始化OSD模块(不打开OSD设备，只初始化相关资源)
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_osd.h)
+ */
+AM_ErrorCode_t AM_OSD_Init(void)
+{
+	pthread_mutex_lock(&am_gAdpLock);
+	osd_init();
+	pthread_mutex_unlock(&am_gAdpLock);
+
+	return AM_SUCCESS;
+}
+
+/**\brief 释放OSD模块
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_osd.h)
+ */
+AM_ErrorCode_t AM_OSD_Quit(void)
+{
+	pthread_mutex_lock(&am_gAdpLock);
+	osd_deinit();
+	pthread_mutex_unlock(&am_gAdpLock);
+
+	return AM_SUCCESS;
+}
+
 /**\brief 打开一个OSD设备
  * \param dev_no OSD设备号
  * \param[in] para 设备开启参数

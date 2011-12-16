@@ -1703,7 +1703,7 @@ static AM_ErrorCode_t aml_set_deinterlace(int val)
 	return AM_FileEcho("/sys/module/deinterlace/parameters/deinterlace_mode", buf);		
 	
 #else
-	ret = AM_FileEcho("/sys/class/vfm/map","rm all");
+	ret = AM_FileEcho("/sys/class/vfm/map",(val)?"rm default decoder amvideo":"rm default decoder deinterlace amvideo");
 	if(ret == AM_SUCCESS)
 		ret = AM_FileEcho("/sys/class/vfm/map", (val)?"add default decoder deinterlace amvideo":"add default decoder amvideo");
 	return ret;
@@ -2398,7 +2398,7 @@ extern unsigned long CMEM_getPhys(unsigned long virts);
 static AM_ErrorCode_t aml_decode_jpeg(AV_JPEGData_t *jpeg, const uint8_t *data, int len, int mode, void *para)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
-#if !defined(ANDROID) && !defined(CHIP_8626X)
+#if !defined(ANDROID)
 	AV_JPEGDecodePara_t *dec_para = (AV_JPEGDecodePara_t*)para;
 	AV_JPEGDecState_t s;
 	AM_Bool_t decLoop = AM_TRUE;
@@ -2414,7 +2414,7 @@ static AM_ErrorCode_t aml_decode_jpeg(AV_JPEGData_t *jpeg, const uint8_t *data, 
 #endif
 
 	char tmp_buf[64];
-	
+
 	s = AV_JPEG_DEC_STAT_INFOCONFIG;
 	while(decLoop)
 	{
@@ -3653,9 +3653,9 @@ static AM_ErrorCode_t aml_file_info(AM_AV_Device_t *dev, AM_AV_FileInfo_t *info)
 
 static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t para, void *val)
 {
-	const char *name = NULL, *cmd;
+	const char *name = NULL, *cmd = "";
 	char buf[32];
-	AM_ErrorCode_t ret;
+	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_VideoWindow_t *win;
 	
 	switch(para)

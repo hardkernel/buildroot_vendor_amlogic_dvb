@@ -1,6 +1,6 @@
 
 
-#include "am_mw_subtitle.h"
+#include "am_sub.h"
 #include "includes.h"
 #include "list.h"
 #include "dvb_sub.h"
@@ -87,7 +87,7 @@ struct sub_display_set
     	INT32U state;
     	INT32U display;
     	dvbsub_picture_t* sub_pic;
-    	SUB_Screen_t sub_screen;
+    	AM_SUB_Screen_t sub_screen;
 };
 
 
@@ -106,8 +106,8 @@ typedef struct am_mw_subtitle_s
 	int ancillary_id;
 	int pes_pid;
 	PesWorkBuffer_t pwb;
-	sub_show_callback show_cb;
-	sub_clear_callback clear_cb;
+	AM_SUB_ShowCb_t show_cb;
+	AM_SUB_ClearCb_t clear_cb;
 	pthread_mutex_t     lock;
 	sem_t subtitle_decode;
 	int decode_destroyed;
@@ -138,7 +138,7 @@ static void subtitle_remove( struct sub_display_set* sub_display)
 
 		 for (i = 0; i < sub_display->sub_screen.region_num; i++)
 		 {
-			 sub_display->sub_screen.region[i].palette = NULL;
+			 sub_display->sub_screen.region[i].palette.colors = NULL;
 			 sub_display->sub_screen.region[i].buffer = NULL;
 			 sub_display->sub_screen.region[i].text = NULL;
 		 }
@@ -186,7 +186,7 @@ static  void subtitle_cb(INT32U handle, dvbsub_picture_t *display)
 			sub_display->sub_screen.region_num = num;
 			if (num > 0)
 			{
-                		sub_display->sub_screen.region = (SUB_Region_t*)calloc(num, sizeof(SUB_Region_t));
+                		sub_display->sub_screen.region = (AM_SUB_Region_t*)calloc(num, sizeof(AM_SUB_Region_t));
 				
 	        	        if (sub_display->sub_screen.region)
 	        	        {
@@ -200,8 +200,8 @@ static  void subtitle_cb(INT32U handle, dvbsub_picture_t *display)
 	        	                sub_display->sub_screen.region[num].width   = pic_reg->width;
 	        	                sub_display->sub_screen.region[num].height  = pic_reg->height;
 	
-	        	                sub_display->sub_screen.region[num].entry   = pic_reg->entry;
-	        	                sub_display->sub_screen.region[num].palette = (SUB_palette_t*)pic_reg->clut;
+	        	                sub_display->sub_screen.region[num].palette.color_count = pic_reg->entry;
+	        	                sub_display->sub_screen.region[num].palette.colors = pic_reg->clut;
 	
 	        	                sub_display->sub_screen.region[num].background  = pic_reg->background;
 	        	                sub_display->sub_screen.region[num].buffer      = pic_reg->p_buf;
@@ -235,7 +235,7 @@ static  void subtitle_cb(INT32U handle, dvbsub_picture_t *display)
 	return ;
 }
 
-int am_mw_subtitle_init(int buffer_size)
+AM_ErrorCode_t AM_SUB_Init(int buffer_size)
 {
 
 	int ret=AM_SUCCESS;
@@ -257,7 +257,7 @@ int am_mw_subtitle_init(int buffer_size)
 	context_sub.pwb.length=buffer_size;
 	if(!context_sub.pwb.start_ptr)
 	{
-		ret=AM_MW_SUBTITLE_ERR_NO_MEM;
+		ret=AM_SUB_ERR_NO_MEM;
 		goto exit;
 	}
 
@@ -278,7 +278,7 @@ exit:
 }
 
 
-int am_mw_subtitle_deinit()
+AM_ErrorCode_t AM_SUB_Quit()
 {
 	//first quit
 	context_sub.flags &=~SUBTITLE_PES_GET;
@@ -468,26 +468,26 @@ static int open_demux_pes_filter(int dev_no,int pid,int type)
 	struct dmx_pes_filter_params  param;
 	if(dev_no>MAX_DMX_COUNT)
 	{
-		ret=AM_MW_SUBTITLE_ERR_OPEN_PES;
+		ret=AM_SUB_ERR_OPEN_PES;
 		goto exit;
 	}
 	ret=AM_DMX_AllocateFilter(dev_no,&fhandle);
 	if(ret)
 	{
-		ret=AM_MW_SUBTITLE_ERR_OPEN_PES;
+		ret=AM_SUB_ERR_OPEN_PES;
 		goto exit;
 
 	}
 	ret=AM_DMX_SetCallback(dev_no,fhandle,pes_filter_callback,0);
 	if(ret)
 	{
-		ret=AM_MW_SUBTITLE_ERR_OPEN_PES;
+		ret=AM_SUB_ERR_OPEN_PES;
 		goto error;
 	}
 	ret=AM_DMX_SetBufferSize(dev_no,fhandle,0x40000);
 	if(ret)
 	{
-		ret=AM_MW_SUBTITLE_ERR_OPEN_PES;
+		ret=AM_SUB_ERR_OPEN_PES;
 		goto error;
 	}
 	param.pid=pid;
@@ -497,7 +497,7 @@ static int open_demux_pes_filter(int dev_no,int pid,int type)
 
 	if(ret)
 	{
-		ret=AM_MW_SUBTITLE_ERR_OPEN_PES;
+		ret=AM_SUB_ERR_OPEN_PES;
 		goto error;
 	}
 
@@ -505,7 +505,7 @@ static int open_demux_pes_filter(int dev_no,int pid,int type)
 
 	if(ret)
 	{
-		ret=AM_MW_SUBTITLE_ERR_OPEN_PES;
+		ret=AM_SUB_ERR_OPEN_PES;
 		goto error;
 	}
 	context_sub.fhandle=fhandle;
@@ -536,14 +536,14 @@ static int close_demux_pes_filter()
 
 #endif
 
-int am_mw_start_subtitle(int composition_id, int ancillary_id,int dmx_id,int pid)
+AM_ErrorCode_t AM_SUB_Start(int dmx_id, int pid, int composition_id, int ancillary_id)
 {
 	int ret=AM_SUCCESS;
 
 	ret=dvbsub_decoder_create(composition_id,ancillary_id,subtitle_cb,&context_sub.decode_handle);
 	if(ret)
 	{
-		ret=AM_MW_SUBTITLE_ERR_CREATE_DECODE;
+		ret=AM_SUB_ERR_CREATE_DECODE;
 		goto exit;
 	}
 	pthread_mutex_lock(&context_sub.lock);
@@ -560,7 +560,7 @@ int am_mw_start_subtitle(int composition_id, int ancillary_id,int dmx_id,int pid
 #endif
 	if(ret)
 	{
-		ret=AM_MW_SUBTITLE_ERR_OPEN_PES;
+		ret=AM_SUB_ERR_OPEN_PES;
 		goto error_open;
 	}
 
@@ -593,7 +593,7 @@ exit:
 }
 
 
-int am_mw_stop_subtitle()
+AM_ErrorCode_t AM_SUB_Stop(void)
 {
 
 	int ret=AM_SUCCESS;
@@ -1084,7 +1084,7 @@ static void *subtitle_thread(void *para)
 	INT32U time_out = 0;
 	INT32U remove_prev = 0;
 	struct sub_display_set* tmp_display = NULL;
-	SUB_Screen_t *show_screen = NULL, *clear_screen = NULL;
+	AM_SUB_Screen_t *show_screen = NULL, *clear_screen = NULL;
 	int decode_flag=0;
 	int sem_value=0;;
 	int count=0;
@@ -1260,7 +1260,7 @@ start:
 	return 0;
 }
 
-int am_mw_set_update_cb(sub_show_callback ssc ,sub_clear_callback scc)
+AM_ErrorCode_t AM_SUB_RegisterUpdateCbs(AM_SUB_ShowCb_t ssc, AM_SUB_ClearCb_t scc)
 {
 	context_sub.show_cb=ssc;	
 	context_sub.clear_cb=scc;	
@@ -1269,13 +1269,13 @@ int am_mw_set_update_cb(sub_show_callback ssc ,sub_clear_callback scc)
 }
 
 //show or hide subtitle
-int am_mw_subtitle_show(unsigned char isShow)
+AM_ErrorCode_t AM_SUB_Show(AM_Bool_t isShow)
 {
 	int ret=AM_SUCCESS;
 
 	if(!(context_sub.flags&SUBTITLE_RUN_FLAG))
 	{
-		ret=AM_MW_SUBTITLE_ERR_NOT_RUN;
+		ret=AM_SUB_ERR_NOT_RUN;
 		goto exit;
 	}
 

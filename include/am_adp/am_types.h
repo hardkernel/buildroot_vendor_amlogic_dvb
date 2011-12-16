@@ -55,10 +55,8 @@ enum AM_MOD_ID
 	AM_MOD_GUI,    /**< GUI模块*/
 	AM_MOD_REC,    /**< 录像管理模块*/
 	AM_MOD_TV,     /**< TV模块*/
-	AM_MOD_PesFilter,/**< Subtitle模块*/
-	AM_MOD_MW_SUBTITLE,/**< mw Subtitle模块*/
-	AM_MOD_MW_TELETEXT,/**< mw Teletext模块*/
-
+	AM_MOD_SUB,    /**< Subtitle模块*/
+	AM_MOD_TT,     /**< Teletext模块*/
 	AM_MOD_MAX
 };
 

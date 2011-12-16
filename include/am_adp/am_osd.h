@@ -233,6 +233,20 @@ typedef struct
  * Function prototypes  
  ***************************************************************************/
 
+/**\brief 初始化OSD模块(不打开OSD设备，只初始化相关资源)
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_osd.h)
+ */
+extern AM_ErrorCode_t AM_OSD_Init(void);
+
+/**\brief 释放OSD模块
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_osd.h)
+ */
+extern AM_ErrorCode_t AM_OSD_Quit(void);
+
 /**\brief 打开一个OSD设备
  * \param dev_no OSD设备号
  * \param[in] para 设备开启参数
