@@ -3653,9 +3653,9 @@ static AM_ErrorCode_t aml_file_info(AM_AV_Device_t *dev, AM_AV_FileInfo_t *info)
 
 static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t para, void *val)
 {
-	const char *name = NULL, *cmd;
+	const char *name = NULL, *cmd = "";
 	char buf[32];
-	AM_ErrorCode_t ret;
+	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_VideoWindow_t *win;
 	
 	switch(para)

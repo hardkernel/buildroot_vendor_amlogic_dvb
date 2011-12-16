@@ -9,9 +9,9 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_font/am_font.c am_font/freetype.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
-		   am_subtitle/am_mw_subtitle.c am_subtitle/dvb_sub.c am_subtitle/sub_memory.c\
-		   am_teletext/am_mw_teletext.c am_teletext/VTCommon.c am_teletext/VTDrawer.c am_teletext/VTTeletext.c\
-		   am_teletext/VTCharacterSet.c am_teletext/VTDecoder.c am_teletext/VTMosaicGraphics.c am_teletext/VTTopText.c\
+		   am_sub/am_sub.c am_sub/dvb_sub.c am_sub/sub_memory.c\
+		   am_tt/am_tt.c am_tt/VTCommon.c am_tt/VTDrawer.c am_tt/VTTeletext.c\
+		   am_tt/VTCharacterSet.c am_tt/VTDecoder.c am_tt/VTMosaicGraphics.c am_tt/VTTopText.c\
 		   am_si/am_si.c\
 		   am_si/libdvbsi/tables/bat.c\
 		   am_si/libdvbsi/tables/sdt.c\
