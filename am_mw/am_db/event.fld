@@ -16,3 +16,5 @@
 "sub_status integer",								/**< 预约播放状态, 0-尚未通知用户, 1-已得到用户确认,正等待开始时间到达时通知播放*/
 "parental_rating integer",							/**< 父母权限控制*/
 "source_id integer",								/**< ATSC source_id*/
+"db_dimension_ids text",							/**< ATSC ContentAdvisoryDescr中取出的对应于dimension_table中的db_id，用空格隔开每个dimension_db_id*/
+"rating_values text",								/**< ATSC ContentAdvisoryDescr中取出的对应dimension的value值，与上面db_dimension_ids一一对应*/

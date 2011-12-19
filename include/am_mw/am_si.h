@@ -155,7 +155,7 @@ extern "C"
 
 /*ATSC descriptor*/
 #define AM_SI_DESCR_SERVICE_LOCATION		(0xA1)
-
+#define AM_SI_DESCR_CONTENT_ADVISORY		(0x87)
 
 /**\brief 遍历SI提供的链表开始*/
 #define AM_SI_LIST_BEGIN(l, v) for ((v)=(l); (v)!=NULL; (v)=(v)->p_next){

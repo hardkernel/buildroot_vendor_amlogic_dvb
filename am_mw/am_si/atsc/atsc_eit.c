@@ -152,6 +152,7 @@ INT32S atsc_psip_parse_eit(INT8U* data, INT32U length, eit_section_info_t *info)
 				{
 					memset(tmp_evt_info, 0, sizeof(eit_event_info_t));
 
+					tmp_evt_info->event_id = MAKE_SHORT_HL(eit_sect_evt->event_id);
 					tmp_evt_info->start_time = MAKE_WORD_HML(eit_sect_evt->start_time);
 					tmp_evt_info->start_time += 315964800; /* secs_Between_1Jan1970_6Jan1980*/
 					

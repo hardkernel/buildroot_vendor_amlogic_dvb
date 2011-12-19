@@ -602,10 +602,10 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 			{
 				eit_section_info_t *p_eit;
 
+				AM_DEBUG(1, "%s: tid 0x%x, source_id 0x%x, sec %x, last %x", sec_ctrl->tname, header.table_id,
+								header.extension, header.sec_num, header.last_sec_num);
 				if (AM_SI_DecodeSection(mon->hsi, sec_ctrl->pid, (uint8_t*)data, len, (void**)&p_eit) == AM_SUCCESS)
 				{
-					AM_DEBUG(1, "PSIP EIT tid 0x%x, source_id 0x%x, sec %x, last %x", header.table_id,
-								header.extension, header.sec_num, header.last_sec_num);
 					/*设置为已接收*/
 					am_epg_tablectl_mark_section(sec_ctrl, &header); 
 					/*触发通知事件*/
@@ -985,10 +985,13 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 static void am_epg_psip_eit_done(AM_EPG_Monitor_t *mon)
 {
 	int i;
+	int now;
 	
+	AM_TIME_GetClock(&now);
 	for (i=0; i<mon->psip_eit_count; i++)
 	{
-		if (mon->psip_eitctl[i].fid != -1 && am_epg_tablectl_test_complete(&mon->psip_eitctl[i]))
+		if (mon->psip_eitctl[i].fid != -1 && am_epg_tablectl_test_complete(&mon->psip_eitctl[i])
+			&& (now - mon->psip_eitctl[i].data_arrive_time) > mon->psip_eitctl[i].repeat_distance)
 		{
 			AM_DEBUG(1, "Stop filter for PSIP EIT%d", i);
 			am_epg_free_filter(mon, &mon->psip_eitctl[i].fid);
@@ -1041,7 +1044,7 @@ static void am_epg_tablectl_data_init(AM_EPG_Monitor_t *mon)
 	{
 		snprintf(name, sizeof(name), "ATSC EIT%d", i);
 		am_epg_tablectl_init(&mon->psip_eitctl[i], AM_EPG_EVT_PSIP_EIT_DONE, 0x1fff, AM_SI_TID_PSIP_EIT,
-							 0xff, name, 100, am_epg_psip_eit_done, 0);
+							 0xff, name, MAX_EIT_SUBTABLE_CNT, am_epg_psip_eit_done, 5000);
 	}
 }
 
