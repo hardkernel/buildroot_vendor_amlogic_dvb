@@ -219,7 +219,7 @@ static int normal_cmd(const char *cmd)
 		sscanf(cmd+3, "%d", &v);
 		AM_AOUT_SetVolume(AOUT_DEV_NO, v);
 	}	
-	else if(!strncmp(cmd, "aout", 5))
+	else if(!strncmp(cmd, "aout", 4))
 	{
 		AM_Bool_t mute;
 		AM_AOUT_OutputMode_t out;
@@ -237,6 +237,27 @@ static int normal_cmd(const char *cmd)
 							(out==AM_AOUT_OUTPUT_SWAP)?"SWAP":"???");
 		printf("Volume: %d\n", vol);
 	}
+	else if(!strncmp(cmd, "vout", 4))
+	{
+		AM_AV_VideoAspectRatio_t as;
+		AM_AV_VideoAspectMatchMode_t am;
+		
+		AM_AV_GetVideoAspectRatio(AV_DEV_NO, &as);
+		AM_AV_GetVideoAspectMatchMode(AV_DEV_NO, &am);
+
+		printf("Video Out Info:\n");
+		printf("AspectRatio: %s\n", (as==AM_AV_VIDEO_ASPECT_AUTO)?"AUTO":
+							(as==AM_AV_VIDEO_ASPECT_16_9)?"16x9":
+							(as==AM_AV_VIDEO_ASPECT_4_3)?"4x3":"???");
+		printf("AspectMatch: %s\n", (am==AM_AV_VIDEO_ASPECT_MATCH_IGNORE)?"IGNORE":
+							(am==AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX)?"LETTERBOX":
+							(am==AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN)?"PANSCAN":
+							(am==AM_AV_VIDEO_ASPECT_MATCH_COMBINED)?"COMBINED":"???");
+	}
+	else if(!strncmp(cmd, "auto", 4))
+	{
+		AM_AV_SetVideoAspectRatio(AV_DEV_NO, AM_AV_VIDEO_ASPECT_AUTO);
+	}	
 	else if(!strncmp(cmd, "16x9", 4))
 	{
 		AM_AV_SetVideoAspectRatio(AV_DEV_NO, AM_AV_VIDEO_ASPECT_16_9);
@@ -245,7 +266,22 @@ static int normal_cmd(const char *cmd)
 	{
 		AM_AV_SetVideoAspectRatio(AV_DEV_NO, AM_AV_VIDEO_ASPECT_4_3);
 	}
-
+	else if(!strncmp(cmd, "igno", 4))
+	{
+		AM_AV_SetVideoAspectMatchMode(AV_DEV_NO, AM_AV_VIDEO_ASPECT_MATCH_IGNORE);
+	}
+	else if(!strncmp(cmd, "lett", 4))
+	{
+		AM_AV_SetVideoAspectMatchMode(AV_DEV_NO, AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX);
+	}
+	else if(!strncmp(cmd, "pans", 4))
+	{
+		AM_AV_SetVideoAspectMatchMode(AV_DEV_NO, AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN);
+	}
+	else if(!strncmp(cmd, "comb", 4))
+	{
+		AM_AV_SetVideoAspectMatchMode(AV_DEV_NO, AM_AV_VIDEO_ASPECT_MATCH_COMBINED);
+	}
 	else
 	{
 		return 0;

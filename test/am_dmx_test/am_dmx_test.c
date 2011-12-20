@@ -258,8 +258,12 @@ int main(int argc, char **argv)
 	memset(&para, 0, sizeof(para));
 	AM_TRY(AM_DMX_Open(DMX_DEV_NO, &para));
 
-	AM_TRY(AM_DMX_SetSource(DMX_DEV_NO,AM_DMX_SRC_TS2));
-	
+{
+	AM_DMX_Source_t s = AM_DMX_SRC_TS2;
+	AM_TRY(AM_DMX_SetSource(DMX_DEV_NO, s));
+	printf("TS SRC = %d\n", s);
+}
+
 	get_section();
 	
 	AM_DMX_Close(DMX_DEV_NO);

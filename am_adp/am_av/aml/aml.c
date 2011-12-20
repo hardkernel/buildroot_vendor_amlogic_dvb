@@ -92,8 +92,17 @@ void *adec_handle;
 #define VID_DISABLE_FILE    "/sys/class/video/disable_video"
 #define VID_BLACKOUT_FILE   "/sys/class/video/blackout_policy"
 #define VID_SCREEN_MODE_FILE  "/sys/class/video/screen_mode"
-#define VID_ASPECT_RATIO_FILE "/sys/class/video/aspect_ratio"
+
+/*{"none", "ignore", "pan-scan", "letter_box", "combined"}*/
+#define VID_SCREEN_MODE_FILE  "/sys/class/video/screen_mode" 
+#define VID_ASPECT_RATIO_FILE "/sys/class/video/aspect_ratio"   
+
+#ifdef CHIP_8226H
 #define VID_ASPECT_MATCH_FILE "/sys/class/video/aspect_match_mode"
+#else
+/*{"normal", "full stretch", "4-3", "16-9"}*/
+#define VID_ASPECT_MATCH_FILE "/sys/class/video/matchmethod" 
+#endif
 
 #define DISP_MODE_FILE      "/sys/class/display/mode"
 #define ASTREAM_FORMAT_FILE "/sys/class/astream/format"
@@ -2685,12 +2694,13 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 					break;
 				case 2:
 					dev->video_ratio = AM_AV_VIDEO_ASPECT_4_3;
+					dev->video_mode = AM_AV_VIDEO_DISPLAY_FULL_SCREEN;
+					break;					
 				case 3:
 					dev->video_ratio = AM_AV_VIDEO_ASPECT_16_9;
 					dev->video_mode = AM_AV_VIDEO_DISPLAY_FULL_SCREEN;
 					break;
 			}
-			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_IGNORE;
  #endif		
 		}
 	}
@@ -2717,6 +2727,7 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 			dev->vout_h = 1080;
 		}
 	}
+#ifdef CHIP_8226H	
 	if(AM_FileRead(VID_ASPECT_RATIO_FILE, buf, sizeof(buf))==AM_SUCCESS)
 	{
 		if (!strncmp(buf, "auto", 4))
@@ -2751,6 +2762,30 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_COMBINED;
 		}
 	}
+#else
+	if(AM_FileRead(VID_ASPECT_MATCH_FILE, buf, sizeof(buf))==AM_SUCCESS)
+	{
+		if(sscanf(buf, "%d", &v)==1)
+		{
+			switch(v)
+			{
+				case 0:
+				case 1:
+					dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_IGNORE;
+					break;
+				case 2:
+					dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN;
+					break;
+				case 3:
+					dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX;
+					break;
+				case 4:
+					dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_COMBINED;
+					break;
+			}
+		}
+	}
+#endif	
 //#endif
 
 #if !defined(ADEC_API_NEW)
@@ -3703,19 +3738,6 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 #endif	
 		break;
 		case AV_VIDEO_PARA_RATIO:
-			name = VID_ASPECT_RATIO_FILE;
-			switch((int)val)
-			{
-				case AM_AV_VIDEO_ASPECT_AUTO:
-					cmd = "auto";
-				break;
-				case AM_AV_VIDEO_ASPECT_16_9:
-					cmd = "16x9";
-				break;
-				case AM_AV_VIDEO_ASPECT_4_3:
-					cmd = "4x3";
-				break;
-			}
 #ifndef 	CHIP_8226H
 			name = VID_SCREEN_MODE_FILE;
 			switch((int)val)
@@ -3730,10 +3752,41 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 					cmd = "2";
 				break;
 			}
+#else			
+			name = VID_ASPECT_RATIO_FILE;
+			switch((int)val)
+			{
+				case AM_AV_VIDEO_ASPECT_AUTO:
+					cmd = "auto";
+				break;
+				case AM_AV_VIDEO_ASPECT_16_9:
+					cmd = "16x9";
+				break;
+				case AM_AV_VIDEO_ASPECT_4_3:
+					cmd = "4x3";
+				break;
+			}
  #endif
 		break;
 		case AV_VIDEO_PARA_RATIO_MATCH:
 			name = VID_ASPECT_MATCH_FILE;
+#ifndef 	CHIP_8226H		
+			switch((int)val)
+			{
+				case AM_AV_VIDEO_ASPECT_MATCH_IGNORE:
+					cmd = "1";
+				break;
+				case AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX:
+					cmd = "3";
+				break;
+				case AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN:
+					cmd = "2";
+				break;
+				case AM_AV_VIDEO_ASPECT_MATCH_COMBINED:
+					cmd = "4";
+				break;
+			}
+#else			
 			switch((int)val)
 			{
 				case AM_AV_VIDEO_ASPECT_MATCH_IGNORE:
@@ -3749,6 +3802,7 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 					cmd = "combined";
 				break;
 			}
+#endif			
 		break;
 		case AV_VIDEO_PARA_MODE:
 			name = VID_SCREEN_MODE_FILE;
