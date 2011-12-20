@@ -16,6 +16,7 @@
 #include "../am_adp_internal.h"
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 
 /****************************************************************************
  * Macro definitions
@@ -222,6 +223,10 @@ static void* dmx_data_thread(void *arg)
 			pthread_mutex_unlock(&dev->lock);
 			pthread_cond_broadcast(&dev->cond);
 #endif
+		}
+		else
+		{
+			usleep(10000);
 		}
 	}
 	
