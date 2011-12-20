@@ -765,6 +765,12 @@ static void store_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_
 						}
 						/*业务类型*/
 						srv_type = psd->i_service_type;
+
+						/*service type 0x16 and 0x19 is user defined, as digital television service*/
+						if((srv_type == 0x16) || (srv_type == 0x19))
+						{
+							srv_type = 0x1;
+						}
 					
 						/*跳出多层循环*/
 						goto SDT_END;
