@@ -9,6 +9,13 @@ else
 		LICUDATA:=
 		LGPSSTUB:=
 	endif
+	ifeq ($(ANDROID_VERSION),4.0)
+		LGL:=-lGLESv2_dbg -lGLESv2 -lstlport -lgabi++
+		LUI:=-lstagefright_foundation -lgui -lskia -ljpeg -lemoji
+	else
+		LGL:=
+		LUI:=
+	endif
 	LDFLAGS+=-liconv -lsqlite -licui18n -lamplayer
 endif
 
@@ -73,7 +80,7 @@ endif
 
 
 ifeq ($(TARGET),android)
-LDFLAGS+=-llog -lutils -lmedia -lz -lui -lcutils -lbinder -lEGL -lsonivox -licuuc -lexpat -lsurfaceflinger_client -lhardware -lhardware_legacy -lpixelflinger -lnetutils -lcamera_client $(LICUDATA) -lwpa_client $(LGPSSTUB) -W1,-T $(ARMELF_ANDROID) -Wl,-dynamic-linker,/system/bin/linker -include $(ANDROID_SYSTEM_CORE)/AndroidConfig.h
+LDFLAGS+=-llog -lutils -lmedia -lz -lui $(LUI) -lcutils -lbinder -lEGL $(LGL) -lsonivox -licuuc -lexpat -lsurfaceflinger_client -lhardware -lhardware_legacy -lpixelflinger -lnetutils -lcamera_client $(LICUDATA) -lwpa_client $(LGPSSTUB) -W1,-T $(ARMELF_ANDROID) -Wl,-dynamic-linker,/system/bin/linker -include $(ANDROID_SYSTEM_CORE)/AndroidConfig.h
 CFLAGS+=-O2 -fomit-frame-pointer -fstrict-aliasing -funswitch-loops -finline-limit=300 -fno-exceptions -Wno-multichar -msoft-float -fpic -ffunction-sections -funwind-tables -fstack-protector -fno-short-enums -march=armv7-a -mfloat-abi=softfp -mfpu=neon  -I  $(ANDROID_SYSTEM_CORE) -mthumb-interwork -DANDROID -fmessage-length=0 -W -Wall -Wno-unused -Winit-self -Wpointer-arith -Werror=return-type -Werror=non-virtual-dtor -Werror=address -Werror=sequence-point -DNDEBUG -g -Wstrict-aliasing=2 -finline-functions -fno-inline-functions-called-once -fgcse-after-reload -frerun-cse-after-loop -frename-registers -DNDEBUG -UDEBUG -nostdlib -Bdynamic -Wl,-T,$(ARMELF_X_ANDROID) -Wl,-dynamic-linker,/system/bin/linker 
 
 SHARELIB_LDFLAGS=-nostdlib -Wl,-T,$(ARMELF_XSC_ANDROID)   -Wl,-shared,-Bsymbolic   -Wl,--whole-archive   -Wl,--no-whole-archive  -Wl,--no-undefined  -Wl,--fix-cortex-a8	
