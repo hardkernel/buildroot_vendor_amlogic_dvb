@@ -25,11 +25,13 @@
 #include "libdvbsi/tables/tot.h"
 #include "libdvbsi/tables/bat.h"
 #include "libdvbsi/descriptors/dr.h"
+#include "atsc/atsc_descriptor.h"
 #include "atsc/atsc_mgt.h"
 #include "atsc/atsc_tvct.h"
 #include "atsc/atsc_cvct.h"
 #include "atsc/atsc_rrt.h"
 #include "atsc/atsc_stt.h"
+#include "atsc/atsc_eit.h"
 
 
 #ifdef __cplusplus
@@ -138,6 +140,22 @@ extern "C"
 #define AM_SI_DESCR_AAC						(0x7C)
 #define AM_SI_DESCR_LCN_83                      (0x83)
 #define AM_SI_DESCR_LCN_87                      (0x87)
+
+/*ATSC Table types*/
+#define AM_SI_ATSC_TT_CURRENT_TVCT	0x0
+#define AM_SI_ATSC_TT_NEXT_TVCT		0x1
+#define AM_SI_ATSC_TT_CURRENT_CVCT	0x2
+#define AM_SI_ATSC_TT_NEXT_CVCT		0x3
+#define AM_SI_ATSC_TT_ETT			0x4
+#define AM_SI_ATSC_TT_DCCSCT		0x5
+#define AM_SI_ATSC_TT_EIT0			0x100
+#define AM_SI_ATSC_TT_ETT0			0x200
+#define AM_SI_ATSC_TT_RRT_RR1		0x301
+#define AM_SI_ATSC_TT_DCCT_ID0		0x1400
+
+/*ATSC descriptor*/
+#define AM_SI_DESCR_SERVICE_LOCATION		(0xA1)
+#define AM_SI_DESCR_CONTENT_ADVISORY		(0x87)
 
 /**\brief 遍历SI提供的链表开始*/
 #define AM_SI_LIST_BEGIN(l, v) for ((v)=(l); (v)!=NULL; (v)=(v)->p_next){

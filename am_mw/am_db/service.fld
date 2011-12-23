@@ -21,6 +21,7 @@
 "chan_num numeric",								/**< 频道号*/
 "skip integer",										/**< 是否隐藏, 0不隐藏，1隐藏*/
 "lock integer",										/**< 父母锁, 0不加锁，1加锁*/
+"favor integer",										/**< 喜爱设置，0非喜爱，1喜爱*/
 
 /**< Note: the following fields are added for ATSC only, and they are NOT available for DVB*/
 "major_chan_num integer",							/**< ATSC 主频道号*/

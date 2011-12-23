@@ -42,6 +42,7 @@ enum
 	AM_SCAN_RECVING_MGT			= 0x40,
 	AM_SCAN_RECVING_VCT			= 0x80,
 	AM_SCAN_RECVING_WAIT_FEND	= 0x100,
+	AM_SCAN_SEARCHING_ATV		= 0x200,
 };
 
 /*SCAN内部事件类型*/
@@ -58,6 +59,7 @@ enum
 	AM_SCAN_EVT_VCT_DONE 	= 0x100, /**< VCT表已经接收完毕*/
 	AM_SCAN_EVT_QUIT		= 0x200, /**< 退出搜索事件*/
 	AM_SCAN_EVT_START		= 0x400,/**< 开始搜索事件*/
+	AM_SCAN_EVT_ATV_SEARCH_DONE	= 0X800,	/**< 当前设置的ATV 频率搜索完毕*/
 };
 
 /*SCAN 所在阶段*/
@@ -95,7 +97,29 @@ enum
 	UPDATE_CHAN_SKIP,
 	QUERY_MAX_CHAN_NUM_BY_TYPE,
 	QUERY_MAX_CHAN_NUM,
+	QUERY_MAX_MAJOR_CHAN_NUM,
+	UPDATE_MAJOR_CHAN_NUM,
 	MAX_STMT
+};
+
+/**\brief ATV msg定义*/
+enum CC_ATV_MSG_ID 
+{
+    CC_ATV_MSG_UPDATE_CHANNEL_INFO,
+    CC_ATV_MSG_UPDATE_SEARCHING_FREQ,
+    CC_ATV_MSG_AUTO_SEARCH_FINISHED,
+    CC_ATV_MSG_AUTO_SEARCH_ABORTED,
+    CC_ATV_MSG_MANUAL_SEARCH_FINISHED,
+    CC_ATV_MSG_MANUAL_SEARCH_ABORTED,
+    CC_ATV_MSG_DETECT_FREQUENCY_FINISHED,
+};
+
+/**\brief 频点搜索状态*/
+enum
+{
+	AM_SCAN_FE_DONE,/**< ATV/DTV均搜索完毕*/
+	AM_SCAN_FE_ATV,	/**< ATV正在搜索*/
+	AM_SCAN_FE_DTV,	/**< DTV正在搜索*/
 };
 
 /**\brief 子表接收控制*/
@@ -128,6 +152,15 @@ typedef struct
 	AM_SCAN_SubCtl_t *subctl; 	/**< 子表控制数据*/
 }AM_SCAN_TableCtl_t;
 
+/**\brief 搜索频点数据*/
+typedef struct
+{
+	int status;		/**< 搜索状态, AM_SCAN_FE_ATV等*/
+	AM_Bool_t dtv_locked;	/**< 数字是否以锁住频点，用于ATSC，避免重复设置数字和模拟频率*/
+	int atv_freq;	/**< 模拟频率*/
+	struct dvb_frontend_parameters dtv_para /**< 数字参数*/;
+}AM_SCAN_FrontEndPara_t;
+
 
 /**\brief 搜索中间数据*/
 struct AM_SCAN_Scanner_s
@@ -155,15 +188,16 @@ struct AM_SCAN_Scanner_s
 	int								curr_freq;		/**< 当前正在搜索的频点*/ 
 	int								start_freqs_cnt;/**< 需要搜索的频点个数*/
 	struct dvb_frontend_event		fe_evt;			/**< 前段事件*/
-	struct dvb_frontend_parameters 	*start_freqs;	/**< 需要搜索的频点列表*/ 
+	AM_SCAN_FrontEndPara_t		 	*start_freqs;	/**< 需要搜索的频点列表*/ 
 	AM_SCAN_TS_t					*curr_ts;		/**< 当前正在搜索的TS数据*/
 	dvbpsi_pat_program_t			*cur_prog;		/**< 当前正在接收PMT的Program*/
 	AM_SCAN_StoreCb 				store_cb;		/**< 存储回调*/
 	AM_SCAN_Result_t				result;			/**< 搜索结果*/
-	int							end_code;		/**< 搜索结束码*/
-	void						*user_data;		/**< 用户数据*/
-	AM_Bool_t					store;			/**< 是否存储*/
+	int								end_code;		/**< 搜索结束码*/
+	void							*user_data;		/**< 用户数据*/
+	AM_Bool_t						store;			/**< 是否存储*/
 };
+
 
 /****************************************************************************
  * Function prototypes  

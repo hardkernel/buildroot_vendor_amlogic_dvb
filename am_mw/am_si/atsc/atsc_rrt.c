@@ -16,8 +16,8 @@ static rrt_section_info_t *new_rrt_section_info(void)
         tmp->version_number = DVB_INVALID_VERSION;
         tmp->dimensions_defined = 0;
         tmp->dimensions_info = NULL;
-	 memset(tmp->rating_region_name, 0, sizeof(tmp->rating_region_name));
-	 tmp->desc = NULL;
+	 	memset(&tmp->rating_region_name, 0, sizeof(tmp->rating_region_name));
+	 	tmp->desc = NULL;
         tmp->p_next = NULL;
     }
 
@@ -100,7 +100,7 @@ INT32S atsc_psip_parse_rrt(INT8U* data, INT32U length, rrt_section_info_t *info)
 	INT8U dimensions_defined = 0;
 	INT8U rating_region_name_len;
 	INT8U dimensions_name_len;
-	INT8U values_defined;
+	INT8U values_defined, text_len;
 	INT8U i;
 	INT8U *ptr = NULL;
 
@@ -140,8 +140,9 @@ INT32S atsc_psip_parse_rrt(INT8U* data, INT32U length, rrt_section_info_t *info)
 
 			ptr = sect_data + RRT_SECTION_HEADER_LEN;
 			rating_region_name_len = *ptr++;
+			if (rating_region_name_len > 0)
+				atsc_decode_multiple_string_structure(ptr, &sect_info->rating_region_name);
 
-			parse_multiple_string(ptr, sect_info->rating_region_name); // 
 			ptr += rating_region_name_len;
 			dimensions_defined = *ptr++;
 			sect_info->dimensions_defined = dimensions_defined;
@@ -153,28 +154,22 @@ INT32S atsc_psip_parse_rrt(INT8U* data, INT32U length, rrt_section_info_t *info)
 				if (tmp_dimensions_info)
 				{
 					memset(tmp_dimensions_info, 0, sizeof(rrt_dimensions_info_t));
-					parse_multiple_string(ptr, tmp_dimensions_info->dimensions_name); //
+					if (dimensions_name_len > 0)
+						atsc_decode_multiple_string_structure(ptr, &tmp_dimensions_info->dimensions_name); //
 					ptr += dimensions_name_len;
+					tmp_dimensions_info->graduated_scale = ((*ptr)&0x10) >> 4;
 					values_defined = (*ptr++) & 0x0F;
+					tmp_dimensions_info->values_defined = values_defined;
 					for (i = 0; i < values_defined; i++)
 					{
-						INT8U *pText = NULL;
-						INT8U text_len = *ptr++;
-						parse_multiple_string(ptr, tmp_dimensions_info->rating_value[i].abbrev_rating_value_text);
-						
-						ptr += text_len;
 						text_len = *ptr++;
-						pText = AMMem_malloc(text_len);
-						if (pText)
-						{
-							parse_multiple_string(ptr, pText);
-							tmp_dimensions_info->rating_value[i].rating_value_text = pText;
-						}
-						else
-						{
-							AM_TRACE("[%s] error out of memory !!\n", __FUNC__);
-							//break; 
-						}
+						if (text_len > 0)
+							atsc_decode_multiple_string_structure(ptr, &tmp_dimensions_info->rating_value[i].abbrev_rating_value_text);
+						ptr += text_len;
+						
+						text_len = *ptr++;
+						if (text_len > 0)
+							atsc_decode_multiple_string_structure(ptr, &tmp_dimensions_info->rating_value[i].rating_value_text);
 						ptr += text_len;
 					}
 					tmp_dimensions_info->p_next = NULL;
@@ -221,14 +216,6 @@ void atsc_psip_clear_rrt_info(rrt_section_info_t *info)
 			tmp_dimensions_info = tmp_sect_info->dimensions_info;
 			while(tmp_dimensions_info)
 			{
-				for (i = 0; i < tmp_dimensions_info->values_defined; i++)
-				{
-					if (tmp_dimensions_info->rating_value[i].rating_value_text)
-					{
-						AMMem_free(tmp_dimensions_info->rating_value[i].rating_value_text);
-						tmp_dimensions_info->rating_value[i].rating_value_text = NULL;
-					}
-				}
 				dimensions_info = tmp_dimensions_info->p_next;
 				AMMem_free(tmp_dimensions_info);
 				tmp_dimensions_info = dimensions_info;
@@ -243,12 +230,12 @@ void atsc_psip_clear_rrt_info(rrt_section_info_t *info)
 		}
 		if(info->desc)
 		{
-			AMMem_free(info->desc);
+			atsc_DeleteDescriptors(info->desc);
 		}
 		info->rating_region = 0;
 		info->version_number = DVB_INVALID_VERSION;
 		info->dimensions_defined = 0;
-		memset(info->rating_region_name, 0, sizeof(info->rating_region_name));
+		memset(&info->rating_region_name, 0, sizeof(info->rating_region_name));
 		info->dimensions_info = NULL;
 		info->desc = NULL;
 		info->p_next = NULL;
@@ -277,21 +264,13 @@ void atsc_psip_free_rrt_info(rrt_section_info_t *info)
 			tmp_dimensions_info = tmp_sect_info->dimensions_info;
 			while(tmp_dimensions_info)
 			{
-				for (i = 0; i < tmp_dimensions_info->values_defined; i++)
-				{
-					if (tmp_dimensions_info->rating_value[i].rating_value_text)
-					{
-						AMMem_free(tmp_dimensions_info->rating_value[i].rating_value_text);
-						tmp_dimensions_info->rating_value[i].rating_value_text = NULL;
-					}
-				}
 				dimensions_info = tmp_dimensions_info->p_next;
 				AMMem_free(tmp_dimensions_info);
 				tmp_dimensions_info = dimensions_info;
 			}
-			if (sect_info->desc)
+			if (tmp_sect_info->desc)
 			{
-				AMMem_free(sect_info->desc);	 // --
+				atsc_DeleteDescriptors(tmp_sect_info->desc);	 // --
 			}
 			sect_info = tmp_sect_info->p_next;
 			AMMem_free(tmp_sect_info);
@@ -301,38 +280,4 @@ void atsc_psip_free_rrt_info(rrt_section_info_t *info)
        return ;
 }
 
-void atsc_psip_dump_rrt_info(rrt_section_info_t *info)
-{
-#ifndef __ROM_
-	rrt_section_info_t *tmp = info;
-
-	INT8U i = 0;
-
-	if(info)
-	{
-		AM_TRACE("\r\n============= RRT INFO =============\r\n");
-
-		while(tmp)
-		{ 
-			rrt_dimensions_info_t *dimensions_info = tmp->dimensions_info;
-			AM_TRACE("Region Name: %s ,Rating Region: %d\n", tmp->rating_region_name, tmp->rating_region);
-			while (dimensions_info)
-			{
-				AM_TRACE("    Dimension Name: %s\n", dimensions_info->dimensions_name);
-				for (i = 0; i < dimensions_info->values_defined; i++)
-				{
-					AM_TRACE("        %s    %s\n", dimensions_info->rating_value[i].abbrev_rating_value_text,
-											     dimensions_info->rating_value[i].rating_value_text);
-				}
-				dimensions_info = dimensions_info->p_next;
-			}
-
-			tmp = tmp->p_next;
-		}
-
-		AM_TRACE("\r\n=============== END ================\r\n");
-	}
-#endif
-    return ;
-}
 

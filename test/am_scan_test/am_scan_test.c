@@ -164,6 +164,7 @@ static int start_scan_test()
 	int hscan = 0;
 	int i, mode;
 	struct dvb_frontend_parameters p[10];
+	int afreq[10];
 	char buf[256];
 	AM_Bool_t go = AM_TRUE, new_scan = AM_FALSE;
 	
@@ -182,7 +183,7 @@ static int start_scan_test()
 	p[0].u.qam.fec_inner = FEC_AUTO;
 	while (go)
 	{
-		if (gets(buf))
+		if (fgets(buf, sizeof(buf), stdin))
 		{
 			if(!strncmp(buf, "auto", 4))
 			{
@@ -244,12 +245,16 @@ static int start_scan_test()
 			}
 			para.fend_dev_id = FEND_DEV_NO;
 			para.dmx_dev_id = DMX_DEV_NO;
-			para.source = 0;
+			para.source = AM_SCAN_SRC_DVBC;
 			para.hdb = hdb;
 			para.start_para_cnt = AM_ARRAY_SIZE(p);
 			para.start_para = p;
 			para.mode = mode;
 			para.store_cb = NULL;
+			para.standard = AM_SCAN_STANDARD_ATSC;
+			para.atv_freq_cnt = 1;
+			afreq[0] = 52500000;
+			para.atv_freqs = afreq;
 			
 			AM_SCAN_Create(&para, &hscan);
 			/*注册搜索进度通知事件*/

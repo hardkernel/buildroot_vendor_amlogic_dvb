@@ -9,6 +9,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_font/am_font.c am_font/freetype.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
+		   am_scan/atv_scan.cpp\
 		   am_sub/am_sub.c am_sub/dvb_sub.c am_sub/sub_memory.c\
 		   am_tt/am_tt.c am_tt/VTCommon.c am_tt/VTDrawer.c am_tt/VTTeletext.c\
 		   am_tt/VTCharacterSet.c am_tt/VTDecoder.c am_tt/VTMosaicGraphics.c am_tt/VTTopText.c\
@@ -65,6 +66,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/atsc/atsc_mgt.c\
 		   am_si/atsc/atsc_rrt.c\
 		   am_si/atsc/atsc_stt.c\
+		   am_si/atsc/atsc_eit.c\
 		   am_si/atsc/atsc_descriptor.c\
 		   am_si/atsc/huffman_decode.c
 
@@ -79,10 +81,14 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/tables\
 		    $(LOCAL_PATH)/../include/am_mw/atsc\
 		    $(LOCAL_PATH)/../android/ndk/include\
-		    $(LOCAL_PATH)/../android/ex_include
+		    $(LOCAL_PATH)/../android/ex_include\
+		    $(LOCAL_PATH)/../../tvapi\
+		    frameworks/base/core/jni \
+		    $(LOCAL_PATH)/../../tvapi/include\
+		    $(LOCAL_PATH)/../../tvapi/libtvservice/atv
 
 LOCAL_STATIC_LIBRARIES += libfreetype libiconv
-LOCAL_SHARED_LIBRARIES += libam_adp libsqlite libamplayer liblog libc
+LOCAL_SHARED_LIBRARIES += libam_adp libsqlite libamplayer liblog libc libutils libbinder libtv_client
 
 LOCAL_PRELINK_MODULE := false
 

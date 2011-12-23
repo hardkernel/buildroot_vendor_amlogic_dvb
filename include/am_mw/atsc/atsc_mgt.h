@@ -93,7 +93,8 @@ typedef struct com_table_info
 {
     INT16U  table_type;
     INT16U  table_type_pid;
-    struct   descriptor_info *com_table_desc;
+    INT8U	table_type_version;
+    struct   atsc_descriptor_s *desc;
     struct   com_table_info *p_next;
 }com_table_info_t;
 
@@ -105,7 +106,7 @@ typedef struct mgt_section_info
     INT16U  tables_defined;
     INT32U  is_cable;
     struct com_table_info *com_table_info;
-    struct descriptor_info *mgt_table_desc;
+    struct atsc_descriptor_s *desc;
 }mgt_section_info_t;
 
 /*****************************************************************************

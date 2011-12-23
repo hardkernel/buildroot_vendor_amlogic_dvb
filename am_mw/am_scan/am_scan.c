@@ -75,12 +75,8 @@
 /*添加数据列表中*/
 #define ADD_TO_LIST(_t, _l)\
 	AM_MACRO_BEGIN\
-		if ((_l) == NULL){\
-			(_l) = (_t);\
-		}else{\
-			(_t)->p_next = (_l)->p_next;\
-			(_l)->p_next = (_t);\
-		}\
+		(_t)->p_next = (_l);\
+		_l = _t;\
 	AM_MACRO_END
 	
 /*释放一个表的所有SI数据*/
@@ -123,6 +119,58 @@
 		prog.evt = t;\
 		prog.data = (void*)d;\
 		SIGNAL_EVENT(AM_SCAN_EVT_PROGRESS, (void*)&prog);\
+	AM_MACRO_END
+	
+/*存储一个service到数据库，在store_dvb_ts/store_atsc_ts中调用*/
+#define STORE_SRV()\
+	AM_MACRO_BEGIN\
+		uint8_t tv_srv_type, radio_srv_type;\
+		if (result->standard != AM_SCAN_STANDARD_ATSC){\
+			tv_srv_type = 0x1;\
+			radio_srv_type = 0x2;\
+		} else {\
+			tv_srv_type = 0x2;\
+			radio_srv_type = 0x3;\
+		}\
+		/*对于SDT没有描述srv_type但音视频PID有效的节目，按电视或广播节目存储*/\
+		if (vid != 0x1fff && srv_type == 0)\
+			srv_type = tv_srv_type;\
+		else if (vid == 0x1fff && aid1 != 0x1fff && srv_type == 0)\
+			srv_type = radio_srv_type;\
+		/*SDT/VCT描述为TV 或 Radio的节目，但音视频PID无效，不存储为TV或Radio*/\
+		if (vid == 0x1fff && aid1 == 0x1fff && (srv_type == tv_srv_type || srv_type == radio_srv_type)){\
+			srv_type = 0;\
+		}\
+		if (!strcmp(name, "") && (srv_type == tv_srv_type || srv_type == radio_srv_type) && \
+			result->standard != AM_SCAN_STANDARD_ATSC)\
+			strcpy(name, "No Name");\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 1, src);\
+		sqlite3_bind_text(stmts[UPDATE_SRV], 2, name, strlen(name), SQLITE_STATIC);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 3, srv_type);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 4, eit_sche);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 5, eit_pf);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 6, rs);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 7, free_ca);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 8, 50);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 9, AM_AOUT_OUTPUT_DUAL_LEFT);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 10, vid);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 11, aid1);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 12, aid2);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 13, vfmt);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 14, afmt1);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 15, afmt2);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 16, chan_num);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 17, major_chan_num);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 18, minor_chan_num);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 19, access_controlled);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 20, hidden);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 21, hide_guide);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 22, source_id);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 23, 0);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 24, srv_dbid);\
+		sqlite3_step(stmts[UPDATE_SRV]);\
+		sqlite3_reset(stmts[UPDATE_SRV]);\
+		AM_DEBUG(1, "Updating Program '%s' OK", name);\
 	AM_MACRO_END
 
 typedef struct{
@@ -179,7 +227,7 @@ const char *sql_stmts[MAX_STMT] =
 	"delete  from srv_table where db_ts_id=?",
 	"select db_id from srv_table where db_net_id=? and db_ts_id=? and service_id=?",
 	"insert into srv_table(db_net_id, db_ts_id,service_id) values(?,?,?)",
-	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?, running_status=?, free_ca_mode=?, volume=?, aud_track=?, vid_pid=?, aud1_pid=?, aud2_pid=?,vid_fmt=?,aud1_fmt=?,aud2_fmt=?,skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,hide_guide=?,source_id=? where db_id=?",
+	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?, running_status=?, free_ca_mode=?, volume=?, aud_track=?, vid_pid=?, aud1_pid=?, aud2_pid=?,vid_fmt=?,aud1_fmt=?,aud2_fmt=?,skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,hide_guide=?, source_id=?,favor=?  where db_id=?",
 	"select db_id,service_type from srv_table where db_ts_id=? order by service_id",
 	"update srv_table set chan_num=? where db_id=?",
 	"delete  from evt_table where db_ts_id=?",
@@ -193,6 +241,8 @@ const char *sql_stmts[MAX_STMT] =
 	"update srv_table set skip=? where db_id=?",
 	"select max(chan_num) from srv_table where service_type=?",
 	"select max(chan_num) from srv_table",
+	"select max(major_chan_num) from srv_table",
+	"update srv_table set major_chan_num=?, chan_num=? where db_id=(select db_id from srv_table where db_ts_id=?)",
 };
 
 /****************************************************************************
@@ -203,6 +253,70 @@ static AM_ErrorCode_t am_scan_request_section(AM_SCAN_Scanner_t *scanner, AM_SCA
 static AM_ErrorCode_t am_scan_request_next_pmt(AM_SCAN_Scanner_t *scanner);
 static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner);
 extern AM_ErrorCode_t AM_EPG_ConvertCode(char *in_code,int in_len,char *out_code,int out_len);
+extern int am_scan_start_atv_search(void *dtv_para);
+extern int am_scan_stop_atv_search();
+extern int am_scan_atv_detect_frequency(int freq);
+
+void am_scan_notify_from_atv(const int *msg_pdu, void *para)
+{
+	struct AM_SCAN_Scanner_s *scanner = (struct AM_SCAN_Scanner_s *)para;
+	
+	if (scanner == NULL)
+		return;
+		
+	if (msg_pdu[0] == CC_ATV_MSG_DETECT_FREQUENCY_FINISHED)
+	{
+		AM_DEBUG(1, "CC_ATV_MSG_DETECT_FREQUENCY_FINISHED notified");
+		
+		pthread_mutex_lock(&scanner->lock);
+		scanner->evt_flag |= AM_SCAN_EVT_ATV_SEARCH_DONE;
+		if (msg_pdu[2] > 0)
+		{
+			if ((int)scanner->curr_ts->fend_para.frequency == msg_pdu[1])
+			{
+				if (scanner->end_code == AM_SCAN_RESULT_UNLOCKED)
+				{
+					scanner->end_code = AM_SCAN_RESULT_OK;
+				}
+				scanner->curr_ts->analog_channel = (AM_SCAN_ATVChannelInfo_t*)malloc(sizeof(AM_SCAN_ATVChannelInfo_t));
+				if (scanner->curr_ts->analog_channel != NULL)
+				{
+					scanner->curr_ts->analog_channel->TSID = 0xffff;
+					scanner->curr_ts->analog_channel->detect_freq = msg_pdu[1];
+					scanner->curr_ts->analog_channel->freq = msg_pdu[2];
+					scanner->curr_ts->analog_channel->min_freq = msg_pdu[3];
+					scanner->curr_ts->analog_channel->max_freq = msg_pdu[4];
+					scanner->curr_ts->analog_channel->band = msg_pdu[5];
+					scanner->curr_ts->analog_channel->audio_std = msg_pdu[6];
+					scanner->curr_ts->analog_channel->video_std = msg_pdu[7];
+					scanner->curr_ts->analog_channel->vol_comp = msg_pdu[8];
+					scanner->curr_ts->analog_channel->chan_jump = msg_pdu[9];
+					scanner->curr_ts->analog_channel->fine_tune_flag = msg_pdu[10];
+					AM_DEBUG(1, ">>>Notify from ATV, detect_freq %d, freq %d, video_std %d, audio_std %d",
+						scanner->curr_ts->analog_channel->detect_freq,
+						scanner->curr_ts->analog_channel->freq, scanner->curr_ts->analog_channel->video_std, 
+						scanner->curr_ts->analog_channel->audio_std);
+				}
+				else
+				{
+					AM_DEBUG(1, "Error, No memory for adding new analog channel");
+				}
+			}
+			else
+			{
+				AM_DEBUG(1, ">>>Notify from ATV, cur_freq=%d is not the frequency we expeceted",  msg_pdu[1]);
+			}
+		}
+		else
+		{
+			scanner->curr_ts->analog_channel = NULL;
+			AM_DEBUG(1, ">>>Notify from ATV, cur_freq=-1, nothing searched");
+		}
+		pthread_cond_signal(&scanner->cond);
+		pthread_mutex_unlock(&scanner->lock);
+	}
+}
+
 
 static AM_ErrorCode_t convert_code_to_utf8(const char *cod, char *in_code,int in_len,char *out_code,int out_len)
 {
@@ -427,8 +541,608 @@ static int insert_teletext(sqlite3_stmt **stmts, int db_srv_id, int pid, dvbpsi_
 	return 0;
 }
 
-/**\brief 存储一个TS到数据库*/
-static void store_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_t *ts, ScanRecTab_t *tab)
+/**\brief 存储一个TS到数据库, ATSC*/
+static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_t *ts)
+{
+	dvbpsi_pmt_t *pmt;
+	dvbpsi_pmt_es_t *es;
+	atsc_descriptor_t *descr;
+	cvct_section_info_t *cvct;
+	tvct_section_info_t *tvct;
+	cvct_channel_info_t *ccinfo;
+	tvct_channel_info_t *tcinfo;
+	int src = result->src, i;
+	int net_dbid,dbid, srv_dbid;
+	int orig_net_id = -1, ts_id = -1;
+	char selbuf[256];
+	char insbuf[400];
+	sqlite3 *hdb = result->hdb;
+	uint16_t vid, aid1, aid2;
+	uint8_t srv_type, eit_sche, eit_pf, rs, free_ca;
+	int afmt1, afmt2, vfmt, avfmt, chan_num;
+	int major_chan_num, minor_chan_num, source_id;
+	uint8_t access_controlled, hidden, hide_guide;
+	char name[AM_DB_MAX_SRV_NAME_LEN + 1];
+	AM_Bool_t stream_found_in_vct = AM_FALSE;
+	AM_Bool_t program_found_in_vct = AM_FALSE;
+	
+	if (ts->type != AM_SCAN_TS_ANALOG && ts->tvcts == NULL && ts->cvcts == NULL && ts->pats == NULL)
+	{
+		AM_DEBUG(1,  ">>>There is no VCT and PAT found in this TS, skip this TS");
+		return;
+	}
+	
+	if (ts->type == AM_SCAN_TS_ANALOG)
+	{
+		if (ts->analog_channel == NULL)
+			return;
+		ts_id = ts->analog_channel->TSID;
+	}
+	else
+	{
+		if (ts->tvcts != NULL)
+		{
+			ts_id = ts->tvcts->transport_stream_id;
+		}
+		else if (ts->cvcts != NULL)
+		{
+			ts_id = ts->cvcts->transport_stream_id;
+		}
+		else if (ts->pats)
+		{
+			ts_id = ts->pats->i_ts_id;
+		}
+	}
+	
+	/*检查该TS是否已经添加*/
+	dbid = insert_ts(stmts, src, (int)ts->fend_para.frequency);
+	if (dbid == -1)
+	{
+		AM_DEBUG(1, "insert new ts error");
+		return;
+	}
+	net_dbid = -1;
+	/*更新TS数据*/
+	sqlite3_bind_int(stmts[UPDATE_TS], 1, net_dbid);
+	sqlite3_bind_int(stmts[UPDATE_TS], 2, ts_id);
+	sqlite3_bind_int(stmts[UPDATE_TS], 3, (int)ts->fend_para.u.qam.symbol_rate);
+	sqlite3_bind_int(stmts[UPDATE_TS], 4, (int)ts->fend_para.u.qam.modulation);
+	sqlite3_bind_int(stmts[UPDATE_TS], 5, (int)ts->fend_para.u.ofdm.bandwidth);
+	sqlite3_bind_int(stmts[UPDATE_TS], 6, ts->snr);
+	sqlite3_bind_int(stmts[UPDATE_TS], 7, ts->ber);
+	sqlite3_bind_int(stmts[UPDATE_TS], 8, ts->strength);
+	sqlite3_bind_int(stmts[UPDATE_TS], 9, dbid);
+	sqlite3_step(stmts[UPDATE_TS]);
+	sqlite3_reset(stmts[UPDATE_TS]);
+
+	/*清除与该TS下service关联的分组数据*/
+	sqlite3_bind_int(stmts[DELETE_SRV_GRP], 1, dbid);
+	sqlite3_step(stmts[DELETE_SRV_GRP]);
+	sqlite3_reset(stmts[DELETE_SRV_GRP]);
+
+	/*清除该TS下所有subtitles,teletexts*/
+	AM_DEBUG(1, "Delete all subtitles & teletexts in TS %d", dbid);
+	sqlite3_bind_int(stmts[DELETE_TS_SUBTITLES], 1, dbid);
+	sqlite3_step(stmts[DELETE_TS_SUBTITLES]);
+	sqlite3_reset(stmts[DELETE_TS_SUBTITLES]);
+	sqlite3_bind_int(stmts[DELETE_TS_TELETEXTS], 1, dbid);
+	sqlite3_step(stmts[DELETE_TS_TELETEXTS]);
+	sqlite3_reset(stmts[DELETE_TS_TELETEXTS]);
+	
+	/*清除该TS下所有service*/
+	sqlite3_bind_int(stmts[DELETE_TS_SRVS], 1, dbid);
+	sqlite3_step(stmts[DELETE_TS_SRVS]);
+	sqlite3_reset(stmts[DELETE_TS_SRVS]);
+
+	/*清除该TS下所有events*/
+	AM_DEBUG(1, "Delete all events in TS %d", dbid);
+	sqlite3_bind_int(stmts[DELETE_TS_EVTS], 1, dbid);
+	sqlite3_step(stmts[DELETE_TS_EVTS]);
+	sqlite3_reset(stmts[DELETE_TS_EVTS]);
+	
+	if (ts->type == AM_SCAN_TS_ANALOG)
+	{
+		if (ts->analog_channel == NULL)
+			return;
+		name[0] = '\0';
+		vid = aid1 = aid2 = 0x1fff;
+		srv_type = 0;
+		eit_sche = 0;
+		eit_pf = 0;
+		rs = 0;
+		free_ca = 1;
+		vfmt = 0;
+		afmt1 = afmt2 = 0;
+		major_chan_num = 0;
+		minor_chan_num = 0;
+		access_controlled = 0;
+		hidden = 0;
+		hide_guide = 0;
+		chan_num = 0;
+		source_id = 0;
+		
+		/*添加新业务到数据库*/
+		srv_dbid = insert_srv(stmts, net_dbid, dbid, 0xffff);
+		if (srv_dbid == -1)
+		{
+			AM_DEBUG(1, "insert new srv error");
+			return;
+		}
+		vfmt = ts->analog_channel->video_std;
+		afmt1 = ts->analog_channel->audio_std;
+		/*从VCT中查找模拟频道名称和频道号*/
+		if (ts->analog_channel->TSID != 0xffff)
+		{
+			AM_SCAN_TS_t *ts;
+			char name[14+1];
+		
+			AM_SI_LIST_BEGIN(result->tses, ts)
+				if (ts->cvcts != NULL)
+				{
+					AM_SI_LIST_BEGIN(ts->cvcts, cvct)
+					AM_SI_LIST_BEGIN(cvct->vct_chan_info, ccinfo)
+						if (ccinfo->channel_TSID == ts->analog_channel->TSID && 
+							ccinfo->service_type == 0x1)
+						{
+							memcpy(ts->analog_channel->name, ccinfo->short_name, 14);
+							ts->analog_channel->name[14] = 0;
+							AM_DEBUG(1, "Analog TV program '%s' (TSID=%d) found in CVCT", 
+								 ts->analog_channel->name, ccinfo->channel_TSID);
+							ts->analog_channel->major_chan_num = ccinfo->major_channel_number;
+							ts->analog_channel->minor_chan_num = ccinfo->minor_channel_number;
+						
+							goto analog_vct_done;
+						}
+					AM_SI_LIST_END()
+					AM_SI_LIST_END()
+				}
+				else if (ts->tvcts != NULL)
+				{
+					AM_SI_LIST_BEGIN(ts->tvcts, tvct)
+					AM_SI_LIST_BEGIN(tvct->vct_chan_info, tcinfo)
+						if (tcinfo->channel_TSID == ts->analog_channel->TSID && 
+							tcinfo->service_type == 0x1)
+						{
+							memcpy(ts->analog_channel->name, tcinfo->short_name, 14);
+							ts->analog_channel->name[14] = 0;
+							AM_DEBUG(1, "Analog TV program '%s' (TSID=%d) found in TVCT", 
+								 ts->analog_channel->name, tcinfo->channel_TSID);
+							ts->analog_channel->major_chan_num = tcinfo->major_channel_number;
+							ts->analog_channel->minor_chan_num = tcinfo->minor_channel_number;
+						
+							goto analog_vct_done;
+						}
+					AM_SI_LIST_END()
+					AM_SI_LIST_END()
+				}
+			AM_SI_LIST_END()
+		
+			AM_DEBUG(1, ">>>>Analog Channel(TSID=%d) found, but there is no decription in VCT", ts->analog_channel->TSID);
+		}
+analog_vct_done:
+		major_chan_num = ts->analog_channel->major_chan_num;
+		minor_chan_num = ts->analog_channel->minor_chan_num;
+		chan_num = (major_chan_num<<16) | (minor_chan_num&0xffff);
+		srv_type = 0x1; /*ATSC Analog program*/
+		if (ts->analog_channel->TSID != 0xffff)
+			strcpy(name, ts->analog_channel->name);
+		else
+			snprintf(name, sizeof(name), "%s %d", 
+				(src==AM_SCAN_SRC_CABLE)?"Cable":((src==AM_SCAN_SRC_TERRISTRIAL)?"Terristrial":"Satellite"),
+				major_chan_num);
+			
+		AM_DEBUG(0, "ATSC Analog Channel('%s':%d) TSID(%d) found!",name, major_chan_num, ts->analog_channel->TSID);
+		STORE_SRV();
+		
+		return;
+	}
+
+	/*NOTE: 有两种存储ATSC节目的方法：
+	 *1.直接从VCT里查找service_location_des来获取音视频流；
+	 *2.普通PAT/PMT方式获取音视频流;
+	 *默认先尝试第一种方法*/
+	 
+	if (ts->cvcts)
+	{
+		/*find service location desc first*/
+		AM_SI_LIST_BEGIN(ts->cvcts, cvct)
+		AM_SI_LIST_BEGIN(cvct->vct_chan_info, ccinfo)
+			/*Skip inactive program*/
+			if (ccinfo->program_number == 0)
+				continue;
+			
+			/*从VCT表中查找该service并获取信息*/
+			if (cvct->transport_stream_id == 0 || ccinfo->channel_TSID == cvct->transport_stream_id)
+			{	
+				name[0] = '\0';
+				vid = aid1 = aid2 = 0x1fff;
+				srv_type = 0;
+				eit_sche = 0;
+				eit_pf = 0;
+				rs = 0;
+				free_ca = 1;
+				vfmt = 0;
+				afmt1 = afmt2 = 0;
+				major_chan_num = 0;
+				minor_chan_num = 0;
+				access_controlled = 0;
+				hidden = 0;
+				hide_guide = 0;
+				chan_num = 0;
+				source_id = 0;
+				/*添加新业务到数据库*/
+				srv_dbid = insert_srv(stmts, net_dbid, dbid, ccinfo->program_number);
+				if (srv_dbid == -1)
+				{
+					AM_DEBUG(1, "insert new srv error");
+					continue;
+				}
+				AM_SI_LIST_BEGIN(ccinfo->desc, descr)			
+					if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE_LOCATION)
+					{
+						atsc_service_location_dr_t *asld = (atsc_service_location_dr_t*)descr->p_decoded;
+						for (i=0; i<asld->i_elem_count; i++)
+						{
+							avfmt = -1;
+							switch (asld->elem[i].i_stream_type)
+							{
+								/*video pid and video format*/
+								case 0x02:
+									if (avfmt == -1)
+										avfmt = VFORMAT_MPEG12;
+									if (vid == 0x1fff)
+									{
+										vid = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
+										vfmt = avfmt;
+									}
+									break;
+								/*audio pid and audio format*/
+								case 0x81:
+									if (avfmt == -1)
+										avfmt = AFORMAT_AC3;
+									if (aid1 == 0x1fff)
+									{
+										aid1 = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
+										afmt1 = avfmt;
+									}
+									else if (aid2 == 0x1fff)
+									{
+										aid2 = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
+										afmt2 = avfmt;
+									}
+									break;
+								default:
+									break;
+							}
+						}
+					}
+				AM_SI_LIST_END()
+			
+				major_chan_num = ccinfo->major_channel_number;
+				minor_chan_num = ccinfo->minor_channel_number;
+				
+				chan_num = (major_chan_num<<16) | (minor_chan_num&0xffff);
+				hidden = ccinfo->hidden;
+				hide_guide = ccinfo->hide_guide;
+				source_id = ccinfo->source_id;
+				memcpy(name, ccinfo->short_name, sizeof(ccinfo->short_name));
+				name[sizeof(ccinfo->short_name)] = 0;
+				/*业务类型*/
+				srv_type = ccinfo->service_type;
+				
+				if (! stream_found_in_vct)
+					stream_found_in_vct = AM_TRUE;
+					
+				AM_DEBUG(0 ,"(CVCT)program(%d)('%s':%d-%d, %s) in current TSID(%d) found!", ccinfo->program_number, 
+					 name, major_chan_num, minor_chan_num, 
+					 (srv_type == 0x2)?"ATSC Digital TV":((srv_type == 0x3)?"ATSC Audio":"Other"),
+					 ccinfo->channel_TSID);
+				/*Store this service*/
+				STORE_SRV();
+			}
+			else
+			{
+				AM_DEBUG(1, ">>>>>>(CVCT) program(%d) in other TSID(%d) found!", 
+						ccinfo->program_number, ccinfo->channel_TSID);
+				continue;
+			}
+		AM_SI_LIST_END()
+		AM_SI_LIST_END()
+	}
+	else if (ts->tvcts)
+	{
+		/*find service location desc first*/
+		AM_SI_LIST_BEGIN(ts->tvcts, tvct)
+		AM_SI_LIST_BEGIN(tvct->vct_chan_info, tcinfo)
+			/*Skip inactive program*/
+			if (tcinfo->program_number == 0 || tcinfo->program_number == 0xffff)
+				continue;
+			
+			/*从VCT表中查找该service并获取信息*/
+			if (tvct->transport_stream_id == 0 || tcinfo->channel_TSID == tvct->transport_stream_id)
+			{	
+				name[0] = '\0';
+				vid = aid1 = aid2 = 0x1fff;
+				srv_type = 0;
+				eit_sche = 0;
+				eit_pf = 0;
+				rs = 0;
+				free_ca = 1;
+				vfmt = 0;
+				afmt1 = afmt2 = 0;
+				major_chan_num = 0;
+				minor_chan_num = 0;
+				access_controlled = 0;
+				hidden = 0;
+				hide_guide = 0;
+				chan_num = 0;
+				source_id = 0;
+				/*添加新业务到数据库*/
+				srv_dbid = insert_srv(stmts, net_dbid, dbid, tcinfo->program_number);
+				if (srv_dbid == -1)
+				{
+					AM_DEBUG(1, "insert new srv error");
+					continue;
+				}
+				AM_SI_LIST_BEGIN(tcinfo->desc, descr)			
+					if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE_LOCATION)
+					{
+						AM_DEBUG(1, "Service location descr found");
+						atsc_service_location_dr_t *asld = (atsc_service_location_dr_t*)descr->p_decoded;
+						AM_DEBUG(1, "Service location descr stream count %d", asld->i_elem_count);
+						for (i=0; i<asld->i_elem_count; i++)
+						{
+							avfmt = -1;
+							switch (asld->elem[i].i_stream_type)
+							{
+								/*video pid and video format*/
+								case 0x02:
+									AM_DEBUG(1, "found video, pid %d", asld->elem[i].i_pid);
+									if (avfmt == -1)
+										avfmt = VFORMAT_MPEG12;
+									if (vid == 0x1fff)
+									{
+										vid = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
+										vfmt = avfmt;
+									}
+									break;
+								/*audio pid and audio format*/
+								case 0x81:
+									AM_DEBUG(1, "found audio, pid %d", asld->elem[i].i_pid);
+									if (avfmt == -1)
+										avfmt = AFORMAT_AC3;
+									if (aid1 == 0x1fff)
+									{
+										aid1 = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
+										afmt1 = avfmt;
+									}
+									else if (aid2 == 0x1fff)
+									{
+										aid2 = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
+										afmt2 = avfmt;
+									}
+									break;
+								default:
+									break;
+							}
+						}
+					}
+				AM_SI_LIST_END()
+
+				major_chan_num = tcinfo->major_channel_number;
+				minor_chan_num = tcinfo->minor_channel_number;
+				
+				chan_num = (major_chan_num<<16) | (minor_chan_num&0xffff);
+				hidden = tcinfo->hidden;
+				hide_guide = tcinfo->hide_guide;
+				source_id = tcinfo->source_id;
+				memcpy(name, tcinfo->short_name, sizeof(tcinfo->short_name));
+				name[sizeof(tcinfo->short_name)] = 0;
+				/*业务类型*/
+				srv_type = tcinfo->service_type;
+				
+				if (! stream_found_in_vct)
+					stream_found_in_vct = AM_TRUE;
+					
+				AM_DEBUG(0 ,"(TVCT)program(%d)('%s':%d-%d, %s) in current TSID(%d) found!", tcinfo->program_number, 
+					 name, major_chan_num, minor_chan_num, 
+					 (srv_type == 0x2)?"ATSC Digital TV":((srv_type == 0x3)?"ATSC Audio":"Other"),
+					 tcinfo->channel_TSID);
+				/*Store this service*/
+				STORE_SRV();
+			}
+			else
+			{
+				AM_DEBUG(1, ">>>>>>(TVCT) program(%d) in other TSID(%d) found!", 
+						tcinfo->program_number, tcinfo->channel_TSID);
+				continue;
+			}
+		AM_SI_LIST_END()
+		AM_SI_LIST_END()
+	}
+	
+	/*已从VCT中分析到基础流，无需查找PAT/PMT*/
+	if (stream_found_in_vct)
+		return;
+		
+	/*find from PMT*/
+	AM_SI_LIST_BEGIN(ts->pmts, pmt)
+		name[0] = '\0';
+		vid = aid1 = aid2 = 0x1fff;
+		srv_type = 0;
+		eit_sche = 0;
+		eit_pf = 0;
+		rs = 0;
+		free_ca = 1;
+		vfmt = 0;
+		afmt1 = afmt2 = 0;
+		major_chan_num = 0;
+		minor_chan_num = 0;
+		access_controlled = 0;
+		hidden = 0;
+		hide_guide = 0;
+		chan_num = 0;
+		source_id = 0;
+		
+		/*添加新业务到数据库*/
+		srv_dbid = insert_srv(stmts, net_dbid, dbid, pmt->i_program_number);
+		if (srv_dbid == -1)
+		{
+			AM_DEBUG(1, "insert new srv error");
+			continue;
+		}
+		/*取ES流信息*/
+		AM_SI_LIST_BEGIN(pmt->p_first_es, es)
+			avfmt = -1;
+			
+			switch (es->i_type)
+			{
+				/*video pid and video format*/
+				case 0x2:
+					if (avfmt == -1)
+						avfmt = VFORMAT_MPEG12;
+					if (vid == 0x1fff)
+					{
+						vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
+						vfmt = avfmt;
+					}
+					break;
+				/*audio pid and audio format*/
+				case 0x81:
+					if (avfmt == -1)
+						avfmt = AFORMAT_AC3;
+            		if (aid1 == 0x1fff)
+            		{
+						aid1 = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
+						afmt1 = avfmt;
+					}
+					else if (aid2 == 0x1fff)
+					{
+						aid2 = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
+						afmt2 = avfmt;
+					}
+					break;
+				default:
+					break;
+			}
+		AM_SI_LIST_END()
+		if (ts->cvcts)
+		{
+			program_found_in_vct = AM_FALSE;
+			AM_SI_LIST_BEGIN(ts->cvcts, cvct)
+			if (cvct->transport_stream_id == ts->pats->i_ts_id)
+			{
+				AM_SI_LIST_BEGIN(cvct->vct_chan_info, ccinfo)
+					/*从VCT表中查找该service并获取信息*/
+					if (ccinfo->channel_TSID == cvct->transport_stream_id)
+					{
+						if (ccinfo->program_number == pmt->i_program_number)
+						{
+							major_chan_num = ccinfo->major_channel_number;
+							minor_chan_num = ccinfo->minor_channel_number;
+						
+							chan_num = (major_chan_num<<16) | (minor_chan_num&0xffff);
+							hidden = ccinfo->hidden;
+							hide_guide = ccinfo->hide_guide;
+							source_id = ccinfo->source_id;
+							memcpy(name, ccinfo->short_name, sizeof(ccinfo->short_name));
+							name[sizeof(ccinfo->short_name)] = 0;
+							/*业务类型*/
+							srv_type = ccinfo->service_type;
+						
+							program_found_in_vct = AM_TRUE;
+							
+							AM_DEBUG(0 ,"(CVCT/PMT)program(%d)('%s':%d-%d, %s) in current TSID(%d) found!", ccinfo->program_number, 
+									 name, major_chan_num, minor_chan_num, 
+									 (srv_type == 0x2)?"ATSC Digital TV":((srv_type == 0x3)?"ATSC Audio":"Other"),
+									 ccinfo->channel_TSID);
+							/*跳出多层循环*/
+							goto VCT_END;
+						}
+					}
+					else
+					{
+						AM_DEBUG(1, ">>>>>>(TVCT) program(%d) in other TSID(%d) found!", 
+							ccinfo->program_number, ccinfo->channel_TSID);
+						continue;
+					}
+				AM_SI_LIST_END()
+			}
+			else
+			{
+				/*This case will not happen*/
+				AM_DEBUG(1, ">>>>>>Found unknown CVCT in current TS, current ts id is %d, this ts id is %d", 
+						ts->pats->i_ts_id, cvct->transport_stream_id);
+			}
+			AM_SI_LIST_END()
+		}
+		else if (ts->tvcts)
+		{
+			program_found_in_vct = AM_FALSE;
+			AM_SI_LIST_BEGIN(ts->tvcts, tvct)
+			if (tvct->transport_stream_id == ts->pats->i_ts_id)
+			{
+				AM_SI_LIST_BEGIN(tvct->vct_chan_info, tcinfo)
+					/*从VCT表中查找该service并获取信息*/
+					if (tcinfo->channel_TSID == tvct->transport_stream_id)
+					{
+						if (tcinfo->program_number == pmt->i_program_number)
+						{
+							major_chan_num = tcinfo->major_channel_number;
+							minor_chan_num = tcinfo->minor_channel_number;
+						
+							chan_num = (major_chan_num<<16) | (minor_chan_num&0xffff);
+							hidden = tcinfo->hidden;
+							hide_guide = tcinfo->hide_guide;
+							source_id = tcinfo->source_id;
+							memcpy(name, tcinfo->short_name, sizeof(tcinfo->short_name));
+							name[sizeof(tcinfo->short_name)] = 0;
+							/*业务类型*/
+							srv_type = tcinfo->service_type;
+							
+							program_found_in_vct = AM_TRUE;
+							
+							AM_DEBUG(0 ,"(TVCT/PMT)program(%d)('%s':%d-%d, %s) in current TSID(%d) found!", tcinfo->program_number, 
+									 name, major_chan_num, minor_chan_num, 
+									 (srv_type == 0x2)?"ATSC Digital TV":((srv_type == 0x3)?"ATSC Audio":"Other"),
+									 tcinfo->channel_TSID);
+							/*跳出多层循环*/
+							goto VCT_END;
+						}
+					}
+					else
+					{
+						AM_DEBUG(1, ">>>>>>(TVCT) program(%d) in other TSID(%d) found!, this TSID(%d)", 
+							tcinfo->program_number, tcinfo->channel_TSID, tvct->transport_stream_id);			
+						continue;
+					}
+				AM_SI_LIST_END()
+			}
+			else
+			{
+				/*This case will not happen*/
+				AM_DEBUG(1, ">>>>>>Found unknown TVCT in current TS, current ts id is %d, this ts id is %d", 
+						ts->pats->i_ts_id, tvct->transport_stream_id);
+			}
+			AM_SI_LIST_END()
+		}
+VCT_END:
+		if (program_found_in_vct)
+		{
+			/*Store this service*/
+			STORE_SRV();
+		}
+		else
+		{
+			AM_DEBUG(1, ">>>>>Program %d found in PMT, but not found in VCT, this program will not be saved", pmt->i_program_number);
+		}
+		
+	AM_SI_LIST_END()
+	
+}
+
+/**\brief 存储一个TS到数据库, DVB*/
+static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_t *ts, ScanRecTab_t *tab)
 {
 	dvbpsi_pmt_t *pmt;
 	dvbpsi_sdt_t *sdt;
@@ -436,10 +1150,7 @@ static void store_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_
 	dvbpsi_sdt_service_t *srv;
 	dvbpsi_descriptor_t *descr;
 	dvbpsi_nit_t *nit;
-	cvct_section_info_t *cvct;
-	tvct_section_info_t *tvct;
-	cvct_channel_info_t *ccinfo;
-	tvct_channel_info_t *tcinfo;
+	int src = result->src;
 	int net_dbid,dbid, srv_dbid;
 	int orig_net_id = -1;
 	char selbuf[256];
@@ -451,85 +1162,77 @@ static void store_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_
 	int major_chan_num, minor_chan_num, source_id;
 	uint8_t access_controlled, hidden, hide_guide;
 	char name[AM_DB_MAX_SRV_NAME_LEN + 1];
-		
+	
 	/*没有PAT，不存储*/
 	if (!ts->pats)
 	{
 		AM_DEBUG(1, "No PAT found in ts, will not store to dbase");
 		return;
 	}
-	
-	if (result->standard != AM_SCAN_STANDARD_ATSC)
+
+	/*获取所在网络*/
+	if (ts->sdts)
 	{
-		/*获取所在网络*/
-		if (ts->sdts)
-		{
-			/*按照SDT中描述的orignal_network_id查找网络记录，不存在则新添加一个network记录*/
-			orig_net_id = ts->sdts->i_network_id;
-		}
-		else if (result->nits)
-		{
-			/*在自动搜索时按NIT表描述的network_id查找网络*/
-			orig_net_id = result->nits->i_network_id;
-		
-		}
+		/*按照SDT中描述的orignal_network_id查找网络记录，不存在则新添加一个network记录*/
+		orig_net_id = ts->sdts->i_network_id;
+	}
+	else if (result->nits)
+	{
+		/*在自动搜索时按NIT表描述的network_id查找网络*/
+		orig_net_id = result->nits->i_network_id;
 
-		if (orig_net_id != -1)
+	}
+
+	if (orig_net_id != -1)
+	{
+		net_dbid = insert_net(stmts, src, orig_net_id);
+		if (net_dbid != -1)
 		{
-			net_dbid = insert_net(stmts, result->src, orig_net_id);
-			if (net_dbid != -1)
+			char netname[256];
+
+			netname[0] = '\0';
+			/*新增加一个network记录*/
+			if (result->nits && (orig_net_id == result->nits->i_network_id))
 			{
-				char netname[256];
-
-				netname[0] = '\0';
-				/*新增加一个network记录*/
-				if (result->nits && (orig_net_id == result->nits->i_network_id))
+				AM_SI_LIST_BEGIN(result->nits, nit)
+				AM_SI_LIST_BEGIN(nit->p_first_descriptor, descr)
+				if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_NETWORK_NAME)
 				{
-					AM_SI_LIST_BEGIN(result->nits, nit)
-					AM_SI_LIST_BEGIN(nit->p_first_descriptor, descr)
-					if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_NETWORK_NAME)
-					{
-						dvbpsi_network_name_dr_t *pnn = (dvbpsi_network_name_dr_t*)descr->p_decoded;
+					dvbpsi_network_name_dr_t *pnn = (dvbpsi_network_name_dr_t*)descr->p_decoded;
 
-						/*取网络名称*/
-						if (descr->i_length > 0)
-						{
-							AM_EPG_ConvertCode((char*)pnn->i_network_name, descr->i_length,\
-										netname, 255);
-							netname[255] = 0;
-							break;
-						}
+					/*取网络名称*/
+					if (descr->i_length > 0)
+					{
+						AM_EPG_ConvertCode((char*)pnn->i_network_name, descr->i_length,\
+									netname, 255);
+						netname[255] = 0;
+						break;
 					}
-					AM_SI_LIST_END()	
-					AM_SI_LIST_END()
 				}
-			
-				AM_DEBUG(0, "###Network Name is '%s'", netname);
-				sqlite3_bind_text(stmts[UPDATE_NET], 1, netname, -1, SQLITE_STATIC);
-				sqlite3_bind_int(stmts[UPDATE_NET], 2, net_dbid);
-				sqlite3_step(stmts[UPDATE_NET]);
-				sqlite3_reset(stmts[UPDATE_NET]);
+				AM_SI_LIST_END()	
+				AM_SI_LIST_END()
 			}
-			else
-			{
-				AM_DEBUG(1, "insert new network error");
-				return;
-			}
+	
+			AM_DEBUG(0, "###Network Name is '%s'", netname);
+			sqlite3_bind_text(stmts[UPDATE_NET], 1, netname, -1, SQLITE_STATIC);
+			sqlite3_bind_int(stmts[UPDATE_NET], 2, net_dbid);
+			sqlite3_step(stmts[UPDATE_NET]);
+			sqlite3_reset(stmts[UPDATE_NET]);
 		}
 		else
 		{
-			/*没有找到有效的orignal_network_id,则网络标识为无效*/
-			net_dbid = -1;
+			AM_DEBUG(1, "insert new network error");
+			return;
 		}
 	}
 	else
 	{
-		/*No network in ATSC*/
+		/*没有找到有效的orignal_network_id,则网络标识为无效*/
 		net_dbid = -1;
 	}
-		
+	
 	/*检查该TS是否已经添加*/
-	dbid = insert_ts(stmts, result->src, (int)ts->fend_para.frequency);
+	dbid = insert_ts(stmts, src, (int)ts->fend_para.frequency);
 	if (dbid == -1)
 	{
 		AM_DEBUG(1, "insert new ts error");
@@ -573,7 +1276,6 @@ static void store_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_
 	sqlite3_step(stmts[DELETE_TS_EVTS]);
 	sqlite3_reset(stmts[DELETE_TS_EVTS]);
 
-	
 	/*遍历PMT表*/
 	AM_SI_LIST_BEGIN(ts->pmts, pmt)
 		name[0] = '\0';
@@ -683,13 +1385,13 @@ static void store_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_
 					if (avfmt == -1)
 						avfmt = AFORMAT_AC3;
 				case 0x8A:
-		                case 0x82:
-		                case 0x85:
-		                case 0x86:
-		                	if (avfmt == -1)
-		                		avfmt = AFORMAT_DTS;
-	                		if (aid1 == 0x1fff)
-	                		{
+                case 0x82:
+                case 0x85:
+                case 0x86:
+                	if (avfmt == -1)
+                		avfmt = AFORMAT_DTS;
+            		if (aid1 == 0x1fff)
+            		{
 						aid1 = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
 						AM_DEBUG(0, "Set audio1 format to %d", avfmt);
 						afmt1 = avfmt;
@@ -738,184 +1440,72 @@ static void store_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_
 			AM_SI_LIST_END()
 		AM_SI_LIST_END()
 
-		if (result->standard != AM_SCAN_STANDARD_ATSC)
-		{
-			AM_SI_LIST_BEGIN(ts->sdts, sdt)
-			AM_SI_LIST_BEGIN(sdt->p_first_service, srv)
-				/*从SDT表中查找该service并获取信息*/
-				if (srv->i_service_id == srv_id)
+		AM_SI_LIST_BEGIN(ts->sdts, sdt)
+		AM_SI_LIST_BEGIN(sdt->p_first_service, srv)
+			/*从SDT表中查找该service并获取信息*/
+			if (srv->i_service_id == srv_id)
+			{
+				AM_DEBUG(0 ,"SDT for service %d found!", srv_id);
+				eit_sche = (uint8_t)srv->b_eit_schedule;
+				eit_pf = (uint8_t)srv->b_eit_present;
+				rs = srv->i_running_status;
+				free_ca = (uint8_t)srv->b_free_ca;
+			
+				AM_SI_LIST_BEGIN(srv->p_first_descriptor, descr)
+				if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE)
 				{
-					AM_DEBUG(0 ,"SDT for service %d found!", srv_id);
-					eit_sche = (uint8_t)srv->b_eit_schedule;
-					eit_pf = (uint8_t)srv->b_eit_present;
-					rs = srv->i_running_status;
-					free_ca = (uint8_t)srv->b_free_ca;
-				
-					AM_SI_LIST_BEGIN(srv->p_first_descriptor, descr)
-					if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE)
+					dvbpsi_service_dr_t *psd = (dvbpsi_service_dr_t*)descr->p_decoded;
+			
+					/*取节目名称*/
+					if (psd->i_service_name_length > 0)
 					{
-						dvbpsi_service_dr_t *psd = (dvbpsi_service_dr_t*)descr->p_decoded;
-				
-						/*取节目名称*/
-						if (psd->i_service_name_length > 0)
-						{
-							AM_EPG_ConvertCode((char*)psd->i_service_name, psd->i_service_name_length,\
-										name, AM_DB_MAX_SRV_NAME_LEN);
-							name[AM_DB_MAX_SRV_NAME_LEN] = 0;
-						}
-						/*业务类型*/
-						srv_type = psd->i_service_type;
-
-						/*service type 0x16 and 0x19 is user defined, as digital television service*/
-						if((srv_type == 0x16) || (srv_type == 0x19))
-						{
-							srv_type = 0x1;
-						}
-					
-						/*跳出多层循环*/
-						goto SDT_END;
+						AM_EPG_ConvertCode((char*)psd->i_service_name, psd->i_service_name_length,\
+									name, AM_DB_MAX_SRV_NAME_LEN);
+						name[AM_DB_MAX_SRV_NAME_LEN] = 0;
 					}
-					AM_SI_LIST_END()
+					/*业务类型*/
+					srv_type = psd->i_service_type;
+				
+					/*跳出多层循环*/
+					goto SDT_END;
 				}
-			AM_SI_LIST_END()
-			AM_SI_LIST_END()
-		}
-		else if (ts->cvcts)
-		{
-			/*ATSC CVCT*/
-			AM_SI_LIST_BEGIN(ts->cvcts, cvct)
-			if (cvct->transport_stream_id == ts->pats->i_ts_id)
-			{
-				AM_SI_LIST_BEGIN(cvct->vct_chan_info, ccinfo)
-					/*从VCT表中查找该service并获取信息*/
-					if (ccinfo->program_number == srv_id)
-					{
-						AM_DEBUG(0 ,"CVCT for program %d found!", srv_id);
-						major_chan_num = ccinfo->major_channel_number;
-						minor_chan_num = ccinfo->minor_channel_number;
-						
-						chan_num = (major_chan_num<<16) | (minor_chan_num&0xffff);
-						hidden = ccinfo->hidden;
-						hide_guide = ccinfo->hide_guide;
-						source_id = ccinfo->source_id;
-						/*取节目名称
-						convert_code_to_utf8("utf-16", (char*)ccinfo->short_name, sizeof(ccinfo->short_name),\
-											name, AM_DB_MAX_SRV_NAME_LEN);*/
-						memcpy(name, ccinfo->short_name, sizeof(ccinfo->short_name));
-						name[sizeof(ccinfo->short_name)] = 0;
-						/*业务类型*/
-						srv_type = ccinfo->service_type;
-						
-						/*跳出多层循环*/
-						goto SDT_END;
-					}
 				AM_SI_LIST_END()
 			}
-			else
-			{
-				AM_DEBUG(1, ">>>>>>Found unknown CVCT in current TS, current ts id is %d, this ts id is %d", 
-						ts->pats->i_ts_id, cvct->transport_stream_id);
-			}
-			AM_SI_LIST_END()
-		}
-		else if (ts->tvcts)
-		{
-			/*ATSC TVCT*/
-			AM_SI_LIST_BEGIN(ts->tvcts, tvct)
-			if (tvct->transport_stream_id == ts->pats->i_ts_id)
-			{
-				AM_SI_LIST_BEGIN(tvct->vct_chan_info, tcinfo)
-					/*从VCT表中查找该service并获取信息*/
-					if (tcinfo->program_number == srv_id)
-					{
-						AM_DEBUG(0 ,"TVCT for program %d found!", srv_id);
-						major_chan_num = tcinfo->major_channel_number;
-						minor_chan_num = tcinfo->minor_channel_number;
-				
-						chan_num = (major_chan_num<<16) | (minor_chan_num&0xffff);
-						hidden = tcinfo->hidden;
-						hide_guide = tcinfo->hide_guide;
-						source_id = tcinfo->source_id;
-						/*取节目名称
-						convert_code_to_utf8("utf-16", (char*)tcinfo->short_name, sizeof(tcinfo->short_name),\
-											name, AM_DB_MAX_SRV_NAME_LEN);*/
-						memcpy(name, tcinfo->short_name, sizeof(tcinfo->short_name));
-						name[sizeof(tcinfo->short_name)] = 0;
-						/*业务类型*/
-						srv_type = tcinfo->service_type;
-						AM_DEBUG(1, "major %d, minor %d, short_name %s, srv_type %d", major_chan_num, minor_chan_num, (char*)tcinfo->short_name, srv_type);
-						/*跳出多层循环*/
-						goto SDT_END;
-					}
-				AM_SI_LIST_END()
-			}
-			else
-			{
-				AM_DEBUG(1, ">>>>>>Found unknown TVCT in current TS, current ts id is %d, this ts id is %d", 
-						ts->pats->i_ts_id, tvct->transport_stream_id);
-			}
-			AM_SI_LIST_END()
-		}
+		AM_SI_LIST_END()
+		AM_SI_LIST_END()
+
 SDT_END:
-	//if (vid != 0x1fff || aid1 != 0x1fff)
-	{
-		uint8_t tv_srv_type, radio_srv_type;
-		
-		if (result->standard != AM_SCAN_STANDARD_ATSC)
-		{
-			tv_srv_type = 0x1;
-			radio_srv_type = 0x2;
-		}
-		else
-		{
-			tv_srv_type = 0x2;
-			radio_srv_type = 0x3;
-		}
-		/*对于SDT没有描述srv_type但音视频PID有效的节目，按电视或广播节目存储*/
-		if (vid != 0x1fff && srv_type == 0)
-			srv_type = tv_srv_type;
-		else if (vid == 0x1fff && aid1 != 0x1fff && srv_type == 0)
-			srv_type = radio_srv_type;
-
-		/*SDT描述为TV 或 Radio的节目，但音视频PID无效，不存储为TV或Radio*/
-		if (vid == 0x1fff && aid1 == 0x1fff && (srv_type == tv_srv_type || srv_type == radio_srv_type))
-		{
-			srv_type = 0;
-		}
-
-		if (!strcmp(name, "") && (srv_type == tv_srv_type || srv_type == radio_srv_type))
-			strcpy(name, "No Name");
-				
-		sqlite3_bind_int(stmts[UPDATE_SRV], 1, result->src);
-		sqlite3_bind_text(stmts[UPDATE_SRV], 2, name, strlen(name), SQLITE_STATIC);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 3, srv_type);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 4, eit_sche);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 5, eit_pf);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 6, rs);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 7, free_ca);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 8, 50);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 9, AM_AOUT_OUTPUT_DUAL_LEFT);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 10, vid);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 11, aid1);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 12, aid2);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 13, vfmt);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 14, afmt1);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 15, afmt2);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 16, chan_num);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 17, major_chan_num);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 18, minor_chan_num);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 19, access_controlled);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 20, hidden);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 21, hide_guide);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 22, source_id);
-		sqlite3_bind_int(stmts[UPDATE_SRV], 23, srv_dbid);
-		sqlite3_step(stmts[UPDATE_SRV]);
-		sqlite3_reset(stmts[UPDATE_SRV]);
-	
-		AM_DEBUG(1, "Updating '%s' OK", name);
-	}
+	/*Store this service*/
+	STORE_SRV();
 	
 	AM_SI_LIST_END()
+}
+
+/**\brief 清除数据库中某个源的所有数据*/
+static void am_scan_clear_source(sqlite3 *hdb, int src)
+{
+	char sqlstr[128];
+	
+	/*删除network记录*/
+	snprintf(sqlstr, sizeof(sqlstr), "delete from net_table where src=%d",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+	/*清空TS记录*/
+	snprintf(sqlstr, sizeof(sqlstr), "delete from ts_table where src=%d",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+	/*清空service group记录*/
+	snprintf(sqlstr, sizeof(sqlstr), "delete from grp_map_table where db_srv_id in (select db_id from srv_table where src=%d)",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+	/*清空subtitle teletext记录*/
+	snprintf(sqlstr, sizeof(sqlstr), "delete from subtitle_table where db_srv_id in (select db_id from srv_table where src=%d)",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+	snprintf(sqlstr, sizeof(sqlstr), "delete from teletext_table where db_srv_id in (select db_id from srv_table where src=%d)",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+	/*清空SRV记录*/
+	snprintf(sqlstr, sizeof(sqlstr), "delete from srv_table where src=%d",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+	/*清空event记录*/
+	snprintf(sqlstr, sizeof(sqlstr), "delete from evt_table where src=%d",src);
+	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
 }
 
 /**\brief 默认搜索完毕存储函数*/
@@ -948,32 +1538,16 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 	/*自动搜索和全频段搜索时删除该源下的所有信息*/
 	if (!(result->mode & AM_SCAN_MODE_MANUAL) && result->tses)
 	{
-		/*删除network记录*/
-		snprintf(sqlstr, sizeof(sqlstr), "delete from net_table where src=%d",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-		/*清空TS记录*/
-		snprintf(sqlstr, sizeof(sqlstr), "delete from ts_table where src=%d",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-		/*清空service group记录*/
-		snprintf(sqlstr, sizeof(sqlstr), "delete from grp_map_table where db_srv_id in (select db_id from srv_table where src=%d)",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-		/*清空subtitle teletext记录*/
-		snprintf(sqlstr, sizeof(sqlstr), "delete from subtitle_table where db_srv_id in (select db_id from srv_table where src=%d)",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-		snprintf(sqlstr, sizeof(sqlstr), "delete from teletext_table where db_srv_id in (select db_id from srv_table where src=%d)",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-		/*清空SRV记录*/
-		snprintf(sqlstr, sizeof(sqlstr), "delete from srv_table where src=%d",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-		/*清空event记录*/
-		snprintf(sqlstr, sizeof(sqlstr), "delete from evt_table where src=%d",result->src);
-		sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+		am_scan_clear_source(hdb, result->src);
 	}
 	
 	AM_DEBUG(1, "Store tses, %p", result->tses);
 	/*依次存储每个TS*/
 	AM_SI_LIST_BEGIN(result->tses, ts)
-		store_ts(stmts, result, ts, &srv_tab);
+		if (result->standard != AM_SCAN_STANDARD_ATSC)
+			store_dvb_ts(stmts, result, ts, &srv_tab);
+		else
+			store_atsc_ts(stmts, result, ts);
 	AM_SI_LIST_END()
 
 	/*根据LCN排序*/
@@ -1383,6 +1957,9 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 	dvbpsi_nit_ts_t *ts;
 	dvbpsi_descriptor_t *descr;
 	struct dvb_frontend_parameters *param;
+	AM_SCAN_FrontEndPara_t *old_para;
+	int old_para_cnt;
+	int i;
 
 	am_scan_free_filter(scanner, &scanner->nitctl.fid);
 	/*清除事件标志*/
@@ -1398,6 +1975,8 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 	/*清除搜索标识*/
 	scanner->recv_status &= ~scanner->nitctl.recv_flag;
 	
+	old_para = scanner->start_freqs;
+	old_para_cnt = scanner->start_freqs_cnt;
 	if (scanner->start_freqs)
 		free(scanner->start_freqs);
 	scanner->start_freqs = NULL;
@@ -1416,15 +1995,23 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 		AM_DEBUG(1, "No TS in NIT");
 		goto NIT_END;
 	}
-	scanner->start_freqs = (struct dvb_frontend_parameters*)\
-							malloc(sizeof(struct dvb_frontend_parameters) * scanner->start_freqs_cnt);
+	scanner->start_freqs_cnt = AM_MAX(scanner->start_freqs_cnt, old_para_cnt);
+	scanner->start_freqs = (AM_SCAN_FrontEndPara_t*)\
+							malloc(sizeof(AM_SCAN_FrontEndPara_t) * scanner->start_freqs_cnt);
 	if (!scanner->start_freqs)
 	{
 		AM_DEBUG(1, "No enough memory for building ts list");
 		scanner->start_freqs_cnt = 0;
 		goto NIT_END;
 	}
-
+	memset(scanner->start_freqs, 0, sizeof(AM_SCAN_FrontEndPara_t) * scanner->start_freqs_cnt);
+	/*包含模拟频点*/
+	for (i=0; i<old_para_cnt; i++)
+	{
+		if (old_para[i].atv_freq > 0)
+			scanner->start_freqs[i].atv_freq = old_para[i].atv_freq;
+	}
+	
 	scanner->start_freqs_cnt = 0;
 	
 	/*从NIT搜索结果中取出频点列表存到start_freqs中*/
@@ -1437,7 +2024,7 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 			{
 				dvbpsi_cable_delivery_dr_t *pcd = (dvbpsi_cable_delivery_dr_t*)descr->p_decoded;
 
-				param = &scanner->start_freqs[scanner->start_freqs_cnt];
+				param = &scanner->start_freqs[scanner->start_freqs_cnt].dtv_para;
 				param->frequency = pcd->i_frequency/1000;
 				param->u.qam.modulation = pcd->i_modulation_type;
 				param->u.qam.symbol_rate = pcd->i_symbol_rate;
@@ -1450,7 +2037,7 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 			{
 				dvbpsi_terr_deliv_sys_dr_t *pcd = (dvbpsi_terr_deliv_sys_dr_t*)descr->p_decoded;
 
-				param = &scanner->start_freqs[scanner->start_freqs_cnt];
+				param = &scanner->start_freqs[scanner->start_freqs_cnt].dtv_para;
 				param->frequency = pcd->i_centre_frequency/1000;
 				param->u.ofdm.bandwidth = pcd->i_bandwidth;
 				scanner->start_freqs_cnt++;
@@ -1468,7 +2055,7 @@ NIT_END:
 	{
 		AM_DEBUG(1, "No Delivery system descriptor in NIT");
 	}
-
+	scanner->start_freqs_cnt = AM_MAX(scanner->start_freqs_cnt, old_para_cnt);
 	if (scanner->recv_status == AM_SCAN_RECVING_COMPLETE)
 	{
 		/*开始搜索TS*/
@@ -1593,9 +2180,74 @@ static void am_scan_vct_done(AM_SCAN_Scanner_t *scanner)
 	scanner->recv_status &= ~scanner->vctctl.recv_flag;
 
 	if (scanner->vctctl.tid == AM_SI_TID_PSIP_CVCT)
+	{
+		atsc_descriptor_t *descr;
+		cvct_section_info_t *cvct;
+		cvct_channel_info_t *chan;
+		
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_CVCT_DONE, (void*)scanner->curr_ts->cvcts);
+		
+		/*是否需要搜索PAT/PMT*/
+		if (scanner->curr_ts->cvcts)
+		{
+			/*find service location desc first*/
+			AM_SI_LIST_BEGIN(scanner->curr_ts->cvcts, cvct)
+			AM_SI_LIST_BEGIN(cvct->vct_chan_info, chan);
+			if (chan->channel_TSID == cvct->transport_stream_id)
+			{
+				AM_SI_LIST_BEGIN(chan->desc, descr)			
+					if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE_LOCATION)
+					{
+						atsc_service_location_dr_t *asld = (atsc_service_location_dr_t*)descr->p_decoded;
+						
+						if (asld->i_elem_count > 0)
+						{
+							AM_DEBUG(1, "Found ServiceLocationDescr in CVCT, will not scan PAT/PMT");
+							return;
+						}
+					}
+				}
+				AM_SI_LIST_END()
+			AM_SI_LIST_END()
+			AM_SI_LIST_END()
+		}
+	}
 	else
+	{
+		atsc_descriptor_t *descr;
+		tvct_section_info_t *tvct;
+		tvct_channel_info_t *chan;
+
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TVCT_DONE, (void*)scanner->curr_ts->tvcts);
+		
+		/*是否需要搜索PAT/PMT*/
+		if (scanner->curr_ts->tvcts)
+		{
+			/*find service location desc first*/
+			AM_SI_LIST_BEGIN(scanner->curr_ts->tvcts, tvct)
+			AM_SI_LIST_BEGIN(tvct->vct_chan_info, chan);
+			if (chan->channel_TSID == tvct->transport_stream_id)
+			{
+				AM_SI_LIST_BEGIN(chan->desc, descr)			
+					if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE_LOCATION)
+					{
+						atsc_service_location_dr_t *asld = (atsc_service_location_dr_t*)descr->p_decoded;
+						
+						if (asld->i_elem_count > 0)
+						{
+							AM_DEBUG(1, "Found ServiceLocationDescr in TVCT, will not scan PAT/PMT");
+							return;
+						}
+					}
+				}
+				AM_SI_LIST_END()
+			AM_SI_LIST_END()
+			AM_SI_LIST_END()
+		}
+	}
+		
+	/*VCT中未发现有效service location descr, 尝试搜索PAT/PMT*/
+	am_scan_request_section(scanner, &scanner->patctl);
 }
 
 /**\brief 根据过滤器号取得相应控制数据*/
@@ -1628,6 +2280,79 @@ static AM_SCAN_TableCtl_t *am_scan_get_section_ctrl_by_fid(AM_SCAN_Scanner_t *sc
 	
 	return scl;
 }
+
+/**\brief 从一个TVCT中添加虚拟频道*/
+static void am_scan_add_vc_from_tvct(AM_SCAN_Scanner_t *scanner, tvct_section_info_t *vct)
+{
+	tvct_channel_info_t *tmp, *new;
+	AM_Bool_t found;
+	
+	AM_SI_LIST_BEGIN(vct->vct_chan_info, tmp)
+		new = (tvct_channel_info_t *)malloc(sizeof(tvct_channel_info_t));
+		if (new == NULL)
+		{
+			AM_DEBUG(0, "Error, no enough memory for adding a new VC");
+			continue;
+		}
+		/*here we share the desc pointer*/
+		*new = *tmp;
+		new->p_next = NULL;
+		
+		found = AM_FALSE;
+		/*Is this vc already added?*/
+		AM_SI_LIST_BEGIN(scanner->result.tvcs, tmp)
+			if (tmp->channel_TSID == new->channel_TSID && 
+				tmp->program_number == new->program_number)
+			{
+				found = AM_TRUE;
+				break;
+			}
+		AM_SI_LIST_END()
+		
+		if (! found)		
+		{
+			/*Add this vc to result.vcs*/
+			ADD_TO_LIST(new, scanner->result.tvcs);
+		}
+	AM_SI_LIST_END()
+}
+
+/**\brief 从一个CVCT中添加虚拟频道*/
+static void am_scan_add_vc_from_cvct(AM_SCAN_Scanner_t *scanner, cvct_section_info_t *vct)
+{
+	cvct_channel_info_t *tmp, *new;
+	AM_Bool_t found;
+	
+	AM_SI_LIST_BEGIN(vct->vct_chan_info, tmp)
+		new = (cvct_channel_info_t *)malloc(sizeof(cvct_channel_info_t));
+		if (new == NULL)
+		{
+			AM_DEBUG(0, "Error, no enough memory for adding a new VC");
+			continue;
+		}
+		/*here we share the desc pointer*/
+		*new = *tmp;
+		new->p_next = NULL;
+		
+		found = AM_FALSE;
+		/*Is this vc already added?*/
+		AM_SI_LIST_BEGIN(scanner->result.cvcs, tmp)
+			if (tmp->channel_TSID == new->channel_TSID && 
+				tmp->program_number == new->program_number)
+			{
+				found = AM_TRUE;
+				break;
+			}
+		AM_SI_LIST_END()
+		
+		if (! found)		
+		{
+			/*Add this vc to result.vcs*/
+			ADD_TO_LIST(new, scanner->result.cvcs);
+		}
+	AM_SI_LIST_END()
+}
+
 
 /**\brief 数据处理函数*/
 static void am_scan_section_handler(int dev_no, int fid, const uint8_t *data, int len, void *user_data)
@@ -1711,11 +2436,19 @@ static void am_scan_section_handler(int dev_no, int fid, const uint8_t *data, in
 				break;
 			case AM_SI_TID_PSIP_TVCT:
 				if (scanner->curr_ts)
+				{
 					COLLECT_SECTION(tvct_section_info_t, scanner->curr_ts->tvcts);
+					//if (scanner->curr_ts->tvcts != NULL)
+					//	am_scan_add_vc_from_tvct(scanner, scanner->curr_ts->tvcts);
+				}
 				break;
 			case AM_SI_TID_PSIP_CVCT:
 				if (scanner->curr_ts)
+				{
 					COLLECT_SECTION(cvct_section_info_t, scanner->curr_ts->cvcts);
+					//if (scanner->curr_ts->tvcts != NULL)
+					//	am_scan_add_vc_from_cvct(scanner, scanner->curr_ts->cvcts);
+				}
 				break;
 			default:
 				AM_DEBUG(1, "Scan: Unkown section data, table_id 0x%x", data[0]);
@@ -1852,7 +2585,8 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner)
 	do
 	{
 		scanner->curr_freq++;
-		if (scanner->curr_freq < 0 || scanner->curr_freq >= scanner->start_freqs_cnt)
+		if (scanner->curr_freq < 0 || scanner->curr_freq >= scanner->start_freqs_cnt || 
+			scanner->start_freqs[scanner->curr_freq].dtv_para.frequency <= 0)
 		{
 			AM_DEBUG(1, "Cannot get nit after all trings!");
 			if (scanner->start_freqs)
@@ -1869,14 +2603,14 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner)
 			return AM_SCAN_ERR_CANNOT_GET_NIT;
 		}
 
-		AM_DEBUG(1, "Tring to recv NIT in frequency %u ...", scanner->start_freqs[scanner->curr_freq].frequency);
+		AM_DEBUG(1, "Tring to recv NIT in frequency %u ...", scanner->start_freqs[scanner->curr_freq].dtv_para.frequency);
 
 		tp.index = scanner->curr_freq;
 		tp.total = scanner->start_freqs_cnt;
-		tp.fend_para = scanner->start_freqs[scanner->curr_freq];
+		tp.fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para;
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_BEGIN, (void*)&tp);
 		
-		ret = AM_FEND_SetPara(scanner->fend_dev, &scanner->start_freqs[scanner->curr_freq]);
+		ret = AM_FEND_SetPara(scanner->fend_dev, &scanner->start_freqs[scanner->curr_freq].dtv_para);
 		if (ret == AM_SUCCESS)
 		{
 			scanner->recv_status |= AM_SCAN_RECVING_WAIT_FEND;
@@ -1892,18 +2626,95 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner)
 	return ret;
 }
 
+/**\brief 尝试模拟频点搜索*/
+static AM_ErrorCode_t am_scan_try_atv_search(AM_SCAN_Scanner_t *scanner)
+{
+	AM_ErrorCode_t ret = AM_FAILURE;
+	
+	AM_DEBUG(1, "Start scanning atv frequency %u ...", scanner->start_freqs[scanner->curr_freq].atv_freq);
+	if (scanner->curr_ts == NULL)
+	{
+		scanner->curr_ts = (AM_SCAN_TS_t*)malloc(sizeof(AM_SCAN_TS_t));
+		if (scanner->curr_ts == NULL)
+		{
+			AM_DEBUG(1, "Error, no enough memory for adding a new ts");
+			return ret;
+		}
+		memset(scanner->curr_ts, 0, sizeof(AM_SCAN_TS_t));
+
+		scanner->curr_ts->fend_para.frequency = scanner->start_freqs[scanner->curr_freq].atv_freq;
+		scanner->curr_ts->type = AM_SCAN_TS_ANALOG;
+
+		/*添加到搜索结果列表*/
+		ADD_TO_LIST(scanner->curr_ts, scanner->result.tses);
+	}
+	
+	
+	/*开始模拟搜索时关闭前端设备*/
+	AM_FEND_Close(scanner->fend_dev);
+
+	/*开始模拟搜索*/
+	am_scan_start_atv_search((void*)scanner);
+
+	scanner->curr_ts->type = AM_SCAN_TS_ANALOG;
+	scanner->curr_ts->fend_para.frequency = scanner->start_freqs[scanner->curr_freq].atv_freq;
+	if (am_scan_atv_detect_frequency(scanner->curr_ts->fend_para.frequency) == 0)
+	{
+		scanner->recv_status |= AM_SCAN_SEARCHING_ATV;
+		scanner->start_freqs[scanner->curr_freq].status = AM_SCAN_FE_ATV;
+		/*等待模拟搜索回调完成本次搜索*/
+		ret = AM_SUCCESS;
+	}
+	else
+	{
+		AM_DEBUG(1, "Cannot start search for atv frequency %d, try next", 
+			scanner->start_freqs[scanner->curr_freq].atv_freq);
+		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_END, scanner->curr_ts);
+	}
+	
+	return ret;
+}
+
 /**\brief 从频率列表中选择下一个频点开始搜索*/
 static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 {
-	AM_ErrorCode_t ret;
+	AM_ErrorCode_t ret = AM_FAILURE;
 	AM_SCAN_TSProgress_t tp;
 
 	if (scanner->stage != AM_SCAN_STAGE_TS)
 		scanner->stage = AM_SCAN_STAGE_TS;
 
 	if (scanner->curr_freq >= 0)
-		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_END, scanner->curr_ts);
+	{ 
+		if (scanner->start_freqs[scanner->curr_freq].status == AM_SCAN_FE_ATV)
+		{
+			AM_FEND_OpenPara_t fpara;
+			am_scan_stop_atv_search();
+			scanner->start_freqs[scanner->curr_freq].status = AM_SCAN_FE_DONE;
+			/*模拟搜索完毕后，打开数字前端设备*/
+			memset(&fpara, 0, sizeof(fpara));
+			AM_FEND_Open(scanner->fend_dev, &fpara);
 
+			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_END, scanner->curr_ts);
+		}
+		else if (scanner->start_freqs[scanner->curr_freq].status == AM_SCAN_FE_DTV)
+		{
+			if (scanner->start_freqs[scanner->curr_freq].atv_freq > 0)
+			{
+				if (scanner->standard != AM_SCAN_STANDARD_ATSC || !scanner->start_freqs[scanner->curr_freq].dtv_locked) 
+				{	
+					if (am_scan_try_atv_search(scanner) == AM_SUCCESS)
+					{
+						/*等待模拟搜索回调完成本次搜索*/
+						return AM_SUCCESS;
+					}
+				}
+			}
+		}
+		scanner->start_freqs[scanner->curr_freq].status = AM_SCAN_FE_DONE;
+	}
+
+	/*Try Next FrontEndPara, may be include atv & dtv*/
 	scanner->curr_ts = NULL;
 			
 	do
@@ -1926,34 +2737,41 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 
 			return AM_SUCCESS;
 		}
-
-		AM_DEBUG(1, "Start scanning frequency %u ...", scanner->start_freqs[scanner->curr_freq].frequency);
-
 		
 		tp.index = scanner->curr_freq;
 		tp.total = scanner->start_freqs_cnt;
-		tp.fend_para = scanner->start_freqs[scanner->curr_freq];
+		tp.fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para;
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_BEGIN, (void*)&tp);
 		
-		ret = AM_FEND_SetPara(scanner->fend_dev, &scanner->start_freqs[scanner->curr_freq]);
-		if (ret == AM_SUCCESS)
+		AM_DEBUG(1, "tp index %d, dtv %d, atv %d", scanner->curr_freq, 
+			scanner->start_freqs[scanner->curr_freq].dtv_para.frequency,
+			scanner->start_freqs[scanner->curr_freq].atv_freq);
+		if (scanner->start_freqs[scanner->curr_freq].dtv_para.frequency > 0)
 		{
-			scanner->recv_status |= AM_SCAN_RECVING_WAIT_FEND;
+			AM_DEBUG(1, "Start scanning dtv frequency %u ...", scanner->start_freqs[scanner->curr_freq].dtv_para.frequency);
+			ret = AM_FEND_SetPara(scanner->fend_dev, &scanner->start_freqs[scanner->curr_freq].dtv_para);
+			if (ret == AM_SUCCESS)
+			{
+				scanner->recv_status |= AM_SCAN_RECVING_WAIT_FEND;
+				scanner->start_freqs[scanner->curr_freq].status = AM_SCAN_FE_DTV;
+			}
+			else if (scanner->start_freqs[scanner->curr_freq].atv_freq > 0)
+			{
+				AM_DEBUG(1, "Set DTV frequency %d Failed, try ATV frequency %d", 
+					scanner->start_freqs[scanner->curr_freq].dtv_para.frequency,
+					scanner->start_freqs[scanner->curr_freq].atv_freq);
+				/*数字频点锁频失败，尝试模拟频点*/
+				ret = am_scan_try_atv_search(scanner);
+			}
 		}
-		else
+		else if (scanner->start_freqs[scanner->curr_freq].atv_freq > 0)
 		{
-			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_END, NULL);
-			AM_DEBUG(1, "AM_FEND_SetPara Failed, try next frequency");
-			AM_DEBUG(1, ">>>>[total:%dcur:%d, f:%ds=%dm=%d]", 
-				scanner->start_freqs_cnt, scanner->curr_freq, 
-				scanner->start_freqs[scanner->curr_freq].frequency,
-				scanner->start_freqs[scanner->curr_freq].u.qam.symbol_rate,
-				scanner->start_freqs[scanner->curr_freq].u.qam.modulation);
+			ret = am_scan_try_atv_search(scanner);
 		}
-			
+		
 	}while(ret != AM_SUCCESS);
 
-	return AM_SUCCESS;
+	return ret;
 }
 
 static void am_scan_fend_callback(int dev_no, int event_type, void *param, void *user_data)
@@ -2038,6 +2856,21 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 	return AM_SUCCESS;
 }
 
+/**\brief ATV搜索完一个频道事件处理*/
+static void am_scan_solve_atv_search_done_evt(AM_SCAN_Scanner_t *scanner)
+{
+	if (scanner->curr_ts == NULL || scanner->curr_ts->type != AM_SCAN_TS_ANALOG
+		|| scanner->curr_ts->analog_channel == NULL)
+	{
+		goto done;
+	}
+	scanner->curr_ts->fend_para.frequency = scanner->curr_ts->analog_channel->freq;
+	scanner->curr_ts->analog_channel->major_chan_num = scanner->curr_freq + 1;
+	scanner->curr_ts->analog_channel->minor_chan_num = 0;
+done:
+	scanner->recv_status &= ~AM_SCAN_SEARCHING_ATV;
+}
+
 /**\brief SCAN前端事件处理*/
 static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 {
@@ -2045,7 +2878,7 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 	
 	if ((scanner->curr_freq >= 0) && 
 		(scanner->curr_freq < scanner->start_freqs_cnt) &&
-		(scanner->start_freqs[scanner->curr_freq].frequency != \
+		(scanner->start_freqs[scanner->curr_freq].dtv_para.frequency != \
 		scanner->fe_evt.parameters.frequency))
 	{
 		AM_DEBUG(1, "Unexpected fend_evt arrived");
@@ -2099,6 +2932,7 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 				goto try_next;
 			}
 			memset(scanner->curr_ts, 0, sizeof(AM_SCAN_TS_t));
+			scanner->curr_ts->type = AM_SCAN_TS_DIGITAL;
 
 			/*存储信号信息*/
 			scanner->curr_ts->snr = si.snr;
@@ -2113,7 +2947,7 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 				am_scan_tablectl_clear(&scanner->mgtctl);
 				
 				/*请求数据*/
-				am_scan_request_section(scanner, &scanner->patctl);
+				//am_scan_request_section(scanner, &scanner->patctl);
 				am_scan_request_section(scanner, &scanner->catctl);
 				am_scan_request_section(scanner, &scanner->mgtctl);
 			}
@@ -2139,7 +2973,8 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 			}
 			
 
-			scanner->curr_ts->fend_para = scanner->start_freqs[scanner->curr_freq];
+			scanner->curr_ts->fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para;
+			scanner->start_freqs[scanner->curr_freq].dtv_locked = AM_TRUE;
 			/*添加到搜索结果列表*/
 			ADD_TO_LIST(scanner->curr_ts, scanner->result.tses);
 
@@ -2155,9 +2990,14 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 try_next:
 	/*尝试下一频点*/	
 	if (scanner->stage == AM_SCAN_STAGE_NIT)
+	{
 		am_scan_try_nit(scanner);
+	}
 	else if (scanner->stage == AM_SCAN_STAGE_TS)
+	{
+		scanner->start_freqs[scanner->curr_freq].dtv_locked = AM_FALSE;
 		am_scan_start_next_ts(scanner);
+	}
 
 }
 
@@ -2294,6 +3134,9 @@ handle_events:
 			/*VCT表收齐事件*/
 			if (evt_flag & AM_SCAN_EVT_VCT_DONE)
 				scanner->vctctl.done(scanner);
+			/*ATV搜索完一个Channel*/
+			if (evt_flag & AM_SCAN_EVT_ATV_SEARCH_DONE)
+				am_scan_solve_atv_search_done_evt(scanner);
 
 			/*退出事件*/
 			if (evt_flag & AM_SCAN_EVT_QUIT)
@@ -2320,6 +3163,9 @@ handle_events:
 			}
 		}
 	}
+	
+
+	am_scan_stop_atv_search();
 
 	/*反注册前端事件*/
 	AM_EVT_Unsubscribe(scanner->fend_dev, AM_FEND_EVT_STATUS_CHANGED, am_scan_fend_callback, (void*)scanner);
@@ -2418,6 +3264,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	int rc;
 	pthread_mutexattr_t mta;
 	int use_default=0;
+	int i;
 	
 	if (para->start_para_cnt < 0 || !handle)
 		return AM_SCAN_ERR_INVALID_PARAM;
@@ -2459,51 +3306,65 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 			&& (! para->start_para_cnt)) {
 		use_default = 1;
 		para->start_para_cnt = 
-			(para->source==AM_SCAN_SRC_DVBC)? AM_ARRAY_SIZE(dvbc_std_freqs) 
-			: (para->source==AM_SCAN_SRC_DVBT) ? (DEFAULT_DVBT_FREQ_STOP-DEFAULT_DVBT_FREQ_START)/8000+1
+			(para->source==AM_SCAN_SRC_CABLE)? AM_ARRAY_SIZE(dvbc_std_freqs) 
+			: (para->source==AM_SCAN_SRC_TERRISTRIAL) ? (DEFAULT_DVBT_FREQ_STOP-DEFAULT_DVBT_FREQ_START)/8000+1
 			: 0/*Fix me*/;
 	}
-
+	
 	/*配置起始频点*/
-	scanner->start_freqs = (struct dvb_frontend_parameters*)\
-							malloc(sizeof(struct dvb_frontend_parameters) * para->start_para_cnt);
+	scanner->start_freqs_cnt = AM_MAX(para->start_para_cnt, para->atv_freq_cnt);
+	scanner->start_freqs = (AM_SCAN_FrontEndPara_t*)\
+							malloc(sizeof(AM_SCAN_FrontEndPara_t) * scanner->start_freqs_cnt);
 	if (!scanner->start_freqs)
 	{
 		AM_DEBUG(1, "Scan: scan create error, no enough memory");
 		free(scanner);
 		return AM_SCAN_ERR_NO_MEM;
 	}
-	scanner->start_freqs_cnt = para->start_para_cnt;
+	memset(scanner->start_freqs, 0, sizeof(AM_SCAN_FrontEndPara_t) * scanner->start_freqs_cnt);
+	
 	/*全频段搜索时按标准频率表搜索*/
 	if (((para->mode & AM_SCAN_MODE_ALLBAND) 
 		    ||(para->mode & AM_SCAN_MODE_AUTO))
 		 && use_default )
 	{
-		int i;
 		struct dvb_frontend_parameters tpara;
 		
-		if(para->source==AM_SCAN_SRC_DVBC) {
+		if(para->source==AM_SCAN_SRC_CABLE) {
 			tpara.u.qam.modulation = DEFAULT_DVBC_MODULATION;
 			tpara.u.qam.symbol_rate = DEFAULT_DVBC_SYMBOLRATE;
-			for (i=0; i<scanner->start_freqs_cnt; i++)
+			for (i=0; i<para->start_para_cnt; i++)
 			{
 				tpara.frequency = dvbc_std_freqs[i]*1000;
-				scanner->start_freqs[i] = tpara;
+				scanner->start_freqs[i].dtv_para = tpara;
 			}
-		} else if(para->source==AM_SCAN_SRC_DVBT) {
+		} else if(para->source==AM_SCAN_SRC_TERRISTRIAL) {
 			tpara.u.ofdm.bandwidth = DEFAULT_DVBT_BW;
-			for (i=0; i<scanner->start_freqs_cnt; i++)
+			for (i=0; i<para->start_para_cnt; i++)
 			{
 				tpara.frequency = (DEFAULT_DVBT_FREQ_START+(8000*i))*1000;
-				scanner->start_freqs[i] = tpara;
+				scanner->start_freqs[i].dtv_para = tpara;
 			}
 		}
 	}
 	else
 	{
-		memcpy(scanner->start_freqs, para->start_para, sizeof(struct dvb_frontend_parameters) * para->start_para_cnt);
+		/*拷贝用户设置的手动数字频率列表*/
+		for (i=0; i<para->start_para_cnt; i++)
+		{
+			scanner->start_freqs[i].dtv_para = para->start_para[i];
+		}
 	}
-
+	
+	/*配置模拟频点参数*/
+	if (para->atv_freq_cnt > 0)
+	{
+		for (i=0; i<para->atv_freq_cnt; i++)
+		{
+			scanner->start_freqs[i].atv_freq = para->atv_freqs[i];
+		}
+	}
+	
 	scanner->result.mode = para->mode;
 	scanner->result.src = para->source;
 	scanner->result.hdb = para->hdb;
