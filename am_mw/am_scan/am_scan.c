@@ -2847,7 +2847,7 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 
 		/*In order to support lcn, add nit info support in manual and allband scan mode*/
 		if ((scanner->result.enable_lcn)
-			&& (scanner->result.mode & AM_SCAN_MODE_MANUAL) || (scanner->result.mode & AM_SCAN_MODE_ALLBAND))
+			&& ((scanner->result.mode & AM_SCAN_MODE_MANUAL) || (scanner->result.mode & AM_SCAN_MODE_ALLBAND)))
 		{
 			am_scan_tablectl_init(&scanner->nitctl, AM_SCAN_RECVING_NIT, AM_SCAN_EVT_NIT_DONE, NIT_TIMEOUT, 
 								AM_SI_PID_NIT, AM_SI_TID_NIT_ACT, "NIT", 1, am_scan_nit_done_nousefreqinfo, 0);		
