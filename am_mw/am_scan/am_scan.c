@@ -253,9 +253,30 @@ static AM_ErrorCode_t am_scan_request_section(AM_SCAN_Scanner_t *scanner, AM_SCA
 static AM_ErrorCode_t am_scan_request_next_pmt(AM_SCAN_Scanner_t *scanner);
 static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner);
 extern AM_ErrorCode_t AM_EPG_ConvertCode(char *in_code,int in_len,char *out_code,int out_len);
+
+#ifdef SUPPORT_ATV_SCAN
 extern int am_scan_start_atv_search(void *dtv_para);
 extern int am_scan_stop_atv_search();
 extern int am_scan_atv_detect_frequency(int freq);
+#else
+static int am_scan_start_atv_search(void *dtv_para)
+{
+	AM_DEBUG(1, "%s: dummy function, should not be called", __func__);	
+	return 0;
+}
+
+static int am_scan_stop_atv_search()
+{
+	AM_DEBUG(1, "%s: dummy function, should not be called", __func__);	
+	return 0;
+}
+
+static int am_scan_atv_detect_frequency(int freq)
+{
+	AM_DEBUG(1, "%s: dummy function, should not be called", __func__);	
+	return 0;
+}
+#endif
 
 void am_scan_notify_from_atv(const int *msg_pdu, void *para)
 {
@@ -2694,8 +2715,6 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 			/*模拟搜索完毕后，打开数字前端设备*/
 			memset(&fpara, 0, sizeof(fpara));
 			AM_FEND_Open(scanner->fend_dev, &fpara);
-
-			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_END, scanner->curr_ts);
 		}
 		else if (scanner->start_freqs[scanner->curr_freq].status == AM_SCAN_FE_DTV)
 		{
@@ -2711,6 +2730,7 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 				}
 			}
 		}
+		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_END, scanner->curr_ts);
 		scanner->start_freqs[scanner->curr_freq].status = AM_SCAN_FE_DONE;
 	}
 
@@ -3310,6 +3330,15 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 			: (para->source==AM_SCAN_SRC_TERRISTRIAL) ? (DEFAULT_DVBT_FREQ_STOP-DEFAULT_DVBT_FREQ_START)/8000+1
 			: 0/*Fix me*/;
 	}
+
+#ifndef SUPPORT_ATV_SCAN
+	/*no atv scan supported*/
+	if (para->atv_freq_cnt > 0)
+	{
+		AM_DEBUG(1, "Scan: ATV Scan is not supported");
+		para->atv_freq_cnt = 0;
+	}
+#endif
 	
 	/*配置起始频点*/
 	scanner->start_freqs_cnt = AM_MAX(para->start_para_cnt, para->atv_freq_cnt);
