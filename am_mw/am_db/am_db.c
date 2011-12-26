@@ -263,7 +263,7 @@ static char *db_get_sql_string_buf(void)
 	int temp, max, i;
 
 	max = 0;
-	for (i=0; i<AM_ARRAY_SIZE(db_tables); i++)
+	for (i=0; i<(int)AM_ARRAY_SIZE(db_tables); i++)
 	{
 		DB_CAL_FIELD_STRING_LEN(db_tables[i].fields, db_tables[i].get_size(), temp);
 		temp += strlen(db_tables[i].table_name);
@@ -384,7 +384,9 @@ AM_ErrorCode_t AM_DB_Select(sqlite3 *handle, const char *sql, int *max_row, cons
 	/*从数据库查询数据*/
 	if (sqlite3_get_table(handle, sql, &db_result, &row, &col, &errmsg) != SQLITE_OK)
 	{
-		AM_DEBUG(1, "DBase Select:select error, reason [%s]", errmsg);
+		AM_DEBUG(1, "DBase Select:get table failed, reason [%s]", errmsg);
+		if (db_result != NULL)
+			sqlite3_free_table(db_result);
 		return AM_DB_ERR_SELECT_FAILED;
 	}
 
@@ -461,7 +463,7 @@ AM_ErrorCode_t AM_DB_CreateTables(sqlite3 *handle)
 	}
 	
 	/*依次创建表*/
-	for (i=0; i<AM_ARRAY_SIZE(db_tables); i++)
+	for (i=0; i<(int)AM_ARRAY_SIZE(db_tables); i++)
 	{
 		AM_DEBUG(1, "Creating table [%s]", db_tables[i].table_name);
 	

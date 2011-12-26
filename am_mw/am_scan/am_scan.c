@@ -170,7 +170,8 @@
 		sqlite3_bind_int(stmts[UPDATE_SRV], 24, srv_dbid);\
 		sqlite3_step(stmts[UPDATE_SRV]);\
 		sqlite3_reset(stmts[UPDATE_SRV]);\
-		AM_DEBUG(1, "Updating Program '%s' OK", name);\
+		AM_DEBUG(1, "Updating Program: '%s',srv_type(%d), vid(%d), aid1(%d), aid2(%d), vfmt(%d), afmt1(%d), afmt2(%d) ",\
+			name,srv_type,vid,aid1,aid2,vfmt,afmt1,afmt2);\
 	AM_MACRO_END
 
 typedef struct{
@@ -1387,7 +1388,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 					if (vid == 0x1fff)
 					{
 						vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
-						AM_DEBUG(0, "Set video format to %d", avfmt);
+						AM_DEBUG(3, "Set video format to %d", avfmt);
 						vfmt = avfmt;
 					}
 					break;
@@ -1414,12 +1415,12 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
             		if (aid1 == 0x1fff)
             		{
 						aid1 = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
-						AM_DEBUG(0, "Set audio1 format to %d", avfmt);
+						AM_DEBUG(3, "Set audio1 format to %d", avfmt);
 						afmt1 = avfmt;
 					}
 					else if (aid2 == 0x1fff)
 					{
-						AM_DEBUG(0, "Set audio2 format to %d", avfmt);
+						AM_DEBUG(3, "Set audio2 format to %d", avfmt);
 						aid2 = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
 						afmt2 = avfmt;
 					}
@@ -1486,6 +1487,11 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 					}
 					/*业务类型*/
 					srv_type = psd->i_service_type;
+					/*service type 0x16 and 0x19 is user defined, as digital television service*/
+					if((srv_type == 0x16) || (srv_type == 0x19))
+					{
+						srv_type = 0x1;
+					}
 				
 					/*跳出多层循环*/
 					goto SDT_END;
@@ -2093,7 +2099,7 @@ static void am_scan_nit_done_nousefreqinfo(AM_SCAN_Scanner_t *scanner)
 	am_scan_free_filter(scanner, &scanner->nitctl.fid);
 	/*清除事件标志*/
 	//scanner->evt_flag &= ~scanner->nitctl.evt_flag;
-AM_DEBUG(1, "$$$$$$$$$$$$$$ am_scan_nit_done_nousefreqinfo %p", scanner->result.nits);
+	AM_DEBUG(1, "$$$$$$$$$$$$$$ am_scan_nit_done_nousefreqinfo %p", scanner->result.nits);
 	/*清除搜索标识*/
 	scanner->recv_status &= ~scanner->nitctl.recv_flag;
 }
