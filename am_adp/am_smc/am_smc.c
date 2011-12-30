@@ -227,9 +227,9 @@ smc_status_thread(void *arg)
 			dev->flags &= ~SMC_FL_RUN_CB;
 			pthread_mutex_unlock(&dev->lock);
 			pthread_cond_broadcast(&dev->cond);
-			
-			usleep(SMC_STATUS_SLEEP_TIME*1000);
 		}
+
+		usleep(SMC_STATUS_SLEEP_TIME*1000);
 	}
 	
 	return NULL;
