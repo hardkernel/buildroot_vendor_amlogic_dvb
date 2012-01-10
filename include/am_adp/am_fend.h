@@ -66,7 +66,8 @@ typedef enum
 	AM_FEND_DEMOD_AUTO,  /**< AUTO */
 	AM_FEND_DEMOD_DVBC,  /**< DVB-C*/
 	AM_FEND_DEMOD_DVBT,  /**< DVB-T*/
-	AM_FEND_DEMOD_DVBS,  /**< DVB-S*/	
+	AM_FEND_DEMOD_DVBS,  /**< DVB-S*/
+	AM_FEND_DEMOD_ISDBT,  /**< ISDB-T*/
 	AM_FEND_DEMOD_COUNT
 } AM_FEND_DemodMode_t;
 
@@ -117,6 +118,7 @@ extern AM_ErrorCode_t AM_FEND_GetInfo(int dev_no, struct dvb_frontend_info *info
  *   - 其他值 错误代码(见am_fend.h)
  */
 extern AM_ErrorCode_t AM_FEND_SetPara(int dev_no, const struct dvb_frontend_parameters *para);
+extern AM_ErrorCode_t AM_FEND_SetProp(int dev_no, const struct dtv_properties *prop);
 
 /**\brief 取得当前端设备设定的参数
  * \param dev_no 前端设备号
@@ -126,6 +128,7 @@ extern AM_ErrorCode_t AM_FEND_SetPara(int dev_no, const struct dvb_frontend_para
  *   - 其他值 错误代码(见am_fend.h)
  */
 extern AM_ErrorCode_t AM_FEND_GetPara(int dev_no, struct dvb_frontend_parameters *para);
+extern AM_ErrorCode_t AM_FEND_GetProp(int dev_no, struct dtv_properties *prop);
 
 /**\brief 取得前端设备当前的锁定状态
  * \param dev_no 前端设备号

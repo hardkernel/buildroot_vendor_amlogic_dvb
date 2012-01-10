@@ -50,6 +50,8 @@ static AM_ErrorCode_t dvb_set_tone(AM_FEND_Device_t *dev, fe_sec_tone_mode_t ton
 static AM_ErrorCode_t dvb_set_voltage(AM_FEND_Device_t *dev, fe_sec_voltage_t voltage);
 static AM_ErrorCode_t dvb_enable_high_lnb_voltage(AM_FEND_Device_t *dev, long arg);
 static AM_ErrorCode_t dvb_close (AM_FEND_Device_t *dev);
+static AM_ErrorCode_t dvb_set_prop (AM_FEND_Device_t *dev, const struct dtv_properties *prop);
+static AM_ErrorCode_t dvb_get_prop (AM_FEND_Device_t *dev, struct dtv_properties *prop);
 
 /****************************************************************************
  * Static data
@@ -59,6 +61,8 @@ const AM_FEND_Driver_t linux_dvb_fend_drv =
 .open = dvb_open,
 .set_para = dvb_set_para,
 .get_para = dvb_get_para,
+.set_prop = dvb_set_prop,
+.get_prop = dvb_get_prop,
 .get_status = dvb_get_status,
 .get_snr = dvb_get_snr,
 .get_ber = dvb_get_ber,
@@ -131,6 +135,32 @@ static AM_ErrorCode_t dvb_get_para (AM_FEND_Device_t *dev, struct dvb_frontend_p
 	if(ioctl(fd, FE_GET_FRONTEND, para)==-1)
 	{
 		AM_DEBUG(1, "ioctl FE_GET_FRONTEND failed, error:%s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t dvb_set_prop (AM_FEND_Device_t *dev, const struct dtv_properties *prop)
+{
+	int fd = (int)dev->drv_data;
+	printf("set prop>>>>>>>>>>>>.\n");
+	if(ioctl(fd, FE_SET_PROPERTY, prop)==-1)
+	{
+		AM_DEBUG(1, "ioctl FE_SET_PROPERTY failed, error:%s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t dvb_get_prop (AM_FEND_Device_t *dev, struct dtv_properties *prop)
+{
+	int fd = (int)dev->drv_data;
+	
+	if(ioctl(fd, FE_GET_PROPERTY, prop)==-1)
+	{
+		AM_DEBUG(1, "ioctl FE_GET_PROPERTY failed, error:%s", strerror(errno));
 		return AM_FAILURE;
 	}
 

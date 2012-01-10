@@ -1488,7 +1488,8 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 					/*业务类型*/
 					srv_type = psd->i_service_type;
 					/*service type 0x16 and 0x19 is user defined, as digital television service*/
-					if((srv_type == 0x16) || (srv_type == 0x19))
+					/*service type 0xc0 is type of partial reception service in ISDBT*/
+					if((srv_type == 0x16) || (srv_type == 0x19) || (srv_type == 0xc0))
 					{
 						srv_type = 0x1;
 					}
@@ -2824,7 +2825,8 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 		return AM_SUCCESS;
 	}
 	
-	AM_DEBUG(1, "@@@ Start scan use standard: %s @@@", (scanner->standard==AM_SCAN_STANDARD_DVB)?"DVB":"ATSC");
+	AM_DEBUG(1, "@@@ Start scan use standard: %s @@@", (scanner->standard==AM_SCAN_STANDARD_DVB)?"DVB" :
+		(scanner->standard==AM_SCAN_STANDARD_ISDB)?"ISDB" : "ATSC");
 
 	/*注册前端事件*/
 	AM_EVT_Subscribe(scanner->fend_dev, AM_FEND_EVT_STATUS_CHANGED, am_scan_fend_callback, (void*)scanner);
@@ -3296,9 +3298,10 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 		return AM_SCAN_ERR_INVALID_PARAM;
 		
 	*handle = 0;	
-	if (para->standard != AM_SCAN_STANDARD_DVB && para->standard != AM_SCAN_STANDARD_ATSC)
+	if (para->standard != AM_SCAN_STANDARD_DVB && para->standard != AM_SCAN_STANDARD_ATSC
+		&& para->standard != AM_SCAN_STANDARD_ISDB)
 	{
-		AM_DEBUG(1, "Unknown scan standard, must be DVB or ATSC");
+		AM_DEBUG(1, "Unknown scan standard, must be DVB or ATSC, ISDB");
 		return AM_SCAN_ERR_INVALID_PARAM;
 	}
 	

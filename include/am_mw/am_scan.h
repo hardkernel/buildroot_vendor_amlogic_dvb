@@ -81,7 +81,7 @@ enum AM_SCAN_Source
 	AM_SCAN_SRC_AUTO       	= 0x00, /**< 自动判断 */
 	AM_SCAN_SRC_CABLE       = 0x01, /**< Cable搜索 */
 	AM_SCAN_SRC_TERRISTRIAL = 0x02, /**< Terristrial(Air in ATSC)搜索 */
-	AM_SCAN_SRC_SATELLITE   = 0x03, /**< Satellite搜索 */
+	AM_SCAN_SRC_SATELLITE   = 0x04, /**< Satellite搜索 */
 };
 
 /**\brief 标准定义*/
@@ -89,6 +89,7 @@ enum AM_SCAN_Standard
 {
 	AM_SCAN_STANDARD_DVB	= 0x00,	/**< DVB标准*/
 	AM_SCAN_STANDARD_ATSC	= 0x01,	/**< ATSC标准*/
+	AM_SCAN_STANDARD_ISDB   = 0x02, /**< ISDB标准*/
 };
 
 /**\brief 搜索模式定义*/

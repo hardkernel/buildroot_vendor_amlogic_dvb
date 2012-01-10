@@ -53,6 +53,8 @@ typedef struct
 	AM_ErrorCode_t (*set_voltage)(AM_FEND_Device_t *dev, fe_sec_voltage_t voltage);
 	AM_ErrorCode_t (*enable_high_lnb_voltage)(AM_FEND_Device_t *dev, long arg);	
 	AM_ErrorCode_t (*close) (AM_FEND_Device_t *dev);
+	AM_ErrorCode_t (*set_prop) (AM_FEND_Device_t *dev, const struct dtv_properties *prop);
+	AM_ErrorCode_t (*get_prop) (AM_FEND_Device_t *dev, struct dtv_properties *prop);
 } AM_FEND_Driver_t;
 
 /**\brief 前端设备*/

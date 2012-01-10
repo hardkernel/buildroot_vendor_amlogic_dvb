@@ -14,6 +14,7 @@
 #include <am_fend.h>
 #include <string.h>
 #include <stdio.h>
+#include <am_misc.h>
 
 /****************************************************************************
  * Macro definitions
@@ -62,9 +63,10 @@ int main(int argc, char **argv)
 	while(loop)
 	{
 		struct dvb_frontend_parameters p;
-		int mode;
+		int mode, current_mode;
 		int freq, srate, qam;
 		int bw;
+		char buf[64], name[64];
 		
 		memset(&para, 0, sizeof(para));
 		
@@ -74,11 +76,28 @@ int main(int argc, char **argv)
 		if(fe_id<0)
 			return 0;
 		
+		para.mode = AM_FEND_DEMOD_AUTO;
+		
 		printf("Input fontend mode: (0-DVBC, 1-DVBT)\n");
 		printf("mode(0/1): ");
 		scanf("%d", &mode);
 		
-		para.mode = (mode==0)?AM_FEND_DEMOD_DVBC : AM_FEND_DEMOD_DVBT;
+		sprintf(name, "/sys/class/amlfe-%d/mode", fe_id);
+		if(AM_FileRead(name, buf, sizeof(buf))==AM_SUCCESS) {
+			if(sscanf(buf, ":%d", &current_mode)==1) {
+				if(current_mode != mode) {
+					int r;
+					printf("Frontend(%d) dose not match the mode expected, change it?: (y/N) ", fe_id);
+					getchar();/*CR*/
+					r=getchar();
+					if((r=='y') || (r=='Y'))
+						para.mode = (mode==0)?AM_FEND_DEMOD_DVBC : 
+									(mode==1)? AM_FEND_DEMOD_DVBT : 
+									AM_FEND_DEMOD_AUTO;
+				}
+			}
+		}
+
 		AM_TRY(AM_FEND_Open(/*FEND_DEV_NO*/fe_id, &para));
 		AM_TRY(AM_FEND_SetCallback(/*FEND_DEV_NO*/fe_id, fend_cb, NULL));
 		

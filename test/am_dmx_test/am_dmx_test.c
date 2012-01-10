@@ -203,6 +203,17 @@ static int get_section()
 	return 0;
 }
 
+static int setlayer(int layer/*1/2/4/7*/)
+{
+	AM_ErrorCode_t ret;
+
+	struct dtv_property p = {.cmd=DTV_ISDBT_LAYER_ENABLED, .u.data = layer};
+	struct dtv_properties props = {.num=1, .props=&p};
+	printf("AM FEND SetProp layer:%d\n", props.props[0].u.data);
+	ret = AM_FEND_SetProp(FEND_DEV_NO, &props);
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	AM_DMX_OpenPara_t para;
@@ -210,12 +221,17 @@ int main(int argc, char **argv)
 	struct dvb_frontend_parameters p;
 	fe_status_t status;
 	int freq = 0;
+	int layer = -1;
 	
 	memset(&fpara, 0, sizeof(fpara));
 #if 1
 	if(argc>1)
 	{
 		sscanf(argv[1], "%d", &freq);
+	}
+	if(argc>2)
+	{
+		sscanf(argv[2], "%d", &layer);
 	}
 	
 	if(!freq)
@@ -254,6 +270,10 @@ int main(int argc, char **argv)
 			printf("unlocked\n");
 		}
 	}
+	
+	if(layer!=-1)
+		setlayer(layer);
+
 #endif	
 	memset(&para, 0, sizeof(para));
 	AM_TRY(AM_DMX_Open(DMX_DEV_NO, &para));

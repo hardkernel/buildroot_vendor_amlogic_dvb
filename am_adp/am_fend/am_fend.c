@@ -320,6 +320,30 @@ AM_ErrorCode_t AM_FEND_SetPara(int dev_no, const struct dvb_frontend_parameters 
 	return ret;
 }
 
+AM_ErrorCode_t AM_FEND_SetProp(int dev_no, const struct dtv_properties *prop)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	
+	assert(para);
+	
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	
+	if(!dev->drv->set_prop)
+	{
+		AM_DEBUG(1, "fronend %d no not support set_prop", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	ret = dev->drv->set_prop(dev, prop);
+	
+	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
+
 /**\brief 取得当前端设备设定的参数
  * \param dev_no 前端设备号
  * \param[out] para 前端设置参数
@@ -350,6 +374,31 @@ AM_ErrorCode_t AM_FEND_GetPara(int dev_no, struct dvb_frontend_parameters *para)
 	
 	return ret;
 }
+
+AM_ErrorCode_t AM_FEND_GetProp(int dev_no, struct dtv_properties *prop)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	
+	assert(para);
+	
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	
+	if(!dev->drv->get_prop)
+	{
+		AM_DEBUG(1, "fronend %d no not support get_prop", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	ret = dev->drv->get_prop(dev, prop);
+	
+	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
+
 
 /**\brief 取得前端设备当前的锁定状态
  * \param dev_no 前端设备号
