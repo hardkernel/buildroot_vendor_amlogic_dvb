@@ -79,6 +79,8 @@ enum AM_AV_EventType
 	AM_AV_EVT_AV_DATA_RESUME,	/**< 在AM_AV_EVT_AV_NO_DATA后，检测到Audio or Video PTS有变化，通知有数据*/
 	AM_AV_EVT_VIDEO_ES_END,     /**< 注入视频ES数据结束*/
 	AM_AV_EVT_AUDIO_ES_END,     /**< 注入音频ES数据结束*/
+	AM_AV_EVT_VIDEO_SCAMBLED,
+	AM_AV_EVT_AUDIO_SCAMBLED,
 	AM_AV_EVT_END
 };
 

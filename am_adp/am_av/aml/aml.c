@@ -2965,6 +2965,7 @@ static void* aml_av_monitor_thread(void *arg)
 	struct am_io_param astatus;
 	struct am_io_param vstatus;
 	struct timespec rt;
+	AM_Bool_t avStatus[2];
 	
 	last_apts = last_vpts = 0;
 	last_dec_vpts = dec_vpts = 0;
@@ -3089,7 +3090,20 @@ static void* aml_av_monitor_thread(void *arg)
 								av_playing = AM_FALSE;
 
 								AM_DEBUG(1, "Notify Audio & Video no data event");
-								AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
+								AM_DMX_GetScrambleStatus(dev->dev_no, avStatus);
+
+								if (avStatus[0] == AM_TRUE)
+								{
+									AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_SCAMBLED, NULL);
+								}
+								else if (avStatus[1] == AM_TRUE)
+								{
+									AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_SCAMBLED, NULL);
+								}
+								else
+								{
+									AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
+								}
 								pts_repeat_count = 0;
 								notified = AM_TRUE;
 							}
