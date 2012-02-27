@@ -282,8 +282,8 @@ static AM_ErrorCode_t fb_open (AM_OSD_Device_t *dev, const AM_OSD_OpenPara_t *pa
 		var.yres_virtual = AM_MAX(para->height, para->output_height);
 	}
 	
-	var.xres         = para->width;
-	var.yres         = para->height;
+	var.xres         = para->output_width;
+	var.yres         = para->output_height;
 	var.bits_per_pixel = mode;
 
 	
