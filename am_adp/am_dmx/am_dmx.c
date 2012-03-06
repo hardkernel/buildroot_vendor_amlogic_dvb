@@ -819,3 +819,24 @@ AM_ErrorCode_t AM_DMX_Sync(int dev_no)
 	return ret;
 }
 
+AM_ErrorCode_t AM_DMX_GetScrambleStatus(int dev_no, AM_Bool_t dev_status[2])
+{
+	char buf[32];
+	char class_file[64];
+	int vflag, aflag;
+
+	snprintf(class_file,sizeof(class_file), "/sys/class/dmx/demux%d_scramble", dev_no);
+	if(AM_FileRead(class_file, buf, sizeof(buf))==AM_SUCCESS)
+	{
+		sscanf(buf,"%d %d", &vflag, &aflag);
+		dev_status[0] = vflag ? AM_TRUE : AM_FALSE;
+		dev_status[1] = aflag ? AM_TRUE : AM_FALSE;
+		AM_DEBUG(1, "AM_DMX_GetScrambleStatus video scamble %d, audio scamble %d\n", vflag, aflag);
+		return AM_TRUE;
+	}
+
+	AM_DEBUG(1, "AM_DMX_GetScrambleStatus read scamble status failed\n");
+	return AM_FAILURE;
+}
+
+

@@ -211,7 +211,7 @@ static AM_ErrorCode_t am_epg_unsubscribe_event(sqlite3 *hdb, int db_evt_id)
 	/*由应用处理时间段冲突*/
 	snprintf(sql, sizeof(sql), "update evt_table set sub_flag=0,sub_status=0 where db_id=%d", db_evt_id);
 
-	if (sqlite3_exec(hdb, sql, NULL, NULL, &errmsg) != SQLITE_DONE)
+	if (sqlite3_exec(hdb, sql, NULL, NULL, &errmsg) != SQLITE_OK)
 	{
 		AM_DEBUG(0, "Unsubscribe EPG event for db_id=%d failed, reason: %s", db_evt_id, errmsg ? errmsg : "Unknown");
 		if (errmsg)
@@ -219,6 +219,30 @@ static AM_ErrorCode_t am_epg_unsubscribe_event(sqlite3 *hdb, int db_evt_id)
 		return AM_EPG_ERR_SUBSCRIBE_EVENT_FAILED;
 	}
 
+	return AM_SUCCESS;
+}
+
+/**\brief 删除过期的event*/
+static AM_ErrorCode_t am_epg_delete_expired_events(sqlite3 *hdb)
+{
+	int now;
+	char sql[128];
+	char *errmsg;
+	
+	if (hdb == NULL)
+		return AM_EPG_ERR_INVALID_PARAM;
+		
+	AM_DEBUG(1, "Deleting expired epg events...");
+	AM_EPG_GetUTCTime(&now);
+	snprintf(sql, sizeof(sql), "delete from evt_table where end<%d", now);
+	if (sqlite3_exec(hdb, sql, NULL, NULL, &errmsg) != SQLITE_OK)
+	{
+		AM_DEBUG(0, "Delete expired events failed: %s", errmsg ? errmsg : "Unknown");
+		if (errmsg)
+			sqlite3_free(errmsg);
+		return AM_FAILURE;
+	}
+	AM_DEBUG(1, "Delete expired epg events done!");
 	return AM_SUCCESS;
 }
 
@@ -871,6 +895,9 @@ static void am_epg_eit50_done(AM_EPG_Monitor_t *mon)
 	/*设置完成时间以进行下一次刷新*/
 	AM_TIME_GetClock(&mon->eit50ctl.check_time);
 	mon->eit50ctl.data_arrive_time = 0;
+	
+	/*Delete the expired events*/
+	am_epg_delete_expired_events(mon->hdb);		
 }
 
 /**\brief EIT schedule actual tableid=0x51 搜索完毕处理*/
@@ -891,6 +918,8 @@ static void am_epg_eit60_done(AM_EPG_Monitor_t *mon)
 	/*设置完成时间以进行下一次刷新*/
 	AM_TIME_GetClock(&mon->eit60ctl.check_time);
 	mon->eit60ctl.data_arrive_time = 0;
+	/*Delete the expired events*/
+	am_epg_delete_expired_events(mon->hdb);		
 }
 
 /**\brief EIT schedule other tableid=0x61 搜索完毕处理*/

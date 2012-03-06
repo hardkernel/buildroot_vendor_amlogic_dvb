@@ -325,7 +325,7 @@ AM_ErrorCode_t AM_FEND_SetProp(int dev_no, const struct dtv_properties *prop)
 	AM_FEND_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
-	assert(para);
+	assert(prop);
 	
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
 	
@@ -380,7 +380,7 @@ AM_ErrorCode_t AM_FEND_GetProp(int dev_no, struct dtv_properties *prop)
 	AM_FEND_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
-	assert(para);
+	assert(prop);
 	
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
 	
