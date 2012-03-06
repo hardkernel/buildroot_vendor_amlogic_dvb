@@ -240,6 +240,7 @@ typedef struct
 	pthread_mutex_t lock;	/*读写锁*/
 	pthread_cond_t		cond;
 	AM_Bool_t	loop;	/*是否使用循环文件*/
+	char	*name;	/*文件名称*/
 } AV_TimeshiftFile_t;
 
 /**\brief Timeshift播放模式相关数据*/
@@ -1269,6 +1270,7 @@ static AM_ErrorCode_t aml_timeshift_file_open(AV_TimeshiftFile_t *tfile, const c
 			AM_DEBUG(0, "Cannot open timeshift output file '%s' for writing: %s", file_name, strerror(errno));
 			ret = AM_AV_ERR_CANNOT_OPEN_FILE;
 		}
+		tfile->name = strdup(file_name);
 	}
 	else
 	{
@@ -1279,6 +1281,7 @@ static AM_ErrorCode_t aml_timeshift_file_open(AV_TimeshiftFile_t *tfile, const c
 			AM_DEBUG(0, "Cannot open playback output file '%s' for reading: %s", file_name, strerror(errno));
 			ret = AM_AV_ERR_CANNOT_OPEN_FILE;
 		}
+		tfile->name = NULL;
 	}
 
 	if (ret == AM_SUCCESS)
@@ -1334,6 +1337,16 @@ static AM_ErrorCode_t aml_timeshift_file_close(AV_TimeshiftFile_t *tfile)
 	{
 		close(tfile->wfd);
 		tfile->wfd = -1;
+	}
+	
+	/*remove timeshift file*/
+	if (tfile->name != NULL)
+	{
+		if (unlink(tfile->name) != 0)
+			AM_DEBUG(1, "@@ Delete timeshift file failed: %s @@", strerror(errno));
+		
+		free(tfile->name);
+		tfile->name = NULL;
 	}
 	pthread_mutex_unlock(&tfile->lock);
 	pthread_mutex_destroy(&tfile->lock);
@@ -2227,8 +2240,8 @@ static void *aml_timeshift_thread(void *arg)
 				AM_DEBUG(1, "total %lld, avail %lld, alen %d, vlen %d, duration %d, size %lld", 
 					tshift->file.total , tshift->file.avail , astatus.status.data_len , vstatus.status.data_len, tshift->duration, tshift->file.size);
 				if (tshift->rate)
-					info.current_time = (tshift->file.total - tshift->file.avail - 188*(astatus.status.data_len+vstatus.status.data_len)/184)
-										*tshift->duration/tshift->file.size;
+					info.current_time = (tshift->file.total - tshift->file.avail - 188*(loff_t)(astatus.status.data_len+vstatus.status.data_len)/184)
+										*(loff_t)tshift->duration/tshift->file.size;
 				else
 					info.current_time = 0;
 				if (info.current_time < 0)
