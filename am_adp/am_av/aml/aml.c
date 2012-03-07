@@ -1710,6 +1710,9 @@ static AM_ErrorCode_t aml_set_deinterlace(AM_Bool_t di)
 #ifdef DEINTERLACE_OLD
 	return AM_FileEcho("/sys/module/deinterlace/parameters/deinterlace_mode", di?"2":"0");
 #else
+	ret = AM_FileEcho("/sys/class/graphics/fb0/free_scale", "0");
+	ret = AM_FileEcho("/sys/class/graphics/fb1/free_scale", "0");
+
 	ret = AM_FileEcho("/sys/class/vfm/map", "rm default");
 	ret = AM_FileEcho("/sys/class/vfm/map", di?"add default decoder deinterlace amvideo":"add default decoder ppmgr amvideo");
 
