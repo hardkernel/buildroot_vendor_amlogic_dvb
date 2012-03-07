@@ -79,7 +79,12 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/tables\
 		    $(LOCAL_PATH)/../include/am_mw/atsc\
 		    $(LOCAL_PATH)/../android/ndk/include\
-		    $(LOCAL_PATH)/../android/ex_include
+		    $(LOCAL_PATH)/../android/ex_include\
+		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amadec/include\
+		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amcodec/include\
+		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amffmpeg\
+		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amplayer
+
 		    
 
 LOCAL_STATIC_LIBRARIES += libfreetype libiconv

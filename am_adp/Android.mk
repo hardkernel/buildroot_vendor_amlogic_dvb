@@ -27,7 +27,12 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
-		    $(LOCAL_PATH)/../android/ndk/include
+		    $(LOCAL_PATH)/../android/ndk/include\
+		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amadec/include\
+		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amcodec/include\
+		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amffmpeg\
+		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amplayer
+
 
 LOCAL_SHARED_LIBRARIES += libamplayer liblog libc
 
@@ -63,7 +68,11 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND
 LOCAL_ARM_MODE := arm 
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
-            $(LOCAL_PATH)/../android/ndk/include
+            $(LOCAL_PATH)/../android/ndk/include\
+	    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amadec/include\
+	    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amcodec/include\
+	    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amffmpeg\
+	    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amplayer
 
 LOCAL_SHARED_LIBRARIES += libamplayer liblog libc
 

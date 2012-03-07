@@ -25,7 +25,8 @@
 #include <unistd.h>
 #include <poll.h>
 #include <errno.h>
-#include <linux/amports/amstream.h>
+#include <amports/amstream.h>
+
 #ifdef CHIP_8226H
 #include <linux/jpegdec.h>
 #endif
@@ -48,28 +49,18 @@
 #define PLAYER_INFO_POP_INTERVAL 500
 #define FILENAME_LENGTH_MAX 2048
 
-extern int audio_decode_init(void **handle);
-extern int audio_decode_start(void *handle);
-extern int audio_decode_pause(void *handle);
-extern int audio_decode_resume(void *handle);
-extern int audio_decode_stop(void *handle);
-extern int audio_decode_release(void **handle);
-extern int audio_decode_basic_init(void);
-extern void audio_set_av_sync_threshold(void *handle, int threshold);
-
-extern int audio_decode_set_mute(void *handle, int);
-#ifdef CHIP_8626X
-extern int audio_decode_set_volume( int);
-#else
-extern int audio_decode_set_volume(void *, float);
-#endif
-extern int audio_channels_swap(void *);
-extern int audio_channel_left_mono(void *);
-extern int audio_channel_right_mono(void *);
-extern int audio_channel_stereo(void *);
-extern int audio_output_muted(void *handle);
+#include <codec_type.h>
+#include <adec-external-ctrl.h>
 
 void *adec_handle;
+#endif
+
+#ifndef TRICKMODE_NONE
+#define TRICKMODE_NONE      0x00
+#define TRICKMODE_I         0x01
+#define TRICKMODE_FFFB      0x02
+#define TRICK_STAT_DONE     0x01
+#define TRICK_STAT_WAIT     0x00
 #endif
 
 /****************************************************************************
@@ -208,10 +199,6 @@ typedef struct
 	int                aud_fd;
 	int                vid_fd;
 } AV_InjectData_t;
-
-#if defined(ADEC_API_NEW)
-typedef struct audio_info  audio_info_t;
-#endif
 
 /**\brief Timeshift播放状态*/
 typedef enum
@@ -1206,8 +1193,11 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 #if !defined(ADEC_API_NEW)
 		adec_cmd("start");
 #else
-		audio_decode_init(&adec_handle);
-
+		{
+			codec_para_t cp;
+			memset(&cp, 0, sizeof(cp));
+			audio_decode_init(&adec_handle, &cp);
+		}
 #ifdef CHIP_8626X
 		audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
 #endif
@@ -1714,24 +1704,17 @@ static int aml_timeshift_get_trick_stat(AV_TimeshiftData_t *tshift)
 	return state;
 }
 
-static AM_ErrorCode_t aml_set_deinterlace(int val)
+static AM_ErrorCode_t aml_set_deinterlace(AM_Bool_t di)
 {
 	AM_ErrorCode_t ret;
-	char buf[16];
-	
-	snprintf(buf, sizeof(buf), "%d", val);
-
 #ifdef DEINTERLACE_OLD
-	return AM_FileEcho("/sys/module/deinterlace/parameters/deinterlace_mode", buf);		
-	
+	return AM_FileEcho("/sys/module/deinterlace/parameters/deinterlace_mode", di?"2":"0");
 #else
-	ret = AM_FileEcho("/sys/class/vfm/map",(val)?"rm default decoder amvideo":"rm default decoder deinterlace amvideo");
-	if(ret == AM_SUCCESS)
-		ret = AM_FileEcho("/sys/class/vfm/map", (val)?"add default decoder deinterlace amvideo":"add default decoder amvideo");
-	return ret;
+	ret = AM_FileEcho("/sys/class/vfm/map", "rm default");
+	ret = AM_FileEcho("/sys/class/vfm/map", di?"add default decoder deinterlace amvideo":"add default decoder ppmgr amvideo");
+
+	return AM_SUCCESS;
 #endif
-	
-	
 }
 
 /**\brief 设置Timeshift参数*/
@@ -1837,8 +1820,12 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 				AM_DEBUG(1, "set audio info failed");
 			}
 		}
-		audio_decode_init(&adec_handle);
+		{
+			codec_para_t cp;
+			memset(&cp, 0, sizeof(cp));
 
+			audio_decode_init(&adec_handle, &cp);
+		}
 #ifdef CHIP_8626X
 		audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
 #endif
@@ -1922,7 +1909,7 @@ static int am_timeshift_reset(AV_TimeshiftData_t *tshift, int deinterlace_val, A
 {
 	aml_destroy_timeshift_data(tshift, AM_FALSE);
 	if (deinterlace_val != -1)
-		aml_set_deinterlace(deinterlace_val);
+		aml_set_deinterlace(deinterlace_val?AM_TRUE:AM_FALSE);
 	aml_start_timeshift(tshift, &tshift->para, AM_FALSE, start_audio);
 
 	/*Set the left to 0, we will read from the new point*/
@@ -2815,6 +2802,7 @@ static AM_ErrorCode_t aml_close(AM_AV_Device_t *dev)
 	return AM_SUCCESS;
 }
 
+#if 0
 typedef struct {
     unsigned int    format;  ///< video format, such as H264, MPEG2...
     unsigned int    width;   ///< video source width
@@ -2825,6 +2813,7 @@ typedef struct {
     float		    ratio;   ///< aspect ratio of video source
     void *          param;   ///< other parameters for video decoder
 } dec_sysinfo_t;
+#endif
 dec_sysinfo_t am_sysinfo;
 
 static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp, AM_Bool_t create_thread)
@@ -3030,8 +3019,11 @@ static void* aml_av_monitor_thread(void *arg)
 					AM_DEBUG(1, "set audio info failed");
 				}
 
-				audio_decode_init(&adec_handle);
-
+				{
+					codec_para_t cp;
+					memset(&cp, 0, sizeof(cp));
+					audio_decode_init(&adec_handle, &cp);
+				}
 #ifdef CHIP_8626X
 				audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
 #endif
@@ -3192,6 +3184,7 @@ static AM_ErrorCode_t aml_open_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 			dev->aud_player.drv_data = src;
 		break;
 		case AV_PLAY_TS:
+			aml_set_deinterlace(AM_TRUE);
 			fd = open(STREAM_TS_FILE, O_RDWR);
 			if(fd==-1)
 			{
@@ -3281,8 +3274,12 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 #ifndef ADEC_API_NEW
 			adec_cmd("start");
 #else
-			audio_decode_init(&adec_handle);
+			{
+				codec_para_t cp;
+				memset(&cp, 0, sizeof(cp));
 
+				audio_decode_init(&adec_handle, &cp);
+			}
 #ifdef CHIP_8626X
 			audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
 #endif
@@ -3298,7 +3295,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 			AM_FileEcho(PCR_RECOVER_FILE, "1");
 #endif
 #endif
-			aml_set_deinterlace(2);
+			//aml_set_deinterlace(AM_TRUE);
 			AM_TRY(aml_start_ts_mode(dev, tp, AM_TRUE));
 		break;
 		case AV_PLAY_FILE:
@@ -3415,8 +3412,8 @@ static AM_ErrorCode_t aml_close_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 			AM_FileEcho(PCR_RECOVER_FILE, "0");
 #endif
 #endif
-		aml_set_deinterlace(0);
 		ret = aml_close_ts_mode(dev, AM_TRUE);
+		aml_set_deinterlace(AM_FALSE);
 		break;
 		case AV_PLAY_FILE:
 			data = (AV_FilePlayerData_t*)dev->file_player.drv_data;

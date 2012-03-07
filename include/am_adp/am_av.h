@@ -14,6 +14,8 @@
 #include "am_types.h"
 #include "am_osd.h"
 #include "am_evt.h"
+#include <amports/vformat.h>
+#include <amports/aformat.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -134,7 +136,7 @@ typedef enum
 	AM_AV_TS_SRC_DMX2                    /**< Demux2*/
 } AM_AV_TSSource_t;
 
-/**\brief 音频压缩格式*/
+#if 0
 typedef enum {
 	AFORMAT_MPEG   = 0,
 	AFORMAT_PCM_S16LE = 1,
@@ -159,8 +161,12 @@ typedef enum {
 	AFORMAT_UNSUPPORT = 20,
 	AFORMAT_MAX    = 21
 } AM_AV_AFormat_t;
+#else
+/**\brief 音频压缩格式*/
+typedef aformat_t AM_AV_AFormat_t;
+#endif
 
-/**\brief 视频压缩格式*/
+#if 0
 typedef enum
 {
 	VFORMAT_MPEG12 = 0,
@@ -175,6 +181,10 @@ typedef enum
 	VFORMAT_H264MVC,
 	VFORMAT_MAX
 } AM_AV_VFormat_t;
+#else
+/**\brief 视频压缩格式*/
+typedef vformat_t AM_AV_VFormat_t;
+#endif
 
 /**\brief 数据封装格式*/
 typedef enum
