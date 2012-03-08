@@ -2076,6 +2076,22 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 			info->current_time = (tshift->file.total - tshift->file.avail)*tshift->duration/tshift->file.size;
 			info->current_time *= 1000;
 			break;
+		case AV_PLAY_RESET_VPATH:
+			ioctl(tshift->cntl_fd, AMSTREAM_IOC_TRICKMODE, TRICKMODE_NONE);
+			/*stop play first*/
+			aml_destroy_timeshift_data(tshift, AM_FALSE);
+			/*reset the vpath*/
+			
+			/*restart play now*/
+			aml_start_timeshift(tshift, &tshift->para, AM_FALSE, AM_TRUE);
+
+			/*Set the left to 0, we will read from the new point*/
+			tshift->left = 0;
+			tshift->inject_size = 0;
+			tshift->timeout = 0;
+			/* will turn to play state from current_time */
+			tshift->state = AV_TIMESHIFT_STAT_SEARCHOK;
+			break;
 		default:
 			AM_DEBUG(1, "Unsupported timeshift play command %d", cmd);
 			return -1;
@@ -2352,42 +2368,9 @@ static AM_ErrorCode_t aml_timeshift_fill_data(AM_AV_Device_t *dev, uint8_t *data
 static AM_ErrorCode_t aml_timeshift_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *para)
 {
 	AV_TimeshiftData_t *data;
-//	AV_FileSeekPara_t *sp;
-//	int rc = -1;
-//	AV_TimeshiftState_t state = -1;
 	
 	data = (AV_TimeshiftData_t*)dev->timeshift_player.drv_data;
 	
-/*	switch(cmd)
-	{
-		case AV_PLAY_START:
-			state = AV_TIMESHIFT_STAT_PLAY;
-		break;
-		case AV_PLAY_PAUSE:
-			state = AV_TIMESHIFT_STAT_PAUSE;
-		break;
-		case AV_PLAY_RESUME:
-			state = AV_TIMESHIFT_STAT_PLAY;
-		break;
-		case AV_PLAY_FF:
-		case AV_PLAY_FB:
-			state = AV_TIMESHIFT_STAT_FFFB;
-		break;
-		case AV_PLAY_SEEK:
-			
-		break;
-		default:
-			AM_DEBUG(1, "illegal media player command");
-			return AM_AV_ERR_NOT_SUPPORTED;
-		break;
-	}
-	
-	if((int)state==-1)
-	{
-		AM_DEBUG(1, "timeshift player operation failed");
-		return AM_AV_ERR_SYS;
-	}
-	*/
 	pthread_mutex_lock(&data->lock);
 	data->cmd = cmd;
 	if (cmd == AV_PLAY_FF || cmd == AV_PLAY_FB)
