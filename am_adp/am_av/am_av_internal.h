@@ -241,9 +241,9 @@ struct AM_AV_Device
 	AM_AV_VideoAspectRatio_t     video_ratio;  /**< 视频长宽比*/
 	AM_AV_VideoAspectMatchMode_t video_match;  /**< 长宽比匹配模式*/
 	AM_AV_VideoDisplayMode_t     video_mode;   /**< 视频显示模式*/
-	int              vpath_fs;       /**< free scale参数*/
-	int              vpath_di;       /**< deinterlace参数*/
-	int              vpath_ppmgr;    /**< ppmgr参数*/
+	AM_AV_FreeScalePara_t        vpath_fs;       /**< free scale参数*/
+	AM_AV_DeinterlacePara_t      vpath_di;       /**< deinterlace参数*/
+	AM_AV_PPMGRPara_t            vpath_ppmgr;    /**< ppmgr参数*/
 	AM_AV_PlayPara_t curr_para;      /**< 当前播放参数*/
 };
 

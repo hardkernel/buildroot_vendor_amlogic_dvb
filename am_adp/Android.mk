@@ -34,7 +34,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amplayer
 
 
-LOCAL_SHARED_LIBRARIES += libamplayer liblog libc
+LOCAL_SHARED_LIBRARIES += libamplayer libcutils liblog libc
 
 LOCAL_PRELINK_MODULE := false
 
@@ -74,7 +74,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 	    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amffmpeg\
 	    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amplayer
 
-LOCAL_SHARED_LIBRARIES += libamplayer liblog libc
+LOCAL_SHARED_LIBRARIES += libamplayer libcutils liblog libc
 
 LOCAL_PRELINK_MODULE := false
 

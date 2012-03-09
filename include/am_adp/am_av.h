@@ -219,13 +219,26 @@ typedef enum
 	AM_AV_VIDEO_DISPLAY_FULL_SCREEN /**< 全屏显示*/
 } AM_AV_VideoDisplayMode_t;
 
-/**\brief Video path参数*/
+/**\brief Freescale参数*/
 typedef enum
 {
-	AM_AV_VPATH_FREE_SCALE,       /**< Free scale*/
-	AM_AV_VPATH_DEINTERLACE,      /**< Deinterlace*/
-	AM_AV_VPATH_PPMGR             /**< PPMGR*/
-} AM_AV_VPathPara_t;
+	AM_AV_FREE_SCALE_DISABLE,     /**< 不使用freescale*/
+	AM_AV_FREE_SCALE_ENABLE       /**< 使用freescale*/
+} AM_AV_FreeScalePara_t;
+
+/**\brief Deinterlace参数*/
+typedef enum
+{
+	AM_AV_DEINTERLACE_DISABLE,    /**< 不使用deinterlace*/
+	AM_AV_DEINTERLACE_ENABLE      /**< 使用deinterlace*/
+} AM_AV_DeinterlacePara_t;
+
+/**\brief PPMGR参数*/
+typedef enum
+{
+	AM_AV_PPMGR_DISABLE,          /**< 不使用PPMGR*/
+	AM_AV_PPMGR_ENABLE            /**< 使用PPMGR*/
+} AM_AV_PPMGRPara_t;
 
 /**\brief 音视频解码设备开启参数*/
 typedef struct
@@ -999,13 +1012,14 @@ extern AM_ErrorCode_t AM_AV_FastBackwardTimeshift(int dev_no, int speed);
 
 /**\brief 设置视频通道参数
  * \param dev_no 音视频设备号
- * \param para 参数类型
- * \param val 参数值
+ * \param fs free scale参数
+ * \param di deinterlace参数
+ * \param pp PPMGR参数
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_av.h)
  */
-extern AM_ErrorCode_t AM_AV_SetVPathPara(int dev_no, AM_AV_VPathPara_t para, int val);
+extern AM_ErrorCode_t AM_AV_SetVPathPara(int dev_no, AM_AV_FreeScalePara_t fs, AM_AV_DeinterlacePara_t di, AM_AV_PPMGRPara_t pp);
 
 #ifdef __cplusplus
 }

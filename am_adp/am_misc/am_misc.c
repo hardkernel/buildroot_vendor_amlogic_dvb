@@ -111,7 +111,8 @@ AM_ErrorCode_t AM_FileEcho(const char *name, const char *cmd)
 	ret = write(fd, cmd, len);
 	if(ret!=len)
 	{
-		AM_DEBUG(1, "write failed \"%s\"", strerror(errno));
+		AM_DEBUG(1, "write failed file:\"%s\" cmd:\"%s\" error:\"%s\"", name, cmd, strerror(errno));
+		close(fd);
 		return AM_FAILURE;
 	}
 
@@ -145,7 +146,7 @@ AM_ErrorCode_t AM_FileRead(const char *name, char *buf, int len)
 	ret = fgets(buf, len, fp);
 	if(!ret)
 	{
-		AM_DEBUG(1, "read the file \"%s\" failed", name);
+		AM_DEBUG(1, "read the file:\"%s\" error:\"%s\" failed", name, strerror(errno));
 	}
 	
 	fclose(fp);

@@ -323,29 +323,13 @@ static void av_vout_format_changed(int dev_no, int event_type, void *param, void
 	}
 }
 
-static AM_ErrorCode_t av_set_vpath(AM_AV_Device_t *dev, AM_AV_VPathPara_t para, int val)
+extern AM_ErrorCode_t av_set_vpath(AM_AV_Device_t *dev, AM_AV_FreeScalePara_t fs, AM_AV_DeinterlacePara_t di, AM_AV_PPMGRPara_t pp)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
-	switch(para){
-		case AM_AV_VPATH_FREE_SCALE:
-			if(dev->vpath_fs==val)
-				return ret;
-			dev->vpath_fs = val;
-			break;
-		case AM_AV_VPATH_DEINTERLACE:
-			if(dev->vpath_di==val)
-				return ret;
-			dev->vpath_di = val;
-			break;
-		case AM_AV_VPATH_PPMGR:
-			if(dev->vpath_ppmgr==val)
-				return ret;
-			dev->vpath_ppmgr = val;
-			break;
-		default:
-			return AM_AV_ERR_INVAL_ARG;
-	}
+	dev->vpath_fs = fs;
+	dev->vpath_di = di;
+	dev->vpath_ppmgr = pp;
 
 	if(dev->mode & AV_TIMESHIFT){
 		if(dev->drv->timeshift_cmd){
@@ -355,9 +339,6 @@ static AM_ErrorCode_t av_set_vpath(AM_AV_Device_t *dev, AM_AV_VPathPara_t para, 
 		int mode = dev->mode & ~AV_PLAY_AUDIO_ES;
 		AM_AV_PlayPara_t para = dev->curr_para;
 		void *p = NULL;
-
-		if(!mode)
-			return ret;
 
 		if(mode&AV_PLAY_VIDEO_ES){
 			p = &para.ves;
@@ -377,13 +358,17 @@ static AM_ErrorCode_t av_set_vpath(AM_AV_Device_t *dev, AM_AV_VPathPara_t para, 
 			p = &para.inject;
 		}
 
-		av_stop_all(dev, mode);
+		if(mode){
+			av_stop_all(dev, mode);
+		}
 
 		if(dev->drv->set_vpath){
 			ret = dev->drv->set_vpath(dev);
 		}
 
-		av_start(dev, mode, p);
+		if(mode){
+			av_start(dev, mode, p);
+		}
 
 		if(mode&AV_PLAY_VIDEO_ES){
 		}else if(mode&AV_PLAY_TS){
@@ -2725,14 +2710,15 @@ AM_ErrorCode_t AM_AV_FastBackwardTimeshift(int dev_no, int speed)
 
 /**\brief 设置视频通道参数
  * \param dev_no 音视频设备号
- * \param para 参数类型
- * \param val 参数值
+ * \param fs free scale参数
+ * \param di deinterlace参数
+ * \param pp PPMGR参数
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_av.h)
  */
 AM_ErrorCode_t
-AM_AV_SetVPathPara(int dev_no, AM_AV_VPathPara_t para, int val)
+AM_AV_SetVPathPara(int dev_no, AM_AV_FreeScalePara_t fs, AM_AV_DeinterlacePara_t di, AM_AV_PPMGRPara_t pp)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -2741,7 +2727,7 @@ AM_AV_SetVPathPara(int dev_no, AM_AV_VPathPara_t para, int val)
 	
 	pthread_mutex_lock(&dev->lock);
 
-	ret = av_set_vpath(dev, para, val);
+	ret = av_set_vpath(dev, fs, di, pp);
 	
 	pthread_mutex_unlock(&dev->lock);
 	

@@ -27,6 +27,11 @@
 #include <errno.h>
 #include <amports/amstream.h>
 
+#ifdef ANDROID
+#include <sys/system_properties.h>
+#endif
+
+
 #ifdef CHIP_8226H
 #include <linux/jpegdec.h>
 #endif
@@ -265,6 +270,7 @@ typedef struct
 	uint8_t				buf[1024*1024];
 	AV_TimeshiftFile_t	file;
 	AM_AV_TimeshiftPara_t para;
+	AM_AV_Device_t       *dev;
 } AV_TimeshiftData_t;
 
 /****************************************************************************
@@ -289,6 +295,8 @@ static AM_ErrorCode_t aml_get_astatus(AM_AV_Device_t *dev, AM_AV_AudioStatus_t *
 static AM_ErrorCode_t aml_get_vstatus(AM_AV_Device_t *dev, AM_AV_VideoStatus_t *para);
 static AM_ErrorCode_t aml_timeshift_fill_data(AM_AV_Device_t *dev, uint8_t *data, int size);
 static AM_ErrorCode_t aml_timeshift_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *para);
+static AM_ErrorCode_t aml_set_vpath(AM_AV_Device_t *dev);
+
 
 const AM_AV_Driver_t aml_av_drv =
 {
@@ -308,7 +316,8 @@ const AM_AV_Driver_t aml_av_drv =
 .get_audio_status = aml_get_astatus,
 .get_video_status = aml_get_vstatus,
 .timeshift_fill = aml_timeshift_fill_data,
-.timeshift_cmd = aml_timeshift_cmd
+.timeshift_cmd = aml_timeshift_cmd,
+.set_vpath   = aml_set_vpath
 };
 
 /*音频控制（通过解码器）操作*/
@@ -1712,22 +1721,6 @@ static int aml_timeshift_get_trick_stat(AV_TimeshiftData_t *tshift)
 	return state;
 }
 
-static AM_ErrorCode_t aml_set_deinterlace(AM_Bool_t di)
-{
-	AM_ErrorCode_t ret;
-#ifdef DEINTERLACE_OLD
-	return AM_FileEcho("/sys/module/deinterlace/parameters/deinterlace_mode", di?"2":"0");
-#else
-	ret = AM_FileEcho("/sys/class/graphics/fb0/free_scale", "0");
-	ret = AM_FileEcho("/sys/class/graphics/fb1/free_scale", "0");
-
-	ret = AM_FileEcho("/sys/class/vfm/map", "rm default");
-	ret = AM_FileEcho("/sys/class/vfm/map", di?"add default decoder amvideo":"add default decoder ppmgr amvideo");
-
-	return AM_SUCCESS;
-#endif
-}
-
 /**\brief 设置Timeshift参数*/
 static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_TimeshiftPara_t *para, AM_Bool_t create_thread, AM_Bool_t start_audio)
 {
@@ -1919,8 +1912,7 @@ static void aml_destroy_timeshift_data(AV_TimeshiftData_t *tshift, AM_Bool_t des
 static int am_timeshift_reset(AV_TimeshiftData_t *tshift, int deinterlace_val, AM_Bool_t start_audio)
 {
 	aml_destroy_timeshift_data(tshift, AM_FALSE);
-	if (deinterlace_val != -1)
-		aml_set_deinterlace(deinterlace_val?AM_TRUE:AM_FALSE);
+
 	aml_start_timeshift(tshift, &tshift->para, AM_FALSE, start_audio);
 
 	/*Set the left to 0, we will read from the new point*/
@@ -2083,6 +2075,22 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 			tshift->state = AV_TIMESHIFT_STAT_SEARCHOK;
 			info->current_time = (tshift->file.total - tshift->file.avail)*tshift->duration/tshift->file.size;
 			info->current_time *= 1000;
+			break;
+		case AV_PLAY_RESET_VPATH:
+			ioctl(tshift->cntl_fd, AMSTREAM_IOC_TRICKMODE, TRICKMODE_NONE);
+			/*stop play first*/
+			aml_destroy_timeshift_data(tshift, AM_FALSE);
+			/*reset the vpath*/
+			aml_set_vpath(tshift->dev);
+			/*restart play now*/
+			aml_start_timeshift(tshift, &tshift->para, AM_FALSE, AM_TRUE);
+
+			/*Set the left to 0, we will read from the new point*/
+			tshift->left = 0;
+			tshift->inject_size = 0;
+			tshift->timeout = 0;
+			/* will turn to play state from current_time */
+			tshift->state = AV_TIMESHIFT_STAT_SEARCHOK;
 			break;
 		default:
 			AM_DEBUG(1, "Unsupported timeshift play command %d", cmd);
@@ -2360,42 +2368,9 @@ static AM_ErrorCode_t aml_timeshift_fill_data(AM_AV_Device_t *dev, uint8_t *data
 static AM_ErrorCode_t aml_timeshift_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *para)
 {
 	AV_TimeshiftData_t *data;
-//	AV_FileSeekPara_t *sp;
-//	int rc = -1;
-//	AV_TimeshiftState_t state = -1;
 	
 	data = (AV_TimeshiftData_t*)dev->timeshift_player.drv_data;
 	
-/*	switch(cmd)
-	{
-		case AV_PLAY_START:
-			state = AV_TIMESHIFT_STAT_PLAY;
-		break;
-		case AV_PLAY_PAUSE:
-			state = AV_TIMESHIFT_STAT_PAUSE;
-		break;
-		case AV_PLAY_RESUME:
-			state = AV_TIMESHIFT_STAT_PLAY;
-		break;
-		case AV_PLAY_FF:
-		case AV_PLAY_FB:
-			state = AV_TIMESHIFT_STAT_FFFB;
-		break;
-		case AV_PLAY_SEEK:
-			
-		break;
-		default:
-			AM_DEBUG(1, "illegal media player command");
-			return AM_AV_ERR_NOT_SUPPORTED;
-		break;
-	}
-	
-	if((int)state==-1)
-	{
-		AM_DEBUG(1, "timeshift player operation failed");
-		return AM_AV_ERR_SYS;
-	}
-	*/
 	pthread_mutex_lock(&data->lock);
 	data->cmd = cmd;
 	if (cmd == AV_PLAY_FF || cmd == AV_PLAY_FB)
@@ -3194,7 +3169,6 @@ static AM_ErrorCode_t aml_open_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 			dev->aud_player.drv_data = src;
 		break;
 		case AV_PLAY_TS:
-			aml_set_deinterlace(AM_TRUE);
 			fd = open(STREAM_TS_FILE, O_RDWR);
 			if(fd==-1)
 			{
@@ -3238,6 +3212,7 @@ static AM_ErrorCode_t aml_open_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 				AM_DEBUG(1, "not enough memory");
 				return AM_AV_ERR_NO_MEM;
 			}
+			tshift->dev = dev;
 			dev->timeshift_player.drv_data = tshift;
 		break;
 		default:
@@ -3305,7 +3280,6 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 			AM_FileEcho(PCR_RECOVER_FILE, "1");
 #endif
 #endif
-			//aml_set_deinterlace(AM_TRUE);
 			AM_TRY(aml_start_ts_mode(dev, tp, AM_TRUE));
 		break;
 		case AV_PLAY_FILE:
@@ -3423,7 +3397,6 @@ static AM_ErrorCode_t aml_close_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 #endif
 #endif
 		ret = aml_close_ts_mode(dev, AM_TRUE);
-		aml_set_deinterlace(AM_FALSE);
 		break;
 		case AV_PLAY_FILE:
 			data = (AV_FilePlayerData_t*)dev->file_player.drv_data;
@@ -4107,6 +4080,93 @@ get_fail:
 	return AM_FAILURE;
 }
 
+static AM_ErrorCode_t
+aml_set_vpath(AM_AV_Device_t *dev)
+{
+	AM_ErrorCode_t ret;
+	int times = 10;
 
+	AM_DEBUG(1, "set video path fs:%d di:%d ppmgr:%d", dev->vpath_fs, dev->vpath_di, dev->vpath_ppmgr);
 
+	do{
+		ret = AM_FileEcho("/sys/class/vfm/map", "rm default");
+		if(ret!=AM_SUCCESS){
+			usleep(10000);
+		}
+	}while(ret!=AM_SUCCESS && times--);
+
+	if(dev->vpath_fs==AM_AV_FREE_SCALE_ENABLE){
+		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "1");
+		AM_FileEcho("/sys/class/graphics/fb1/free_scale", "1");
+
+#ifdef ANDROID
+		{
+			AM_FileEcho("/sys/class/graphics/fb0/request2XScale", "2");
+			AM_FileEcho("/sys/class/graphics/fb1/scale", "0");
+			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "0");
+		}
+#endif
+	}else{
+		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "0");
+		AM_FileEcho("/sys/class/graphics/fb1/free_scale", "0");
+
+#ifdef ANDROID
+		{
+			char m1080scale[8];
+			char mode[16];
+			char *reqcmd, *osd1axis, *osd1cmd;
+			AM_Bool_t scale=AM_TRUE;
+
+			property_get("ro.platform.has.1080scale",m1080scale,"fail");
+			if(!strncmp(m1080scale, "fail", 4)){
+				scale = AM_FALSE;
+			}
+
+			AM_FileRead("/sys/class/display/mode", mode, sizeof(mode));
+
+			if(strncmp(m1080scale, "2", 1) && (strncmp(m1080scale, "1", 1) || (strncmp(mode, "1080i", 5) && strncmp(mode, "1080p", 5) && strncmp(mode, "720p", 4)))){
+				scale = AM_FALSE;
+			}
+
+			if(!strncmp(mode, "480i", 4) || !strncmp(mode, "480p", 4)){
+				reqcmd   = "16 720 480";
+				osd1axis = "1280 720 720 480";
+				osd1cmd  = "0x10001";
+			}else if(!strncmp(mode, "576i", 4) || !strncmp(mode, "576p", 4)){
+				reqcmd   = "16 720 576";
+				osd1axis = "1280 720 720 576";
+				osd1cmd  = "0x10001";
+			}else if(!strncmp(mode, "1080i", 5) || !strncmp(mode, "1080p", 5)){
+				reqcmd   = "8";
+				osd1axis = "1280 720 1920 1080";
+				osd1cmd  = "0x10001";
+			}else{
+				reqcmd   = "2";
+				osd1axis = NULL;
+				osd1cmd  = "0";
+			}
+
+			if(scale){
+				AM_FileEcho("/sys/class/graphics/fb0/request2XScale", reqcmd);
+				if(osd1axis){
+					AM_FileEcho("/sys/class/graphics/fb1/scale_axis", osd1axis);
+				}
+				AM_FileEcho("/sys/class/graphics/fb1/scale", osd1cmd);
+			}
+
+			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "3");
+		}
+#endif
+	}
+
+	if(dev->vpath_ppmgr!=AM_AV_PPMGR_DISABLE){
+		AM_FileEcho("/sys/class/vfm/map", "add default decoder ppmgr amvideo");
+	}else if(dev->vpath_di==AM_AV_DEINTERLACE_ENABLE){
+		AM_FileEcho("/sys/class/vfm/map", "add default decoder deinterlace amvideo");
+	}else{
+		AM_FileEcho("/sys/class/vfm/map", "add default decoder amvideo");
+	}
+
+	return AM_SUCCESS;
+}
 
