@@ -323,6 +323,92 @@ static void av_vout_format_changed(int dev_no, int event_type, void *param, void
 	}
 }
 
+static AM_ErrorCode_t av_set_vpath(AM_AV_Device_t *dev, AM_AV_VPathPara_t para, int val)
+{
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	switch(para){
+		case AM_AV_VPATH_FREE_SCALE:
+			if(dev->vpath_fs==val)
+				return ret;
+			dev->vpath_fs = val;
+			break;
+		case AM_AV_VPATH_DEINTERLACE:
+			if(dev->vpath_di==val)
+				return ret;
+			dev->vpath_di = val;
+			break;
+		case AM_AV_VPATH_PPMGR:
+			if(dev->vpath_ppmgr==val)
+				return ret;
+			dev->vpath_ppmgr = val;
+			break;
+		default:
+			return AM_AV_ERR_INVAL_ARG;
+	}
+
+	if(dev->mode & AV_TIMESHIFT){
+		if(dev->drv->timeshift_cmd){
+			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_RESET_VPATH, NULL);
+		}
+	}else{
+		int mode = dev->mode & ~AV_PLAY_AUDIO_ES;
+		AM_AV_PlayPara_t para = dev->curr_para;
+		void *p = NULL;
+
+		if(!mode)
+			return ret;
+
+		if(mode&AV_PLAY_VIDEO_ES){
+			p = &para.ves;
+			dev->vid_player.para.need_free = AM_FALSE;
+		}else if(mode&AV_PLAY_TS){
+			p = &para.ts;
+		}else if(mode&AV_PLAY_FILE){
+			AM_AV_PlayStatus_t status;
+
+			p = &para.file;
+			if(dev->drv->file_status){
+				if(dev->drv->file_status(dev, &status)==AM_SUCCESS){
+					para.pos = status.position;
+				}
+			}
+		}else if(mode&AV_INJECT){
+			p = &para.inject;
+		}
+
+		av_stop_all(dev, mode);
+
+		if(dev->drv->set_vpath){
+			ret = dev->drv->set_vpath(dev);
+		}
+
+		av_start(dev, mode, p);
+
+		if(mode&AV_PLAY_VIDEO_ES){
+		}else if(mode&AV_PLAY_TS){
+		}else if(mode&AV_PLAY_FILE){
+			if(para.start && dev->drv->file_cmd){
+				dev->drv->file_cmd(dev, AV_PLAY_SEEK, (void*)para.pos);
+				if(para.pause)
+					dev->drv->file_cmd(dev, AV_PLAY_PAUSE, NULL);
+				else if(para.speed>0)
+					dev->drv->file_cmd(dev, AV_PLAY_FF, (void*)para.speed);
+				else if(para.speed<0)
+					dev->drv->file_cmd(dev, AV_PLAY_FB, (void*)para.speed);
+			}
+		}else if(mode&AV_INJECT){
+			if(para.pause){
+				if(dev->drv->inject_cmd){
+					dev->drv->inject_cmd(dev, AV_PLAY_PAUSE, NULL);
+				}
+			}
+		}
+	}
+
+	return ret;
+}
+
 /****************************************************************************
  * API functions
  ***************************************************************************/
@@ -371,6 +457,9 @@ AM_ErrorCode_t AM_AV_Open(int dev_no, const AM_AV_OpenPara_t *para)
 	dev->vout_dev_no      = para->vout_dev_no;
 	dev->vout_w           = 0;
 	dev->vout_h           = 0;
+	dev->vpath_fs         = -1;
+	dev->vpath_di         = -1;
+	dev->vpath_ppmgr      = -1;
 	
 	if(dev->drv->open)
 	{
@@ -477,6 +566,9 @@ AM_ErrorCode_t AM_AV_StartTS(int dev_no, uint16_t vpid, uint16_t apid, AM_AV_VFo
 	para.afmt = afmt;
 	
 	ret = av_start(dev, AV_PLAY_TS, &para);
+	if(ret==AM_SUCCESS){
+		dev->curr_para.ts = para;
+	}
 	
 	pthread_mutex_unlock(&dev->lock);
 	
@@ -536,6 +628,12 @@ AM_ErrorCode_t AM_AV_StartFile(int dev_no, const char *fname, AM_Bool_t loop, in
 	{
 		snprintf(dev->file_player.name, sizeof(dev->file_player.name), "%s", fname);
 		dev->file_player.speed = 0;
+		dev->curr_para.file = para;
+		dev->curr_para.start = AM_TRUE;
+		dev->curr_para.speed = 0;
+		dev->curr_para.pause = AM_FALSE;
+		dev->curr_para.file.name = dev->curr_para.file_name;
+		snprintf(dev->curr_para.file_name, sizeof(dev->curr_para.file_name), "%s", fname);
 	}
 	
 	pthread_mutex_unlock(&dev->lock);
@@ -570,6 +668,12 @@ AM_ErrorCode_t AM_AV_AddFile(int dev_no, const char *fname)
 	{
 		snprintf(dev->file_player.name, sizeof(dev->file_player.name), "%s", fname);
 		dev->file_player.speed = 0;
+		dev->curr_para.file = para;
+		dev->curr_para.start = AM_FALSE;
+		dev->curr_para.speed = 0;
+		dev->curr_para.pause = AM_FALSE;
+		dev->curr_para.file.name = dev->curr_para.file_name;
+		snprintf(dev->curr_para.file_name, sizeof(dev->curr_para.file_name), "%s", fname);
 	}
 	
 	pthread_mutex_unlock(&dev->lock);
@@ -603,6 +707,10 @@ AM_ErrorCode_t AM_AV_StartCurrFile(int dev_no)
 		if(dev->drv->file_cmd)
 		{
 			ret = dev->drv->file_cmd(dev, AV_PLAY_START, 0);
+			if(ret==AM_SUCCESS){
+				dev->curr_para.file.start = AM_TRUE;
+				dev->curr_para.start = AM_TRUE;
+			}
 		}
 	}
 	
@@ -659,6 +767,9 @@ AM_ErrorCode_t AM_AV_PauseFile(int dev_no)
 		if(dev->drv->file_cmd)
 		{
 			ret = dev->drv->file_cmd(dev, AV_PLAY_PAUSE, NULL);
+			if(ret==AM_SUCCESS){
+				dev->curr_para.pause = AM_TRUE;
+			}
 		}
 	}
 	
@@ -693,6 +804,9 @@ AM_ErrorCode_t AM_AV_ResumeFile(int dev_no)
 		if(dev->drv->file_cmd)
 		{
 			ret = dev->drv->file_cmd(dev, AV_PLAY_RESUME, NULL);
+			if(ret==AM_SUCCESS){
+				dev->curr_para.pause = AM_FALSE;
+			}
 		}
 	}
 	
@@ -727,6 +841,9 @@ AM_ErrorCode_t AM_AV_PauseInject(int dev_no)
 		if(dev->drv->inject_cmd)
 		{
 			ret = dev->drv->inject_cmd(dev, AV_PLAY_PAUSE, NULL);
+			if(ret==AM_SUCCESS){
+				dev->curr_para.pause = AM_TRUE;
+			}
 		}
 	}
 	
@@ -761,6 +878,9 @@ AM_ErrorCode_t AM_AV_ResumeInject(int dev_no)
 		if(dev->drv->inject_cmd)
 		{
 			ret = dev->drv->inject_cmd(dev, AV_PLAY_RESUME, NULL);
+			if(ret==AM_SUCCESS){
+				dev->curr_para.pause = AM_FALSE;
+			}
 		}
 	}
 	
@@ -844,6 +964,7 @@ AM_ErrorCode_t AM_AV_FastForwardFile(int dev_no, int speed)
 			if(ret==AM_SUCCESS)
 			{
 				dev->file_player.speed = speed;
+				dev->curr_para.speed = speed;
 				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_PLAYER_SPEED_CHANGED, (void*)speed);
 			}
 		}
@@ -890,6 +1011,7 @@ AM_ErrorCode_t AM_AV_FastBackwardFile(int dev_no, int speed)
 			if(ret==AM_SUCCESS)
 			{
 				dev->file_player.speed = -speed;
+				dev->curr_para.speed = -speed;
 				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_PLAYER_SPEED_CHANGED, (void*)-speed);
 			}
 		}
@@ -999,6 +1121,12 @@ AM_ErrorCode_t AM_AV_StartInject(int dev_no, const AM_AV_InjectPara_t *para)
 	pthread_mutex_lock(&dev->lock);
 	
 	ret = av_start(dev, AV_INJECT, (void*)para);
+	if(ret==AM_SUCCESS){
+		dev->curr_para.inject = *para;
+		dev->curr_para.start = AM_TRUE;
+		dev->curr_para.speed  = 0;
+		dev->curr_para.pause  = AM_FALSE;
+	}
 	
 	pthread_mutex_unlock(&dev->lock);
 	
@@ -1372,6 +1500,9 @@ AM_ErrorCode_t AM_AV_StartVideoES(int dev_no, AM_AV_VFormat_t format, const char
 	pthread_mutex_lock(&dev->lock);
 	
 	ret = av_start(dev, AV_PLAY_VIDEO_ES, &para);
+	if(ret==AM_SUCCESS){
+		dev->curr_para.ves = para;
+	}
 	
 	pthread_mutex_unlock(&dev->lock);
 	
@@ -1410,6 +1541,9 @@ AM_ErrorCode_t AM_AV_StartVideoESData(int dev_no, AM_AV_VFormat_t format, const 
 	pthread_mutex_lock(&dev->lock);
 	
 	ret = av_start(dev, AV_PLAY_VIDEO_ES, &para);
+	if(ret==AM_SUCCESS){
+		dev->curr_para.ves = para;
+	}
 	
 	pthread_mutex_unlock(&dev->lock);
 	
@@ -1476,6 +1610,9 @@ AM_ErrorCode_t AM_AV_StartAudioES(int dev_no, AM_AV_AFormat_t format, const char
 	pthread_mutex_lock(&dev->lock);
 	
 	ret = av_start(dev, AV_PLAY_AUDIO_ES, &para);
+	if(ret==AM_SUCCESS){
+		dev->curr_para.aes = para;
+	}
 	
 	pthread_mutex_unlock(&dev->lock);
 	
@@ -1515,6 +1652,9 @@ AM_ErrorCode_t AM_AV_StartAudioESData(int dev_no, AM_AV_AFormat_t format, const 
 	pthread_mutex_lock(&dev->lock);
 	
 	ret = av_start(dev, AV_PLAY_AUDIO_ES, &para);
+	if(ret==AM_SUCCESS){
+		dev->curr_para.aes = para;
+	}
 	
 	pthread_mutex_unlock(&dev->lock);
 	
@@ -2273,6 +2413,14 @@ AM_ErrorCode_t AM_AV_StartTimeshift(int dev_no, const AM_AV_TimeshiftPara_t *par
 	pthread_mutex_lock(&dev->lock);
 	
 	ret = av_start(dev, AV_TIMESHIFT, (void*)para);
+	if(ret==AM_SUCCESS){
+		dev->curr_para.time_shift = *para;
+		dev->curr_para.time_shift.file_path = dev->curr_para.file_name;
+		snprintf(dev->curr_para.file_name, sizeof(dev->curr_para.file_name), "%s", para->file_path);
+		dev->curr_para.start = AM_FALSE;
+		dev->curr_para.speed = 0;
+		dev->curr_para.pause = AM_FALSE;
+	}
 	
 	pthread_mutex_unlock(&dev->lock);
 	
@@ -2363,6 +2511,9 @@ AM_ErrorCode_t AM_AV_PlayTimeshift(int dev_no)
 		if(dev->drv->timeshift_cmd)
 		{
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_START, 0);
+			if(ret==AM_SUCCESS){
+				dev->curr_para.start = AM_TRUE;
+			}
 		}
 	}
 	
@@ -2397,6 +2548,9 @@ AM_ErrorCode_t AM_AV_PauseTimeshift(int dev_no)
 		if(dev->drv->timeshift_cmd)
 		{
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_PAUSE, NULL);
+			if(ret==AM_SUCCESS){
+				dev->curr_para.pause = AM_TRUE;
+			}
 		}
 	}
 	
@@ -2431,6 +2585,9 @@ AM_ErrorCode_t AM_AV_ResumeTimeshift(int dev_no)
 		if(dev->drv->timeshift_cmd)
 		{
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_RESUME, NULL);
+			if(ret==AM_SUCCESS){
+				dev->curr_para.pause = AM_FALSE;
+			}
 		}
 	}
 	
@@ -2511,6 +2668,9 @@ AM_ErrorCode_t AM_AV_FastForwardTimeshift(int dev_no, int speed)
 		if(dev->drv->timeshift_cmd)
 		{
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_FF, (void*)speed);
+			if(ret==AM_SUCCESS){
+				dev->curr_para.speed = speed;
+			}
 		}
 	}
 	
@@ -2552,6 +2712,9 @@ AM_ErrorCode_t AM_AV_FastBackwardTimeshift(int dev_no, int speed)
 		if(dev->drv->timeshift_cmd)
 		{
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_FB, (void*)-speed);
+			if(ret==AM_SUCCESS){
+				dev->curr_para.speed = -speed;
+			}
 		}
 	}
 	
@@ -2560,5 +2723,28 @@ AM_ErrorCode_t AM_AV_FastBackwardTimeshift(int dev_no, int speed)
 	return ret;
 }
 
+/**\brief 设置视频通道参数
+ * \param dev_no 音视频设备号
+ * \param para 参数类型
+ * \param val 参数值
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+AM_ErrorCode_t
+AM_AV_SetVPathPara(int dev_no, AM_AV_VPathPara_t para, int val)
+{
+	AM_AV_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	
+	AM_TRY(av_get_openned_dev(dev_no, &dev));
+	
+	pthread_mutex_lock(&dev->lock);
 
+	ret = av_set_vpath(dev, para, val);
+	
+	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
 

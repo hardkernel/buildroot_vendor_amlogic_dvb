@@ -128,7 +128,8 @@ typedef enum
 	AV_PLAY_RESUME,                  /**< 恢复播放*/
 	AV_PLAY_FF,                      /**< 快速前进*/
 	AV_PLAY_FB,                      /**< 快速后退*/
-	AV_PLAY_SEEK                     /**< 设定播放位置*/
+	AV_PLAY_SEEK,                    /**< 设定播放位置*/
+	AV_PLAY_RESET_VPATH              /**< 重新设定Video path*/
 } AV_PlayCmd_t;
 
 /**\brief 文件播放参数*/
@@ -191,7 +192,24 @@ struct AM_AV_Driver
 	AM_ErrorCode_t (*get_video_status)(AM_AV_Device_t *dev, AM_AV_VideoStatus_t *s);
 	AM_ErrorCode_t (*timeshift_fill)(AM_AV_Device_t *dev, uint8_t *data, int size);
 	AM_ErrorCode_t (*timeshift_cmd)(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *para);
+	AM_ErrorCode_t (*set_vpath)(AM_AV_Device_t *dev);
 };
+
+/**\brief 音视频播放参数*/
+typedef struct {
+	AM_AV_InjectPara_t    inject;
+	AV_TSPlayPara_t       ts;
+	AV_FilePlayPara_t     file;
+	char                  file_name[256];
+	AM_Bool_t             pause;
+	AM_Bool_t             loop;
+	AM_Bool_t             start;
+	int                   speed;
+	int                   pos;
+	AV_DataPlayPara_t     aes;
+	AV_DataPlayPara_t     ves;
+	AM_AV_TimeshiftPara_t time_shift;
+}AM_AV_PlayPara_t;
 
 /**\brief 音视频解码设备*/
 struct AM_AV_Device
@@ -223,6 +241,10 @@ struct AM_AV_Device
 	AM_AV_VideoAspectRatio_t     video_ratio;  /**< 视频长宽比*/
 	AM_AV_VideoAspectMatchMode_t video_match;  /**< 长宽比匹配模式*/
 	AM_AV_VideoDisplayMode_t     video_mode;   /**< 视频显示模式*/
+	int              vpath_fs;       /**< free scale参数*/
+	int              vpath_di;       /**< deinterlace参数*/
+	int              vpath_ppmgr;    /**< ppmgr参数*/
+	AM_AV_PlayPara_t curr_para;      /**< 当前播放参数*/
 };
 
 /****************************************************************************

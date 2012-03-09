@@ -116,6 +116,14 @@ void *adec_handle;
 #define AUDIO_LOW_LEN (1*1024)
 #define AV_SYNC_THRESHOLD	300
 
+#ifdef ANDROID
+#define audio_decode_start(h)\
+	AM_MACRO_BEGIN\
+	audio_decode_start(h);\
+	audio_decode_set_volume(h, 1.);\
+	AM_MACRO_END
+#endif
+
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
@@ -1714,7 +1722,7 @@ static AM_ErrorCode_t aml_set_deinterlace(AM_Bool_t di)
 	ret = AM_FileEcho("/sys/class/graphics/fb1/free_scale", "0");
 
 	ret = AM_FileEcho("/sys/class/vfm/map", "rm default");
-	ret = AM_FileEcho("/sys/class/vfm/map", di?"add default decoder deinterlace amvideo":"add default decoder ppmgr amvideo");
+	ret = AM_FileEcho("/sys/class/vfm/map", di?"add default decoder amvideo":"add default decoder ppmgr amvideo");
 
 	return AM_SUCCESS;
 #endif
@@ -3032,7 +3040,6 @@ static void* aml_av_monitor_thread(void *arg)
 #endif
 
 				audio_decode_start(adec_handle);
-
 				AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
 #endif
 				av_playing = AM_TRUE;
