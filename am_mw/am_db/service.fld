@@ -13,12 +13,16 @@
 "volume integer", 									/**< 音量*/
 "aud_track integer", 								/**< 声道*/
 "vid_pid integer", 									/**< 视频PID*/
-"aud1_pid integer", 								/**< 音频1 PID,无多伴音时默认使用该PID*/
-"aud2_pid integer", 								/**< 音频2 PID,多伴音时使用*/
 "vid_fmt integer",									/**< 视频压缩格式*/
-"aud1_fmt integer",								/**< 音频1压缩格式*/
-"aud2_fmt integer",								/**< 音频2压缩格式*/
-"chan_num numeric",								/**< 频道号*/
+
+"current_aud integer",								/**< 当前音频索引，0为第一个*/
+/**< Note: 一下audio相关的3组数据里，audio的个数和顺序是一致的*/
+"aud_pids text",									/**< 音频PIDs，格式为[pid_count, pid1, pid2,...],
+														如 "3 100 101 102"表示有3个PID，分别为100, 101, 102*/
+"aud_fmts text",									/**< 音频压缩格式，格式为[fmt_count, fmt1, fmt2,...]*/
+"aud_langs text",									/**< 音频语言，多语言支持，格式为[lang_count, lang1, lang2,...]*/	
+
+"chan_num numeric",									/**< 频道号*/
 "skip integer",										/**< 是否隐藏, 0不隐藏，1隐藏*/
 "lock integer",										/**< 父母锁, 0不加锁，1加锁*/
 "favor integer",										/**< 喜爱设置，0非喜爱，1喜爱*/
@@ -31,6 +35,6 @@
 														When the flag is set to ‘0’, event access is not 
 														restricted*/
 "hidden integer",									/**< ATSC 是否隐藏*/
-"hide_guide integer",								/**< ATSC 隐藏的节目是否可以在EPG中显示*/
+"hide_guide integer",									/**< ATSC 隐藏的节目是否可以在EPG中显示*/
 "source_id integer",								/**< ATSC program 的 source id，用于与EIT ETT中的source id对应*/
 
