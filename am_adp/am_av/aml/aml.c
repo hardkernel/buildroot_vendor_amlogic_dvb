@@ -81,6 +81,8 @@ void *adec_handle;
 #define JPEG_DEC_FILE       "/dev/amjpegdec"
 #define AMVIDEO_FILE        "/dev/amvideo"
 
+#define PPMGR_FILE			"/dev/ppmgr"
+
 #define VID_AXIS_FILE       "/sys/class/video/axis"
 #define VID_CONTRAST_FILE   "/sys/class/video/contrast"
 #define VID_SATURATION_FILE "/sys/class/video/saturation"
@@ -128,6 +130,27 @@ void *adec_handle;
 	audio_decode_set_volume(h, 1.);\
 	AM_MACRO_END
 #endif
+
+#define PPMGR_IOC_MAGIC         'P'
+#define PPMGR_IOC_2OSD0         _IOW(PPMGR_IOC_MAGIC, 0x00, unsigned int)
+#define PPMGR_IOC_ENABLE_PP     _IOW(PPMGR_IOC_MAGIC, 0X01, unsigned int)
+#define PPMGR_IOC_CONFIG_FRAME  _IOW(PPMGR_IOC_MAGIC, 0X02, unsigned int)
+#define PPMGR_IOC_VIEW_MODE     _IOW(PPMGR_IOC_MAGIC, 0X03, unsigned int)
+
+#define MODE_3D_DISABLE         0x00000000
+#define MODE_3D_ENABLE          0x00000001
+#define MODE_AUTO               0x00000002
+#define MODE_2D_TO_3D           0x00000004
+#define MODE_LR                 0x00000008
+#define MODE_BT                 0x00000010
+#define MODE_LR_SWITCH          0x00000020
+#define MODE_FIELD_DEPTH        0x00000040
+#define MODE_3D_TO_2D_L         0x00000080
+#define MODE_3D_TO_2D_R         0x00000100
+#define LR_FORMAT_INDICATOR     0x00000200
+#define BT_FORMAT_INDICATOR     0x00000400
+
+
 
 /****************************************************************************
  * Type definitions
@@ -267,7 +290,6 @@ typedef struct
 	pthread_mutex_t		lock;
 	pthread_cond_t		cond;
 	AV_TimeshiftState_t	state;
-	uint8_t				buf[1024*1024];
 	AV_TimeshiftFile_t	file;
 	AM_AV_TimeshiftPara_t para;
 	AM_AV_Device_t       *dev;
@@ -4080,6 +4102,105 @@ get_fail:
 	return AM_FAILURE;
 }
 
+static AM_ErrorCode_t aml_set_ppmgr_3dcmd(int cmd)
+{
+	int ppmgr_fd;
+	int arg = -1, ret;
+	
+	ppmgr_fd = open(PPMGR_FILE, O_RDWR);
+	if (ppmgr_fd < 0) 
+	{
+		AM_DEBUG(0, "Open /dev/ppmgr error(%s)!\n", strerror(errno));
+		return AM_AV_ERR_SYS;
+	}
+
+    switch (cmd) 
+    {
+    case AM_AV_PPMGR_MODE3D_DISABLE:
+        arg = MODE_3D_DISABLE;
+        AM_DEBUG(1,"3D fucntion (0: Disalbe!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_AUTO:
+        arg = MODE_3D_ENABLE|MODE_AUTO;
+        AM_DEBUG(1,"3D fucntion (1: Auto!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_2D_TO_3D:
+        arg = MODE_3D_ENABLE|MODE_2D_TO_3D;
+        AM_DEBUG(1,"3D fucntion (2: 2D->3D!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_LR:
+        arg = MODE_3D_ENABLE|MODE_LR;
+        AM_DEBUG(1,"3D fucntion (3: L/R!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_BT:
+        arg = MODE_3D_ENABLE|MODE_BT;
+        AM_DEBUG(1,"3D fucntion (4: B/T!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_OFF_LR_SWITCH:
+        arg = MODE_3D_ENABLE|MODE_LR;
+        AM_DEBUG(1,"3D fucntion (5: LR SWITCH OFF!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_ON_LR_SWITCH:
+        arg = MODE_3D_ENABLE|MODE_LR_SWITCH;
+        AM_DEBUG(1,"3D fucntion (6: LR SWITCH!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_FIELD_DEPTH:
+        arg = MODE_3D_ENABLE|MODE_FIELD_DEPTH;
+        AM_DEBUG(1,"3D function (7: FIELD_DEPTH!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_OFF_3D_TO_2D:
+        arg = MODE_3D_ENABLE|MODE_LR;
+        AM_DEBUG(1,"3D fucntion (8: 3D_TO_2D_TURN_OFF!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_L_3D_TO_2D:
+        arg = MODE_3D_ENABLE|MODE_3D_TO_2D_L;
+        AM_DEBUG(1,"3D function (9: 3D_TO_2D_L!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_R_3D_TO_2D:
+        arg = MODE_3D_ENABLE|MODE_3D_TO_2D_R;
+        AM_DEBUG(1,"3D function (10: 3D_TO_2D_R!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_OFF_LR_SWITCH_BT:
+        arg = MODE_3D_ENABLE|MODE_BT|BT_FORMAT_INDICATOR;
+        AM_DEBUG(1,"3D function (11: BT SWITCH OFF!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_ON_LR_SWITCH_BT:
+        arg = MODE_3D_ENABLE|MODE_LR_SWITCH|BT_FORMAT_INDICATOR;
+        AM_DEBUG(1,"3D fucntion (12: BT SWITCH!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_OFF_3D_TO_2D_BT:
+        arg = MODE_3D_ENABLE|MODE_BT;
+        AM_DEBUG(1,"3D fucntion (13: 3D_TO_2D_TURN_OFF_BT!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_L_3D_TO_2D_BT:
+        arg = MODE_3D_ENABLE|MODE_3D_TO_2D_L|BT_FORMAT_INDICATOR;
+        AM_DEBUG(1,"3D function (14: 3D TO 2D L BT!)\n");
+        break;
+    case AM_AV_PPMGR_MODE3D_R_3D_TO_2D_BT:
+        arg = MODE_3D_ENABLE|MODE_3D_TO_2D_R|BT_FORMAT_INDICATOR;
+        AM_DEBUG(1,"3D function (15: 3D TO 2D R BT!)\n");
+        break;
+    default:
+    	AM_DEBUG(1, "Unkown set 3D cmd %d", cmd);
+    	arg = -1;
+    	break;
+    }
+    
+    if (arg != -1)
+    {
+    	if (ioctl(ppmgr_fd, PPMGR_IOC_ENABLE_PP, arg) == -1)
+    	{
+    		AM_DEBUG(1, "Set 3D function failed: %s", strerror(errno));
+    		close(ppmgr_fd);
+    		return AM_AV_ERR_SYS;
+    	}
+    }
+
+	close(ppmgr_fd);
+	
+    return AM_SUCCESS;
+}
+
 static AM_ErrorCode_t
 aml_set_vpath(AM_AV_Device_t *dev)
 {
@@ -4087,7 +4208,9 @@ aml_set_vpath(AM_AV_Device_t *dev)
 	int times = 10;
 
 	AM_DEBUG(1, "set video path fs:%d di:%d ppmgr:%d", dev->vpath_fs, dev->vpath_di, dev->vpath_ppmgr);
-
+	
+	AM_FileEcho("/sys/class/deinterlace/di0/config", "disable");
+	
 	do{
 		ret = AM_FileEcho("/sys/class/vfm/map", "rm default");
 		if(ret!=AM_SUCCESS){
@@ -4161,8 +4284,13 @@ aml_set_vpath(AM_AV_Device_t *dev)
 
 	if(dev->vpath_ppmgr!=AM_AV_PPMGR_DISABLE){
 		AM_FileEcho("/sys/class/vfm/map", "add default decoder ppmgr amvideo");
+		if (dev->vpath_ppmgr!=AM_AV_PPMGR_ENABLE) {
+			/*Set 3D mode*/
+			AM_TRY(aml_set_ppmgr_3dcmd(dev->vpath_ppmgr));
+		}
 	}else if(dev->vpath_di==AM_AV_DEINTERLACE_ENABLE){
 		AM_FileEcho("/sys/class/vfm/map", "add default decoder deinterlace amvideo");
+		AM_FileEcho("/sys/class/deinterlace/di0/config", "enable");
 	}else{
 		AM_FileEcho("/sys/class/vfm/map", "add default decoder amvideo");
 	}
