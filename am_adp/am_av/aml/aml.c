@@ -127,6 +127,17 @@ void *adec_handle;
 	audio_decode_start(h);\
 	audio_decode_set_volume(h, 1.);\
 	AM_MACRO_END
+
+#define open(a...)\
+	({\
+	 int ret, times=300;\
+	 do{\
+	 	ret = open(a);\
+	 	if(ret==-1)\
+	 		usleep(10000);\
+	 }while(ret==-1 && times--);\
+	 ret;\
+	 })
 #endif
 
 /****************************************************************************
