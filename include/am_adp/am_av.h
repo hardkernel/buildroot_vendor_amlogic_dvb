@@ -1039,6 +1039,16 @@ extern AM_ErrorCode_t AM_AV_FastBackwardTimeshift(int dev_no, int speed);
  */
 extern AM_ErrorCode_t AM_AV_SetVPathPara(int dev_no, AM_AV_FreeScalePara_t fs, AM_AV_DeinterlacePara_t di, AM_AV_PPMGRPara_t pp);
 
+/**\brief TS播放模式时切换音频，用于多音频切换，需先调用StartTS
+ * \param dev_no 音视频设备号
+ * \param apid 音频流PID
+ * \param afmt 音频压缩格式
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+extern AM_ErrorCode_t AM_AV_SwitchTSAudio(int dev_no, uint16_t apid, AM_AV_AFormat_t afmt);
+
 #ifdef __cplusplus
 }
 #endif

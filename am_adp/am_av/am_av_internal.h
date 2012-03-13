@@ -193,6 +193,7 @@ struct AM_AV_Driver
 	AM_ErrorCode_t (*timeshift_fill)(AM_AV_Device_t *dev, uint8_t *data, int size);
 	AM_ErrorCode_t (*timeshift_cmd)(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *para);
 	AM_ErrorCode_t (*set_vpath)(AM_AV_Device_t *dev);
+	AM_ErrorCode_t (*switch_ts_audio)(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt);
 };
 
 /**\brief 音视频播放参数*/

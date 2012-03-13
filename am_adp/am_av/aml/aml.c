@@ -329,7 +329,7 @@ static AM_ErrorCode_t aml_get_vstatus(AM_AV_Device_t *dev, AM_AV_VideoStatus_t *
 static AM_ErrorCode_t aml_timeshift_fill_data(AM_AV_Device_t *dev, uint8_t *data, int size);
 static AM_ErrorCode_t aml_timeshift_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *para);
 static AM_ErrorCode_t aml_set_vpath(AM_AV_Device_t *dev);
-
+static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt);
 
 const AM_AV_Driver_t aml_av_drv =
 {
@@ -350,7 +350,8 @@ const AM_AV_Driver_t aml_av_drv =
 .get_video_status = aml_get_vstatus,
 .timeshift_fill = aml_timeshift_fill_data,
 .timeshift_cmd = aml_timeshift_cmd,
-.set_vpath   = aml_set_vpath
+.set_vpath   = aml_set_vpath,
+.switch_ts_audio = aml_switch_ts_audio
 };
 
 /*音频控制（通过解码器）操作*/
@@ -4308,4 +4309,75 @@ aml_set_vpath(AM_AV_Device_t *dev)
 
 	return AM_SUCCESS;
 }
+
+/**\brief 切换TS播放的音频*/
+static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt)
+{
+	int fd;
+	
+	fd = (int)dev->ts_player.drv_data;
+	
+	if (fd < 0)
+	{
+		AM_DEBUG(1, "ts_player fd < 0, error!");
+		return AM_AV_ERR_SYS;
+	}
+	
+	/*Stop Audio first*/
+	if (dev->ts_player.av_thread_running) 
+	{
+		dev->ts_player.av_thread_running = AM_FALSE;
+		pthread_cond_broadcast(&gAVMonCond);
+		pthread_join(dev->ts_player.av_mon_thread, NULL);
+	}
+#if !defined(ADEC_API_NEW)
+	adec_cmd("stop");
+#else
+	if(adec_handle)
+	{
+		audio_decode_stop(adec_handle);
+		audio_decode_release(&adec_handle);
+	}
+	adec_handle = NULL;
+#endif
+	
+	/*Set Audio PID & fmt*/
+	if(apid && (apid<0x1fff))
+	{
+		if(ioctl(fd, AMSTREAM_IOC_AFORMAT, (int)afmt)==-1)
+		{
+			AM_DEBUG(1, "set audio format failed");
+			return AM_AV_ERR_SYS;
+		}
+		if(ioctl(fd, AMSTREAM_IOC_AID, (int)apid)==-1)
+		{
+			AM_DEBUG(1, "set audio PID failed");
+			return AM_AV_ERR_SYS;
+		}
+	}
+	
+	/*reset audio*/
+	if(ioctl(fd, AMSTREAM_IOC_AUDIO_RESET, 0)==-1)
+	{
+		AM_DEBUG(1, "audio reset failed");
+		return AM_AV_ERR_SYS;
+	}
+	
+	AM_TIME_GetClock(&dev->ts_player.av_start_time);
+	
+	/*Start Audio*/
+	dev->ts_player.av_thread_running = AM_TRUE;
+	if(pthread_create(&dev->ts_player.av_mon_thread, NULL, aml_av_monitor_thread, (void*)dev))
+	{
+		AM_DEBUG(1, "create the av buf monitor thread failed");
+		dev->ts_player.av_thread_running = AM_FALSE;
+	}
+		
+	dev->ts_player.play_para.apid = apid;
+	dev->ts_player.play_para.afmt = afmt;
+	
+	
+	return AM_SUCCESS;
+}
+
 

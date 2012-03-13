@@ -2734,3 +2734,30 @@ AM_AV_SetVPathPara(int dev_no, AM_AV_FreeScalePara_t fs, AM_AV_DeinterlacePara_t
 	return ret;
 }
 
+/**\brief TS播放模式时切换音频，用于多音频切换，需先调用StartTS
+ * \param dev_no 音视频设备号
+ * \param apid 音频流PID
+ * \param afmt 音频压缩格式
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+AM_ErrorCode_t AM_AV_SwitchTSAudio(int dev_no, uint16_t apid, AM_AV_AFormat_t afmt)
+{
+	AM_AV_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	
+	AM_TRY(av_get_openned_dev(dev_no, &dev));
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	if ((dev->mode & AV_PLAY_TS) && dev->drv->switch_ts_audio) 
+		ret = dev->drv->switch_ts_audio(dev, apid, afmt);
+	
+	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
+
+
+
