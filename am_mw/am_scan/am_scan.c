@@ -591,6 +591,8 @@ static void add_audio(AM_SCAN_AudioInfo_t *ai, int aud_pid, int aud_fmt, char la
 	{
 		sprintf(ai->audios[ai->audio_count].lang, "Audio%d", ai->audio_count+1);
 	}
+	
+	AM_DEBUG(1, "Add a audio: pid %d, language: %s", aud_pid, ai->audios[ai->audio_count].lang);
 
 	ai->audio_count++;
 }
@@ -1361,8 +1363,6 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	sqlite3_step(stmts[DELETE_TS_EVTS]);
 	sqlite3_reset(stmts[DELETE_TS_EVTS]);
 
-	aud_info.audio_count = 0;
-	
 	/*遍历PMT表*/
 	AM_SI_LIST_BEGIN(ts->pmts, pmt)
 		name[0] = '\0';
@@ -1381,6 +1381,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 		hide_guide = 0;
 		chan_num = 0;
 		source_id = 0;
+		aud_info.audio_count = 0;
 		
 		/*添加新业务到数据库*/
 		srv_dbid = insert_srv(stmts, net_dbid, dbid, srv_id);
@@ -1417,14 +1418,6 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 								AM_DEBUG(0, "!!Found DTS Descriptor!!!");
 								afmt_tmp = AFORMAT_DTS;
 								break;
-							case AM_SI_DESCR_ISO639:
-								if (descr->p_decoded != NULL)
-								{
-									dvbpsi_iso639_dr_t *pisod = (dvbpsi_iso639_dr_t*)descr->p_decoded;
-									if (pisod->i_code_count > 0)
-										memcpy(lang_tmp, pisod->code[0].iso_639_code, sizeof(lang_tmp));
-								}
-								break;
 							default:
 								break;
 						}
@@ -1434,10 +1427,13 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 				case 0x1:
 				case 0x2:
 					vfmt_tmp = VFORMAT_MPEG12;
+					break;
 				case 0x10:
 					vfmt_tmp = VFORMAT_MPEG4;
+					break;
 				case 0x1b:
 					vfmt_tmp = VFORMAT_H264;
+					break;
 				case 0xea:
 					vfmt_tmp = VFORMAT_VC1;
 					break;
@@ -1445,12 +1441,16 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 				case 0x3:
 				case 0x4:
 					afmt_tmp = AFORMAT_MPEG;
+					break;
 				case 0x0f:
 					afmt_tmp = AFORMAT_AAC;
+					break;
 				case 0x11:
 					afmt_tmp = AFORMAT_AAC_LATM;
+					break;
 				case 0x81:
 					afmt_tmp = AFORMAT_AC3;
+					break;
 				case 0x8A:
                 case 0x82:
                 case 0x85:
@@ -1470,6 +1470,17 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 			}
 			if (afmt_tmp != -1)
 			{
+				AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+					if (descr->i_tag == AM_SI_DESCR_ISO639 && descr->p_decoded != NULL)
+					{
+						dvbpsi_iso639_dr_t *pisod = (dvbpsi_iso639_dr_t*)descr->p_decoded;
+						if (pisod->i_code_count > 0) 
+						{
+							memcpy(lang_tmp, pisod->code[0].iso_639_code, sizeof(lang_tmp));
+							break;
+						}
+					}
+				AM_SI_LIST_END()
 				add_audio(&aud_info, es->i_pid, afmt_tmp, lang_tmp);
 			}
 
