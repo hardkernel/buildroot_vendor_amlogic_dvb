@@ -22,6 +22,7 @@
 "aud_fmts text",									/**< 音频压缩格式，格式为[fmt_count, fmt1, fmt2,...]*/
 "aud_langs text",									/**< 音频语言，多语言支持，格式为[lang_count, lang1, lang2,...]*/	
 
+"db_sub_id integer",								/**< 该service的当前subtitle数据库索引*/
 "chan_num numeric",									/**< 频道号*/
 "skip integer",										/**< 是否隐藏, 0不隐藏，1隐藏*/
 "lock integer",										/**< 父母锁, 0不加锁，1加锁*/

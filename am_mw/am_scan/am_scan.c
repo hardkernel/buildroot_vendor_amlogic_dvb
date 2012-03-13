@@ -228,7 +228,7 @@ const char *sql_stmts[MAX_STMT] =
 	"delete  from srv_table where db_ts_id=?",
 	"select db_id from srv_table where db_net_id=? and db_ts_id=? and service_id=?",
 	"insert into srv_table(db_net_id, db_ts_id,service_id) values(?,?,?)",
-	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?, running_status=?, free_ca_mode=?, volume=?, aud_track=?, vid_pid=?, vid_fmt=?,aud_pids=?,aud_fmts=?,aud_langs=?,skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,hide_guide=?, source_id=?,favor=?,current_aud=?  where db_id=?",
+	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?, running_status=?, free_ca_mode=?, volume=?, aud_track=?, vid_pid=?, vid_fmt=?,aud_pids=?,aud_fmts=?,aud_langs=?,db_sub_id=-1,skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,hide_guide=?, source_id=?,favor=?,current_aud=?  where db_id=?",
 	"select db_id,service_type from srv_table where db_ts_id=? order by service_id",
 	"update srv_table set chan_num=? where db_id=?",
 	"delete  from evt_table where db_ts_id=?",
