@@ -81,15 +81,19 @@ extern "C"
 #define AM_TOKEN_VALUE_INT(_str, _delim, _index, _default) \
 	({\
 		char *token;\
+		char *_strbak = strdup(_str);\
 		int counter = 0;\
 		int val = _default;\
-		AM_TOKEN_PARSE_BEGIN(_str, _delim, token)\
-			if (counter == (_index)) {\
-				val = atoi(token);\
-				break;\
-			}\
-			counter++;\
-		AM_TOKEN_PARSE_END(_str, _delim, token)\
+		if (_strbak != NULL) {\
+			AM_TOKEN_PARSE_BEGIN(_strbak, _delim, token)\
+				if (counter == (_index)) {\
+					val = atoi(token);\
+					break;\
+				}\
+				counter++;\
+			AM_TOKEN_PARSE_END(_strbak, _delim, token)\
+			free(_strbak);\
+		}\
 		val;\
 	})
 

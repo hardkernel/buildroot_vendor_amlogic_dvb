@@ -441,8 +441,6 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 	{
 		int i;
 		char pid_para[256];
-		char str[256];
-		char str1[256];
 		char *pid_tok;
 		
 		row = 1;
@@ -456,16 +454,18 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 		i = 0;
 		AM_TOKEN_PARSE_BEGIN(pid_para, " ", pid_tok)
 			if (i < AM_DVR_MAX_PID_COUNT)
-				rec->rec_pids.pids[i] = AM_TOKEN_VALUE_INT(pid_para, " ", i, 0x1fff);
+				rec->rec_pids.pids[i] = atoi(pid_tok);
 			else
 				break;
 			i++;
 		AM_TOKEN_PARSE_END(pid_para, " ", pid_tok)
+		rec->rec_pids.pid_count = i;
 	}
+	
 	if (rec->rec_pids.pid_count <= 0)
 		return AM_REC_ERR_INVALID_PARAM;
 
-	snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), "%s/DVBRecordFiles", rec->store_dir);
+	snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), "%s/DVBRecordFiles", rec->store_dir);	
 	/*尝试创建录像文件夹*/
 	if (mkdir(rec->rec_file_name, 0666) && errno != EEXIST)
 	{
