@@ -135,10 +135,10 @@
 		/*对于SDT没有描述srv_type但音视频PID有效的节目，按电视或广播节目存储*/\
 		if (vid != 0x1fff && srv_type == 0)\
 			srv_type = tv_srv_type;\
-		else if (vid == 0x1fff && aid1 != 0x1fff && srv_type == 0)\
+		else if (vid == 0x1fff && aud_info.audio_count > 0 && srv_type == 0)\
 			srv_type = radio_srv_type;\
 		/*SDT/VCT描述为TV 或 Radio的节目，但音视频PID无效，不存储为TV或Radio*/\
-		if (vid == 0x1fff && aid1 == 0x1fff && (srv_type == tv_srv_type || srv_type == radio_srv_type)){\
+		if (vid == 0x1fff && aud_info.audio_count <= 0 && (srv_type == tv_srv_type || srv_type == radio_srv_type)){\
 			srv_type = 0;\
 		}\
 		if (!strcmp(name, "") && (srv_type == tv_srv_type || srv_type == radio_srv_type) && \
@@ -154,24 +154,24 @@
 		sqlite3_bind_int(stmts[UPDATE_SRV], 8, 50);\
 		sqlite3_bind_int(stmts[UPDATE_SRV], 9, AM_AOUT_OUTPUT_DUAL_LEFT);\
 		sqlite3_bind_int(stmts[UPDATE_SRV], 10, vid);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 11, aid1);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 12, aid2);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 13, vfmt);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 14, afmt1);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 15, afmt2);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 16, chan_num);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 17, major_chan_num);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 18, minor_chan_num);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 19, access_controlled);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 20, hidden);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 21, hide_guide);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 22, source_id);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 23, 0);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 11, vfmt);\
+		sqlite3_bind_text(stmts[UPDATE_SRV], 12, str_apids, strlen(str_apids), SQLITE_STATIC);\
+		sqlite3_bind_text(stmts[UPDATE_SRV], 13, str_afmts, strlen(str_afmts), SQLITE_STATIC);\
+		sqlite3_bind_text(stmts[UPDATE_SRV], 14, str_alangs, strlen(str_alangs), SQLITE_STATIC);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 15, chan_num);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 16, major_chan_num);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 17, minor_chan_num);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 18, access_controlled);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 29, hidden);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 20, hide_guide);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 21, source_id);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 22, 0);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 23, -1);\
 		sqlite3_bind_int(stmts[UPDATE_SRV], 24, srv_dbid);\
 		sqlite3_step(stmts[UPDATE_SRV]);\
 		sqlite3_reset(stmts[UPDATE_SRV]);\
-		AM_DEBUG(1, "Updating Program: '%s',srv_type(%d), vid(%d), aid1(%d), aid2(%d), vfmt(%d), afmt1(%d), afmt2(%d) ",\
-			name,srv_type,vid,aid1,aid2,vfmt,afmt1,afmt2);\
+		AM_DEBUG(1, "Updating Program: '%s',srv_type(%d), vpid(%d), vfmt(%d),apids(%s), afmts(%s), alangs(%s) ",\
+			name,srv_type,vid,vfmt,str_apids, str_afmts, str_alangs);\
 	AM_MACRO_END
 
 typedef struct{
@@ -228,7 +228,7 @@ const char *sql_stmts[MAX_STMT] =
 	"delete  from srv_table where db_ts_id=?",
 	"select db_id from srv_table where db_net_id=? and db_ts_id=? and service_id=?",
 	"insert into srv_table(db_net_id, db_ts_id,service_id) values(?,?,?)",
-	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?, running_status=?, free_ca_mode=?, volume=?, aud_track=?, vid_pid=?, aud1_pid=?, aud2_pid=?,vid_fmt=?,aud1_fmt=?,aud2_fmt=?,skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,hide_guide=?, source_id=?,favor=?  where db_id=?",
+	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?, running_status=?, free_ca_mode=?, volume=?, aud_track=?, vid_pid=?, vid_fmt=?,aud_pids=?,aud_fmts=?,aud_langs=?,db_sub_id=-1,skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,hide_guide=?, source_id=?,favor=?,current_aud=?  where db_id=?",
 	"select db_id,service_type from srv_table where db_ts_id=? order by service_id",
 	"update srv_table set chan_num=? where db_id=?",
 	"delete  from evt_table where db_ts_id=?",
@@ -563,6 +563,68 @@ static int insert_teletext(sqlite3_stmt **stmts, int db_srv_id, int pid, dvbpsi_
 	return 0;
 }
 
+/**\brief 添加一个audio*/
+static void add_audio(AM_SCAN_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang[3])
+{
+	int i;
+	
+	for (i=0; i<ai->audio_count; i++)
+	{
+		if (ai->audios[i].pid == aud_pid)
+			return;
+	}
+	if (ai->audio_count >= AM_SCAN_MAX_AUD_CNT)
+	{
+		AM_DEBUG(1, "Too many audios, Max count %d", AM_SCAN_MAX_AUD_CNT);
+		return;
+	}
+	if (ai->audio_count < 0)
+		ai->audio_count = 0;
+	ai->audios[ai->audio_count].pid = aud_pid;
+	ai->audios[ai->audio_count].fmt = aud_fmt;
+	memset(ai->audios[ai->audio_count].lang, 0, sizeof(ai->audios[ai->audio_count].lang));
+	if (lang[0] != 0)
+	{
+		memcpy(ai->audios[ai->audio_count].lang, lang, 3);
+	}
+	else
+	{
+		sprintf(ai->audios[ai->audio_count].lang, "Audio%d", ai->audio_count+1);
+	}
+	
+	AM_DEBUG(1, "Add a audio: pid %d, language: %s", aud_pid, ai->audios[ai->audio_count].lang);
+
+	ai->audio_count++;
+}
+
+/**\brief 将audio数据格式化成字符串已便存入数据库*/
+static void format_audio_strings(AM_SCAN_AudioInfo_t *ai, char *pids, char *fmts, char *langs)
+{
+	int i;
+	
+	if (ai->audio_count < 0)
+		ai->audio_count = 0;
+		
+	pids[0] = 0;
+	fmts[0] = 0;
+	langs[0] = 0;
+	for (i=0; i<ai->audio_count; i++)
+	{
+		if (i == 0)
+		{
+			sprintf(pids, "%d", ai->audios[i].pid);
+			sprintf(fmts, "%d", ai->audios[i].fmt);
+			sprintf(langs, "%s", ai->audios[i].lang);
+		}
+		else
+		{
+			sprintf(pids, "%s %d", pids, ai->audios[i].pid);
+			sprintf(fmts, "%s %d", fmts, ai->audios[i].fmt);
+			sprintf(langs, "%s %s", langs, ai->audios[i].lang);
+		}
+	}
+}
+
 /**\brief 存储一个TS到数据库, ATSC*/
 static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_t *ts)
 {
@@ -581,12 +643,17 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	sqlite3 *hdb = result->hdb;
 	uint16_t vid, aid1, aid2;
 	uint8_t srv_type, eit_sche, eit_pf, rs, free_ca;
-	int afmt1, afmt2, vfmt, avfmt, chan_num;
+	int vfmt, chan_num, afmt_tmp, vfmt_tmp;
 	int major_chan_num, minor_chan_num, source_id;
 	uint8_t access_controlled, hidden, hide_guide;
 	char name[AM_DB_MAX_SRV_NAME_LEN + 1];
+	char lang_tmp[3];
+	char str_apids[256];
+	char str_afmts[256];
+	char str_alangs[256];
 	AM_Bool_t stream_found_in_vct = AM_FALSE;
 	AM_Bool_t program_found_in_vct = AM_FALSE;
+	AM_SCAN_AudioInfo_t aud_info;
 	
 	if (ts->type != AM_SCAN_TS_ANALOG && ts->tvcts == NULL && ts->cvcts == NULL && ts->pats == NULL)
 	{
@@ -667,14 +734,13 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 		if (ts->analog_channel == NULL)
 			return;
 		name[0] = '\0';
-		vid = aid1 = aid2 = 0x1fff;
+		vid = 0x1fff;
 		srv_type = 0;
 		eit_sche = 0;
 		eit_pf = 0;
 		rs = 0;
 		free_ca = 1;
 		vfmt = 0;
-		afmt1 = afmt2 = 0;
 		major_chan_num = 0;
 		minor_chan_num = 0;
 		access_controlled = 0;
@@ -682,6 +748,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 		hide_guide = 0;
 		chan_num = 0;
 		source_id = 0;
+		aud_info.audio_count = 0;
 		
 		/*添加新业务到数据库*/
 		srv_dbid = insert_srv(stmts, net_dbid, dbid, 0xffff);
@@ -691,7 +758,9 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 			return;
 		}
 		vfmt = ts->analog_channel->video_std;
-		afmt1 = ts->analog_channel->audio_std;
+		memset(lang_tmp, 0, sizeof(lang_tmp));
+		add_audio(&aud_info, 0x1fff, ts->analog_channel->audio_std, lang_tmp);
+		
 		/*从VCT中查找模拟频道名称和频道号*/
 		if (ts->analog_channel->TSID != 0xffff)
 		{
@@ -742,6 +811,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 			AM_DEBUG(1, ">>>>Analog Channel(TSID=%d) found, but there is no decription in VCT", ts->analog_channel->TSID);
 		}
 analog_vct_done:
+		format_audio_strings(&aud_info, str_apids, str_afmts, str_alangs);
 		major_chan_num = ts->analog_channel->major_chan_num;
 		minor_chan_num = ts->analog_channel->minor_chan_num;
 		chan_num = (major_chan_num<<16) | (minor_chan_num&0xffff);
@@ -777,14 +847,13 @@ analog_vct_done:
 			if (cvct->transport_stream_id == 0 || ccinfo->channel_TSID == cvct->transport_stream_id)
 			{	
 				name[0] = '\0';
-				vid = aid1 = aid2 = 0x1fff;
+				vid = 0x1fff;
 				srv_type = 0;
 				eit_sche = 0;
 				eit_pf = 0;
 				rs = 0;
 				free_ca = 1;
 				vfmt = 0;
-				afmt1 = afmt2 = 0;
 				major_chan_num = 0;
 				minor_chan_num = 0;
 				access_controlled = 0;
@@ -792,6 +861,8 @@ analog_vct_done:
 				hide_guide = 0;
 				chan_num = 0;
 				source_id = 0;
+				aud_info.audio_count = 0;
+				
 				/*添加新业务到数据库*/
 				srv_dbid = insert_srv(stmts, net_dbid, dbid, ccinfo->program_number);
 				if (srv_dbid == -1)
@@ -805,41 +876,40 @@ analog_vct_done:
 						atsc_service_location_dr_t *asld = (atsc_service_location_dr_t*)descr->p_decoded;
 						for (i=0; i<asld->i_elem_count; i++)
 						{
-							avfmt = -1;
+							afmt_tmp = -1;
+							vfmt_tmp = -1;
+							memset(lang_tmp, 0, sizeof(lang_tmp));
 							switch (asld->elem[i].i_stream_type)
 							{
 								/*video pid and video format*/
 								case 0x02:
-									if (avfmt == -1)
-										avfmt = VFORMAT_MPEG12;
-									if (vid == 0x1fff)
-									{
-										vid = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
-										vfmt = avfmt;
-									}
+									vfmt_tmp = VFORMAT_MPEG12;
 									break;
 								/*audio pid and audio format*/
 								case 0x81:
-									if (avfmt == -1)
-										avfmt = AFORMAT_AC3;
-									if (aid1 == 0x1fff)
-									{
-										aid1 = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
-										afmt1 = avfmt;
-									}
-									else if (aid2 == 0x1fff)
-									{
-										aid2 = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
-										afmt2 = avfmt;
-									}
+									afmt_tmp = AFORMAT_AC3;
 									break;
 								default:
 									break;
 							}
+							if (vfmt_tmp != -1)
+							{
+								vid = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
+								vfmt = vfmt_tmp;
+							}
+							if (afmt_tmp != -1)
+							{
+								add_audio(&aud_info, asld->elem[i].i_pid, afmt_tmp, lang_tmp);
+							}
 						}
+						/* found the service location descr */
+						if (! stream_found_in_vct)
+							stream_found_in_vct = AM_TRUE;
 					}
 				AM_SI_LIST_END()
-			
+				
+				format_audio_strings(&aud_info, str_apids, str_afmts, str_alangs);
+				
 				major_chan_num = ccinfo->major_channel_number;
 				minor_chan_num = ccinfo->minor_channel_number;
 				
@@ -851,9 +921,6 @@ analog_vct_done:
 				name[sizeof(ccinfo->short_name)] = 0;
 				/*业务类型*/
 				srv_type = ccinfo->service_type;
-				
-				if (! stream_found_in_vct)
-					stream_found_in_vct = AM_TRUE;
 					
 				AM_DEBUG(0 ,"(CVCT)program(%d)('%s':%d-%d, %s) in current TSID(%d) found!", ccinfo->program_number, 
 					 name, major_chan_num, minor_chan_num, 
@@ -884,14 +951,13 @@ analog_vct_done:
 			if (tvct->transport_stream_id == 0 || tcinfo->channel_TSID == tvct->transport_stream_id)
 			{	
 				name[0] = '\0';
-				vid = aid1 = aid2 = 0x1fff;
+				vid = 0x1fff;
 				srv_type = 0;
 				eit_sche = 0;
 				eit_pf = 0;
 				rs = 0;
 				free_ca = 1;
 				vfmt = 0;
-				afmt1 = afmt2 = 0;
 				major_chan_num = 0;
 				minor_chan_num = 0;
 				access_controlled = 0;
@@ -899,6 +965,8 @@ analog_vct_done:
 				hide_guide = 0;
 				chan_num = 0;
 				source_id = 0;
+				aud_info.audio_count = 0;
+				
 				/*添加新业务到数据库*/
 				srv_dbid = insert_srv(stmts, net_dbid, dbid, tcinfo->program_number);
 				if (srv_dbid == -1)
@@ -914,43 +982,40 @@ analog_vct_done:
 						AM_DEBUG(1, "Service location descr stream count %d", asld->i_elem_count);
 						for (i=0; i<asld->i_elem_count; i++)
 						{
-							avfmt = -1;
+							afmt_tmp = -1;
+							vfmt_tmp = -1;
+							memset(lang_tmp, 0, sizeof(lang_tmp));
 							switch (asld->elem[i].i_stream_type)
 							{
 								/*video pid and video format*/
 								case 0x02:
-									AM_DEBUG(1, "found video, pid %d", asld->elem[i].i_pid);
-									if (avfmt == -1)
-										avfmt = VFORMAT_MPEG12;
-									if (vid == 0x1fff)
-									{
-										vid = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
-										vfmt = avfmt;
-									}
+									vfmt_tmp = VFORMAT_MPEG12;
 									break;
 								/*audio pid and audio format*/
 								case 0x81:
-									AM_DEBUG(1, "found audio, pid %d", asld->elem[i].i_pid);
-									if (avfmt == -1)
-										avfmt = AFORMAT_AC3;
-									if (aid1 == 0x1fff)
-									{
-										aid1 = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
-										afmt1 = avfmt;
-									}
-									else if (aid2 == 0x1fff)
-									{
-										aid2 = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
-										afmt2 = avfmt;
-									}
+									afmt_tmp = AFORMAT_AC3;
 									break;
 								default:
 									break;
 							}
+							if (vfmt_tmp != -1)
+							{
+								vid = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
+								vfmt = vfmt_tmp;
+							}
+							if (afmt_tmp != -1)
+							{
+								add_audio(&aud_info, asld->elem[i].i_pid, afmt_tmp, lang_tmp);
+							}
 						}
+						/* found the service location descr */
+						if (! stream_found_in_vct)
+							stream_found_in_vct = AM_TRUE;
 					}
 				AM_SI_LIST_END()
 
+				format_audio_strings(&aud_info, str_apids, str_afmts, str_alangs);
+				
 				major_chan_num = tcinfo->major_channel_number;
 				minor_chan_num = tcinfo->minor_channel_number;
 				
@@ -962,9 +1027,6 @@ analog_vct_done:
 				name[sizeof(tcinfo->short_name)] = 0;
 				/*业务类型*/
 				srv_type = tcinfo->service_type;
-				
-				if (! stream_found_in_vct)
-					stream_found_in_vct = AM_TRUE;
 					
 				AM_DEBUG(0 ,"(TVCT)program(%d)('%s':%d-%d, %s) in current TSID(%d) found!", tcinfo->program_number, 
 					 name, major_chan_num, minor_chan_num, 
@@ -990,14 +1052,13 @@ analog_vct_done:
 	/*find from PMT*/
 	AM_SI_LIST_BEGIN(ts->pmts, pmt)
 		name[0] = '\0';
-		vid = aid1 = aid2 = 0x1fff;
+		vid = 0x1fff;
 		srv_type = 0;
 		eit_sche = 0;
 		eit_pf = 0;
 		rs = 0;
 		free_ca = 1;
 		vfmt = 0;
-		afmt1 = afmt2 = 0;
 		major_chan_num = 0;
 		minor_chan_num = 0;
 		access_controlled = 0;
@@ -1005,6 +1066,7 @@ analog_vct_done:
 		hide_guide = 0;
 		chan_num = 0;
 		source_id = 0;
+		aud_info.audio_count = 0;
 		
 		/*添加新业务到数据库*/
 		srv_dbid = insert_srv(stmts, net_dbid, dbid, pmt->i_program_number);
@@ -1015,39 +1077,37 @@ analog_vct_done:
 		}
 		/*取ES流信息*/
 		AM_SI_LIST_BEGIN(pmt->p_first_es, es)
-			avfmt = -1;
+			afmt_tmp = -1;
+			vfmt_tmp = -1;
+			memset(lang_tmp, 0, sizeof(lang_tmp));
 			
 			switch (es->i_type)
 			{
 				/*video pid and video format*/
-				case 0x2:
-					if (avfmt == -1)
-						avfmt = VFORMAT_MPEG12;
-					if (vid == 0x1fff)
-					{
-						vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
-						vfmt = avfmt;
-					}
+				case 0x02:
+					vfmt_tmp = VFORMAT_MPEG12;
 					break;
 				/*audio pid and audio format*/
 				case 0x81:
-					if (avfmt == -1)
-						avfmt = AFORMAT_AC3;
-            		if (aid1 == 0x1fff)
-            		{
-						aid1 = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
-						afmt1 = avfmt;
-					}
-					else if (aid2 == 0x1fff)
-					{
-						aid2 = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
-						afmt2 = avfmt;
-					}
+					afmt_tmp = AFORMAT_AC3;
 					break;
 				default:
 					break;
 			}
+			if (vfmt_tmp != -1)
+			{
+				vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
+				vfmt = vfmt_tmp;
+			}
+			if (afmt_tmp != -1)
+			{
+				add_audio(&aud_info, es->i_pid, afmt_tmp, lang_tmp);
+			}
+							
 		AM_SI_LIST_END()
+		
+		format_audio_strings(&aud_info, str_apids, str_afmts, str_alangs);
+		
 		if (ts->cvcts)
 		{
 			program_found_in_vct = AM_FALSE;
@@ -1180,10 +1240,15 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	sqlite3 *hdb = result->hdb;
 	uint16_t vid, aid1, aid2, srv_id;
 	uint8_t srv_type, eit_sche, eit_pf, rs, free_ca;
-	int afmt1, afmt2, vfmt, avfmt, chan_num;
+	int vfmt, chan_num, afmt_tmp, vfmt_tmp;
 	int major_chan_num, minor_chan_num, source_id;
 	uint8_t access_controlled, hidden, hide_guide;
 	char name[AM_DB_MAX_SRV_NAME_LEN + 1];
+	char lang_tmp[3];
+	char str_apids[256];
+	char str_afmts[256];
+	char str_alangs[256];
+	AM_SCAN_AudioInfo_t aud_info;
 	
 	/*没有PAT，不存储*/
 	if (!ts->pats)
@@ -1301,7 +1366,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	/*遍历PMT表*/
 	AM_SI_LIST_BEGIN(ts->pmts, pmt)
 		name[0] = '\0';
-		vid = aid1 = aid2 = 0x1fff;
+		vid = 0x1fff;
 		srv_id = pmt->i_program_number;
 		srv_type = 0;
 		eit_sche = 0;
@@ -1309,7 +1374,6 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 		rs = 0;
 		free_ca = 1;
 		vfmt = 0;
-		afmt1 = afmt2 = 0;
 		major_chan_num = 0;
 		minor_chan_num = 0;
 		access_controlled = 0;
@@ -1317,6 +1381,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 		hide_guide = 0;
 		chan_num = 0;
 		source_id = 0;
+		aud_info.audio_count = 0;
 		
 		/*添加新业务到数据库*/
 		srv_dbid = insert_srv(stmts, net_dbid, dbid, srv_id);
@@ -1330,103 +1395,93 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 
 		/*取ES流信息*/
 		AM_SI_LIST_BEGIN(pmt->p_first_es, es)
-			avfmt = -1;
-			
+			afmt_tmp = -1;
+			vfmt_tmp = -1;
+			memset(lang_tmp, 0, sizeof(lang_tmp));
 			switch (es->i_type)
 			{
 				/*override by parse descriptor*/
 				case 0x6:
 					AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
-						if (descr->i_tag == AM_SI_DESCR_AC3 || 
-						descr->i_tag == AM_SI_DESCR_ENHANCED_AC3)
+						switch (descr->i_tag)
 						{
-							AM_DEBUG(0, "!!Found AC3 Descriptor!!!");
-							avfmt = AFORMAT_AC3;
+							case AM_SI_DESCR_AC3:
+							case AM_SI_DESCR_ENHANCED_AC3:
+								AM_DEBUG(0, "!!Found AC3 Descriptor!!!");
+								afmt_tmp = AFORMAT_AC3;
+								break;
+							case AM_SI_DESCR_AAC:
+								AM_DEBUG(0, "!!Found AAC Descriptor!!!");
+								afmt_tmp = AFORMAT_AAC;
+								break;
+							case AM_SI_DESCR_DTS:
+								AM_DEBUG(0, "!!Found DTS Descriptor!!!");
+								afmt_tmp = AFORMAT_DTS;
+								break;
+							default:
+								break;
 						}
-						else if (descr->i_tag == AM_SI_DESCR_AAC)
-						{
-							AM_DEBUG(0, "!!Found AAC Descriptor!!!");
-							avfmt = AFORMAT_AAC;
-						}
-						else if (descr->i_tag == AM_SI_DESCR_DTS)
-						{
-							AM_DEBUG(0, "!!Found DTS Descriptor!!!");
-							avfmt = AFORMAT_DTS;
-						}
-						
-						if (avfmt != -1)
-						{
-							if (aid1 == 0x1fff)
-							{
-								aid1 = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
-								afmt1 = avfmt;
-							}
-							else if (aid2 == 0x1fff)
-							{
-								aid2 = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
-								afmt2 = avfmt;
-							}
-							break;
-						}
-						
 					AM_SI_LIST_END()
 					break;
 				/*video pid and video format*/
 				case 0x1:
 				case 0x2:
-					if (avfmt == -1)
-						avfmt = VFORMAT_MPEG12;
+					vfmt_tmp = VFORMAT_MPEG12;
+					break;
 				case 0x10:
-					if (avfmt == -1)
-						avfmt = VFORMAT_MPEG4;
+					vfmt_tmp = VFORMAT_MPEG4;
+					break;
 				case 0x1b:
-					if (avfmt == -1)
-						avfmt = VFORMAT_H264;
+					vfmt_tmp = VFORMAT_H264;
+					break;
 				case 0xea:
-					if (avfmt == -1)
-						avfmt = VFORMAT_VC1;
-					if (vid == 0x1fff)
-					{
-						vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
-						AM_DEBUG(3, "Set video format to %d", avfmt);
-						vfmt = avfmt;
-					}
+					vfmt_tmp = VFORMAT_VC1;
 					break;
 				/*audio pid and audio format*/ 
 				case 0x3:
 				case 0x4:
-					if (avfmt == -1)
-						avfmt = AFORMAT_MPEG;
+					afmt_tmp = AFORMAT_MPEG;
+					break;
 				case 0x0f:
-					if (avfmt == -1)
-						avfmt = AFORMAT_AAC;
+					afmt_tmp = AFORMAT_AAC;
+					break;
 				case 0x11:
-					if (avfmt == -1)
-						avfmt = AFORMAT_AAC_LATM;
+					afmt_tmp = AFORMAT_AAC_LATM;
+					break;
 				case 0x81:
-					if (avfmt == -1)
-						avfmt = AFORMAT_AC3;
+					afmt_tmp = AFORMAT_AC3;
+					break;
 				case 0x8A:
                 case 0x82:
                 case 0x85:
                 case 0x86:
-                	if (avfmt == -1)
-                		avfmt = AFORMAT_DTS;
-            		if (aid1 == 0x1fff)
-            		{
-						aid1 = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
-						AM_DEBUG(3, "Set audio1 format to %d", avfmt);
-						afmt1 = avfmt;
-					}
-					else if (aid2 == 0x1fff)
-					{
-						AM_DEBUG(3, "Set audio2 format to %d", avfmt);
-						aid2 = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
-						afmt2 = avfmt;
-					}
+                	afmt_tmp = AFORMAT_DTS;
 					break;
 				default:
 					break;
+			}
+			
+			/*添加音视频流*/
+			if (vfmt_tmp != -1)
+			{
+				vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
+				AM_DEBUG(3, "Set video format to %d", vfmt_tmp);
+				vfmt = vfmt_tmp;
+			}
+			if (afmt_tmp != -1)
+			{
+				AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+					if (descr->i_tag == AM_SI_DESCR_ISO639 && descr->p_decoded != NULL)
+					{
+						dvbpsi_iso639_dr_t *pisod = (dvbpsi_iso639_dr_t*)descr->p_decoded;
+						if (pisod->i_code_count > 0) 
+						{
+							memcpy(lang_tmp, pisod->code[0].iso_639_code, sizeof(lang_tmp));
+							break;
+						}
+					}
+				AM_SI_LIST_END()
+				add_audio(&aud_info, es->i_pid, afmt_tmp, lang_tmp);
 			}
 
 			/*查找Subtilte和Teletext描述符，并添加相关记录*/
@@ -1461,7 +1516,10 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 				}
 			AM_SI_LIST_END()
 		AM_SI_LIST_END()
-
+		
+		/*格式化音频数据字符串*/
+		format_audio_strings(&aud_info, str_apids, str_afmts, str_alangs);
+		
 		AM_SI_LIST_BEGIN(ts->sdts, sdt)
 		AM_SI_LIST_BEGIN(sdt->p_first_service, srv)
 			/*从SDT表中查找该service并获取信息*/

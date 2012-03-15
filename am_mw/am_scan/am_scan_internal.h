@@ -21,7 +21,8 @@ extern "C"
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
-
+/*最大支持的音频个数*/
+#define AM_SCAN_MAX_AUD_CNT 32
 
 /****************************************************************************
  * Type definitions
@@ -197,6 +198,19 @@ struct AM_SCAN_Scanner_s
 	void							*user_data;		/**< 用户数据*/
 	AM_Bool_t						store;			/**< 是否存储*/
 };
+
+
+/**\brief 音频数据*/
+typedef struct
+{
+	int		audio_count;
+	struct
+	{
+		int		pid;	/**< audio PID*/
+		int		fmt;	/**< audio format*/
+		char	lang[10];	/**< audio language*/	
+	}audios[AM_SCAN_MAX_AUD_CNT];
+}AM_SCAN_AudioInfo_t;
 
 
 /****************************************************************************

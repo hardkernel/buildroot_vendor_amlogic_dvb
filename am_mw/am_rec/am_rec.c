@@ -254,6 +254,9 @@ static int am_rec_db_add_record(AM_REC_Recorder_t *rec, int start, int duration,
 	char evt_name[64];
 	char recpara[256];
 	char fmts[32];
+	char apids[256];
+	char afmts[256];
+	int aud_idx;
 	
 	srv_name[0] = 0;
 	evt_name[0] = 0;
@@ -281,12 +284,17 @@ static int am_rec_db_add_record(AM_REC_Recorder_t *rec, int start, int duration,
 		}
 		/*取事件对应频道名称*/
 		row = 1;
-		snprintf(sql, sizeof(sql), "select name,vid_pid,aud1_pid, vid_fmt,aud1_fmt from srv_table where db_id=%d", db_srv_id);
-		if (AM_DB_Select(rec->hdb, sql, &row, "%s:64,%d,%d,%d,%d",srv_name, &pids[0], &pids[1],&avfmts[0],&avfmts[1]) != AM_SUCCESS || row< 1)
+		snprintf(sql, sizeof(sql), "select name,vid_pid,aud_pids, vid_fmt,aud_fmts, current_aud from srv_table where db_id=%d", db_srv_id);
+		if (AM_DB_Select(rec->hdb, sql, &row, "%s:64,%d,%s:256,%d,%s:256,%d",srv_name, 
+			&pids[0],apids,&avfmts[0],afmts,&aud_idx) != AM_SUCCESS || row< 1)
 		{
 			AM_DEBUG(0, "Cannot get srv info for db_id = %d", db_srv_id);
 			return AM_REC_ERR_INVALID_PARAM;
 		}
+		if (aud_idx < 0)
+			aud_idx = 0;
+		pids[1] = AM_TOKEN_VALUE_INT(apids, " ", aud_idx, 0x1fff);
+		avfmts[1] = AM_TOKEN_VALUE_INT(afmts, " ", aud_idx, 0);
 		pid_cnt = 2;
 	}
 	else if (para->type == AM_REC_TYPE_PID)
@@ -306,33 +314,44 @@ static int am_rec_db_add_record(AM_REC_Recorder_t *rec, int start, int duration,
 	{
 		db_srv_id = para->u.service.db_srv_id;
 		row = 1;
-		snprintf(sql, sizeof(sql), "select db_ts_id,name,vid_pid,aud1_pid, vid_fmt,aud1_fmt from srv_table where db_id=%d", db_srv_id);
-		if (AM_DB_Select(rec->hdb, sql, &row, "%d,%s:64,%d,%d,%d,%d",
-		&db_ts_id, srv_name, &pids[0], &pids[1],&avfmts[0],&avfmts[1]) != AM_SUCCESS || row< 1)
+		snprintf(sql, sizeof(sql), "select db_ts_id,name,vid_pid,aud_pids, vid_fmt,aud_fmts,current_aud from srv_table where db_id=%d", db_srv_id);
+		if (AM_DB_Select(rec->hdb, sql, &row, "%d,%s:64,%d,%s:256,%d,%s:256,%d",
+		&db_ts_id, srv_name, &pids[0], apids,&avfmts[0],afmts,&aud_idx) != AM_SUCCESS || row< 1)
 		{
 			AM_DEBUG(0, "Cannot get srv info for db_id = %d", db_srv_id);
 			return AM_REC_ERR_INVALID_PARAM;
 		}
+		if (aud_idx < 0)
+			aud_idx = 0;
+		pids[1] = AM_TOKEN_VALUE_INT(apids, " ", aud_idx, 0x1fff);
+		avfmts[1] = AM_TOKEN_VALUE_INT(afmts, " ", aud_idx, 0);
 		pid_cnt = 2;
 	}
 	else if (para->type == AM_REC_TYPE_CHAN_NUM)
 	{
 		row = 1;
-		snprintf(sql, sizeof(sql), "select db_ts_id,name,vid_pid,aud1_pid, vid_fmt,aud1_fmt from srv_table where chan_num=%d", para->u.chan_num.num);
-		if (AM_DB_Select(rec->hdb, sql, &row, "%d,%s:64,%d,%d,%d,%d",
-		&db_ts_id, srv_name, &pids[0], &pids[1],&avfmts[0],&avfmts[1]) != AM_SUCCESS || row< 1)
+		snprintf(sql, sizeof(sql), "select db_ts_id,name,vid_pid,aud_pids, vid_fmt,aud_fmts,current_aud from srv_table where chan_num=%d", para->u.chan_num.num);
+		if (AM_DB_Select(rec->hdb, sql, &row, "%d,%s:64,%d,%s:256,%d,%s:256,%d",
+		&db_ts_id, srv_name, &pids[0], apids,&avfmts[0],afmts,&aud_idx) != AM_SUCCESS || row< 1)
 		{
 			AM_DEBUG(0, "Cannot get srv info for chan_num = %d", para->u.chan_num.num);
 			return AM_REC_ERR_INVALID_PARAM;
 		}
+		if (aud_idx < 0)
+			aud_idx = 0;
+		pids[1] = AM_TOKEN_VALUE_INT(apids, " ", aud_idx, 0x1fff);
+		avfmts[1] = AM_TOKEN_VALUE_INT(afmts, " ", aud_idx, 0);
 		pid_cnt = 2;
 	}
 
 	/*生成录像PID信息*/
-	snprintf(recpara, sizeof(recpara), "%d", pid_cnt);
+	recpara[0] = 0;
 	for (i=0; i<pid_cnt; i++)
 	{
-		snprintf(recpara, sizeof(recpara), "%s %d", recpara, pids[i]);
+		if (i == 0)
+			snprintf(recpara, sizeof(recpara), "%d", pids[i]);
+		else
+			snprintf(recpara, sizeof(recpara), "%s %d", recpara, pids[i]);
 	}
 	
 	/*添加到数据库*/
@@ -362,6 +381,10 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 	rec->rec_pids.pid_count = 0;
 	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
 	{
+		char apids[256];
+		char afmts[256];
+		int aud_idx;
+	
 		if (rec->rec_para.type == AM_REC_TYPE_EVENT)
 		{
 			AM_DEBUG(0, "Timeshifting dose not support the event type");
@@ -384,23 +407,33 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 		{
 			/*从srv_table查询音视频PID*/
 			row = 1;
-			snprintf(sql, sizeof(sql), "select vid_pid,aud1_pid,vid_fmt,aud1_fmt from srv_table where db_id=%d", rec->rec_para.u.service.db_srv_id);
-			if (AM_DB_Select(rec->hdb, sql, &row, "%d,%d,%d,%d",&rec->rec_pids.pids[0], &rec->rec_pids.pids[1],&rec->vfmt, &rec->afmt1) != AM_SUCCESS || row< 1)
+			snprintf(sql, sizeof(sql), "select vid_pid,aud_pids,vid_fmt,aud_fmts,current_aud from srv_table where db_id=%d", rec->rec_para.u.service.db_srv_id);
+			if (AM_DB_Select(rec->hdb, sql, &row, "%d,%s:256,%d,%s:256,%d",&rec->rec_pids.pids[0], 
+				apids,&rec->vfmt, afmts, &aud_idx) != AM_SUCCESS || row< 1)
 			{
 				AM_DEBUG(0, "Cannot get srv info for db_id = %d", rec->rec_para.u.service.db_srv_id);
 				return AM_REC_ERR_INVALID_PARAM;
 			}
+			if (aud_idx < 0)
+				aud_idx = 0;
+			rec->rec_pids.pids[1] = AM_TOKEN_VALUE_INT(apids, " ", aud_idx, 0x1fff);
+			rec->afmt1 = AM_TOKEN_VALUE_INT(afmts, " ", aud_idx, 0);
 			rec->rec_pids.pid_count = 2;
 		}
 		else if (rec->rec_para.type == AM_REC_TYPE_CHAN_NUM)
 		{
 			row = 1;
-			snprintf(sql, sizeof(sql), "select vid_pid,aud1_pid,vid_fmt,aud1_fmt from srv_table where chan_num=%d", rec->rec_para.u.chan_num.num);
-			if (AM_DB_Select(rec->hdb, sql, &row, "%d,%d,%d,%d", &rec->rec_pids.pids[0], &rec->rec_pids.pids[1],&rec->vfmt, &rec->afmt1) != AM_SUCCESS || row< 1)
+			snprintf(sql, sizeof(sql), "select vid_pid,aud_pids,vid_fmt,aud_fmts,current_aud from srv_table where chan_num=%d", rec->rec_para.u.chan_num.num);
+			if (AM_DB_Select(rec->hdb, sql, &row, "%d,%s:256,%d,%s:256,%d", &rec->rec_pids.pids[0], 
+				apids,&rec->vfmt, afmts, &aud_idx) != AM_SUCCESS || row< 1)
 			{
 				AM_DEBUG(0, "Cannot get srv info for chan_num = %d", rec->rec_para.u.chan_num.num);
 				return AM_REC_ERR_INVALID_PARAM;
 			}
+			if (aud_idx < 0)
+				aud_idx = 0;
+			rec->rec_pids.pids[1] = AM_TOKEN_VALUE_INT(apids, " ", aud_idx, 0x1fff);
+			rec->afmt1 = AM_TOKEN_VALUE_INT(afmts, " ", aud_idx, 0);
 			rec->rec_pids.pid_count = 2;
 		}
 	}
@@ -408,8 +441,7 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 	{
 		int i;
 		char pid_para[256];
-		char str[256];
-		char str1[256];
+		char *pid_tok;
 		
 		row = 1;
 		snprintf(sql, sizeof(sql), "select duration,pids from rec_table where db_id=%d", rec->rec_db_id);
@@ -419,23 +451,21 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 			return AM_REC_ERR_INVALID_PARAM;
 		}
 		/*取出PID信息*/
-		sscanf(pid_para, "%d", &rec->rec_pids.pid_count);
-		if (rec->rec_pids.pid_count > AM_DVR_MAX_PID_COUNT)
-			rec->rec_pids.pid_count = AM_DVR_MAX_PID_COUNT;
-		strcpy(str, "%*d");
-		
-		for (i=0; i<rec->rec_pids.pid_count; i++)
-		{
-			snprintf(str1, sizeof(str1), "%s %%d", str);
-			sscanf(pid_para, str1, &rec->rec_pids.pids[i]);
-			strcat(str, " %*d");
-		}
-
+		i = 0;
+		AM_TOKEN_PARSE_BEGIN(pid_para, " ", pid_tok)
+			if (i < AM_DVR_MAX_PID_COUNT)
+				rec->rec_pids.pids[i] = atoi(pid_tok);
+			else
+				break;
+			i++;
+		AM_TOKEN_PARSE_END(pid_para, " ", pid_tok)
+		rec->rec_pids.pid_count = i;
 	}
+	
 	if (rec->rec_pids.pid_count <= 0)
 		return AM_REC_ERR_INVALID_PARAM;
 
-	snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), "%s/DVBRecordFiles", rec->store_dir);
+	snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), "%s/DVBRecordFiles", rec->store_dir);	
 	/*尝试创建录像文件夹*/
 	if (mkdir(rec->rec_file_name, 0666) && errno != EEXIST)
 	{

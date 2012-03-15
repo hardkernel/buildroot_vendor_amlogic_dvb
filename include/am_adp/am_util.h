@@ -67,6 +67,36 @@ extern "C"
 		goto final;\
 	AM_MACRO_END
 
+/**\brief 开始解析一个被指定字符隔开的字符串*/
+#define AM_TOKEN_PARSE_BEGIN(_str, _delim, _token) \
+	_token = strtok(_str, _delim);\
+	while (_token != NULL) {
+	
+#define AM_TOKEN_PARSE_END(_str, _delim, _token) \
+	_token = strtok(NULL, _delim);\
+	}
+	
+
+/**\brief 从一个被指定字符隔开的字符串中取指定位置的值，int类型，如未找到指定位置，则使用默认值_default代替*/
+#define AM_TOKEN_VALUE_INT(_str, _delim, _index, _default) \
+	({\
+		char *token;\
+		char *_strbak = strdup(_str);\
+		int counter = 0;\
+		int val = _default;\
+		if (_strbak != NULL) {\
+			AM_TOKEN_PARSE_BEGIN(_strbak, _delim, token)\
+				if (counter == (_index)) {\
+					val = atoi(token);\
+					break;\
+				}\
+				counter++;\
+			AM_TOKEN_PARSE_END(_strbak, _delim, token)\
+			free(_strbak);\
+		}\
+		val;\
+	})
+
 /****************************************************************************
  * Type definitions
  ***************************************************************************/

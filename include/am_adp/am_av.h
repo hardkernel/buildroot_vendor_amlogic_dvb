@@ -236,8 +236,26 @@ typedef enum
 /**\brief PPMGR参数*/
 typedef enum
 {
-	AM_AV_PPMGR_DISABLE,          /**< 不使用PPMGR*/
-	AM_AV_PPMGR_ENABLE            /**< 使用PPMGR*/
+	AM_AV_PPMGR_DISABLE,	/**< 不使用PPMGR*/
+	AM_AV_PPMGR_ENABLE,		/**< 使用PPMGR*/
+	/*以下为3D模式设置*/
+	AM_AV_PPMGR_MODE3D_DISABLE,
+	AM_AV_PPMGR_MODE3D_AUTO,
+	AM_AV_PPMGR_MODE3D_2D_TO_3D,
+	AM_AV_PPMGR_MODE3D_LR,
+	AM_AV_PPMGR_MODE3D_BT,
+	AM_AV_PPMGR_MODE3D_OFF_LR_SWITCH,
+	AM_AV_PPMGR_MODE3D_ON_LR_SWITCH,
+	AM_AV_PPMGR_MODE3D_FIELD_DEPTH,
+	AM_AV_PPMGR_MODE3D_OFF_3D_TO_2D,
+	AM_AV_PPMGR_MODE3D_L_3D_TO_2D,
+	AM_AV_PPMGR_MODE3D_R_3D_TO_2D,
+	AM_AV_PPMGR_MODE3D_OFF_LR_SWITCH_BT,
+	AM_AV_PPMGR_MODE3D_ON_LR_SWITCH_BT,
+	AM_AV_PPMGR_MODE3D_OFF_3D_TO_2D_BT,
+	AM_AV_PPMGR_MODE3D_L_3D_TO_2D_BT,
+	AM_AV_PPMGR_MODE3D_R_3D_TO_2D_BT,
+	AM_AV_PPMGR_MODE3D_MAX,
 } AM_AV_PPMGRPara_t;
 
 /**\brief 音视频解码设备开启参数*/
@@ -1020,6 +1038,16 @@ extern AM_ErrorCode_t AM_AV_FastBackwardTimeshift(int dev_no, int speed);
  *   - 其他值 错误代码(见am_av.h)
  */
 extern AM_ErrorCode_t AM_AV_SetVPathPara(int dev_no, AM_AV_FreeScalePara_t fs, AM_AV_DeinterlacePara_t di, AM_AV_PPMGRPara_t pp);
+
+/**\brief TS播放模式时切换音频，用于多音频切换，需先调用StartTS
+ * \param dev_no 音视频设备号
+ * \param apid 音频流PID
+ * \param afmt 音频压缩格式
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+extern AM_ErrorCode_t AM_AV_SwitchTSAudio(int dev_no, uint16_t apid, AM_AV_AFormat_t afmt);
 
 #ifdef __cplusplus
 }
