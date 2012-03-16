@@ -4231,6 +4231,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 	}while(ret!=AM_SUCCESS && times--);
 
 	if(dev->vpath_fs==AM_AV_FREE_SCALE_ENABLE){
+		AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
 		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "1");
 		AM_FileEcho("/sys/class/graphics/fb1/free_scale", "1");
 
@@ -4242,6 +4243,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 		}
 #endif
 	}else{
+		AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
 		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "0");
 		AM_FileEcho("/sys/class/graphics/fb1/free_scale", "0");
 
