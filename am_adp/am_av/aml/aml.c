@@ -4240,6 +4240,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			AM_FileEcho("/sys/class/graphics/fb0/request2XScale", "2");
 			AM_FileEcho("/sys/class/graphics/fb1/scale", "0");
 			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "0");
+			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "0");
 		}
 #endif
 	}else{
@@ -4291,7 +4292,8 @@ aml_set_vpath(AM_AV_Device_t *dev)
 				AM_FileEcho("/sys/class/graphics/fb1/scale", osd1cmd);
 			}
 
-			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "3");
+			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "1");
+			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "2");
 		}
 #endif
 	}
