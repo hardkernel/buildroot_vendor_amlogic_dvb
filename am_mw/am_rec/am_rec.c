@@ -257,6 +257,7 @@ static int am_rec_db_add_record(AM_REC_Recorder_t *rec, int start, int duration,
 	char apids[256];
 	char afmts[256];
 	int aud_idx;
+	sqlite3_stmt *ins_stmt = NULL;
 	
 	srv_name[0] = 0;
 	evt_name[0] = 0;
@@ -356,10 +357,18 @@ static int am_rec_db_add_record(AM_REC_Recorder_t *rec, int start, int duration,
 	
 	/*添加到数据库*/
 	snprintf(sql, sizeof(sql), 
-		"insert into rec_table(fend_no,dvr_no, db_ts_id, db_srv_id, db_evt_id, srv_name, evt_name, pids, start, duration, status,file_name,vid_fmt,aud1_fmt,aud2_fmt) values(%d,%d,%d,%d,%d,'%s','%s','%s',%d,%d,%d,'',%d,%d,%d)",
-		rec->fend_dev, rec->dvr_dev, db_ts_id, db_srv_id, db_evt_id, srv_name, evt_name, recpara, start, duration, AM_REC_STAT_NOT_START,avfmts[0],avfmts[1],avfmts[2]);
-	if (sqlite3_exec(rec->hdb, sql, NULL, NULL, NULL) != SQLITE_OK)
+		"insert into rec_table(fend_no,dvr_no, db_ts_id, db_srv_id, db_evt_id, srv_name, evt_name, pids, start, duration, status,file_name,vid_fmt,aud1_fmt,aud2_fmt) values(%d,%d,%d,%d,%d,?,?,'%s',%d,%d,%d,'',%d,%d,%d)",
+		rec->fend_dev, rec->dvr_dev, db_ts_id, db_srv_id, db_evt_id, recpara, start, duration, AM_REC_STAT_NOT_START,avfmts[0],avfmts[1],avfmts[2]);
+		
+	if (sqlite3_prepare(rec->hdb, sql, -1, &ins_stmt, NULL) != SQLITE_OK)
+	{
+		AM_DEBUG(0, "Prepare sqlite3 failed for adding new record");
 		return AM_REC_ERR_SQLITE;
+	}
+	sqlite3_bind_text(ins_stmt, 1, srv_name, strlen(srv_name), SQLITE_STATIC);
+	sqlite3_bind_text(ins_stmt, 2, evt_name, strlen(evt_name), SQLITE_STATIC);
+	sqlite3_step(ins_stmt);
+	sqlite3_finalize(ins_stmt);
 
 	/*如果时事件录像，则更新事件预约状态*/
 	if (db_evt_id != -1)
