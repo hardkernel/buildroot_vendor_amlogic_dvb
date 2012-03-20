@@ -240,10 +240,11 @@ const char *sql_stmts[MAX_STMT] =
 	"delete from teletext_table where db_srv_id in (select db_id from srv_table where db_ts_id=?)",
 	"select srv_table.service_id, ts_table.ts_id, net_table.network_id from srv_table, ts_table, net_table where srv_table.db_id=? and ts_table.db_id=srv_table.db_ts_id and net_table.db_id=srv_table.db_net_id",
 	"update srv_table set skip=? where db_id=?",
-	"select max(chan_num) from srv_table where service_type=?",
-	"select max(chan_num) from srv_table",
+	"select max(chan_num) from srv_table where service_type=? and src=?",
+	"select max(chan_num) from srv_table where src=?",
 	"select max(major_chan_num) from srv_table",
 	"update srv_table set major_chan_num=?, chan_num=? where db_id=(select db_id from srv_table where db_ts_id=?)",
+	"select db_id from srv_table where src=? and chan_num=?",
 };
 
 /****************************************************************************
@@ -1601,7 +1602,7 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 	char sqlstr[128];
 	sqlite3 *hdb = result->hdb;
 	sqlite3_stmt	*stmts[MAX_STMT];
-	int i, ret;
+	int i, ret, conflict_lcn_start = 850;
 	ScanRecTab_t srv_tab;
 	AM_Bool_t sorted = 0;
 	
@@ -1657,6 +1658,17 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 
 		if(have_lcn)
 		{
+			/*找到当前无LCN频道或LCN冲突频道的频道号起始位置*/
+			sqlite3_bind_int(stmts[QUERY_MAX_CHAN_NUM], 1, result->src);
+			if(sqlite3_step(stmts[QUERY_MAX_CHAN_NUM])==SQLITE_ROW)
+			{
+				conflict_lcn_start = sqlite3_column_int(stmts[QUERY_MAX_CHAN_NUM], 0);
+				if (conflict_lcn_start < 850)
+					conflict_lcn_start = 850;
+				AM_DEBUG(1, "Have LCN, will set conflict LCN from %d", conflict_lcn_start);
+			}
+			sqlite3_reset(stmts[QUERY_MAX_CHAN_NUM]);
+			
 			for(i=0; i<srv_tab.srv_cnt; i++)
 			{
 				int r;
@@ -1666,7 +1678,7 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 				if(r==SQLITE_ROW)
 				{
 					int srv_id, ts_id, org_net_id;
-					int num = 0, visible = 0;
+					int num = -1, visible = 0;
 
 					srv_id = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 0);
 					ts_id  = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 1);
@@ -1723,6 +1735,27 @@ lcn_found:
 						sqlite3_step(stmts[UPDATE_CHAN_SKIP]);
 						sqlite3_reset(stmts[UPDATE_CHAN_SKIP]);
 					}
+					
+					if (num >= 0)
+					{
+						/*该频道号是否已存在*/
+						sqlite3_bind_int(stmts[QUERY_SRV_BY_CHAN_NUM], 1, result->src);
+						sqlite3_bind_int(stmts[QUERY_SRV_BY_CHAN_NUM], 2, num);
+						if(sqlite3_step(stmts[QUERY_SRV_BY_CHAN_NUM])==SQLITE_ROW)
+						{
+							AM_DEBUG(1, "Find a conflict LCN, set from %d -> %d", num, conflict_lcn_start);
+							/*已经存在，将当前service放到850后*/
+							num = conflict_lcn_start++;
+							
+						}
+						sqlite3_reset(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE]);
+					}
+					else
+					{
+						/*未找到LCN， 将当前service放到850后*/
+						num = conflict_lcn_start++;
+						AM_DEBUG(1, "No LCN found for this program, automatically set to %d", num);
+					}
 
 					sqlite3_bind_int(stmts[UPDATE_CHAN_NUM], 1, num);
 					sqlite3_bind_int(stmts[UPDATE_CHAN_NUM], 2, srv_tab.srv_ids[i]);
@@ -1749,6 +1782,7 @@ lcn_found:
 		{
 #ifndef SORT_TOGETHER
 			sqlite3_bind_int(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE], 1, 1);
+			sqlite3_bind_int(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE], 2, result->src);
 			r = sqlite3_step(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE]);
 			if(r==SQLITE_ROW)
 			{
@@ -1757,6 +1791,7 @@ lcn_found:
 			sqlite3_reset(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE]);
 
 			sqlite3_bind_int(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE], 1, 2);
+			sqlite3_bind_int(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE], 2, result->src);
 			r = sqlite3_step(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE]);
 			if(r==SQLITE_ROW)
 			{
@@ -1764,6 +1799,7 @@ lcn_found:
 			}
 			sqlite3_reset(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE]);
 #else
+			sqlite3_bind_int(stmts[QUERY_MAX_CHAN_NUM], 1, result->src);
 			r = sqlite3_step(stmts[QUERY_MAX_CHAN_NUM]);
 			if(r==SQLITE_ROW)
 			{
