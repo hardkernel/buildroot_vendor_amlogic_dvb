@@ -1748,7 +1748,7 @@ lcn_found:
 							num = conflict_lcn_start++;
 							
 						}
-						sqlite3_reset(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE]);
+						sqlite3_reset(stmts[QUERY_SRV_BY_CHAN_NUM]);
 					}
 					else
 					{
