@@ -2932,8 +2932,7 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 {
 	int fd;
-	
-	fd = (int)dev->ts_player.drv_data;
+
 	if (destroy_thread && dev->ts_player.av_thread_running) 
 	{
 		dev->ts_player.av_thread_running = AM_FALSE;
@@ -2951,8 +2950,13 @@ static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 	}
 	adec_handle = NULL;
 #endif
-
-	return close(fd);
+	fd = (int)dev->ts_player.drv_data;
+	if (fd != -1)
+		close(fd);
+	
+	dev->ts_player.drv_data = (void*)-1;
+	
+	return 0;
 }
 
 /**\brief 读取PTS值*/
