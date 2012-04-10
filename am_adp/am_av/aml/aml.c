@@ -4226,7 +4226,8 @@ aml_set_vpath(AM_AV_Device_t *dev)
 	AM_DEBUG(1, "set video path fs:%d di:%d ppmgr:%d", dev->vpath_fs, dev->vpath_di, dev->vpath_ppmgr);
 	
 	AM_FileEcho("/sys/class/deinterlace/di0/config", "disable");
-	
+
+		
 	do{
 		ret = AM_FileEcho("/sys/class/vfm/map", "rm default");
 		if(ret!=AM_SUCCESS){
@@ -4234,8 +4235,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 		}
 	}while(ret!=AM_SUCCESS && times--);
 
-	AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
-
+	
 	if(dev->vpath_fs==AM_AV_FREE_SCALE_ENABLE){
 		AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
 		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "1");
@@ -4316,6 +4316,8 @@ aml_set_vpath(AM_AV_Device_t *dev)
 	}else{
 		AM_FileEcho("/sys/class/vfm/map", "add default decoder amvideo");
 	}
+	
+	AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
 
 	return AM_SUCCESS;
 }
