@@ -4234,6 +4234,8 @@ aml_set_vpath(AM_AV_Device_t *dev)
 		}
 	}while(ret!=AM_SUCCESS && times--);
 
+	AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
+
 	if(dev->vpath_fs==AM_AV_FREE_SCALE_ENABLE){
 		AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
 		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "1");
