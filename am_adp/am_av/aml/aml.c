@@ -4323,7 +4323,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 		}
 #endif
 	}else{
-		AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
+		//AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
 		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "0");
 		AM_FileEcho("/sys/class/graphics/fb1/free_scale", "0");
 
