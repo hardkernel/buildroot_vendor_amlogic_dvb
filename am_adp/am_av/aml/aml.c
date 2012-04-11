@@ -4300,6 +4300,8 @@ aml_set_vpath(AM_AV_Device_t *dev)
 
 			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "1");
 			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "2");
+			AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
+			AM_FileEcho("/sys/class/ppmgr/ppscaler","0");
 		}
 #endif
 	}
@@ -4317,8 +4319,6 @@ aml_set_vpath(AM_AV_Device_t *dev)
 		AM_FileEcho("/sys/class/vfm/map", "add default decoder amvideo");
 	}
 	
-	AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
-
 	return AM_SUCCESS;
 }
 
