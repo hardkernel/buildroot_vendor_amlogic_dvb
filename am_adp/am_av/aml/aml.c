@@ -4217,6 +4217,52 @@ static AM_ErrorCode_t aml_set_ppmgr_3dcmd(int cmd)
     return AM_SUCCESS;
 }
 
+static int
+get_osd_prop(const char *mode, const char *p, const char *defv)
+{
+	char n[32];
+	char v[32];
+	int r;
+
+	snprintf(n, sizeof(n), "ubootenv.var.%soutput%s", mode, p);
+	property_get(n,v,defv);
+	sscanf(v, "%d", &r);
+
+	return r;
+}
+
+static void
+get_osd_rect(const char *mode, int *x, int *y, int *w, int *h)
+{
+	const char *m = mode?mode:"720p";
+	char defw[16], defh[16];
+	int r;
+
+	r = get_osd_prop(m, "x", "0");
+	*x = r;
+	r = get_osd_prop(m, "y", "0");
+	*y = r;
+	if(!strncmp(m, "480", 3)){
+		snprintf(defw, sizeof(defw), "%d", 720);
+		snprintf(defh, sizeof(defh), "%d", 480);
+	}else if(!strncmp(m, "576", 3)){
+		snprintf(defw, sizeof(defw), "%d", 720);
+		snprintf(defh, sizeof(defh), "%d", 576);
+	}else if(!strncmp(m, "720", 3)){
+		snprintf(defw, sizeof(defw), "%d", 1280);
+		snprintf(defh, sizeof(defh), "%d", 720);
+	}else if(!strncmp(m, "1080", 4)){
+		snprintf(defw, sizeof(defw), "%d", 1920);
+		snprintf(defh, sizeof(defh), "%d", 1080);
+	}
+
+
+	r = get_osd_prop(m, "width", defw);
+	*w = r;
+	r = get_osd_prop(m, "height", defh);
+	*h = r;
+}
+
 static AM_ErrorCode_t
 aml_set_vpath(AM_AV_Device_t *dev)
 {
@@ -4243,10 +4289,37 @@ aml_set_vpath(AM_AV_Device_t *dev)
 
 #ifdef ANDROID
 		{
+			char mode[16];
+			char ppr[32];
+			int x, y, w, h;
+
 			AM_FileEcho("/sys/class/graphics/fb0/request2XScale", "2");
 			AM_FileEcho("/sys/class/graphics/fb1/scale", "0");
 			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "0");
 			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "0");
+			AM_FileEcho("/sys/class/ppmgr/ppscaler","1");
+
+			AM_FileRead("/sys/class/display/mode", mode, sizeof(mode));
+			if(!strncmp(mode, "480i", 4)){
+				get_osd_rect("480i", &x, &y, &w, &h);
+			}else if(!strncmp(mode, "480p", 4)){
+				get_osd_rect("480p", &x, &y, &w, &h);
+			}else if(!strncmp(mode, "576i", 4)){
+				get_osd_rect("576i", &x, &y, &w, &h);
+			}else if(!strncmp(mode, "576p", 4)){
+				get_osd_rect("576p", &x, &y, &w, &h);
+			}else if(!strncmp(mode, "720p", 4)){
+				get_osd_rect("720p", &x, &y, &w, &h);
+			}else if(!strncmp(mode, "1080i", 5)){
+				get_osd_rect("1080i", &x, &y, &w, &h);
+			}else if(!strncmp(mode, "1080p", 5)){
+				get_osd_rect("1080p", &x, &y, &w, &h);
+			}else{
+				get_osd_rect(NULL, &x, &y, &w, &h);
+			}
+
+			snprintf(ppr, sizeof(ppr), "%d %d %d %d 0", x, y, x+w, y+h);
+			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect", ppr);
 		}
 #endif
 	}else{
@@ -4302,6 +4375,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "2");
 			AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","0");
+			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");
 		}
 #endif
 	}
