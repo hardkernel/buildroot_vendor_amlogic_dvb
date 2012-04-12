@@ -1678,7 +1678,7 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 				if(r==SQLITE_ROW)
 				{
 					int srv_id, ts_id, org_net_id;
-					int num = -1, visible = 0;
+					int num = -1, visible = 1;
 
 					srv_id = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 0);
 					ts_id  = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 1);
