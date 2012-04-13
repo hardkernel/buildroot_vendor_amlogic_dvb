@@ -379,7 +379,7 @@ static INT8U GetColorValue(INT8U TxtColor)
             uRetValue = 15;
             break;
         case VTCOLOR_NONE:
-            uRetValue = 0;
+            uRetValue = 0xff;
             break;
 
         default:
