@@ -109,7 +109,7 @@ void *adec_handle;
 #define PCR_RECOVER_FILE	"/sys/class/tsync/pcr_recover"
 #endif
 
-//#define PCR_NOT_RECOVER
+#define PCR_NOT_RECOVER
 #define AUDIO_CACHE_TIME        200
 
 #define AUDIO_DMX_PTS_FILE	"/sys/class/stb/audio_pts"
