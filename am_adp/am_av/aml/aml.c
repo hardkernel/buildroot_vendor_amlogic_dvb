@@ -2836,6 +2836,27 @@ typedef struct {
 #endif
 dec_sysinfo_t am_sysinfo;
 
+#define ARC_FREQ_FILE "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
+
+static void set_arc_freq(int hi)
+{
+	static int old_freq = 200000;
+	int freq;
+	char buf[32];
+
+	if(AM_FileRead(ARC_FREQ_FILE, buf, sizeof(buf))==AM_SUCCESS){
+		sscanf(buf, "%d", &freq);
+		if(hi){
+			old_freq = freq;
+			snprintf(buf, sizeof(buf), "%d", 300000);
+			AM_FileEcho(ARC_FREQ_FILE, buf);
+		}else{
+			snprintf(buf, sizeof(buf), "%d", old_freq);
+			AM_FileEcho(ARC_FREQ_FILE, buf);
+		}
+	}
+}
+
 static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp, AM_Bool_t create_thread)
 {
 	int fd, val;
@@ -2886,6 +2907,10 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	}	
 
 	if(tp->apid && (tp->apid<0x1fff)){
+		if((tp->afmt==AFORMAT_AC3) || (tp->afmt==AFORMAT_DTS)){
+			set_arc_freq(1);
+		}
+
 		val = tp->afmt;
 		if(ioctl(fd, AMSTREAM_IOC_AFORMAT, val)==-1)
 		{
@@ -2955,6 +2980,8 @@ static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 		close(fd);
 	
 	dev->ts_player.drv_data = (void*)-1;
+
+	set_arc_freq(0);
 	
 	return 0;
 }
