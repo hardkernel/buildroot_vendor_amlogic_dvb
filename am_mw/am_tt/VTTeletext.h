@@ -15,7 +15,7 @@ typedef enum
 } eVTState;
 
 
-INT32S AM_VT_Init(void);
+INT32S AM_VT_Init(INT32U pageIndex);
 INT32S AM_VT_Exit(void);
 
 #endif

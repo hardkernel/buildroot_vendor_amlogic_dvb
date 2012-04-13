@@ -8,7 +8,7 @@
 
 
 
-INT32S AM_VT_Init(void)
+INT32S AM_VT_Init(INT32U pageIndex)
 {
     if (AM_SUCCESS != VTInitCommonData())
     {
@@ -21,7 +21,7 @@ INT32S AM_VT_Init(void)
         goto fail;
     }
 
-    if (AM_SUCCESS != VTInitDecoderData())
+    if (AM_SUCCESS != VTInitDecoderData(pageIndex))
     {
         M_TELETEXT_DIAG(("\n init Decoder data fail! \n"));
         goto fail;

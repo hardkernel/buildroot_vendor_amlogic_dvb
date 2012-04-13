@@ -137,11 +137,13 @@ AM_ErrorCode_t AM_TT_Quit();
 /**\brief 开始处理teletext(包括数据接收与解析)
  * \param dmx_id  demux id号
  * \param pid  packet id
+ * \param mag magazine id
+ * \param page page number
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tt.h)
  */
-AM_ErrorCode_t AM_TT_Start(int dmx_id, int pid);
+AM_ErrorCode_t AM_TT_Start(int dmx_id, int pid, int mag, int page);
 
 /**\brief 停止处理teletext
  * \return

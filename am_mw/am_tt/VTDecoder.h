@@ -86,7 +86,7 @@ typedef struct _ServiceData
     INT8U   StatusDisplay[20];
 } TServiceData;
 
-INT32S VTInitDecoderData(void);
+INT32S VTInitDecoderData(INT32U pageIndex);
 void VTFreeDecoderData(void);
 void VTDecodeLine(INT8U *data);
 void ResetDecoder(void);

@@ -1050,28 +1050,23 @@ static void teletext_page_process_callback(INT32U event, INT32U index)
 		teletext_header_update(context_tele.cb_parameter);
 		break;
 		case DECODEREVENT_PAGEUPDATE:
-
-		if(context_tele.ecb)
-		{
-			context_tele.ecb(AM_TT_EVT_PAGE_UPDATE);
-		}
 		teletext_page_update(context_tele.cb_parameter);
-
 		break;
 		case DECODEREVENT_PAGEREFRESH:
 		teletext_page_refresh(context_tele.cb_parameter);
-
 		break;
-
 		case DECODEREVENT_GETWAITINGPAGE:
-	
 		AM_TT_SetCurrentPageCode(LOWWORD(context_tele.cb_parameter), HIGHWORD(context_tele.cb_parameter));
 		break;
 		default:
 		break;
 	}
 
-    return;
+	if(context_tele.ecb)
+	{
+		context_tele.ecb(AM_TT_EVT_PAGE_UPDATE);
+	}
+	return;
 }
 
 
@@ -1371,10 +1366,15 @@ static int close_demux_pes_filter()
 #endif
 
 
-AM_ErrorCode_t AM_TT_Start(int dmx_id, int pid)
+AM_ErrorCode_t AM_TT_Start(int dmx_id, int pid, int mag, int page)
 {
 	int ret=AM_SUCCESS;
-	ret=AM_VT_Init();
+	int pageIndex;
+
+    	pageIndex = page;
+    	pageIndex |= (mag ? (mag*0x100) : 0x800);
+
+	ret=AM_VT_Init(pageIndex);
 	
 #ifdef LINUX_PES_FILTER
 	ret=open_demux_pes_filter(dmx_id,pid,2);
@@ -1403,7 +1403,8 @@ AM_ErrorCode_t AM_TT_Start(int dmx_id, int pid)
 	context_tele.dmx_id=dmx_id;
     	SetTeletextMaxPageNum(TELETEXT_MAX_PAGENUM);
     	TeletextRegisterfunc(teletext_page_process_callback);
-	context_tele.wPageIndex = 0x100;
+
+	context_tele.wPageIndex = pageIndex;
 	context_tele.wPageSubCode = 0xffff;
 	context_tele.status=TELETEXT_STARTED;
 	teletext_history_reset();

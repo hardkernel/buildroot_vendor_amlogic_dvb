@@ -77,7 +77,7 @@ static void NotifyDecoderEvent(INT32U uEvent, INT32U uPageCode);
 static void FreePageStore(void);
 static void CopyPageForDisplay(struct TVTPage* pBuffer, struct TVTPage* pPage);
 
-INT32S VTInitDecoderData(void)
+INT32S VTInitDecoderData(INT32U pageIndex)
 {
     INT8U retcode;
     INT16U i;
@@ -90,8 +90,8 @@ INT32S VTInitDecoderData(void)
     m_bSubstituteSpacesForError = FALSE;
     uTeletextMemSize = 0;
     uTtxMaxPageNum = 100;
-    uTtxCurrPageIndex = 0x100;
-    m_CurrPageCode = 0x100;
+    uTtxCurrPageIndex = pageIndex;
+    m_CurrPageCode = pageIndex;
     pthread_mutex_init(&m_CommonHeaderMutex,0);
     pthread_mutex_init(&m_MagazineStateMutex,0);
     pthread_mutex_init(&m_PageStoreMutex,0);
@@ -303,7 +303,8 @@ void VTDecodeLine(INT8U *data)
             m_bMagazineSerial = (uControlBits & VTCONTROL_MAGSERIAL) != 0;
 
             // Update the rolling header if this header is usable
-            if ((uControlBits & VTCONTROL_SUPRESSHEADER) == 0 && (uControlBits & VTCONTROL_INTERRUPTED) == 0)
+            //if ((uControlBits & VTCONTROL_SUPRESSHEADER) == 0 && (uControlBits & VTCONTROL_INTERRUPTED) == 0)
+            if (((uControlBits & VTCONTROL_SUPRESSHEADER) == 0 && (uControlBits & VTCONTROL_INTERRUPTED) == 0) || (uControlBits & VTCONTROL_SUBTITLE|VTCONTROL_NEWSFLASH))
             {
                 // Don't use non-visible page headers because
                 // some on them are missing the clock.
