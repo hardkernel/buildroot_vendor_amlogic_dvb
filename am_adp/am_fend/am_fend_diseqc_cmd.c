@@ -998,7 +998,6 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_GotoAngularPositioner(int dev_no, double local_
 	if(sign == 1){
 	}else if(sign == -1){
 		a = fabs(a);
-
 	}else{
 		return ret;
 	}
@@ -1006,16 +1005,26 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_GotoAngularPositioner(int dev_no, double local_
 	angular = (int)(floor(a));
 	angular_remainder = a - (double)angular;
 
-	if(angular/256 > 0){
+	if(angular/256 == 1){
+		/*this condition isn't happen because satellite cover 1/3 area of earth*/
 		if(sign == 1){
 			remain1 = 0x1;
+
+			angular = angular%256;
+		}else if(sign == -1){
+			remain1 = 0x0;
+			sign = 1;
+			angular = 360 - angular;
+		}
+		
+	}else{
+		if(sign == 1){
+			remain1 = 0x0;
 		}else if(sign == -1){
 			remain1 = 0xF;
-		}
 
-		angular = angular%256;
-	}else{
-		remain1 = 0x0;
+			angular = 256 - angular;
+		}		
 	}
 
 	if(angular/16 > 0){
