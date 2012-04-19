@@ -687,7 +687,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort16(int dev_no, int lnbport,
                                                                   
 /**\brief 设置channel频率 (Diseqc1.1 M) 
  * \param dev_no 前端设备号
- * \param Freq unit HZ 
+ * \param Freq unit KHZ 
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)
@@ -706,7 +706,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetChannelFreq(int dev_no, int freq)
 	cmd.msg[2] = 0x58;
 
 	/*freq BCD*/
-	reamin_freq = freq / (1000 * 100);
+	reamin_freq = freq /100;
 
 	/*10GHZ*/
 	remain1 = reamin_freq / (1000 * 100);
@@ -1074,9 +1074,9 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_GotoAngularPositioner(int dev_no, double local_
  * \param dev_no 前端设备号
  * \param ub_number user band number(0-7)
  * \param inputbank_number input bank number (0-7)
- * \param transponder_freq unit HZ
- * \param oscillator_freq unit HZ
- * \param ub_freq unit HZ    
+ * \param transponder_freq unit KHZ
+ * \param oscillator_freq unit KHZ
+ * \param ub_freq unit KHZ    
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)
@@ -1094,9 +1094,9 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetODUChannel(int dev_no, unsigned char ub_numb
 	struct dvb_diseqc_master_cmd cmd;
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 	unsigned short T = 0;
-	float F_T = transponder_freq/(1000 * 1000);
-	float F_O = oscillator_freq/(1000 * 1000);
-	float F_UB = ub_freq/(1000 * 1000);
+	float F_T = transponder_freq/1000;
+	float F_O = oscillator_freq/1000;
+	float F_UB = ub_freq/1000;
 	unsigned char T1 = 0, T2 = 0;
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;

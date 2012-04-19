@@ -292,13 +292,13 @@ extern int AM_FEND_CalcTerrCNPercentNorDig(float cn, int ber, fe_modulation_t co
  * \param dev_no 前端设备号
  * \param[in] cb 盲扫回调函数
  * \param[in] user_data 状态回调函数的参数
- * \param start_freq 开始频点 
- * \param stop_freq 结束频点
+ * \param start_freq 开始频点 unit HZ
+ * \param stop_freq 结束频点 unit HZ
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend.h)
  */
-extern AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_Callback_t cb, void *user_data, int start_freq, int stop_freq);
+extern AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_Callback_t cb, void *user_data, unsigned int start_freq, unsigned int stop_freq);
 
 /**\brief 卫星盲扫结束
  * \param dev_no 前端设备号

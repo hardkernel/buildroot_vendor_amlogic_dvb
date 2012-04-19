@@ -280,7 +280,7 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_SetMaxLPF(int dev_no, unsigned shor
 /**\brief Performs a blind scan operation. Call the function ::AM_FEND_IBlindScanAPI_GetCurrentScanStatus to check the status of the blind scan operation.*/
 static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Start(int dev_no)
 {
-	AM_FEND_Device_t *dev;
+	AM_FEND_Device_t *dev = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
 	fend_get_openned_dev(dev_no, &dev);
@@ -341,7 +341,7 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Start(int dev_no)
 /**\brief Queries the blind scan status.*/
 static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_GetCurrentScanStatus(int dev_no)
 {
-	AM_FEND_Device_t *dev;
+	AM_FEND_Device_t *dev = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
@@ -387,7 +387,7 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_GetCurrentScanStatus(int dev_no)
 /**\brief Reads the channels found during a particular scan from the firmware and stores the new channels found in the scan and filters out the duplicate ones.*/
 static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Adjust(int dev_no)
 {
-	AM_FEND_Device_t *dev;
+	AM_FEND_Device_t *dev = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
@@ -464,7 +464,7 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Adjust(int dev_no)
 /**\brief Stops blind scan process.*/
 static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Exit(int dev_no)
 {
-	AM_FEND_Device_t *dev;
+	AM_FEND_Device_t *dev = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
@@ -504,7 +504,7 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Exit(int dev_no)
 /**\brief Gets the progress of blind scan process based on current scan step's start frequency.*/
 static unsigned short AM_FEND_IBlindscanAPI_GetProgress(int dev_no)
 {
-	AM_FEND_Device_t *dev;
+	AM_FEND_Device_t *dev = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	unsigned short process = 0;
 		
@@ -523,12 +523,12 @@ static unsigned short AM_FEND_IBlindscanAPI_GetProgress(int dev_no)
 static void* fend_blindscan_thread(void *arg)
 {
 	int dev_no = *((int *)arg);
-	AM_FEND_Device_t *dev;	
+	AM_FEND_Device_t *dev = NULL;	
 	AM_ErrorCode_t ret = AM_FAILURE;
 	unsigned short index = 0;
 	enum AM_FEND_DVBSx_BlindScanAPI_Status BS_Status = DVBSx_BS_Status_Init;
 
-	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	fend_get_openned_dev(dev_no, &dev);
 
 	while(BS_Status != DVBSx_BS_Status_Exit)
 	{
@@ -1564,15 +1564,15 @@ int AM_FEND_CalcTerrCNPercentNorDig(float cn, int ber, fe_modulation_t constella
  * \param dev_no 前端设备号
  * \param[in] cb 盲扫回调函数
  * \param[in] user_data 状态回调函数的参数
- * \param start_freq 开始频点 
- * \param stop_freq 结束频点
+ * \param start_freq 开始频点 unit HZ
+ * \param stop_freq 结束频点 unit HZ
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend.h)
  */
-AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_Callback_t cb, void *user_data, int start_freq, int stop_freq)
+AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_Callback_t cb, void *user_data, unsigned int start_freq, unsigned int stop_freq)
 {
-	AM_FEND_Device_t *dev;
+	AM_FEND_Device_t *dev = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	int rc;
 
@@ -1622,7 +1622,7 @@ AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_Callback_t cb, void *user_d
  */
 AM_ErrorCode_t AM_FEND_BlindExit(int dev_no)
 {
-	AM_FEND_Device_t *dev;
+	AM_FEND_Device_t *dev = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
@@ -1652,7 +1652,7 @@ AM_ErrorCode_t AM_FEND_BlindGetProcess(int dev_no, unsigned int *process)
 
 	assert(process);
 
-	*process = (unsigned short)AM_FEND_IBlindscanAPI_GetProgress(dev_no);
+	*process = (unsigned int)AM_FEND_IBlindscanAPI_GetProgress(dev_no);
 
 	return ret;
 }
@@ -1667,9 +1667,8 @@ AM_ErrorCode_t AM_FEND_BlindGetProcess(int dev_no, unsigned int *process)
  */
 AM_ErrorCode_t AM_FEND_BlindGetTPInfo(int dev_no, struct dvb_frontend_parameters *para, unsigned int *count)
 {
-	AM_FEND_Device_t *dev;
+	AM_FEND_Device_t *dev = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	unsigned short process = 0;
 
 	assert(para);
 	assert(count);
@@ -1680,7 +1679,7 @@ AM_ErrorCode_t AM_FEND_BlindGetTPInfo(int dev_no, struct dvb_frontend_parameters
 
 	if(*count > dev->bs_setting.m_uiChannelCount)
 	{
-		*count = dev->bs_setting.m_uiChannelCount;
+		*count = (unsigned int)(dev->bs_setting.m_uiChannelCount);
 	}
 	
 	memcpy(para, dev->bs_setting.channels, *count);
