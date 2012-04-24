@@ -4310,21 +4310,12 @@ aml_set_vpath(AM_AV_Device_t *dev)
 
 	
 	if(dev->vpath_fs==AM_AV_FREE_SCALE_ENABLE){
-		AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
-		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "1");
-		AM_FileEcho("/sys/class/graphics/fb1/free_scale", "1");
-
+		char mode[16];
+		char ppr[32];
+		AM_Bool_t blank = AM_TRUE;
 #ifdef ANDROID
 		{
-			char mode[16];
-			char ppr[32];
 			int x, y, w, h;
-
-			AM_FileEcho("/sys/class/graphics/fb0/request2XScale", "2");
-			AM_FileEcho("/sys/class/graphics/fb1/scale", "0");
-			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "0");
-			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "0");
-			AM_FileEcho("/sys/class/ppmgr/ppscaler","1");
 
 			AM_FileRead("/sys/class/display/mode", mode, sizeof(mode));
 			if(!strncmp(mode, "480i", 4)){
@@ -4337,6 +4328,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 				get_osd_rect("576p", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "720p", 4)){
 				get_osd_rect("720p", &x, &y, &w, &h);
+				blank = AM_FALSE;
 			}else if(!strncmp(mode, "1080i", 5)){
 				get_osd_rect("1080i", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "1080p", 5)){
@@ -4346,6 +4338,21 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			}
 
 			snprintf(ppr, sizeof(ppr), "%d %d %d %d 0", x, y, x+w, y+h);
+		}
+#endif
+		if(blank){
+			AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
+		}
+		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "1");
+		AM_FileEcho("/sys/class/graphics/fb1/free_scale", "1");
+
+#ifdef ANDROID
+		{
+			AM_FileEcho("/sys/class/graphics/fb0/request2XScale", "2");
+			AM_FileEcho("/sys/class/graphics/fb1/scale", "0");
+			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "0");
+			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "0");
+			AM_FileEcho("/sys/class/ppmgr/ppscaler","1");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect", ppr);
 		}
 #endif
