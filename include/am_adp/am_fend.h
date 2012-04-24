@@ -41,7 +41,9 @@ enum AM_FEND_ErrorCode
 	AM_FEND_ERR_CANNOT_OPEN,              /**< 无法打开设备*/
 	AM_FEND_ERR_TIMEOUT,                  /**< 操作超时*/
 	AM_FEND_ERR_INVOKE_IN_CB,             /**< 操作不能在回调函数中调用*/
-	AM_FEND_ERR_IO,                       /**< 输入输出错误*/
+	AM_FEND_ERR_IO,                       /**< 输入输出错误*/ 
+	AM_FEND_ERR_BLINDSCAN, 								/**< 盲扫错误*/
+	AM_FEND_ERR_BLINDSCAN_INRUNNING, 			/**< 盲扫运行中*/
 	AM_FEND_ERR_END
 };
 
@@ -54,6 +56,7 @@ enum AM_FEND_EventType
 {
 	AM_FEND_EVT_BASE=AM_EVT_TYPE_BASE(AM_MOD_FEND),
 	AM_FEND_EVT_STATUS_CHANGED,    /**< 前端状态发生改变，参数为struct dvb_frontend_event*/
+	AM_FEND_EVT_BLINDSCAN_UPDATE, 
 	AM_FEND_EVT_END
 };
 
@@ -265,8 +268,8 @@ extern AM_ErrorCode_t AM_FEND_SetVoltage(int dev_no, fe_sec_voltage_t voltage);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend.h)
  */
-extern AM_ErrorCode_t AM_FEND_EnableHighLnbVoltage(int dev_no, long arg);
-
+extern AM_ErrorCode_t AM_FEND_EnableHighLnbVoltage(int dev_no, long arg);                          
+                                                                           
 /**\brief 转化信号强度dBm值为百分比(NorDig)
  * \param rf_power_dbm dBm值
  * \param constellation 调制模式
@@ -284,6 +287,46 @@ extern int AM_FEND_CalcTerrPowerPercentNorDig(short rf_power_dbm, fe_modulation_
  * \return 百分比值
  */
 extern int AM_FEND_CalcTerrCNPercentNorDig(float cn, int ber, fe_modulation_t constellation, fe_code_rate_t code_rate, fe_hierarchy_t hierarchy, int isLP);
+
+/**\brief 卫星盲扫开始  
+ * \param dev_no 前端设备号
+ * \param[in] cb 盲扫回调函数
+ * \param[in] user_data 状态回调函数的参数
+ * \param start_freq 开始频点 unit HZ
+ * \param stop_freq 结束频点 unit HZ
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_Callback_t cb, void *user_data, unsigned int start_freq, unsigned int stop_freq);
+
+/**\brief 卫星盲扫结束
+ * \param dev_no 前端设备号
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_BlindExit(int dev_no); 
+
+/**\brief 卫星盲扫进度 
+ * \param dev_no 前端设备号
+ * \param[out] process 盲扫进度0-100
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_BlindGetProcess(int dev_no, unsigned int *process); 
+
+/**\brief 卫星盲扫信息 
+ * \param dev_no 前端设备号
+ * \param[out] para 盲扫频点信息缓存区
+ * \param[in out] para in 盲扫频点信息缓存区大小，out 盲扫频点个数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_BlindGetTPInfo(int dev_no, struct dvb_frontend_parameters *para, unsigned int *count);  
+
 #ifdef __cplusplus
 }
 #endif

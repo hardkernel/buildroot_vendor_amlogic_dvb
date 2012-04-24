@@ -32,6 +32,9 @@ extern "C"
 /**\brief 计算数值_a的绝对值*/
 #define AM_ABS(_a)       ((_a)>0?(_a):-(_a))
 
+/**\brief 计算数值a与b差值的绝对值*/
+#define AM_ABSSUB(a,b) ((a>=b)?(a-b):(b-a))
+
 /**\brief 添加在命令行式宏定义的开头
  * 一些宏需要完成一系列语句，为了使这些语句形成一个整体不被打断，需要用
  * AM_MACRO_BEGIN和AM_MACRO_END将这些语句括起来。如:

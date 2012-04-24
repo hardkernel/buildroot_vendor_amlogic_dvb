@@ -44,6 +44,7 @@ enum AM_MOD_ID
 	AM_MOD_SMC,    /**< 智能卡模块*/
 	AM_MOD_INP,    /**< 输入设备模块*/
 	AM_MOD_FEND,   /**< DVB前端模块*/
+	AM_MOD_FEND_DISEQCCMD,
 	AM_MOD_DSC,    /**< 解扰器模块*/
 	AM_MOD_CFG,    /**< 配置文件分析模块*/
 	AM_MOD_SI,     /**< SI分析模块*/
