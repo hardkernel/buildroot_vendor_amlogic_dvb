@@ -157,10 +157,10 @@ typedef struct
 /**\brief 搜索频点数据*/
 typedef struct
 {
-	int status;		/**< 搜索状态, AM_SCAN_FE_ATV等*/
-	AM_Bool_t dtv_locked;	/**< 数字是否以锁住频点，用于ATSC，避免重复设置数字和模拟频率*/
-	int atv_freq;	/**< 模拟频率*/
-	struct dvb_frontend_parameters dtv_para /**< 数字参数*/;
+	int					status;		/**< 搜索状态, AM_SCAN_FE_ATV等*/
+	AM_Bool_t			dtv_locked;	/**< 数字是否以锁住频点，用于ATSC，避免重复设置数字和模拟频率*/
+	int					atv_freq;	/**< 模拟频率*/
+	AM_SCAN_FEPara_t	dtv_para 	/**< 数字参数*/;
 }AM_SCAN_FrontEndPara_t;
 
 

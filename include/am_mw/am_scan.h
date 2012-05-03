@@ -14,6 +14,7 @@
 #include <am_types.h>
 #include <am_mem.h>
 #include <am_fend.h>
+#include <am_fend_diseqc_cmd.h>
 #include <am_si.h>
 #include <am_db.h>
 
@@ -76,29 +77,33 @@ enum AM_SCAN_EventType
 };
 
 /**\brief 信号源类型 */
-enum AM_SCAN_Source
+typedef enum 
 {
 	AM_SCAN_SRC_AUTO       	= 0x00, /**< 自动判断 */
 	AM_SCAN_SRC_CABLE       = 0x01, /**< Cable搜索 */
 	AM_SCAN_SRC_TERRISTRIAL = 0x02, /**< Terristrial(Air in ATSC)搜索 */
 	AM_SCAN_SRC_SATELLITE   = 0x04, /**< Satellite搜索 */
-};
+}AM_SCAN_Source_t;
 
 /**\brief 标准定义*/
-enum AM_SCAN_Standard
+typedef enum 
 {
 	AM_SCAN_STANDARD_DVB	= 0x00,	/**< DVB标准*/
 	AM_SCAN_STANDARD_ATSC	= 0x01,	/**< ATSC标准*/
 	AM_SCAN_STANDARD_ISDB   = 0x02, /**< ISDB标准*/
-};
+}AM_SCAN_Standard_t;
 
 /**\brief 搜索模式定义*/
 enum AM_SCAN_Mode
 {
-	AM_SCAN_MODE_AUTO 		= 0x01,	/**< 自动搜索*/
-	AM_SCAN_MODE_MANUAL 	= 0x02,	/**< 手动搜索*/
-	AM_SCAN_MODE_ALLBAND 	= 0x04, /**< 全频段搜索*/
-	AM_SCAN_MODE_SEARCHBAT	= 0x08, /**< 是否搜索BAT表*/
+	AM_SCAN_MODE_AUTO 			= 0x01,	/**< 自动搜索*/
+	AM_SCAN_MODE_MANUAL 		= 0x02,	/**< 手动搜索*/
+	AM_SCAN_MODE_ALLBAND 		= 0x03, /**< 全频段搜索*/
+	AM_SCAN_MODE_SAT_BLIND		= 0x04,	/**< 卫星盲扫*/
+	
+	/* OR option(s)*/
+	AM_SCAN_MODE_SEARCHBAT		= 0x08, /**< 是否搜索BAT表*/
+	AM_SCAN_MODE_SAT_UNICABLE	= 0x10,	/**< 卫星Unicable模式*/
 };
 
 
@@ -116,6 +121,13 @@ enum AM_SCAN_TSType
 	AM_SCAN_TS_ANALOG
 };
 
+/**\brief 前端参数*/
+typedef struct
+{
+	struct dvb_frontend_parameters	para;	/**< 锁频参数*/
+	AM_FEND_Polarisation_t			polar;	/**< 卫星极化方式*/	
+}AM_SCAN_FEPara_t;
+
 /**\brief 频点进度数据*/
 typedef struct
 {
@@ -127,8 +139,8 @@ typedef struct
 /**\brief 搜索进度数据*/
 typedef struct 
 {
-	int 	evt;	/**< 事件类型，见AM_SCAN_ProgressEvt*/
-	void 	*data;  /**< 事件数据，见AM_SCAN_ProgressEvt描述*/
+	int		evt;	/**< 事件类型，见AM_SCAN_ProgressEvt*/
+	void	*data;  /**< 事件数据，见AM_SCAN_ProgressEvt描述*/
 }AM_SCAN_Progress_t;
 
 /**\brief 当前搜索的频点信号信息*/
@@ -143,32 +155,32 @@ typedef struct
 /**\brief ATV 搜索频道信息*/
 typedef struct
 {
-	int detect_freq;
-    int	freq; /**<channel frequency*/
-    int	start_freq;/**<start search frequency*/
-    int	min_freq;/**<min frequency*/
-   	int	max_freq;	/**<max frequency*/
-    int	band; /**<channel band*/
-    int	audio_std; /**<channel sound standard*/
-    int	video_std; /**<channel video standard*/
-    int	vol_comp; /**<channel volume compensation*/
-    int	chan_jump; /**<channel jump*/
-    int	fine_tune_flag; /**<channel auto fine tune*/
-    int TSID;	/**< Analog Transmmision Signal ID*/
-    char name[15];	/**< Name associated from VCT*/
-    int major_chan_num;
-    int minor_chan_num;
+	int		detect_freq;
+    int		freq;			/**<channel frequency*/
+    int		start_freq;		/**<start search frequency*/
+    int		min_freq;		/**<min frequency*/
+   	int		max_freq;		/**<max frequency*/
+    int		band; 			/**<channel band*/
+    int		audio_std;		/**<channel sound standard*/
+    int		video_std;		/**<channel video standard*/
+    int		vol_comp;		/**<channel volume compensation*/
+    int		chan_jump;		/**<channel jump*/
+    int		fine_tune_flag; /**<channel auto fine tune*/
+    int		TSID;			/**< Analog Transmmision Signal ID*/
+    char	name[15];		/**< Name associated from VCT*/
+    int		major_chan_num;
+    int		minor_chan_num;
 }AM_SCAN_ATVChannelInfo_t;
 
 /**\brief 搜索结果的单个TS数据*/
 typedef struct AM_SCAN_TS_s
 {
-	int							type;			/**< 数字/模拟*/
+	int								type;		/**< 数字/模拟*/
 	
 	/*数字信号数据*/
-	int							snr;			/**< SNR*/
-	int							ber;			/**< BER*/
-	int							strength;		/**< Strength*/
+	int								snr;		/**< SNR*/
+	int								ber;		/**< BER*/
+	int								strength;	/**< Strength*/
 	struct dvb_frontend_parameters 	fend_para;	/**< 频点信息*/
 	dvbpsi_pat_t 					*pats;		/**< 搜索到的PAT表*/
 	dvbpsi_cat_t 					*cats;		/**< 搜索到的CAT表*/
@@ -187,20 +199,27 @@ typedef struct AM_SCAN_TS_s
 /**\brief 节目搜索结果数据结构*/
 typedef struct
 {
-	int 		 src;	/**< 源标识*/
-	int 		 mode;	/**< 搜索模式*/
-	int		 standard; /**< ATSC or DVB*/
-	sqlite3		 *hdb;	/**< 数据库句柄*/
-	dvbpsi_nit_t *nits;	/**< 搜索到的NIT表*/
-	dvbpsi_bat_t *bats;	/**< 搜索到的BAT表*/
-	AM_SCAN_TS_t *tses;	/**< 所有TS列表*/
+	AM_SCAN_Source_t	src;		/**< 源标识*/
+	AM_SCAN_Standard_t	standard;	/**< ATSC or DVB*/
+	int					mode;		/**< 搜索模式*/
+	sqlite3				*hdb;		/**< 数据库句柄*/
+	dvbpsi_nit_t		*nits;		/**< 搜索到的NIT表*/
+	dvbpsi_bat_t		*bats;		/**< 搜索到的BAT表*/
+	AM_SCAN_TS_t		*tses;		/**< 所有TS列表*/
 	
-	cvct_channel_info_t *cvcs;	/**<ATSC C virtual channels*/
-	tvct_channel_info_t *tvcs;	/**<ATSC T virtual channels*/
+	cvct_channel_info_t	*cvcs;		/**<ATSC C virtual channels*/
+	tvct_channel_info_t	*tvcs;		/**<ATSC T virtual channels*/
 
-	AM_Bool_t     enable_lcn; /**< 使用LCN排序*/
-	AM_Bool_t     resort_all; /**< 重新排列数据库中的所有service*/
+	AM_Bool_t			enable_lcn; /**< 使用LCN排序*/
+	AM_Bool_t			resort_all; /**< 重新排列数据库中的所有service*/
 }AM_SCAN_Result_t;
+
+/**\brief 卫星配置参数*/
+typedef struct
+{
+	const char	sat_name[64];        /**< 卫星名称，用于唯一标识一个卫星*/
+
+}AM_SCAN_SatellitePara_t;
 
 
 /**\brief 存储回调函数
@@ -211,23 +230,25 @@ typedef void (*AM_SCAN_StoreCb) (AM_SCAN_Result_t *result);
 /**\brief 搜索创建参数*/
 typedef struct
 {
-	int fend_dev_id;	/**< 前端设备号*/
-	int dmx_dev_id;	/**< demux设备号*/
-	int source;		/**< 源标识*/
-	int mode;			/**< 搜索模式，见AM_SCAN_Mode_t*/
-	int standard;	/**< 搜索标准，DVB/ATSC*/
+	int								fend_dev_id;		/**< 前端设备号*/
+	int								dmx_dev_id;			/**< demux设备号*/
+	int								mode;				/**< 搜索模式组合，见AM_SCAN_Mode*/
+	AM_SCAN_Source_t				source;				/**< 源标识*/
+	AM_SCAN_Standard_t				standard;			/**< 搜索标准，DVB/ATSC*/
 	
-	int start_para_cnt;	/**< 前端参数个数*/
-	struct dvb_frontend_parameters *start_para;	/**< 前端参数列表，自动搜索时对应主频点列表，
+	AM_SCAN_SatellitePara_t			sat_para;			/**< 卫星参数配置,只有当source位Satellite时有效*/
+	
+	int								start_para_cnt;		/**< 前端参数个数*/
+	AM_SCAN_FEPara_t				*start_para;		/**< 前端参数列表，自动搜索时对应主频点列表，
  											手动搜索时为单个频点，全频段搜索时可自定义频点列表或留空使用默认值*/
  	
- 	int atv_freq_cnt;	/**< 模拟频点个数*/
-	int *atv_freqs;	/*模拟频点列表*/
+ 	int								atv_freq_cnt;		/**< 模拟频点个数*/
+	int								*atv_freqs;			/*模拟频点列表*/
 
-	AM_SCAN_StoreCb store_cb;	/**< 搜索完成时存储回调函数*/
-	sqlite3 *hdb;				/**< 数据库句柄*/
-	AM_Bool_t enable_lcn;           /**< 根据逻辑频道号进行排序*/
-	AM_Bool_t resort_all;           /**< 重新排列数据库中的所有service*/
+	AM_SCAN_StoreCb					store_cb;			/**< 搜索完成时存储回调函数*/
+	sqlite3							*hdb;				/**< 数据库句柄*/
+	AM_Bool_t						enable_lcn;			/**< 根据逻辑频道号进行排序*/
+	AM_Bool_t						resort_all;			/**< 重新排列数据库中的所有service*/
 }AM_SCAN_CreatePara_t;
 
 

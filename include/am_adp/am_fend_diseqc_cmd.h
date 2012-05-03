@@ -8,8 +8,8 @@
  * \date 2012-03-20: create the document
  ***************************************************************************/
 
-#ifndef _AM_FEND_H
-#define _AM_FEND_H
+#ifndef _AM_FEND_DISEQC_CMD_H
+#define _AM_FEND_DISEQC_CMD_H
 
 #include "am_types.h"
 #include "am_evt.h"

@@ -173,6 +173,8 @@
 		AM_DEBUG(1, "Updating Program: '%s',srv_type(%d), vpid(%d), vfmt(%d),apids(%s), afmts(%s), alangs(%s) ",\
 			name,srv_type,vid,vfmt,str_apids, str_afmts, str_alangs);\
 	AM_MACRO_END
+	
+#define GET_MODE(_m) ((_m) & 0x07)
 
 typedef struct{
 	int    srv_cnt;
@@ -369,6 +371,19 @@ static AM_ErrorCode_t convert_code_to_utf8(const char *cod, char *in_code,int in
     }
 
     return iconv_close(handle);
+}
+
+
+static void am_scan_calc_local_frequency(int sat_frequency/*kHz*/, int lof_hi/*kHz*/, int lof_lo/*kHz*/, int *frequency/*Hz*/)
+{
+	const int lof_threshold = 11700000;/*kHz*/
+	int lof, local;
+	
+	lof = (sat_frequency > lof_threshold) ? lof_hi : lof_lo;
+	local = abs(sat_frequency - lof);
+	local = ((((local * 2) / 125) + 1) / 2) * 125;
+	*frequency = local * 1000;/* Hz */
+	AM_DEBUG(1, "Get local frequency %d Hz", *frequency);
 }
 
 static void scan_rec_tab_init(ScanRecTab_t *tab)
@@ -2146,7 +2161,7 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 			{
 				dvbpsi_cable_delivery_dr_t *pcd = (dvbpsi_cable_delivery_dr_t*)descr->p_decoded;
 
-				param = &scanner->start_freqs[scanner->start_freqs_cnt].dtv_para;
+				param = &scanner->start_freqs[scanner->start_freqs_cnt].dtv_para.para;
 				param->frequency = pcd->i_frequency/1000;
 				param->u.qam.modulation = pcd->i_modulation_type;
 				param->u.qam.symbol_rate = pcd->i_symbol_rate;
@@ -2159,7 +2174,7 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 			{
 				dvbpsi_terr_deliv_sys_dr_t *pcd = (dvbpsi_terr_deliv_sys_dr_t*)descr->p_decoded;
 
-				param = &scanner->start_freqs[scanner->start_freqs_cnt].dtv_para;
+				param = &scanner->start_freqs[scanner->start_freqs_cnt].dtv_para.para;
 				param->frequency = pcd->i_centre_frequency/1000;
 				param->u.ofdm.bandwidth = pcd->i_bandwidth;
 				scanner->start_freqs_cnt++;
@@ -2708,7 +2723,7 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner)
 	{
 		scanner->curr_freq++;
 		if (scanner->curr_freq < 0 || scanner->curr_freq >= scanner->start_freqs_cnt || 
-			scanner->start_freqs[scanner->curr_freq].dtv_para.frequency <= 0)
+			scanner->start_freqs[scanner->curr_freq].dtv_para.para.frequency <= 0)
 		{
 			AM_DEBUG(1, "Cannot get nit after all trings!");
 			if (scanner->start_freqs)
@@ -2725,14 +2740,14 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner)
 			return AM_SCAN_ERR_CANNOT_GET_NIT;
 		}
 
-		AM_DEBUG(1, "Tring to recv NIT in frequency %u ...", scanner->start_freqs[scanner->curr_freq].dtv_para.frequency);
+		AM_DEBUG(1, "Tring to recv NIT in frequency %u ...", scanner->start_freqs[scanner->curr_freq].dtv_para.para.frequency);
 
 		tp.index = scanner->curr_freq;
 		tp.total = scanner->start_freqs_cnt;
-		tp.fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para;
+		tp.fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para.para;
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_BEGIN, (void*)&tp);
 		
-		ret = AM_FEND_SetPara(scanner->fend_dev, &scanner->start_freqs[scanner->curr_freq].dtv_para);
+		ret = AM_FEND_SetPara(scanner->fend_dev, &scanner->start_freqs[scanner->curr_freq].dtv_para.para);
 		if (ret == AM_SUCCESS)
 		{
 			scanner->recv_status |= AM_SCAN_RECVING_WAIT_FEND;
@@ -2861,16 +2876,16 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 		
 		tp.index = scanner->curr_freq;
 		tp.total = scanner->start_freqs_cnt;
-		tp.fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para;
+		tp.fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para.para;
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_BEGIN, (void*)&tp);
 		
 		AM_DEBUG(1, "tp index %d, dtv %d, atv %d", scanner->curr_freq, 
-			scanner->start_freqs[scanner->curr_freq].dtv_para.frequency,
+			scanner->start_freqs[scanner->curr_freq].dtv_para.para.frequency,
 			scanner->start_freqs[scanner->curr_freq].atv_freq);
-		if (scanner->start_freqs[scanner->curr_freq].dtv_para.frequency > 0)
+		if (scanner->start_freqs[scanner->curr_freq].dtv_para.para.frequency > 0)
 		{
-			AM_DEBUG(1, "Start scanning dtv frequency %u ...", scanner->start_freqs[scanner->curr_freq].dtv_para.frequency);
-			ret = AM_FEND_SetPara(scanner->fend_dev, &scanner->start_freqs[scanner->curr_freq].dtv_para);
+			AM_DEBUG(1, "Start scanning dtv frequency %u ...", scanner->start_freqs[scanner->curr_freq].dtv_para.para.frequency);
+			ret = AM_FEND_SetPara(scanner->fend_dev, &scanner->start_freqs[scanner->curr_freq].dtv_para.para);
 			if (ret == AM_SUCCESS)
 			{
 				scanner->recv_status |= AM_SCAN_RECVING_WAIT_FEND;
@@ -2879,7 +2894,7 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 			else if (scanner->start_freqs[scanner->curr_freq].atv_freq > 0)
 			{
 				AM_DEBUG(1, "Set DTV frequency %d Failed, try ATV frequency %d", 
-					scanner->start_freqs[scanner->curr_freq].dtv_para.frequency,
+					scanner->start_freqs[scanner->curr_freq].dtv_para.para.frequency,
 					scanner->start_freqs[scanner->curr_freq].atv_freq);
 				/*数字频点锁频失败，尝试模拟频点*/
 				ret = am_scan_try_atv_search(scanner);
@@ -2949,7 +2964,8 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 
 		/*In order to support lcn, add nit info support in manual and allband scan mode*/
 		if ((scanner->result.enable_lcn)
-			&& ((scanner->result.mode & AM_SCAN_MODE_MANUAL) || (scanner->result.mode & AM_SCAN_MODE_ALLBAND)))
+			&& (GET_MODE(scanner->result.mode) == AM_SCAN_MODE_MANUAL 
+			|| GET_MODE(scanner->result.mode) == AM_SCAN_MODE_ALLBAND))
 		{
 			am_scan_tablectl_init(&scanner->nitctl, AM_SCAN_RECVING_NIT, AM_SCAN_EVT_NIT_DONE, NIT_TIMEOUT, 
 								AM_SI_PID_NIT, AM_SI_TID_NIT_ACT, "NIT", 1, am_scan_nit_done_nousefreqinfo, 0);		
@@ -2970,7 +2986,8 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 	scanner->end_code = AM_SCAN_RESULT_UNLOCKED;
 
 	/*自动搜索模式时按指定主频点列表开始NIT表请求,其他模式直接按指定频点开始搜索*/
-	if ((scanner->result.mode & AM_SCAN_MODE_AUTO) && scanner->standard == AM_SCAN_STANDARD_DVB)
+	if (GET_MODE(scanner->result.mode) == AM_SCAN_MODE_AUTO 
+		&& scanner->standard == AM_SCAN_STANDARD_DVB)
 		AM_TRY(am_scan_try_nit(scanner));
 	else
 		AM_TRY(am_scan_start_next_ts(scanner));
@@ -3000,7 +3017,7 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 	
 	if ((scanner->curr_freq >= 0) && 
 		(scanner->curr_freq < scanner->start_freqs_cnt) &&
-		(scanner->start_freqs[scanner->curr_freq].dtv_para.frequency != \
+		(scanner->start_freqs[scanner->curr_freq].dtv_para.para.frequency != \
 		scanner->fe_evt.parameters.frequency))
 	{
 		AM_DEBUG(1, "Unexpected fend_evt arrived");
@@ -3087,7 +3104,8 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 
 				/*In order to support lcn, add nit info support in manual and allband scan mode*/
 				if ((!scanner->result.nits) && (scanner->result.enable_lcn)
-					&& ((scanner->result.mode & AM_SCAN_MODE_MANUAL) || (scanner->result.mode & AM_SCAN_MODE_ALLBAND)))
+					&& (GET_MODE(scanner->result.mode) == AM_SCAN_MODE_MANUAL 
+					|| GET_MODE(scanner->result.mode) == AM_SCAN_MODE_ALLBAND))
 				{
 					am_scan_tablectl_clear(&scanner->nitctl);
 					am_scan_request_section(scanner, &scanner->nitctl);
@@ -3095,7 +3113,7 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 			}
 			
 
-			scanner->curr_ts->fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para;
+			scanner->curr_ts->fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para.para;
 			scanner->start_freqs[scanner->curr_freq].dtv_locked = AM_TRUE;
 			/*添加到搜索结果列表*/
 			ADD_TO_LIST(scanner->curr_ts, scanner->result.tses);
@@ -3468,14 +3486,14 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 			for (i=0; i<para->start_para_cnt; i++)
 			{
 				tpara.frequency = dvbc_std_freqs[i]*1000;
-				scanner->start_freqs[i].dtv_para = tpara;
+				scanner->start_freqs[i].dtv_para.para = tpara;
 			}
 		} else if(para->source==AM_SCAN_SRC_TERRISTRIAL) {
 			tpara.u.ofdm.bandwidth = DEFAULT_DVBT_BW;
 			for (i=0; i<para->start_para_cnt; i++)
 			{
 				tpara.frequency = (DEFAULT_DVBT_FREQ_START+(8000*i))*1000;
-				scanner->start_freqs[i].dtv_para = tpara;
+				scanner->start_freqs[i].dtv_para.para = tpara;
 			}
 		}
 	}
@@ -3485,6 +3503,21 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 		for (i=0; i<para->start_para_cnt; i++)
 		{
 			scanner->start_freqs[i].dtv_para = para->start_para[i];
+			
+			/* test in DVB-T */
+			if (para->source == AM_SCAN_SRC_SATELLITE)
+			{
+				am_scan_calc_local_frequency(para->start_para[i].para.frequency, 
+					10600000, 9750000, (int*)&para->start_para[i].para.frequency);
+					
+				para->start_para[i].para.u.ofdm.bandwidth = BANDWIDTH_8_MHZ;
+				para->start_para[i].para.u.ofdm.code_rate_HP = FEC_AUTO;
+				para->start_para[i].para.u.ofdm.code_rate_LP = FEC_AUTO;
+				para->start_para[i].para.u.ofdm.constellation = QAM_AUTO;
+				para->start_para[i].para.u.ofdm.guard_interval = GUARD_INTERVAL_AUTO;
+				para->start_para[i].para.u.ofdm.hierarchy_information = HIERARCHY_AUTO;
+				para->start_para[i].para.u.ofdm.transmission_mode = TRANSMISSION_MODE_AUTO;
+			}
 		}
 	}
 	
