@@ -1682,7 +1682,7 @@ AM_ErrorCode_t AM_FEND_BlindGetTPInfo(int dev_no, struct dvb_frontend_parameters
 		*count = (unsigned int)(dev->bs_setting.m_uiChannelCount);
 	}
 	
-	memcpy(para, dev->bs_setting.channels, *count);
+	memcpy(para, dev->bs_setting.channels, (*count) * sizeof(struct dvb_frontend_parameters));
 
 	pthread_mutex_unlock(&dev->lock);
 
