@@ -82,7 +82,7 @@ typedef enum
 	AM_SCAN_SRC_AUTO       	= 0x00, /**< 自动判断 */
 	AM_SCAN_SRC_CABLE       = 0x01, /**< Cable搜索 */
 	AM_SCAN_SRC_TERRISTRIAL = 0x02, /**< Terristrial(Air in ATSC)搜索 */
-	AM_SCAN_SRC_SATELLITE   = 0x04, /**< Satellite搜索 */
+	AM_SCAN_SRC_SATELLITE   = 0x03, /**< Satellite搜索 */
 }AM_SCAN_Source_t;
 
 /**\brief 标准定义*/
