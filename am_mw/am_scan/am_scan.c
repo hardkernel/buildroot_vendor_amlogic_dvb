@@ -3419,9 +3419,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	
 	/*分析搜索模式*/
 	smode &= 0x07;
-	if (smode != AM_SCAN_MODE_AUTO && 
-		smode != AM_SCAN_MODE_MANUAL && 
-		smode != AM_SCAN_MODE_ALLBAND)
+	if (smode >= AM_SCAN_MODE_MAX)
 	{
 		AM_DEBUG(1, "Scan: unknown scan mode[%d]", smode);
 		return AM_SCAN_ERR_INVALID_PARAM;

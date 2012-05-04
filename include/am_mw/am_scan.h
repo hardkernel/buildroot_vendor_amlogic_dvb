@@ -100,7 +100,7 @@ enum AM_SCAN_Mode
 	AM_SCAN_MODE_MANUAL 		= 0x02,	/**< 手动搜索*/
 	AM_SCAN_MODE_ALLBAND 		= 0x03, /**< 全频段搜索*/
 	AM_SCAN_MODE_SAT_BLIND		= 0x04,	/**< 卫星盲扫*/
-	
+	AM_SCAN_MODE_MAX			= 0x07,
 	/* OR option(s)*/
 	AM_SCAN_MODE_SEARCHBAT		= 0x08, /**< 是否搜索BAT表*/
 	AM_SCAN_MODE_SAT_UNICABLE	= 0x10,	/**< 卫星Unicable模式*/
