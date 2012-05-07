@@ -60,7 +60,8 @@ enum
 	AM_SCAN_EVT_VCT_DONE 	= 0x100, /**< VCT表已经接收完毕*/
 	AM_SCAN_EVT_QUIT		= 0x200, /**< 退出搜索事件*/
 	AM_SCAN_EVT_START		= 0x400,/**< 开始搜索事件*/
-	AM_SCAN_EVT_ATV_SEARCH_DONE	= 0X800,	/**< 当前设置的ATV 频率搜索完毕*/
+	AM_SCAN_EVT_ATV_SEARCH_DONE	= 0x800,	/**< 当前设置的ATV 频率搜索完毕*/
+	AM_SCAN_EVT_BLIND_SCAN_DONE = 0x2000,	/**< 当前卫星盲扫完毕*/
 };
 
 /*SCAN 所在阶段*/
@@ -69,6 +70,10 @@ enum
 	AM_SCAN_STAGE_WAIT_START,
 	AM_SCAN_STAGE_NIT,
 	AM_SCAN_STAGE_TS,
+	AM_SCAN_STAGE_BLIND_HL,
+	AM_SCAN_STAGE_BLIND_VL,
+	AM_SCAN_STAGE_BLIND_HH,
+	AM_SCAN_STAGE_BLIND_VH,
 	AM_SCAN_STAGE_DONE
 };
 
@@ -198,6 +203,7 @@ struct AM_SCAN_Scanner_s
 	int								end_code;		/**< 搜索结束码*/
 	void							*user_data;		/**< 用户数据*/
 	AM_Bool_t						store;			/**< 是否存储*/
+	AM_SCAN_BlindScanProgress_t		bs_progress;	/**< Blind Scan 进度*/
 };
 
 

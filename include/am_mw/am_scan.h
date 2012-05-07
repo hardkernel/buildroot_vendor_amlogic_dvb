@@ -65,6 +65,7 @@ enum AM_SCAN_ProgressEvt
 	AM_SCAN_PROGRESS_CVCT_DONE,		/**< 当前TS的CVCT表搜索完毕，参数为cvct_section_info_t*/
 	AM_SCAN_PROGRESS_STORE_BEGIN,	/**< 开始存储*/
 	AM_SCAN_PROGRESS_STORE_END,		/**< 存储完毕*/
+	AM_SCAN_PROGRESS_BLIND_SCAN,	/**< 卫星盲扫搜索进度，参数为AM_SCAN_BlindScanProgress_t给出的进度信息*/
 };
 
 /**\brief 搜索事件类型*/
@@ -142,6 +143,15 @@ typedef struct
 	int		evt;	/**< 事件类型，见AM_SCAN_ProgressEvt*/
 	void	*data;  /**< 事件数据，见AM_SCAN_ProgressEvt描述*/
 }AM_SCAN_Progress_t;
+
+/**\brief Blind Scan进度数据*/
+typedef struct
+{
+	int	progress;	/**< 盲扫总进度，0-100*/
+	int	polar;		/**< 当前盲扫的极化方式设置，见AM_FEND_Polarisation_t，-1表示未知当前设置的极化方式*/
+	int lo;			/**< 当前盲扫的本振频率，见AM_FEND_Localoscollatorfreq_t， -1表示未知当前的本振*/
+	struct dvb_frontend_parameters 	fend_para;	/**< 当前搜索的频点信息*/
+}AM_SCAN_BlindScanProgress_t;
 
 /**\brief 当前搜索的频点信号信息*/
 typedef struct

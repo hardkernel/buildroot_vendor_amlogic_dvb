@@ -2925,6 +2925,104 @@ static void am_scan_fend_callback(int dev_no, int event_type, void *param, void 
 	pthread_mutex_unlock(&scanner->lock);
 }
 
+/**\brief 卫星BlindScan回调*/
+static void am_scan_blind_scan_callback(int dev_no, int event_type, void *param, void *user_data)
+{
+	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)user_data;
+	int progress;
+	
+	if (!scanner)
+		return;
+	
+	AM_FEND_BlindGetProcess(scanner->fend_dev, (unsigned int*)&progress);
+	
+	pthread_mutex_lock(&scanner->lock);
+	
+	scanner->bs_progress.progress = (scanner->stage - AM_SCAN_STAGE_BLIND_HL)*25 + progress/4;
+	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_BLIND_SCAN, (void*)&scanner->bs_progress);
+	
+	if (progress >= 100)
+	{
+		/* Current blind scan stage done */
+		scanner->evt_flag |= AM_SCAN_EVT_BLIND_SCAN_DONE;
+		pthread_cond_signal(&scanner->cond);
+	}
+	
+	pthread_mutex_unlock(&scanner->lock);
+}
+
+/**\brief 启动一次卫星盲扫*/
+static AM_ErrorCode_t am_scan_start_blind_scan(AM_SCAN_Scanner_t *scanner)
+{
+	int polar = -1, lo = -1;
+	AM_FEND_Polarisation_t p;
+	AM_FEND_Localoscollatorfreq_t l;
+	
+	if (scanner->stage < AM_SCAN_STAGE_BLIND_HL || scanner->stage > AM_SCAN_STAGE_BLIND_VH)
+	{
+		AM_DEBUG(1, "Currently is not in BlindScan mode");
+		return AM_FAILURE;
+	}
+	
+	if (scanner->stage == AM_SCAN_STAGE_BLIND_HL ||
+		scanner->stage == AM_SCAN_STAGE_BLIND_HH)
+		p = AM_FEND_POLARISATION_H;
+	else
+		p = AM_FEND_POLARISATION_V;
+		
+	if (scanner->stage == AM_SCAN_STAGE_BLIND_VL ||
+		scanner->stage == AM_SCAN_STAGE_BLIND_HL)
+		l = AM_FEND_LOCALOSCILLATORFREQ_L;
+	else
+		l = AM_FEND_LOCALOSCILLATORFREQ_H;
+	
+#if 0		
+	if (scanner->result.sat_cfg.lnb_power == AM_SCAN_LNBPOWER_AUTO)
+	{
+		fe_sec_voltage_t vol;
+		
+		if (p == AM_FEND_POLARISATION_H)
+			vol = SEC_VOLTAGE_18;
+		else
+			vol = SEC_VOLTAGE_13;
+			
+		/* Set 13/18V to select polar H/V */
+
+		polar = p;
+	}
+	
+	if (scanner->result.sat_cfg.lnb_22k == AM_SCAN_LNB22K_AUTO)
+	{
+		fe_sec_tone_mode_t tone;
+		
+		if (l == AM_FEND_LOCALOSCILLATORFREQ_L)
+			tone = SEC_TONE_OFF;
+		else
+			tone = SEC_TONE_ON;
+			
+		/* Set 22K to select LOF Hi/Low */
+
+		lo = l;
+	}
+	
+	/* set switch */
+	if (polar == -1)
+		polar = p;
+	if (lo == -1)
+		lo = l;
+	
+	scanner->bs_progress.polar = polar;
+	scanner->bs_prgoress.lo = lo;
+	
+	return AM_FEND_BlindScan(scanner->fend_dev, \
+		m_scan_blind_scan_callback, (void*)scanner, \
+		scanner->result.sat_cfg.blind_scan.start_freq,\
+		scanner->result.sat_cfg.blind_scan.stop_freq);	
+#else
+	return AM_SUCCESS;
+#endif
+}
+
 /**\brief 启动搜索*/
 static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 {
@@ -2985,14 +3083,55 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 	scanner->curr_freq = -1;
 	scanner->end_code = AM_SCAN_RESULT_UNLOCKED;
 
-	/*自动搜索模式时按指定主频点列表开始NIT表请求,其他模式直接按指定频点开始搜索*/
-	if (GET_MODE(scanner->result.mode) == AM_SCAN_MODE_AUTO 
-		&& scanner->standard == AM_SCAN_STANDARD_DVB)
-		AM_TRY(am_scan_try_nit(scanner));
-	else
-		AM_TRY(am_scan_start_next_ts(scanner));
+	/* 启动搜索 */
+	if (scanner->standard == AM_SCAN_STANDARD_DVB)
+	{
+		if (GET_MODE(scanner->result.mode) == AM_SCAN_MODE_AUTO)
+		{
+			/*自动搜索模式时按指定主频点列表开始NIT表请求*/
+			return am_scan_try_nit(scanner);
+		}
+		else if (GET_MODE(scanner->result.mode) == AM_SCAN_MODE_SAT_BLIND)
+		{
+			/* 启动卫星盲扫 */
+			scanner->stage = AM_SCAN_STAGE_BLIND_HL;
+			scanner->bs_progress.progress = 0;
+			return am_scan_start_blind_scan(scanner);
+		}
+	}
+	
+	/*其他模式直接按指定频点开始搜索*/
+	return am_scan_start_next_ts(scanner);
+}
 
-	return AM_SUCCESS;
+/**\brief 完成一次卫星盲扫*/
+static void am_scan_solve_blind_scan_done_evt(AM_SCAN_Scanner_t *scanner)
+{
+	AM_ErrorCode_t ret = AM_FAILURE;
+	
+	/* 退出本次盲扫 */
+	AM_FEND_BlindExit(scanner->fend_dev);
+	
+	while (scanner->stage < AM_SCAN_STAGE_BLIND_VH && ret != AM_SUCCESS)
+	{
+		scanner->stage++;
+		/* 开始下一个配置的盲扫 */
+		ret = am_scan_start_blind_scan(scanner);
+		if (ret != AM_SUCCESS)
+		{
+			AM_DEBUG(1, "Start blind scan failed\n");
+			scanner->bs_progress.progress += 25;
+			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_BLIND_SCAN, (void*)&scanner->bs_progress);
+		}
+	}
+	
+	if (ret != AM_SUCCESS && scanner->stage >= AM_SCAN_STAGE_BLIND_VH)
+	{
+		AM_DEBUG(1, "All blind scan done! Now scan for each TP...");
+		/* Change the scan mode to All band */
+		scanner->result.mode = AM_SCAN_MODE_ALLBAND | (scanner->result.mode & 0xf1);
+		am_scan_start_next_ts(scanner);
+	}
 }
 
 /**\brief ATV搜索完一个频道事件处理*/
@@ -3018,7 +3157,8 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 	if ((scanner->curr_freq >= 0) && 
 		(scanner->curr_freq < scanner->start_freqs_cnt) &&
 		(scanner->start_freqs[scanner->curr_freq].dtv_para.para.frequency != \
-		scanner->fe_evt.parameters.frequency))
+		scanner->fe_evt.parameters.frequency) && 
+		!(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE))
 	{
 		AM_DEBUG(1, "Unexpected fend_evt arrived");
 		return;
@@ -3277,7 +3417,10 @@ handle_events:
 			/*ATV搜索完一个Channel*/
 			if (evt_flag & AM_SCAN_EVT_ATV_SEARCH_DONE)
 				am_scan_solve_atv_search_done_evt(scanner);
-
+			/*完成一次卫星盲扫*/
+			if (evt_flag & AM_SCAN_EVT_BLIND_SCAN_DONE)
+				am_scan_solve_blind_scan_done_evt(scanner);
+				
 			/*退出事件*/
 			if (evt_flag & AM_SCAN_EVT_QUIT)
 			{
@@ -3424,9 +3567,9 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 		AM_DEBUG(1, "Scan: unknown scan mode[%d]", smode);
 		return AM_SCAN_ERR_INVALID_PARAM;
 	}
-	if ((para->mode&AM_SCAN_MODE_MANUAL)  && (para->start_para_cnt == 0 || !para->start_para))
+	if ((GET_MODE(para->mode) == AM_SCAN_MODE_MANUAL)  && (para->start_para_cnt == 0 || !para->start_para))
 		return AM_SCAN_ERR_INVALID_PARAM;
-	if (/*(para->mode&AM_SCAN_MODE_AUTO) &&*/ para->start_para_cnt && !para->start_para)
+	if ( para->start_para_cnt && !para->start_para)
 		return AM_SCAN_ERR_INVALID_PARAM;
 		
 	/*Create a scanner*/
@@ -3438,10 +3581,10 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	}
 	/*数据初始化*/
 	memset(scanner, 0, sizeof(AM_SCAN_Scanner_t));
-	if (para->mode & AM_SCAN_MODE_MANUAL)
+	if (GET_MODE(para->mode) == AM_SCAN_MODE_MANUAL)
 		para->start_para_cnt = 1;
-	else if (((para->mode & AM_SCAN_MODE_ALLBAND)
-				||(para->mode & AM_SCAN_MODE_AUTO)) 
+	else if (((GET_MODE(para->mode) ==  AM_SCAN_MODE_ALLBAND)
+				||(GET_MODE(para->mode) ==  AM_SCAN_MODE_AUTO)) 
 			&& (! para->start_para_cnt)) {
 		use_default = 1;
 		para->start_para_cnt = 
@@ -3472,8 +3615,8 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	memset(scanner->start_freqs, 0, sizeof(AM_SCAN_FrontEndPara_t) * scanner->start_freqs_cnt);
 	
 	/*全频段搜索时按标准频率表搜索*/
-	if (((para->mode & AM_SCAN_MODE_ALLBAND) 
-		    ||(para->mode & AM_SCAN_MODE_AUTO))
+	if (((GET_MODE(para->mode) == AM_SCAN_MODE_ALLBAND) 
+		    ||(GET_MODE(para->mode) == AM_SCAN_MODE_AUTO))
 		 && use_default )
 	{
 		struct dvb_frontend_parameters tpara;
