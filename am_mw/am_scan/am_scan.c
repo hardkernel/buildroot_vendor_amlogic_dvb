@@ -3506,7 +3506,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 			if (para->source == AM_SCAN_SRC_SATELLITE)
 			{
 				am_scan_calc_local_frequency(para->start_para[i].para.frequency, 
-					10600000, 9750000, (int*)&para->start_para[i].para.frequency);
+					11700000, 9750000, (int*)&scanner->start_freqs[i].dtv_para.para.frequency);
 					
 				para->start_para[i].para.u.ofdm.bandwidth = BANDWIDTH_8_MHZ;
 				para->start_para[i].para.u.ofdm.code_rate_HP = FEC_AUTO;
