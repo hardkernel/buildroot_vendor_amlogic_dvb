@@ -612,7 +612,13 @@ static void* fend_blindscan_thread(void *arg)
 					if ( (AM_FEND_IBlindscanAPI_GetProgress(dev_no) < 100))
 						BS_Status = DVBSx_BS_Status_Start;
 					else											
-						BS_Status = DVBSx_BS_Status_Cancel;
+						BS_Status = DVBSx_BS_Status_WaitExit;
+					break;
+				}
+
+			case DVBSx_BS_Status_WaitExit:
+				{
+					usleep(200*1000);
 					break;
 				}
 

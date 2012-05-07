@@ -72,7 +72,8 @@ enum AM_FEND_DVBSx_BlindScanAPI_Status
 	DVBSx_BS_Status_Adjust = 3,							/**< = 3 Indicates that the blind scan process is reading the channel info which have scanned out.*/
 	DVBSx_BS_Status_User_Process = 4,					/**< = 4 Indicates that the blind scan process is in custom code. Customer can add the callback function in this stage such as adding TP information to TP list or lock the TP for parsing PSI.*/
 	DVBSx_BS_Status_Cancel = 5,							/**< = 5 Indicates that the blind scan process is cancelled or the blind scan have completed.*/
-	DVBSx_BS_Status_Exit = 6							/**< = 6 Indicates that the blind scan process have ended.*/
+	DVBSx_BS_Status_Exit = 6,							/**< = 6 Indicates that the blind scan process have ended.*/
+	DVBSx_BS_Status_WaitExit = 7						/**< = 7 Indicates that the blind scan process wait user exit.*/
 };
 
 /**\brief Defines the blind scan mode.*/
@@ -101,7 +102,7 @@ struct AM_FEND_DVBSx_BlindScanAPI_Setting
 	struct dvb_frontend_parameters channels_Temp[16];			/**< Stores the channel information temporarily that scan out results by the blind scan procedure.*/
 	struct dvbsx_blindscanpara	bsPara;							/**< Stores the blind scan parameters each blind scan procedure.*/
 	struct dvbsx_blindscaninfo	bsInfo;							/**< Stores the blind scan status information each blind scan procedure.*/
-	fe_spectral_inversion_t m_eSpectrumMode;				/**< Defines the device spectrum polarity setting.  \sa ::fe_spectral_inversion_t.*/
+	fe_spectral_inversion_t m_eSpectrumMode;					/**< Defines the device spectrum polarity setting.  \sa ::fe_spectral_inversion_t.*/
 };
 
 /**\brief 前端设备*/
