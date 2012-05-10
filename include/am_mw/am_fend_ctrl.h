@@ -14,7 +14,6 @@
 #include <am_types.h>
 #include <am_mem.h>
 #include <am_fend.h>
-#include <am_fend_diseqc_cmd.h>
 
 
 #ifdef __cplusplus
@@ -34,11 +33,21 @@ extern "C"
 
 /****************************************************************************
  * Type definitions
- ***************************************************************************/
+ ***************************************************************************/ 
+ 
+/**\brief 前端控制模块错误代码*/
+enum AM_FENDCTRL_ErrorCode
+{
+	AM_FENDCTRL_ERROR_BASE=AM_ERROR_BASE(AM_MOD_FENDCTRL),
+	AM_FENDCTRL_ERR_END
+};  
+   
+  
 enum { AA=0, AB=1, BA=2, BB=3, SENDNO=4 /* and 0xF0 .. 0xFF*/  };	// DiSEqC Parameter
 typedef enum { DISEQC_NONE=0, V1_0=1, V1_1=2, V1_2=3, SMATV=4 }AM_SEC_Diseqc_Mode;	// DiSEqC Mode
 typedef enum { NO=0, A=1, B=2 }AM_SEC_Toneburst_Param;
 
+/**\brief 卫星设备（diseqc）控制参数*/ 
 typedef struct AM_SEC_DVBSatelliteDiseqcParameters
 {
 	unsigned char m_committed_cmd;
@@ -63,6 +72,7 @@ typedef struct AM_SEC_DVBSatelliteDiseqcParameters
 typedef enum {	HILO=0, ON=1, OFF=2	}AM_SEC_22khz_Signal; // 22 Khz
 typedef enum {	HV=0, _14V=1, _18V=2, _0V=3, HV_13=4 }AM_SEC_Voltage_Mode; // 14/18 V
 
+/**\brief 卫星设备（switch）控制参数*/ 
 typedef struct AM_SEC_DVBSatelliteSwitchParameters
 {
 	AM_SEC_Voltage_Mode m_voltage_mode;
@@ -88,6 +98,7 @@ typedef struct AM_SEC_DVBSatelliteRotorGotoxxParameters
 	double m_latitude;	// latitude for gotoXX? function
 }AM_SEC_DVBSatelliteRotorGotoxxParameters_t;
 
+/**\brief 卫星设备（Motor）控制参数*/ 
 typedef struct AM_SEC_DVBSatelliteRotorParameters
 {
 	AM_SEC_DVBSatelliteRotorInputpowerParameters_t m_inputpower_parameters;
@@ -97,12 +108,10 @@ typedef struct AM_SEC_DVBSatelliteRotorParameters
 
 typedef enum { RELAIS_OFF=0, RELAIS_ON }AM_SEC_12V_Relais_State;
 
-
+/**\brief LNB参数*/ 
 typedef struct AM_SEC_DVBSatelliteLNBParameters
 {
 	AM_SEC_12V_Relais_State m_12V_relais_state;	// 12V relais output on/off
-
-	int m_slot_mask; // useable by slot ( 1 | 2 | 4...)
 
 	unsigned int m_lof_hi,	// for 2 band universal lnb 10600 Mhz (high band offset frequency)
 				m_lof_lo,	// for 2 band universal lnb  9750 Mhz (low band offset frequency)
@@ -148,27 +157,28 @@ typedef enum{
 	DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_SWITCH_CMDS, // delay after change voltage before transmit toneburst/diseqc
 	DELAY_AFTER_DISEQC_RESET_CMD,
 	DELAY_AFTER_DISEQC_PERIPHERIAL_POWERON_CMD,
-	MAX_PARAMS
+	SEC_CMD_MAX_PARAMS
 }AM_SEC_Cmd_Param_t;
 
+/**\brief 卫星设备控制参数*/ 
 typedef struct AM_SEC_DVBSatelliteEquipmentControl
 {
 	AM_SEC_DVBSatelliteLNBParameters_t m_lnbs; // i think its enough
 	int m_rotorMoving;
 	AM_Bool_t m_canMeasureInputPower;
 
-	AM_SEC_Cmd_Param_t m_params[MAX_PARAMS];
+	AM_SEC_Cmd_Param_t m_params[SEC_CMD_MAX_PARAMS];
 }AM_SEC_DVBSatelliteEquipmentControl_t;
 
+typedef enum {
+	Polarisation_Horizontal, Polarisation_Vertical, Polarisation_CircularLeft, Polarisation_CircularRight
+}AM_FENDCTR_POLARISATIONL;
 
 typedef struct AM_FENDCTRL_DVBFrontendParametersSatellite
 {
-	enum {
-		Polarisation_Horizontal, Polarisation_Vertical, Polarisation_CircularLeft, Polarisation_CircularRight
-	};
-
 	AM_Bool_t no_rotor_command_on_tune;
-	int polarisation, orbital_position;
+	AM_FENDCTR_POLARISATIONL polarisation;
+	int orbital_position;
 
 	struct dvb_frontend_parameters para;
 }AM_FENDCTRL_DVBFrontendParametersSatellite_t;
@@ -190,6 +200,7 @@ typedef struct AM_FENDCTRL_DVBFrontendParametersATSC
 
 typedef enum {DVBS = 0, DVBC = 1, DVBT = 2, ATSC = 3}AM_FENDCTRL_Fendtype;
 
+/**\brief 前端控制模块设置参数*/
 typedef struct AM_FENDCTRL_DVBFrontendParameters{
 	union
 	{
@@ -201,12 +212,45 @@ typedef struct AM_FENDCTRL_DVBFrontendParameters{
 	AM_FENDCTRL_Fendtype m_type;
 }AM_FENDCTRL_DVBFrontendParameters_t;
 
-/* sec control interface */
-extern AM_ErrorCode_t AM_SEC_SetSetting(AM_SEC_DVBSatelliteEquipmentControl_t *setting);
-extern AM_ErrorCode_t AM_SEC_GetSetting(AM_SEC_DVBSatelliteEquipmentControl_t *setting);
+/* sec control interface */ 
 
-/* frontend control interface */
-extern AM_ErrorCode_t AM_FENDCTRL_SetPara(int dev_no, const AM_FENDCTRL_DVBFrontendParameters_t *para);
+/**\brief 设定卫星设备控制参数
+ * \param dev_no 前端设备号
+ * \param[in] para 卫星设备控制参数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+extern AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEquipmentControl_t *para); 
+
+/**\brief 获取卫星设备控制参数
+ * \param dev_no 前端设备号
+ * \param[out] para 卫星设备控制参数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+extern AM_ErrorCode_t AM_SEC_GetSetting(int dev_no, AM_SEC_DVBSatelliteEquipmentControl_t *para);
+
+/* frontend control interface */ 
+
+/**\brief 设定前端参数
+ * \param dev_no 前端设备号
+ * \param[in] para 前端设置参数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+extern AM_ErrorCode_t AM_FENDCTRL_SetPara(int dev_no, const AM_FENDCTRL_DVBFrontendParameters_t *para); 
+
+/**\brief 设定前端设备参数，并等待参数设定完成
+ * \param dev_no 前端设备号
+ * \param[in] para 前端设置参数
+ * \param[out] status 返回前端设备状态
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
 extern AM_ErrorCode_t AM_FENDCTRL_Lock(int dev_no, const AM_FENDCTRL_DVBFrontendParameters_t *para, fe_status_t *status);
 
 /****************************************************************************
