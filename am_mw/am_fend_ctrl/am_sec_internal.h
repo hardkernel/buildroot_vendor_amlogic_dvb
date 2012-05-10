@@ -11,7 +11,7 @@
 #ifndef _AM_SEC_INTERNAL_H
 #define _AM_SEC_INTERNAL_H
 
-#include <pthread.h>
+#include "list.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -23,7 +23,6 @@ extern "C"
  ***************************************************************************/
 
 #define MAX_DISEQC_LENGTH  16
-#define MAX_SECCMD_LIST_LENGTH  100
 
 /****************************************************************************
  * Type definitions
@@ -80,6 +79,9 @@ typedef struct pair
 
 typedef struct eSecCommand
 {
+	/* Use kernel list is not portable,  I suggest add a module in future*/
+	struct list_head head;
+
 	int cmd;
 
 	union
@@ -98,27 +100,11 @@ typedef struct eSecCommand
 	};
 }eSecCommand_t;
 
-typedef struct eSecCommandList
-{
-	eSecCommand_t secSequence[MAX_SECCMD_LIST_LENGTH];
-	eSecCommand_t *cur_seccmd;
-}eSecCommandList_t;
 
 /****************************************************************************
  * Function prototypes  
  ***************************************************************************/
 void AM_SEC_SetCommandString(eDVBDiseqcCommand_t *diseqc_cmd, const char *str);
-
-void AM_SEC_SetSecCommand( eSecCommand_t *sec_cmd, int cmd );
-
-void AM_SEC_SetSecCommandByVal( eSecCommand_t *sec_cmd, int cmd, int val );
-
-void AM_SEC_SetSecCommandByDiseqc( eSecCommand_t *sec_cmd, int cmd, eDVBDiseqcCommand_t diseqc );
-
-void AM_SEC_SetSecCommandByMeasure( eSecCommand_t *sec_cmd, int cmd, rotor_t measure );
-
-void AM_SEC_SetSecCommandByCompare( eSecCommand_t *sec_cmd, int cmd, pair_t compare );
-
 
 #ifdef __cplusplus
 }
