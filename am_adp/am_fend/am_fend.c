@@ -469,9 +469,9 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Exit(int dev_no)
 	
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
 	
-	if(!dev->drv->blindscan_getscanstatus)
+	if((!dev->drv->blindscan_getscanstatus) && (!dev->drv->blindscan_cancel))
 	{
-		AM_DEBUG(1, "fronend %d no not support blindscan_getscanstatus", dev_no);
+		AM_DEBUG(1, "fronend %d no not support blindscan_getscanstatus or blindscan_cancel", dev_no);
 		return AM_FEND_ERR_NOT_SUPPORTED;
 	}	
 
@@ -491,8 +491,15 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Exit(int dev_no)
 			}
 		}while(100 != pbsInfo->m_uiProgress);
 	}
+
+	if(ret != AM_SUCCESS)
+	{
+		pthread_mutex_unlock(&dev->lock);
+		return ret;
+	}
 	
 	/*driver need to set in demod mode*/
+	ret = dev->drv->blindscan_cancel(dev);
 
 	usleep(10 * 1000);
 	

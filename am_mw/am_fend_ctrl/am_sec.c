@@ -144,6 +144,10 @@ static struct list_head *AM_SEC_SecCommandListEnd(void)
 	return &sec_command_list;
 }
 
+static int AM_SEC_CanTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para)
+{
+	return 0;
+}
 
 /****************************************************************************
  * API functions
