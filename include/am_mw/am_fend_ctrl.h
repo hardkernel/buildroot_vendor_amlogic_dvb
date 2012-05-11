@@ -177,7 +177,7 @@ typedef enum {
 typedef struct AM_FENDCTRL_DVBFrontendParametersSatellite
 {
 	AM_Bool_t no_rotor_command_on_tune;
-	AM_FENDCTR_POLARISATIONL polarisation;
+	int polarisation;
 	int orbital_position;
 
 	struct dvb_frontend_parameters para;

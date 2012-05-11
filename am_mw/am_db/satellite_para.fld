@@ -4,6 +4,7 @@
 "lnb_num integer",							/**< LNB number*/
 "lof_hi integer",							/**< LNB 高本振频率, kHz*/
 "lof_lo integer",							/**< LNB 低本振频率, kHz*/
+"lof_threshold integer",					/**< LNB 转折频率*/
 "signal_22khz integer",						/**< 22kHz信号，0-ON, 1-OFF, 2-Hi/Lo*/
 "voltage integer",							/**< Voltage mode, 0-13V, 1-18V, 2-OFF, 3-H/V*/
 

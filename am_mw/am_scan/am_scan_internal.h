@@ -77,6 +77,15 @@ enum
 	AM_SCAN_STAGE_DONE
 };
 
+/*卫星盲扫阶段*/
+enum
+{
+	AM_SCAN_BS_STAGE_HL,
+	AM_SCAN_BS_STAGE_VL,
+	AM_SCAN_BS_STAGE_HH,
+	AM_SCAN_BS_STAGE_VH
+};
+
 /*sqlite3 stmts for DVB*/
 enum
 {
@@ -106,6 +115,9 @@ enum
 	QUERY_MAX_MAJOR_CHAN_NUM,
 	UPDATE_MAJOR_CHAN_NUM,
 	QUERY_SRV_BY_CHAN_NUM,
+	QUERY_SAT_PARA_BY_POS_NUM,
+	QUERY_SAT_PARA_BY_LO_LA,
+	INSERT_SAT_PARA,
 	MAX_STMT
 };
 
@@ -168,6 +180,15 @@ typedef struct
 	AM_SCAN_FEPara_t	dtv_para 	/**< 数字参数*/;
 }AM_SCAN_FrontEndPara_t;
 
+/**\brief 卫星盲扫控制数据*/
+typedef struct
+{
+	int							start_freq;	/**< 起始频率*/
+	int							stop_freq;	/**< 结束频率*/
+	int							stage;		/**< HL,HH,VL,VH*/
+	AM_SCAN_BlindScanProgress_t	progress;	/**< Blind Scan 进度*/
+}AM_SCAN_BlindScanCtrl_t;
+
 
 /**\brief 搜索中间数据*/
 struct AM_SCAN_Scanner_s
@@ -203,7 +224,7 @@ struct AM_SCAN_Scanner_s
 	int								end_code;		/**< 搜索结束码*/
 	void							*user_data;		/**< 用户数据*/
 	AM_Bool_t						store;			/**< 是否存储*/
-	AM_SCAN_BlindScanProgress_t		bs_progress;	/**< Blind Scan 进度*/
+	AM_SCAN_BlindScanCtrl_t			bs_ctl;			/**< 盲扫控制*/
 };
 
 

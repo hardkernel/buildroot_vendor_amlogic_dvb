@@ -62,6 +62,10 @@
 #define DEFAULT_DVBT_FREQ_START    474000
 #define DEFAULT_DVBT_FREQ_STOP     858000
 
+/*DVBS盲扫起始结束频率*/
+#define DEFAULT_DVBS_BS_FREQ_START	950000000 /*950MHz*/
+#define DEFAULT_DVBS_BS_FREQ_STOP	2150000000 /*2150MHz*/
+
 /*电视广播排序是否统一编号*/
 #define SORT_TOGETHER
 	
@@ -167,7 +171,8 @@
 		sqlite3_bind_int(stmts[UPDATE_SRV], 21, source_id);\
 		sqlite3_bind_int(stmts[UPDATE_SRV], 22, 0);\
 		sqlite3_bind_int(stmts[UPDATE_SRV], 23, -1);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 24, srv_dbid);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 24, satpara_dbid);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 25, srv_dbid);\
 		sqlite3_step(stmts[UPDATE_SRV]);\
 		sqlite3_reset(stmts[UPDATE_SRV]);\
 		AM_DEBUG(1, "Updating Program: '%s',srv_type(%d), vpid(%d), vfmt(%d),apids(%s), afmts(%s), alangs(%s) ",\
@@ -247,6 +252,11 @@ const char *sql_stmts[MAX_STMT] =
 	"select max(major_chan_num) from srv_table",
 	"update srv_table set major_chan_num=?, chan_num=? where db_id=(select db_id from srv_table where db_ts_id=?)",
 	"select db_id from srv_table where src=? and chan_num=?",
+	"select db_id from sat_para_table where lnb_num=? and motor_num=? and pos_num=?",
+	"select db_id from sat_para_table where lnb_num=? and lo_direction=? and la_direction=? and longitude=? and latitude=?",
+	"insert into sat_para_table(sat_name,lnb_num,lof_hi,lof_lo,lof_threshold,signal_22khz,voltage,motor_num,pos_num,lo_direction,la_direction,\
+	longitude,latitude,diseqc_mode,tone_burst,committed_cmd,uncommitted_cmd,repeat_count,sequence_repeat,fast_diseqc,cmd_order) \
+	values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
 };
 
 /****************************************************************************
@@ -297,7 +307,7 @@ void am_scan_notify_from_atv(const int *msg_pdu, void *para)
 		scanner->evt_flag |= AM_SCAN_EVT_ATV_SEARCH_DONE;
 		if (msg_pdu[2] > 0)
 		{
-			if ((int)scanner->curr_ts->fend_para.frequency == msg_pdu[1])
+			if ((int)scanner->curr_ts->fend_para.para.frequency == msg_pdu[1])
 			{
 				if (scanner->end_code == AM_SCAN_RESULT_UNLOCKED)
 				{
@@ -374,16 +384,24 @@ static AM_ErrorCode_t convert_code_to_utf8(const char *cod, char *in_code,int in
 }
 
 
-static void am_scan_calc_local_frequency(int sat_frequency/*kHz*/, int lof_hi/*kHz*/, int lof_lo/*kHz*/, int *frequency/*Hz*/)
+static void am_scan_get_fend_ctrl_para(AM_SCAN_Source_t src, AM_SCAN_FEPara_t *sfe, AM_FENDCTRL_DVBFrontendParameters_t *fcfe)
 {
-	const int lof_threshold = 11700000;/*kHz*/
-	int lof, local;
-	
-	lof = (sat_frequency > lof_threshold) ? lof_hi : lof_lo;
-	local = abs(sat_frequency - lof);
-	local = ((((local * 2) / 125) + 1) / 2) * 125;
-	*frequency = local * 1000;/* Hz */
-	AM_DEBUG(1, "Get local frequency %d Hz", *frequency);
+	switch (src)
+	{
+		case AM_SCAN_SRC_TERRISTRIAL:
+			fcfe->m_type = DVBT;
+			fcfe->terrestrial.para = sfe->para;
+			break;
+		case AM_SCAN_SRC_SATELLITE:
+			fcfe->m_type = DVBS;
+			fcfe->sat.polarisation = sfe->polar;
+			fcfe->sat.para = sfe->para;
+			break;
+		default:
+			fcfe->m_type = DVBC;
+			fcfe->cable.para = sfe->para;
+			break;
+	}
 }
 
 static void scan_rec_tab_init(ScanRecTab_t *tab)
@@ -641,6 +659,84 @@ static void format_audio_strings(AM_SCAN_AudioInfo_t *ai, char *pids, char *fmts
 	}
 }
 
+/**\brief 查询一个satellite parameter记录是否已经存在 */
+static int get_sat_para_record(sqlite3_stmt **stmts, AM_SCAN_SatellitePara_t *sat_para)
+{
+	sqlite3_stmt *stmt;
+	int db_id = -1;
+	
+	if (sat_para->sec.m_lnbs.m_cursat_parameters.m_rotorPosNum > 0)
+	{
+		/* by motor_num + position_num */
+		stmt = stmts[QUERY_SAT_PARA_BY_POS_NUM];
+		sqlite3_bind_int(stmt, 1, sat_para->lnb_num);
+		sqlite3_bind_int(stmt, 2, sat_para->motor_num);
+		sqlite3_bind_int(stmt, 3, sat_para->sec.m_lnbs.m_cursat_parameters.m_rotorPosNum);
+	}
+	else
+	{
+		/* by longitude + latitude */
+		stmt = stmts[QUERY_SAT_PARA_BY_LO_LA];
+		sqlite3_bind_int(stmt, 1, sat_para->lnb_num);
+		sqlite3_bind_int(stmt, 2, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction);
+		sqlite3_bind_int(stmt, 3, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction);
+		sqlite3_bind_double(stmt, 4, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude);
+		sqlite3_bind_double(stmt, 5, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude);
+	}
+	
+	if (sqlite3_step(stmt) == SQLITE_ROW)
+	{
+		db_id = sqlite3_column_int(stmt, 0);
+	}
+	sqlite3_reset(stmt);
+	
+	return db_id;
+}
+
+/**\brief 添加一个satellite parameter记录，如果已存在，则返回已存在的记录db_id*/
+static int insert_sat_para(sqlite3_stmt **stmts, AM_SCAN_SatellitePara_t *sat_para)
+{
+	sqlite3_stmt *stmt;
+	int db_id = -1;
+	
+	/* Already exist ? */
+	db_id = get_sat_para_record(stmts, sat_para);
+
+	/* insert a new record */
+	if (db_id == -1)
+	{
+		stmt = stmts[INSERT_SAT_PARA];
+		sqlite3_bind_text(stmt, 1, sat_para->sat_name, strlen(sat_para->sat_name), SQLITE_STATIC);
+		sqlite3_bind_int(stmt, 2, sat_para->lnb_num);
+		sqlite3_bind_int(stmt, 3, sat_para->sec.m_lnbs.m_lof_hi);
+		sqlite3_bind_int(stmt, 4, sat_para->sec.m_lnbs.m_lof_lo);
+		sqlite3_bind_int(stmt, 5, sat_para->sec.m_lnbs.m_lof_threshold);
+		sqlite3_bind_int(stmt, 6, sat_para->sec.m_lnbs.m_cursat_parameters.m_22khz_signal);
+		sqlite3_bind_int(stmt, 7, sat_para->sec.m_lnbs.m_cursat_parameters.m_voltage_mode);
+		sqlite3_bind_int(stmt, 8, sat_para->motor_num);
+		sqlite3_bind_int(stmt, 9, sat_para->sec.m_lnbs.m_cursat_parameters.m_rotorPosNum);
+		sqlite3_bind_int(stmt, 10, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction);
+		sqlite3_bind_int(stmt, 11, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction);
+		sqlite3_bind_double(stmt, 12, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude);
+		sqlite3_bind_double(stmt, 13, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude);
+		sqlite3_bind_int(stmt, 14, sat_para->sec.m_lnbs.m_diseqc_parameters.m_diseqc_mode);
+		sqlite3_bind_int(stmt, 15, sat_para->sec.m_lnbs.m_diseqc_parameters.m_toneburst_param);
+		sqlite3_bind_int(stmt, 16, sat_para->sec.m_lnbs.m_diseqc_parameters.m_committed_cmd);
+		sqlite3_bind_int(stmt, 17, sat_para->sec.m_lnbs.m_diseqc_parameters.m_uncommitted_cmd);
+		sqlite3_bind_int(stmt, 18, sat_para->sec.m_lnbs.m_diseqc_parameters.m_repeats);
+		sqlite3_bind_int(stmt, 19, sat_para->sec.m_lnbs.m_diseqc_parameters.m_seq_repeat ? 1 : 0);
+		sqlite3_bind_int(stmt, 20, sat_para->sec.m_lnbs.m_diseqc_parameters.m_use_fast ? 1 : 0);
+		sqlite3_bind_int(stmt, 21, sat_para->sec.m_lnbs.m_diseqc_parameters.m_command_order);
+		
+		if (sqlite3_step(stmt) == SQLITE_DONE)
+			db_id = get_sat_para_record(stmts, sat_para);
+	
+		sqlite3_reset(stmt);
+	}
+		
+	return db_id;
+}
+
 /**\brief 存储一个TS到数据库, ATSC*/
 static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_t *ts)
 {
@@ -652,7 +748,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	cvct_channel_info_t *ccinfo;
 	tvct_channel_info_t *tcinfo;
 	int src = result->src, i;
-	int net_dbid,dbid, srv_dbid;
+	int net_dbid,dbid, srv_dbid, satpara_dbid=-1;
 	int orig_net_id = -1, ts_id = -1;
 	char selbuf[256];
 	char insbuf[400];
@@ -700,7 +796,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	}
 	
 	/*检查该TS是否已经添加*/
-	dbid = insert_ts(stmts, src, (int)ts->fend_para.frequency);
+	dbid = insert_ts(stmts, src, (int)ts->fend_para.para.frequency);
 	if (dbid == -1)
 	{
 		AM_DEBUG(1, "insert new ts error");
@@ -710,9 +806,9 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	/*更新TS数据*/
 	sqlite3_bind_int(stmts[UPDATE_TS], 1, net_dbid);
 	sqlite3_bind_int(stmts[UPDATE_TS], 2, ts_id);
-	sqlite3_bind_int(stmts[UPDATE_TS], 3, (int)ts->fend_para.u.qam.symbol_rate);
-	sqlite3_bind_int(stmts[UPDATE_TS], 4, (int)ts->fend_para.u.qam.modulation);
-	sqlite3_bind_int(stmts[UPDATE_TS], 5, (int)ts->fend_para.u.ofdm.bandwidth);
+	sqlite3_bind_int(stmts[UPDATE_TS], 3, (int)ts->fend_para.para.u.qam.symbol_rate);
+	sqlite3_bind_int(stmts[UPDATE_TS], 4, (int)ts->fend_para.para.u.qam.modulation);
+	sqlite3_bind_int(stmts[UPDATE_TS], 5, (int)ts->fend_para.para.u.ofdm.bandwidth);
 	sqlite3_bind_int(stmts[UPDATE_TS], 6, ts->snr);
 	sqlite3_bind_int(stmts[UPDATE_TS], 7, ts->ber);
 	sqlite3_bind_int(stmts[UPDATE_TS], 8, ts->strength);
@@ -1249,7 +1345,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	dvbpsi_descriptor_t *descr;
 	dvbpsi_nit_t *nit;
 	int src = result->src;
-	int net_dbid,dbid, srv_dbid;
+	int net_dbid,dbid, srv_dbid, satpara_dbid = -1;
 	int orig_net_id = -1;
 	char selbuf[256];
 	char insbuf[400];
@@ -1272,7 +1368,18 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 		AM_DEBUG(1, "No PAT found in ts, will not store to dbase");
 		return;
 	}
-
+	
+	if (result->src == AM_SCAN_SRC_SATELLITE)
+	{
+		/* 存储卫星配置 */
+		satpara_dbid = insert_sat_para(stmts, &result->sat_para);
+		if (satpara_dbid == -1)
+		{
+			AM_DEBUG(1, "Cannot insert satellite parameter!");
+			return;
+		}
+	}
+	
 	/*获取所在网络*/
 	if (ts->sdts)
 	{
@@ -1335,7 +1442,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	}
 	
 	/*检查该TS是否已经添加*/
-	dbid = insert_ts(stmts, src, (int)ts->fend_para.frequency);
+	dbid = insert_ts(stmts, src, (int)ts->fend_para.para.frequency);
 	if (dbid == -1)
 	{
 		AM_DEBUG(1, "insert new ts error");
@@ -1344,13 +1451,14 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	/*更新TS数据*/
 	sqlite3_bind_int(stmts[UPDATE_TS], 1, net_dbid);
 	sqlite3_bind_int(stmts[UPDATE_TS], 2, ts->pats->i_ts_id);
-	sqlite3_bind_int(stmts[UPDATE_TS], 3, (int)ts->fend_para.u.qam.symbol_rate);
-	sqlite3_bind_int(stmts[UPDATE_TS], 4, (int)ts->fend_para.u.qam.modulation);
-	sqlite3_bind_int(stmts[UPDATE_TS], 5, (int)ts->fend_para.u.ofdm.bandwidth);
+	sqlite3_bind_int(stmts[UPDATE_TS], 3, (int)ts->fend_para.para.u.qam.symbol_rate);
+	sqlite3_bind_int(stmts[UPDATE_TS], 4, (int)ts->fend_para.para.u.qam.modulation);
+	sqlite3_bind_int(stmts[UPDATE_TS], 5, (int)ts->fend_para.para.u.ofdm.bandwidth);
 	sqlite3_bind_int(stmts[UPDATE_TS], 6, ts->snr);
 	sqlite3_bind_int(stmts[UPDATE_TS], 7, ts->ber);
 	sqlite3_bind_int(stmts[UPDATE_TS], 8, ts->strength);
-	sqlite3_bind_int(stmts[UPDATE_TS], 9, dbid);
+	sqlite3_bind_int(stmts[UPDATE_TS], 9, satpara_dbid);
+	sqlite3_bind_int(stmts[UPDATE_TS], 10, dbid);
 	sqlite3_step(stmts[UPDATE_TS]);
 	sqlite3_reset(stmts[UPDATE_TS]);
 
@@ -1637,9 +1745,23 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 		}
 	}
 	
-	/*自动搜索和全频段搜索时删除该源下的所有信息*/
-	if (!(result->mode & AM_SCAN_MODE_MANUAL) && result->tses)
+	if (result->src == AM_SCAN_SRC_SATELLITE)
 	{
+		int db_sat_id;
+		/* 删除同一卫星配置下的所有ts & srv */
+		db_sat_id = get_sat_para_record(stmts, &result->sat_para);
+		if (db_sat_id != -1)
+		{
+			AM_DEBUG(1, "Delete tses & srvs for db_sat_para_id=%d", db_sat_id);
+			snprintf(sqlstr, sizeof(sqlstr), "delete from ts_table where db_sat_para_id=%d",db_sat_id);
+			sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+			snprintf(sqlstr, sizeof(sqlstr), "delete from srv_table where db_sat_para_id=%d",db_sat_id);
+			sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+		}
+	}
+	else if (GET_MODE(result->mode) != AM_SCAN_MODE_MANUAL && result->tses)
+	{
+		/*自动搜索和全频段搜索时删除该源下的所有信息*/
 		am_scan_clear_source(hdb, result->src);
 	}
 	
@@ -2708,7 +2830,8 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner)
 {
 	AM_ErrorCode_t ret;
 	AM_SCAN_TSProgress_t tp;
-
+	AM_FENDCTRL_DVBFrontendParameters_t fcpara;
+	
 	if (scanner->stage != AM_SCAN_STAGE_NIT)
 	{
 		scanner->stage = AM_SCAN_STAGE_NIT;
@@ -2744,10 +2867,11 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner)
 
 		tp.index = scanner->curr_freq;
 		tp.total = scanner->start_freqs_cnt;
-		tp.fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para.para;
+		tp.fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para;
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_BEGIN, (void*)&tp);
 		
-		ret = AM_FEND_SetPara(scanner->fend_dev, &scanner->start_freqs[scanner->curr_freq].dtv_para.para);
+		am_scan_get_fend_ctrl_para(scanner->result.src, &scanner->start_freqs[scanner->curr_freq].dtv_para, &fcpara);
+		ret = AM_FENDCTRL_SetPara(scanner->fend_dev, &fcpara);
 		if (ret == AM_SUCCESS)
 		{
 			scanner->recv_status |= AM_SCAN_RECVING_WAIT_FEND;
@@ -2755,7 +2879,7 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner)
 		else
 		{
 			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_END, NULL);
-			AM_DEBUG(1, "AM_FEND_SetPara Failed, try next frequency");
+			AM_DEBUG(1, "AM_FENDCTRL_SetPara Failed, try next frequency");
 		}
 			
 	}while(ret != AM_SUCCESS);
@@ -2779,7 +2903,7 @@ static AM_ErrorCode_t am_scan_try_atv_search(AM_SCAN_Scanner_t *scanner)
 		}
 		memset(scanner->curr_ts, 0, sizeof(AM_SCAN_TS_t));
 
-		scanner->curr_ts->fend_para.frequency = scanner->start_freqs[scanner->curr_freq].atv_freq;
+		scanner->curr_ts->fend_para.para.frequency = scanner->start_freqs[scanner->curr_freq].atv_freq;
 		scanner->curr_ts->type = AM_SCAN_TS_ANALOG;
 
 		/*添加到搜索结果列表*/
@@ -2794,8 +2918,8 @@ static AM_ErrorCode_t am_scan_try_atv_search(AM_SCAN_Scanner_t *scanner)
 	am_scan_start_atv_search((void*)scanner);
 
 	scanner->curr_ts->type = AM_SCAN_TS_ANALOG;
-	scanner->curr_ts->fend_para.frequency = scanner->start_freqs[scanner->curr_freq].atv_freq;
-	if (am_scan_atv_detect_frequency(scanner->curr_ts->fend_para.frequency) == 0)
+	scanner->curr_ts->fend_para.para.frequency = scanner->start_freqs[scanner->curr_freq].atv_freq;
+	if (am_scan_atv_detect_frequency(scanner->curr_ts->fend_para.para.frequency) == 0)
 	{
 		scanner->recv_status |= AM_SCAN_SEARCHING_ATV;
 		scanner->start_freqs[scanner->curr_freq].status = AM_SCAN_FE_ATV;
@@ -2817,6 +2941,7 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 {
 	AM_ErrorCode_t ret = AM_FAILURE;
 	AM_SCAN_TSProgress_t tp;
+	AM_FENDCTRL_DVBFrontendParameters_t fcpara;
 
 	if (scanner->stage != AM_SCAN_STAGE_TS)
 		scanner->stage = AM_SCAN_STAGE_TS;
@@ -2876,7 +3001,7 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 		
 		tp.index = scanner->curr_freq;
 		tp.total = scanner->start_freqs_cnt;
-		tp.fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para.para;
+		tp.fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para;
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_BEGIN, (void*)&tp);
 		
 		AM_DEBUG(1, "tp index %d, dtv %d, atv %d", scanner->curr_freq, 
@@ -2885,7 +3010,8 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 		if (scanner->start_freqs[scanner->curr_freq].dtv_para.para.frequency > 0)
 		{
 			AM_DEBUG(1, "Start scanning dtv frequency %u ...", scanner->start_freqs[scanner->curr_freq].dtv_para.para.frequency);
-			ret = AM_FEND_SetPara(scanner->fend_dev, &scanner->start_freqs[scanner->curr_freq].dtv_para.para);
+			am_scan_get_fend_ctrl_para(scanner->result.src, &scanner->start_freqs[scanner->curr_freq].dtv_para, &fcpara);
+			ret = AM_FENDCTRL_SetPara(scanner->fend_dev, &fcpara);
 			if (ret == AM_SUCCESS)
 			{
 				scanner->recv_status |= AM_SCAN_RECVING_WAIT_FEND;
@@ -2938,8 +3064,8 @@ static void am_scan_blind_scan_callback(int dev_no, int event_type, void *param,
 	
 	pthread_mutex_lock(&scanner->lock);
 	
-	scanner->bs_progress.progress = (scanner->stage - AM_SCAN_STAGE_BLIND_HL)*25 + progress/4;
-	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_BLIND_SCAN, (void*)&scanner->bs_progress);
+	scanner->bs_ctl.progress.progress = (scanner->stage - AM_SCAN_STAGE_BLIND_HL)*25 + progress/4;
+	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_BLIND_SCAN, (void*)&scanner->bs_ctl.progress);
 	
 	if (progress >= 100)
 	{
@@ -2954,73 +3080,41 @@ static void am_scan_blind_scan_callback(int dev_no, int event_type, void *param,
 /**\brief 启动一次卫星盲扫*/
 static AM_ErrorCode_t am_scan_start_blind_scan(AM_SCAN_Scanner_t *scanner)
 {
-	int polar = -1, lo = -1;
 	AM_FEND_Polarisation_t p;
 	AM_FEND_Localoscollatorfreq_t l;
+	AM_SEC_DVBSatelliteEquipmentControl_t *sec;
 	
-	if (scanner->stage < AM_SCAN_STAGE_BLIND_HL || scanner->stage > AM_SCAN_STAGE_BLIND_VH)
+	if (scanner->bs_ctl.stage > AM_SCAN_BS_STAGE_VH)
 	{
 		AM_DEBUG(1, "Currently is not in BlindScan mode");
 		return AM_FAILURE;
 	}
 	
-	if (scanner->stage == AM_SCAN_STAGE_BLIND_HL ||
-		scanner->stage == AM_SCAN_STAGE_BLIND_HH)
+	sec = &scanner->result.sat_para.sec;
+	
+	if (scanner->bs_ctl.stage == AM_SCAN_STAGE_BLIND_HL ||
+		scanner->bs_ctl.stage == AM_SCAN_STAGE_BLIND_HH)
 		p = AM_FEND_POLARISATION_H;
 	else
 		p = AM_FEND_POLARISATION_V;
 		
-	if (scanner->stage == AM_SCAN_STAGE_BLIND_VL ||
-		scanner->stage == AM_SCAN_STAGE_BLIND_HL)
+	if (scanner->bs_ctl.stage == AM_SCAN_STAGE_BLIND_VL ||
+		scanner->bs_ctl.stage == AM_SCAN_STAGE_BLIND_HL)
 		l = AM_FEND_LOCALOSCILLATORFREQ_L;
 	else
 		l = AM_FEND_LOCALOSCILLATORFREQ_H;
-	
-#if 0		
-	if (scanner->result.sat_cfg.lnb_power == AM_SCAN_LNBPOWER_AUTO)
-	{
-		fe_sec_voltage_t vol;
-		
-		if (p == AM_FEND_POLARISATION_H)
-			vol = SEC_VOLTAGE_18;
-		else
-			vol = SEC_VOLTAGE_13;
-			
-		/* Set 13/18V to select polar H/V */
 
-		polar = p;
-	}
 	
-	if (scanner->result.sat_cfg.lnb_22k == AM_SCAN_LNB22K_AUTO)
-	{
-		fe_sec_tone_mode_t tone;
-		
-		if (l == AM_FEND_LOCALOSCILLATORFREQ_L)
-			tone = SEC_TONE_OFF;
-		else
-			tone = SEC_TONE_ON;
-			
-		/* Set 22K to select LOF Hi/Low */
-
-		lo = l;
-	}
+	scanner->bs_ctl.progress.polar = p;
+	scanner->bs_ctl.progress.lo = l;
 	
-	/* set switch */
-	if (polar == -1)
-		polar = p;
-	if (lo == -1)
-		lo = l;
+	if (scanner->result.sat_para.sec.m_lnbs.m_lof_hi == scanner->result.sat_para.sec.m_lnbs.m_lof_lo && 
+		l == AM_FEND_LOCALOSCILLATORFREQ_H)
+		return AM_FAILURE;
 	
-	scanner->bs_progress.polar = polar;
-	scanner->bs_prgoress.lo = lo;
-	
-	return AM_FEND_BlindScan(scanner->fend_dev, \
-		m_scan_blind_scan_callback, (void*)scanner, \
-		scanner->result.sat_cfg.blind_scan.start_freq,\
-		scanner->result.sat_cfg.blind_scan.stop_freq);	
-#else
-	return AM_SUCCESS;
-#endif
+	/* start blind scan */
+	return AM_FEND_BlindScan(scanner->fend_dev, /*am_scan_blind_scan_callback*/NULL, 
+		(void*)scanner, scanner->bs_ctl.start_freq, scanner->bs_ctl.stop_freq);	
 }
 
 /**\brief 启动搜索*/
@@ -3095,7 +3189,9 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 		{
 			/* 启动卫星盲扫 */
 			scanner->stage = AM_SCAN_STAGE_BLIND_HL;
-			scanner->bs_progress.progress = 0;
+			scanner->bs_ctl.progress.progress = 0;
+			scanner->bs_ctl.start_freq = DEFAULT_DVBS_BS_FREQ_START;
+			scanner->bs_ctl.stop_freq = DEFAULT_DVBS_BS_FREQ_START;
 			return am_scan_start_blind_scan(scanner);
 		}
 	}
@@ -3112,20 +3208,20 @@ static void am_scan_solve_blind_scan_done_evt(AM_SCAN_Scanner_t *scanner)
 	/* 退出本次盲扫 */
 	AM_FEND_BlindExit(scanner->fend_dev);
 	
-	while (scanner->stage < AM_SCAN_STAGE_BLIND_VH && ret != AM_SUCCESS)
+	while (scanner->bs_ctl.stage < AM_SCAN_BS_STAGE_VH && ret != AM_SUCCESS)
 	{
 		scanner->stage++;
 		/* 开始下一个配置的盲扫 */
 		ret = am_scan_start_blind_scan(scanner);
 		if (ret != AM_SUCCESS)
 		{
-			AM_DEBUG(1, "Start blind scan failed\n");
-			scanner->bs_progress.progress += 25;
-			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_BLIND_SCAN, (void*)&scanner->bs_progress);
+			AM_DEBUG(1, "Start blind scan failed at stage %d\n", scanner->stage);
+			scanner->bs_ctl.progress.progress += 25;
+			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_BLIND_SCAN, (void*)&scanner->bs_ctl.progress);
 		}
 	}
 	
-	if (ret != AM_SUCCESS && scanner->stage >= AM_SCAN_STAGE_BLIND_VH)
+	if (ret != AM_SUCCESS && scanner->stage >= AM_SCAN_BS_STAGE_VH)
 	{
 		AM_DEBUG(1, "All blind scan done! Now scan for each TP...");
 		/* Change the scan mode to All band */
@@ -3142,7 +3238,7 @@ static void am_scan_solve_atv_search_done_evt(AM_SCAN_Scanner_t *scanner)
 	{
 		goto done;
 	}
-	scanner->curr_ts->fend_para.frequency = scanner->curr_ts->analog_channel->freq;
+	scanner->curr_ts->fend_para.para.frequency = scanner->curr_ts->analog_channel->freq;
 	scanner->curr_ts->analog_channel->major_chan_num = scanner->curr_freq + 1;
 	scanner->curr_ts->analog_channel->minor_chan_num = 0;
 done:
@@ -3253,7 +3349,7 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 			}
 			
 
-			scanner->curr_ts->fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para.para;
+			scanner->curr_ts->fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para;
 			scanner->start_freqs[scanner->curr_freq].dtv_locked = AM_TRUE;
 			/*添加到搜索结果列表*/
 			ADD_TO_LIST(scanner->curr_ts, scanner->result.tses);
@@ -3604,15 +3700,18 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	
 	/*配置起始频点*/
 	scanner->start_freqs_cnt = AM_MAX(para->start_para_cnt, para->atv_freq_cnt);
-	scanner->start_freqs = (AM_SCAN_FrontEndPara_t*)\
-							malloc(sizeof(AM_SCAN_FrontEndPara_t) * scanner->start_freqs_cnt);
-	if (!scanner->start_freqs)
+	if (scanner->start_freqs_cnt > 0)
 	{
-		AM_DEBUG(1, "Scan: scan create error, no enough memory");
-		free(scanner);
-		return AM_SCAN_ERR_NO_MEM;
+		scanner->start_freqs = (AM_SCAN_FrontEndPara_t*)\
+								malloc(sizeof(AM_SCAN_FrontEndPara_t) * scanner->start_freqs_cnt);
+		if (!scanner->start_freqs)
+		{
+			AM_DEBUG(1, "Scan: scan create error, no enough memory");
+			free(scanner);
+			return AM_SCAN_ERR_NO_MEM;
+		}
+		memset(scanner->start_freqs, 0, sizeof(AM_SCAN_FrontEndPara_t) * scanner->start_freqs_cnt);
 	}
-	memset(scanner->start_freqs, 0, sizeof(AM_SCAN_FrontEndPara_t) * scanner->start_freqs_cnt);
 	
 	/*全频段搜索时按标准频率表搜索*/
 	if (((GET_MODE(para->mode) == AM_SCAN_MODE_ALLBAND) 
@@ -3628,6 +3727,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 			{
 				tpara.frequency = dvbc_std_freqs[i]*1000;
 				scanner->start_freqs[i].dtv_para.para = tpara;
+				scanner->start_freqs[i].dtv_para.polar = -1;
 			}
 		} else if(para->source==AM_SCAN_SRC_TERRISTRIAL) {
 			tpara.u.ofdm.bandwidth = DEFAULT_DVBT_BW;
@@ -3635,6 +3735,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 			{
 				tpara.frequency = (DEFAULT_DVBT_FREQ_START+(8000*i))*1000;
 				scanner->start_freqs[i].dtv_para.para = tpara;
+				scanner->start_freqs[i].dtv_para.polar = -1;
 			}
 		}
 	}
@@ -3645,19 +3746,9 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 		{
 			scanner->start_freqs[i].dtv_para = para->start_para[i];
 			
-			/* test in DVB-T */
-			if (para->source == AM_SCAN_SRC_SATELLITE)
+			if (para->source != AM_SCAN_SRC_SATELLITE)
 			{
-				am_scan_calc_local_frequency(para->start_para[i].para.frequency, 
-					11700000, 9750000, (int*)&scanner->start_freqs[i].dtv_para.para.frequency);
-					
-				para->start_para[i].para.u.ofdm.bandwidth = BANDWIDTH_8_MHZ;
-				para->start_para[i].para.u.ofdm.code_rate_HP = FEC_AUTO;
-				para->start_para[i].para.u.ofdm.code_rate_LP = FEC_AUTO;
-				para->start_para[i].para.u.ofdm.constellation = QAM_AUTO;
-				para->start_para[i].para.u.ofdm.guard_interval = GUARD_INTERVAL_AUTO;
-				para->start_para[i].para.u.ofdm.hierarchy_information = HIERARCHY_AUTO;
-				para->start_para[i].para.u.ofdm.transmission_mode = TRANSMISSION_MODE_AUTO;
+				scanner->start_freqs[i].dtv_para.polar = -1;
 			}
 		}
 	}

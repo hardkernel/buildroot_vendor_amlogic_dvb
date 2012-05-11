@@ -15,6 +15,7 @@
 #include <am_mem.h>
 #include <am_fend.h>
 #include <am_fend_diseqc_cmd.h>
+#include <am_fend_ctrl.h>
 #include <am_si.h>
 #include <am_db.h>
 
@@ -126,7 +127,7 @@ enum AM_SCAN_TSType
 typedef struct
 {
 	struct dvb_frontend_parameters	para;	/**< 锁频参数*/
-	AM_FEND_Polarisation_t			polar;	/**< 卫星极化方式*/	
+	int								polar;	/**< 卫星极化方式，见AM_FEND_Polarisation_t，< 0 表示无效*/	
 }AM_SCAN_FEPara_t;
 
 /**\brief 频点进度数据*/
@@ -134,7 +135,7 @@ typedef struct
 {
 	int								index;		/**< 当前搜索频点索引*/
 	int								total;		/**< 总共需要搜索的频点个数*/
-	struct dvb_frontend_parameters 	fend_para;	/**< 当前搜索的频点信息*/
+	AM_SCAN_FEPara_t  				fend_para;	/**< 当前搜索的频点信息*/
 }AM_SCAN_TSProgress_t;
 
 /**\brief 搜索进度数据*/
@@ -191,7 +192,7 @@ typedef struct AM_SCAN_TS_s
 	int								snr;		/**< SNR*/
 	int								ber;		/**< BER*/
 	int								strength;	/**< Strength*/
-	struct dvb_frontend_parameters 	fend_para;	/**< 频点信息*/
+	AM_SCAN_FEPara_t 				fend_para;	/**< 频点信息*/
 	dvbpsi_pat_t 					*pats;		/**< 搜索到的PAT表*/
 	dvbpsi_cat_t 					*cats;		/**< 搜索到的CAT表*/
 	dvbpsi_pmt_t 					*pmts;		/**< 搜索到的PMT表*/
@@ -205,6 +206,15 @@ typedef struct AM_SCAN_TS_s
 
 	struct AM_SCAN_TS_s 			*p_next;	/**< 指向下一个TS*/
 }AM_SCAN_TS_t;
+
+/**\brief 卫星配置参数*/
+typedef struct
+{
+	char									sat_name[64];	/**< 卫星名称，用于唯一标识一个卫星*/
+	int										lnb_num;		/**< LNB number*/
+	int										motor_num;		/**< Motor number*/
+	AM_SEC_DVBSatelliteEquipmentControl_t	sec;			/**< 卫星配置参数*/
+}AM_SCAN_SatellitePara_t;
 
 /**\brief 节目搜索结果数据结构*/
 typedef struct
@@ -222,15 +232,9 @@ typedef struct
 
 	AM_Bool_t			enable_lcn; /**< 使用LCN排序*/
 	AM_Bool_t			resort_all; /**< 重新排列数据库中的所有service*/
+	
+	AM_SCAN_SatellitePara_t	sat_para;/**< 卫星参数配置,只有当source位Satellite时有效*/
 }AM_SCAN_Result_t;
-
-/**\brief 卫星配置参数*/
-typedef struct
-{
-	const char	sat_name[64];        /**< 卫星名称，用于唯一标识一个卫星*/
-
-}AM_SCAN_SatellitePara_t;
-
 
 /**\brief 存储回调函数
  * result 保存的搜索结果
