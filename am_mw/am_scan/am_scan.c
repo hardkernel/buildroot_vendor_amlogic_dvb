@@ -709,6 +709,23 @@ static int insert_sat_para(sqlite3_stmt **stmts, AM_SCAN_SatellitePara_t *sat_pa
 	if (db_id == -1)
 	{
 		AM_DEBUG(1, "@@ Insert a new satellite parameter record !!! @@");
+		AM_DEBUG(1, "name(%s),lnb_num(%d),lof_hi(%d),lof_lo(%d),lof_threshold(%d),22k(%d),vol(%d),motor(%d),pos_num(%d),lodir(%d),ladir(%d),\
+		lo(%f),la(%f),diseqc_mode(%d),toneburst(%d),cdc(%d),ucdc(%d),repeats(%d),seq_repeat(%d),fast_diseqc(%d),cmd_order(%d)",
+		sat_para->sat_name,sat_para->lnb_num,sat_para->sec.m_lnbs.m_lof_hi,sat_para->sec.m_lnbs.m_lof_lo,sat_para->sec.m_lnbs.m_lof_threshold,
+		sat_para->sec.m_lnbs.m_cursat_parameters.m_22khz_signal,sat_para->sec.m_lnbs.m_cursat_parameters.m_voltage_mode,
+		sat_para->motor_num,sat_para->sec.m_lnbs.m_cursat_parameters.m_rotorPosNum,
+		sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction,
+		sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction,
+		sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude,
+		sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude,
+		sat_para->sec.m_lnbs.m_diseqc_parameters.m_diseqc_mode,
+		sat_para->sec.m_lnbs.m_diseqc_parameters.m_toneburst_param,
+		sat_para->sec.m_lnbs.m_diseqc_parameters.m_committed_cmd,
+		sat_para->sec.m_lnbs.m_diseqc_parameters.m_uncommitted_cmd,
+		sat_para->sec.m_lnbs.m_diseqc_parameters.m_repeats,
+		sat_para->sec.m_lnbs.m_diseqc_parameters.m_seq_repeat,
+		sat_para->sec.m_lnbs.m_diseqc_parameters.m_use_fast,
+		sat_para->sec.m_lnbs.m_diseqc_parameters.m_command_order);
 		stmt = stmts[INSERT_SAT_PARA];
 		sqlite3_bind_text(stmt, 1, sat_para->sat_name, strlen(sat_para->sat_name), SQLITE_STATIC);
 		sqlite3_bind_int(stmt, 2, sat_para->lnb_num);
