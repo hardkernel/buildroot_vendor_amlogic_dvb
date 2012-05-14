@@ -15,6 +15,7 @@
 #include "am_sec_internal.h"
 #include "am_fend_ctrl.h"
 
+#include "am_fend.h"
 #include "am_fend_diseqc_cmd.h"
 
 #include <string.h>
@@ -49,6 +50,8 @@ static AM_SEC_DVBSatelliteEquipmentControl_t sec_control;
 
 static struct list_head sec_command_list;
 static struct list_head sec_command_cur;
+
+static long am_sec_fend_data[NUM_DATA_ENTRIES];
 
 /****************************************************************************
  * Static functions
@@ -144,9 +147,125 @@ static struct list_head *AM_SEC_SecCommandListEnd(void)
 	return &sec_command_list;
 }
 
+static int AM_SEC_GetFendData(AM_SEC_FEND_DATA num, long *data)
+{
+	assert(data);
+	
+	if ( num < NUM_DATA_ENTRIES )
+	{
+		*data = am_sec_fend_data[num];
+		return 0;
+	}
+	return -1;
+}
+
+static int AM_SEC_SetFendData(AM_SEC_FEND_DATA num, long val)
+{
+	if ( num < NUM_DATA_ENTRIES )
+	{
+		am_sec_fend_data[num] = val;
+		return 0;
+	}
+	return -1;
+}
+
+
 static int AM_SEC_CanTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para)
 {
-	return 0;
+	assert(para);
+	
+	int score=0;
+	long linked_csw=-1, linked_ucsw=-1, linked_toneburst=-1, rotor_pos=-1;
+
+	AM_SEC_GetFendData(CSW, &linked_csw);
+	AM_SEC_GetFendData(UCSW, &linked_ucsw);
+	AM_SEC_GetFendData(TONEBURST, &linked_toneburst);
+	AM_SEC_GetFendData(ROTOR_POS, &rotor_pos);
+
+	AM_Bool_t rotor = AM_FALSE;
+	AM_SEC_DVBSatelliteLNBParameters_t lnb_param = sec_control.m_lnbs;
+	AM_Bool_t is_unicable = lnb_param.SatCR_idx != -1;
+	AM_Bool_t is_unicable_position_switch = lnb_param.SatCR_positions > 1;
+
+	int ret = 0;
+	AM_SEC_DVBSatelliteDiseqcParameters_t di_param = lnb_param.m_diseqc_parameters;
+
+	AM_Bool_t diseqc=AM_FALSE;
+	long band=0,
+		csw = di_param.m_committed_cmd,
+		ucsw = di_param.m_uncommitted_cmd,
+		toneburst = di_param.m_toneburst_param;
+
+	/* Dishpro bandstacking HACK */
+	if (lnb_param.m_lof_threshold == 1000)
+	{
+		if (!(para->polarisation & AM_FEND_POLARISATION_V))
+		{
+			band |= 1;
+		}
+		band |= 2; /* voltage always 18V for Dishpro */
+	}
+	else
+	{
+		if ( para->para.frequency > lnb_param.m_lof_threshold )
+			band |= 1;
+		if (!(para->polarisation & AM_FEND_POLARISATION_V))
+			band |= 2;
+	}
+
+	if (di_param.m_diseqc_mode >= V1_0)
+	{
+		diseqc=AM_TRUE;
+		if ( di_param.m_committed_cmd < SENDNO )
+			csw = 0xF0 | (csw << 2);
+
+		if (di_param.m_committed_cmd <= SENDNO)
+			csw |= band;
+
+		if ( di_param.m_diseqc_mode == V1_2 )  // ROTOR
+			rotor = AM_TRUE;
+
+		ret = 10000;
+	}
+	else
+	{
+		csw = band;
+		ret = 15000;
+	}
+
+	AM_DEBUG(1, "ret1 %d", ret);
+
+	if (!is_unicable)
+	{
+		// compare tuner data
+		if ( (csw != linked_csw) ||
+			( diseqc && (ucsw != linked_ucsw || toneburst != linked_toneburst) ) )
+		{
+			ret = 0;
+		}
+		else
+			ret += 15;
+		AM_DEBUG(1, "ret2 %d", ret);
+	}
+
+	if (ret && !is_unicable)
+	{
+		int lof = para->para.frequency > lnb_param.m_lof_threshold ?
+			lnb_param.m_lof_hi : lnb_param.m_lof_lo;
+		int tuner_freq = abs(para->para.frequency - lof);
+		if (tuner_freq < 900000 || tuner_freq > 2200000)
+			ret = 0;
+	}
+
+	/* rotor */
+	
+	AM_DEBUG(1, "ret %d, score old %d", ret, score);
+
+	score = ret;
+
+	AM_DEBUG(1, "final score %d", score);
+	
+	return score;
 }
 
 /****************************************************************************
@@ -257,6 +376,11 @@ AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParameter
 	assert(para);
 	
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	if(AM_SEC_CanTune(dev_no, para))
+	{
+
+	}
 			
 	return ret;
 }

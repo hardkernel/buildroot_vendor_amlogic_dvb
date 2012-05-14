@@ -100,6 +100,26 @@ typedef struct eSecCommand
 	};
 }eSecCommand_t;
 
+typedef enum {
+	NEW_CSW,
+	NEW_UCSW,
+	NEW_TONEBURST,
+	CSW,                  // state of the committed switch
+	UCSW,                 // state of the uncommitted switch
+	TONEBURST,            // current state of toneburst switch
+	NEW_ROTOR_CMD,        // prev sent rotor cmd
+	NEW_ROTOR_POS,        // new rotor position (not validated)
+	ROTOR_CMD,            // completed rotor cmd (finalized)
+	ROTOR_POS,            // current rotor position
+	LINKED_PREV_PTR,      // prev double linked list (for linked FEs)
+	LINKED_NEXT_PTR,      // next double linked list (for linked FEs)
+	SATPOS_DEPENDS_PTR,   // pointer to FE with configured rotor (with twin/quattro lnb)
+	FREQ_OFFSET,          // current frequency offset
+	CUR_VOLTAGE,          // current voltage
+	CUR_TONE,             // current continuous tone
+	SATCR,                // current SatCR
+	NUM_DATA_ENTRIES
+}AM_SEC_FEND_DATA;
 
 /****************************************************************************
  * Function prototypes  

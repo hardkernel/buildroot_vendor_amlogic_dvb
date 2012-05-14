@@ -14,7 +14,7 @@
 #include <am_types.h>
 #include <am_mem.h>
 #include <am_fend.h>
-
+#include <am_fend_diseqc_cmd.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -170,15 +170,10 @@ typedef struct AM_SEC_DVBSatelliteEquipmentControl
 	AM_SEC_Cmd_Param_t m_params[SEC_CMD_MAX_PARAMS];
 }AM_SEC_DVBSatelliteEquipmentControl_t;
 
-typedef enum {
-	Polarisation_Horizontal, Polarisation_Vertical, Polarisation_CircularLeft, Polarisation_CircularRight
-}AM_FENDCTR_POLARISATIONL;
-
 typedef struct AM_FENDCTRL_DVBFrontendParametersSatellite
 {
 	AM_Bool_t no_rotor_command_on_tune;
-	AM_FENDCTR_POLARISATIONL polarisation;
-	int orbital_position;
+	AM_FEND_Polarisation_t polarisation;
 
 	struct dvb_frontend_parameters para;
 }AM_FENDCTRL_DVBFrontendParametersSatellite_t;
