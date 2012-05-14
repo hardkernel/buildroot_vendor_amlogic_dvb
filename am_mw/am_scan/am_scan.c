@@ -3794,6 +3794,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	scanner->fend_dev = para->fend_dev_id;
 	scanner->dmx_dev = para->dmx_dev_id;
 	scanner->standard = para->standard;
+	scanner->result.sat_para = para->sat_para;
 	if (! para->store_cb)
 		scanner->store_cb = am_scan_default_store;
 	else
