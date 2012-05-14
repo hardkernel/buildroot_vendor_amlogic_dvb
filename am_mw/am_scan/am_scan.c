@@ -166,7 +166,7 @@
 		sqlite3_bind_int(stmts[UPDATE_SRV], 16, major_chan_num);\
 		sqlite3_bind_int(stmts[UPDATE_SRV], 17, minor_chan_num);\
 		sqlite3_bind_int(stmts[UPDATE_SRV], 18, access_controlled);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 29, hidden);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 19, hidden);\
 		sqlite3_bind_int(stmts[UPDATE_SRV], 20, hide_guide);\
 		sqlite3_bind_int(stmts[UPDATE_SRV], 21, source_id);\
 		sqlite3_bind_int(stmts[UPDATE_SRV], 22, 0);\
@@ -231,11 +231,11 @@ const char *sql_stmts[MAX_STMT] =
 	"update net_table set name=? where db_id=?",
 	"select db_id from ts_table where src=? and freq=?",
 	"insert into ts_table(src,freq) values(?,?)",
-	"update ts_table set db_net_id=?,ts_id=?,symb=?,mod=?,bw=?,snr=?,ber=?,strength=? where db_id=?",
+	"update ts_table set db_net_id=?,ts_id=?,symb=?,mod=?,bw=?,snr=?,ber=?,strength=?,db_sat_para_id=? where db_id=?",
 	"delete  from srv_table where db_ts_id=?",
 	"select db_id from srv_table where db_net_id=? and db_ts_id=? and service_id=?",
 	"insert into srv_table(db_net_id, db_ts_id,service_id) values(?,?,?)",
-	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?, running_status=?, free_ca_mode=?, volume=?, aud_track=?, vid_pid=?, vid_fmt=?,aud_pids=?,aud_fmts=?,aud_langs=?,db_sub_id=-1,skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,hide_guide=?, source_id=?,favor=?,current_aud=?  where db_id=?",
+	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?, running_status=?, free_ca_mode=?, volume=?, aud_track=?, vid_pid=?, vid_fmt=?,aud_pids=?,aud_fmts=?,aud_langs=?,db_sub_id=-1,skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,hide_guide=?, source_id=?,favor=?,current_aud=?,db_sat_para_id=?  where db_id=?",
 	"select db_id,service_type from srv_table where db_ts_id=? order by service_id",
 	"update srv_table set chan_num=? where db_id=?",
 	"delete  from evt_table where db_ts_id=?",
@@ -705,6 +705,7 @@ static int insert_sat_para(sqlite3_stmt **stmts, AM_SCAN_SatellitePara_t *sat_pa
 	/* insert a new record */
 	if (db_id == -1)
 	{
+		AM_DEBUG(1, "@@ Insert a new satellite parameter record !!! @@");
 		stmt = stmts[INSERT_SAT_PARA];
 		sqlite3_bind_text(stmt, 1, sat_para->sat_name, strlen(sat_para->sat_name), SQLITE_STATIC);
 		sqlite3_bind_int(stmt, 2, sat_para->lnb_num);
@@ -812,7 +813,8 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	sqlite3_bind_int(stmts[UPDATE_TS], 6, ts->snr);
 	sqlite3_bind_int(stmts[UPDATE_TS], 7, ts->ber);
 	sqlite3_bind_int(stmts[UPDATE_TS], 8, ts->strength);
-	sqlite3_bind_int(stmts[UPDATE_TS], 9, dbid);
+	sqlite3_bind_int(stmts[UPDATE_TS], 9, satpara_dbid);
+	sqlite3_bind_int(stmts[UPDATE_TS], 10, dbid);
 	sqlite3_step(stmts[UPDATE_TS]);
 	sqlite3_reset(stmts[UPDATE_TS]);
 
@@ -1369,6 +1371,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 		return;
 	}
 	
+	AM_DEBUG(1, "@@ Source is %d @@", result->src);
 	if (result->src == AM_SCAN_SRC_SATELLITE)
 	{
 		/* 存储卫星配置 */
@@ -3761,7 +3764,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 			scanner->start_freqs[i].atv_freq = para->atv_freqs[i];
 		}
 	}
-	
+
 	scanner->result.mode = para->mode;
 	scanner->result.src = para->source;
 	scanner->result.hdb = para->hdb;
