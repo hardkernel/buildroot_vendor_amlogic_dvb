@@ -229,9 +229,9 @@ const char *sql_stmts[MAX_STMT] =
 	"select db_id from net_table where src=? and network_id=?",
 	"insert into net_table(network_id, src) values(?,?)",
 	"update net_table set name=? where db_id=?",
-	"select db_id from ts_table where src=? and freq=?",
-	"insert into ts_table(src,freq) values(?,?)",
-	"update ts_table set db_net_id=?,ts_id=?,symb=?,mod=?,bw=?,snr=?,ber=?,strength=?,db_sat_para_id=? where db_id=?",
+	"select db_id from ts_table where src=? and freq=? and db_sat_para_id=?",
+	"insert into ts_table(src,freq,db_sat_para_id) values(?,?,?)",
+	"update ts_table set db_net_id=?,ts_id=?,symb=?,mod=?,bw=?,snr=?,ber=?,strength=?,polar=? where db_id=?",
 	"delete  from srv_table where db_ts_id=?",
 	"select db_id from srv_table where db_net_id=? and db_ts_id=? and service_id=?",
 	"insert into srv_table(db_net_id, db_ts_id,service_id) values(?,?,?)",
@@ -483,13 +483,14 @@ static int insert_net(sqlite3_stmt **stmts, int src, int orig_net_id)
 }
 
 /**\brief 插入一个TS记录，返回其索引*/
-static int insert_ts(sqlite3_stmt **stmts, int src, int freq)
+static int insert_ts(sqlite3_stmt **stmts, int src, int freq, int db_satpara_id)
 {
 	int db_id = -1;
 
 	/*query wether it exists*/
 	sqlite3_bind_int(stmts[QUERY_TS], 1, src);
 	sqlite3_bind_int(stmts[QUERY_TS], 2, freq);
+	sqlite3_bind_int(stmts[QUERY_TS], 3, db_satpara_id);
 	if (sqlite3_step(stmts[QUERY_TS]) == SQLITE_ROW)
 	{
 		db_id = sqlite3_column_int(stmts[QUERY_TS], 0);
@@ -501,10 +502,12 @@ static int insert_ts(sqlite3_stmt **stmts, int src, int freq)
 	{
 		sqlite3_bind_int(stmts[INSERT_TS], 1, src);
 		sqlite3_bind_int(stmts[INSERT_TS], 2, freq);
+		sqlite3_bind_int(stmts[INSERT_TS], 3, db_satpara_id);
 		if (sqlite3_step(stmts[INSERT_TS]) == SQLITE_DONE)
 		{
 			sqlite3_bind_int(stmts[QUERY_TS], 1, src);
 			sqlite3_bind_int(stmts[QUERY_TS], 2, freq);
+			sqlite3_bind_int(stmts[QUERY_TS], 3, db_satpara_id);
 			if (sqlite3_step(stmts[QUERY_TS]) == SQLITE_ROW)
 			{
 				db_id = sqlite3_column_int(stmts[QUERY_TS], 0);
@@ -797,7 +800,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	}
 	
 	/*检查该TS是否已经添加*/
-	dbid = insert_ts(stmts, src, (int)ts->fend_para.para.frequency);
+	dbid = insert_ts(stmts, src, (int)ts->fend_para.para.frequency, satpara_dbid);
 	if (dbid == -1)
 	{
 		AM_DEBUG(1, "insert new ts error");
@@ -813,7 +816,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	sqlite3_bind_int(stmts[UPDATE_TS], 6, ts->snr);
 	sqlite3_bind_int(stmts[UPDATE_TS], 7, ts->ber);
 	sqlite3_bind_int(stmts[UPDATE_TS], 8, ts->strength);
-	sqlite3_bind_int(stmts[UPDATE_TS], 9, satpara_dbid);
+	sqlite3_bind_int(stmts[UPDATE_TS], 9, ts->fend_para.polar);
 	sqlite3_bind_int(stmts[UPDATE_TS], 10, dbid);
 	sqlite3_step(stmts[UPDATE_TS]);
 	sqlite3_reset(stmts[UPDATE_TS]);
@@ -1445,7 +1448,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	}
 	
 	/*检查该TS是否已经添加*/
-	dbid = insert_ts(stmts, src, (int)ts->fend_para.para.frequency);
+	dbid = insert_ts(stmts, src, (int)ts->fend_para.para.frequency, satpara_dbid);
 	if (dbid == -1)
 	{
 		AM_DEBUG(1, "insert new ts error");
@@ -1460,7 +1463,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	sqlite3_bind_int(stmts[UPDATE_TS], 6, ts->snr);
 	sqlite3_bind_int(stmts[UPDATE_TS], 7, ts->ber);
 	sqlite3_bind_int(stmts[UPDATE_TS], 8, ts->strength);
-	sqlite3_bind_int(stmts[UPDATE_TS], 9, satpara_dbid);
+	sqlite3_bind_int(stmts[UPDATE_TS], 9, ts->fend_para.polar);
 	sqlite3_bind_int(stmts[UPDATE_TS], 10, dbid);
 	sqlite3_step(stmts[UPDATE_TS]);
 	sqlite3_reset(stmts[UPDATE_TS]);
