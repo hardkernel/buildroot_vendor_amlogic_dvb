@@ -369,7 +369,6 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_GetCurrentScanStatus(int dev_no)
 	else
 	{
 		ret = AM_FEND_ERR_BLINDSCAN_INRUNNING;
-		printf("blind scan running %d\n", AM_FEND_ERR_BLINDSCAN_INRUNNING);
 	}
 
 	pthread_mutex_unlock(&dev->lock);
@@ -400,7 +399,7 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Adjust(int dev_no)
 	struct dvb_frontend_parameters *pValid;
 	unsigned int uiSymbolRate_Hz;
 	unsigned int ui_SR_offset;
-	printf("@@@@@@@@AM_FEND_IBlindScanAPI_Adjust m_uiChannelCount %d", pbsInfo->m_uiChannelCount);
+
 	if(pbsInfo->m_uiChannelCount > 0)
 	{
 		ret = dev->drv->blindscan_readchannelinfo(dev, dev->bs_setting.channels_Temp);
@@ -550,7 +549,6 @@ static void* fend_blindscan_thread(void *arg)
 				{			
 					ret = AM_FEND_IBlindScanAPI_Start(dev_no);
 					AM_DEBUG(1, "fend_blindscan_thread AM_FEND_IBlindScanAPI_Start %d", ret);
-					printf("1111111111 %d\n", ret);
 					if(ret != AM_SUCCESS)
 					{
 						BS_Status = DVBSx_BS_Status_Exit;
@@ -566,7 +564,6 @@ static void* fend_blindscan_thread(void *arg)
 				{
 					ret = AM_FEND_IBlindScanAPI_GetCurrentScanStatus(dev_no);
 					AM_DEBUG(1, "fend_blindscan_thread AM_FEND_IBlindScanAPI_GetCurrentScanStatus %d", ret);
-					printf("222222222 %d\n", ret);
 					if(ret == AM_SUCCESS)
 					{
 						BS_Status = DVBSx_BS_Status_Adjust;
@@ -588,7 +585,6 @@ static void* fend_blindscan_thread(void *arg)
 				{
 					ret = AM_FEND_IBlindScanAPI_Adjust(dev_no);
 					AM_DEBUG(1, "fend_blindscan_thread AM_FEND_IBlindScanAPI_Adjust %d", ret);
-					printf("333333333333 %d\n", ret);
 					if(ret != AM_SUCCESS)
 					{
 						BS_Status = DVBSx_BS_Status_Exit;
@@ -619,13 +615,11 @@ static void* fend_blindscan_thread(void *arg)
 					else											
 						BS_Status = DVBSx_BS_Status_WaitExit;
 					
-					printf("444444444 %d\n", BS_Status);
-
 					break;
 				}
 
 			case DVBSx_BS_Status_WaitExit:
-				{printf("555555\n");
+				{
 					usleep(200*1000);
 					break;
 				}
@@ -634,7 +628,7 @@ static void* fend_blindscan_thread(void *arg)
 				{ 
 					ret = AM_FEND_IBlindScanAPI_Exit(dev_no);
 					BS_Status = DVBSx_BS_Status_Exit;
-printf("6666666\n");
+
 					AM_DEBUG(1, "AM_FEND_IBlindScanAPI_Exit");
 					break;
 				}
@@ -646,8 +640,6 @@ printf("6666666\n");
 				}
 		}
 	}
-
-	printf("exit from fend_blindscan_thread\n");
 	
 	return NULL;
 }
@@ -1644,15 +1636,15 @@ AM_ErrorCode_t AM_FEND_BlindExit(int dev_no)
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
-printf("enter AM_FEND_BlindExit\n");
+
 	pthread_mutex_lock(&am_gAdpLock);
 	
 	/*Stop the thread*/
-	dev->enable_blindscan_thread = AM_FALSE;printf("enter AM_FEND_BlindExit1\n");
-	pthread_join(dev->blindscan_thread, NULL);printf("enter AM_FEND_BlindExit2\n");
+	dev->enable_blindscan_thread = AM_FALSE;
+	pthread_join(dev->blindscan_thread, NULL);
 	
 	pthread_mutex_unlock(&am_gAdpLock);
-	printf("leave AM_FEND_BlindExit\n");
+
 	return ret;
 }
 
