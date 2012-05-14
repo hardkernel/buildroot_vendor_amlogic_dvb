@@ -10,3 +10,5 @@
 "snr integer",										/**< SNR*/
 "ber integer",										/**< BER*/
 "strength integer",									/**< Strength*/
+"db_sat_para_id integer",							/**< 卫星信号下，保存的sat_para_table中的数据库唯一索引，非卫星信号下无效*/
+"polar integer",									/**< 极化方式,0-V, 1-H*/
