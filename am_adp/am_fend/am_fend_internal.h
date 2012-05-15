@@ -60,7 +60,6 @@ typedef struct
 	AM_ErrorCode_t (*blindscan_getscanstatus)(AM_FEND_Device_t *dev, struct dvbsx_blindscaninfo *pbsinfo);
 	AM_ErrorCode_t (*blindscan_cancel)(AM_FEND_Device_t *dev);
 	AM_ErrorCode_t (*blindscan_readchannelinfo)(AM_FEND_Device_t *dev, struct dvb_frontend_parameters *pchannel);
-	AM_ErrorCode_t (*blindscan_reset)(AM_FEND_Device_t *dev);
 } AM_FEND_Driver_t;
 
 /**\brief Defines the status of blind scan process.*/
@@ -123,7 +122,7 @@ struct AM_FEND_Device
 	
 	AM_Bool_t          enable_blindscan_thread; /**< 状扫处理线程是否运行*/
 	pthread_t          blindscan_thread;        /**< 盲扫处理线程*/
-	AM_FEND_Callback_t blindscan_cb;		/**< 盲扫更新回调函数*/
+	AM_FEND_BlindCallback_t blindscan_cb;		/**< 盲扫更新回调函数*/
 	void              *blindscan_cb_user_data;		/**< 盲扫更新回调函数参数*/
 	struct AM_FEND_DVBSx_BlindScanAPI_Setting bs_setting;	/**< 盲扫设置*/	
 };
