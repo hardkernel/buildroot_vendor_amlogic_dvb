@@ -122,7 +122,7 @@ struct AM_FEND_Device
 	
 	AM_Bool_t          enable_blindscan_thread; /**< 状扫处理线程是否运行*/
 	pthread_t          blindscan_thread;        /**< 盲扫处理线程*/
-	AM_FEND_Callback_t blindscan_cb;		/**< 盲扫更新回调函数*/
+	AM_FEND_BlindCallback_t blindscan_cb;		/**< 盲扫更新回调函数*/
 	void              *blindscan_cb_user_data;		/**< 盲扫更新回调函数参数*/
 	struct AM_FEND_DVBSx_BlindScanAPI_Setting bs_setting;	/**< 盲扫设置*/	
 };

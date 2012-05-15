@@ -380,6 +380,7 @@ AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParameter
 	if(AM_SEC_CanTune(dev_no, para))
 	{
 
+
 	}
 			
 	return ret;
