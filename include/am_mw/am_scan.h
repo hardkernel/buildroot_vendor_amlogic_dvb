@@ -78,15 +78,6 @@ enum AM_SCAN_EventType
 	AM_SCAN_EVT_END
 };
 
-/**\brief 信号源类型 */
-typedef enum 
-{
-	AM_SCAN_SRC_AUTO       	= 0x00, /**< 自动判断 */
-	AM_SCAN_SRC_CABLE       = 0x01, /**< Cable搜索 */
-	AM_SCAN_SRC_TERRISTRIAL = 0x02, /**< Terristrial(Air in ATSC)搜索 */
-	AM_SCAN_SRC_SATELLITE   = 0x03, /**< Satellite搜索 */
-}AM_SCAN_Source_t;
-
 /**\brief 标准定义*/
 typedef enum 
 {
@@ -219,7 +210,7 @@ typedef struct
 /**\brief 节目搜索结果数据结构*/
 typedef struct
 {
-	AM_SCAN_Source_t	src;		/**< 源标识*/
+	AM_FEND_DemodMode_t	src;		/**< 源标识*/
 	AM_SCAN_Standard_t	standard;	/**< ATSC or DVB*/
 	int					mode;		/**< 搜索模式*/
 	sqlite3				*hdb;		/**< 数据库句柄*/
@@ -247,7 +238,7 @@ typedef struct
 	int								fend_dev_id;		/**< 前端设备号*/
 	int								dmx_dev_id;			/**< demux设备号*/
 	int								mode;				/**< 搜索模式组合，见AM_SCAN_Mode*/
-	AM_SCAN_Source_t				source;				/**< 源标识*/
+	AM_FEND_DemodMode_t				source;				/**< 源标识*/
 	AM_SCAN_Standard_t				standard;			/**< 搜索标准，DVB/ATSC*/
 	
 	AM_SCAN_SatellitePara_t			sat_para;			/**< 卫星参数配置,只有当source位Satellite时有效*/

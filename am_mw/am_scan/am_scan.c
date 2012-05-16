@@ -384,21 +384,22 @@ static AM_ErrorCode_t convert_code_to_utf8(const char *cod, char *in_code,int in
 }
 
 
-static void am_scan_get_fend_ctrl_para(AM_SCAN_Source_t src, AM_SCAN_FEPara_t *sfe, AM_FENDCTRL_DVBFrontendParameters_t *fcfe)
+static void am_scan_get_fend_ctrl_para(AM_FEND_DemodMode_t src, AM_SCAN_FEPara_t *sfe, AM_FENDCTRL_DVBFrontendParameters_t *fcfe)
 {
 	switch (src)
 	{
-		case AM_SCAN_SRC_TERRISTRIAL:
-			fcfe->m_type = DVBT;
+		case AM_FEND_DEMOD_DVBT:
+		case AM_FEND_DEMOD_ISDBT:
+			fcfe->m_type = src;
 			fcfe->terrestrial.para = sfe->para;
 			break;
-		case AM_SCAN_SRC_SATELLITE:
-			fcfe->m_type = DVBS;
+		case AM_FEND_DEMOD_DVBS:
+			fcfe->m_type = src;
 			fcfe->sat.polarisation = sfe->polar;
 			fcfe->sat.para = sfe->para;
 			break;
 		default:
-			fcfe->m_type = DVBC;
+			fcfe->m_type = src;
 			fcfe->cable.para = sfe->para;
 			break;
 	}
@@ -954,7 +955,7 @@ analog_vct_done:
 			strcpy(name, ts->analog_channel->name);
 		else
 			snprintf(name, sizeof(name), "%s %d", 
-				(src==AM_SCAN_SRC_CABLE)?"Cable":((src==AM_SCAN_SRC_TERRISTRIAL)?"Terristrial":"Satellite"),
+				(src==AM_FEND_DEMOD_DVBC)?"Cable":((src==AM_FEND_DEMOD_DVBT)?"Terristrial":"Satellite"),
 				major_chan_num);
 			
 		AM_DEBUG(0, "ATSC Analog Channel('%s':%d) TSID(%d) found!",name, major_chan_num, ts->analog_channel->TSID);
@@ -1392,7 +1393,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	}
 	
 	AM_DEBUG(1, "@@ Source is %d @@", result->src);
-	if (result->src == AM_SCAN_SRC_SATELLITE)
+	if (result->src == AM_FEND_DEMOD_DVBS)
 	{
 		/* 存储卫星配置 */
 		satpara_dbid = insert_sat_para(stmts, &result->sat_para);
@@ -1768,7 +1769,7 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 		}
 	}
 	
-	if (result->src == AM_SCAN_SRC_SATELLITE)
+	if (result->src == AM_FEND_DEMOD_DVBS)
 	{
 		int db_sat_id;
 		/* 删除同一卫星配置下的所有ts & srv */
@@ -3701,15 +3702,17 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	/*数据初始化*/
 	memset(scanner, 0, sizeof(AM_SCAN_Scanner_t));
 	if (GET_MODE(para->mode) == AM_SCAN_MODE_MANUAL)
+	{
 		para->start_para_cnt = 1;
-	else if (((GET_MODE(para->mode) ==  AM_SCAN_MODE_ALLBAND)
-				||(GET_MODE(para->mode) ==  AM_SCAN_MODE_AUTO)) 
-			&& (! para->start_para_cnt)) {
+	}
+	else if (((GET_MODE(para->mode) ==  AM_SCAN_MODE_ALLBAND) || (GET_MODE(para->mode) ==  AM_SCAN_MODE_AUTO)) 
+			&& (! para->start_para_cnt))
+	{
 		use_default = 1;
-		para->start_para_cnt = 
-			(para->source==AM_SCAN_SRC_CABLE)? AM_ARRAY_SIZE(dvbc_std_freqs) 
-			: (para->source==AM_SCAN_SRC_TERRISTRIAL) ? (DEFAULT_DVBT_FREQ_STOP-DEFAULT_DVBT_FREQ_START)/8000+1
-			: 0/*Fix me*/;
+		para->start_para_cnt = (para->source==AM_FEND_DEMOD_DVBC) ? AM_ARRAY_SIZE(dvbc_std_freqs) 
+			: ((para->source==AM_FEND_DEMOD_DVBT || para->source==AM_FEND_DEMOD_ISDBT) ? 
+			(DEFAULT_DVBT_FREQ_STOP-DEFAULT_DVBT_FREQ_START)/8000+1
+			: 0/*Fix me*/);
 	}
 
 #ifndef SUPPORT_ATV_SCAN
@@ -3743,7 +3746,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	{
 		struct dvb_frontend_parameters tpara;
 		
-		if(para->source==AM_SCAN_SRC_CABLE) {
+		if(para->source==AM_FEND_DEMOD_DVBC) {
 			tpara.u.qam.modulation = DEFAULT_DVBC_MODULATION;
 			tpara.u.qam.symbol_rate = DEFAULT_DVBC_SYMBOLRATE;
 			for (i=0; i<para->start_para_cnt; i++)
@@ -3752,7 +3755,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 				scanner->start_freqs[i].dtv_para.para = tpara;
 				scanner->start_freqs[i].dtv_para.polar = -1;
 			}
-		} else if(para->source==AM_SCAN_SRC_TERRISTRIAL) {
+		} else if(para->source==AM_FEND_DEMOD_DVBT || para->source==AM_FEND_DEMOD_ISDBT) {
 			tpara.u.ofdm.bandwidth = DEFAULT_DVBT_BW;
 			for (i=0; i<para->start_para_cnt; i++)
 			{
@@ -3769,7 +3772,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 		{
 			scanner->start_freqs[i].dtv_para = para->start_para[i];
 			
-			if (para->source != AM_SCAN_SRC_SATELLITE)
+			if (para->source != AM_FEND_DEMOD_DVBS)
 			{
 				scanner->start_freqs[i].dtv_para.polar = -1;
 			}
