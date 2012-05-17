@@ -8,8 +8,8 @@
  * \date 2012-03-20: create the document
  ***************************************************************************/
 
-#ifndef _AM_FEND_H
-#define _AM_FEND_H
+#ifndef _AM_FEND_DISEQC_CMD_H
+#define _AM_FEND_DISEQC_CMD_H
 
 #include "am_types.h"
 #include "am_evt.h"
@@ -60,15 +60,17 @@ typedef enum AM_FEND_SWITCHINPUT
 /**\brief DVB-S/S2前端极性*/
 typedef enum AM_FEND_POLARISATION
 {
+	AM_FEND_POLARISATION_H,
 	AM_FEND_POLARISATION_V,
-	AM_FEND_POLARISATION_H
+	AM_FEND_POLARISATION_NOSET
 }AM_FEND_Polarisation_t; 
 
 /**\brief DVB-S/S2前端本振频率*/
 typedef enum AM_FEND_LOCALOSCILLATORFREQ
 {
 	AM_FEND_LOCALOSCILLATORFREQ_L,
-	AM_FEND_LOCALOSCILLATORFREQ_H
+	AM_FEND_LOCALOSCILLATORFREQ_H,
+	AM_FEND_LOCALOSCILLATORFREQ_NOSET
 }AM_FEND_Localoscollatorfreq_t;
 
 /**\brief DVB-S/S2前端本振频率表LOCAL OSCILLATOR FREQ TABLE*/

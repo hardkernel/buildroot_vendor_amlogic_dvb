@@ -29,7 +29,7 @@
 
 #define M_BS_START_FREQ			(950)				/*The start RF frequency, 950MHz*/
 #define M_BS_STOP_FREQ				(2150)				/*The stop RF frequency, 2150MHz*/
-#define M_TUNERMAXLPF_100KHZ		(340)				/*The stop RF frequency, 340 100KHz*/
+#define M_TUNERMAXLPF_100KHZ		(440)				/*The tuner lpf, 440 100KHz. difference tuner value is not same. this is AV2011 tuner*/
 
 /****************************************************************************
  * Static data
@@ -278,16 +278,18 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_SetMaxLPF(int dev_no, unsigned shor
 }
 
 /**\brief Performs a blind scan operation. Call the function ::AM_FEND_IBlindScanAPI_GetCurrentScanStatus to check the status of the blind scan operation.*/
-static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Start(int dev_no)
+static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Start(int dev_no, unsigned int *freq)
 {
+	assert(freq);
+	
 	AM_FEND_Device_t *dev = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
 	fend_get_openned_dev(dev_no, &dev);
 	
-	if((!dev->drv->blindscan_scan) || (!dev->drv->blindscan_reset))
+	if(!dev->drv->blindscan_scan)
 	{
-		AM_DEBUG(1, "fronend %d no not support blindscan_scan or blindscan_reset", dev_no);
+		AM_DEBUG(1, "fronend %d no not support blindscan_scan", dev_no);
 		return AM_FEND_ERR_NOT_SUPPORTED;
 	}	
 
@@ -315,14 +317,6 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Start(int dev_no)
 	pbsPara->m_uiminsymrate_khz = 1000 * (dev->bs_setting.m_uiScan_Min_Symbolrate_MHz);	
 
 	/*driver need to set in blindscan mode*/
-	ret = dev->drv->blindscan_reset(dev);
-	if(ret != AM_SUCCESS)
-	{	
-		ret = AM_FEND_ERR_BLINDSCAN;
-		pthread_mutex_unlock(&dev->lock);
-		return ret;	
-	}
-	
 	ret = dev->drv->blindscan_scan(dev, pbsPara);
 	if(ret != AM_SUCCESS)
 	{
@@ -332,6 +326,9 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Start(int dev_no)
 	}
 	
 	dev->bs_setting.m_uiScaning = 1;
+
+	/*khz*/
+	*freq = (unsigned int)(pbsPara->m_uifrequency_100khz * 100);
 
 	pthread_mutex_unlock(&dev->lock);
 	
@@ -407,7 +404,7 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Adjust(int dev_no)
 	struct dvb_frontend_parameters *pValid;
 	unsigned int uiSymbolRate_Hz;
 	unsigned int ui_SR_offset;
-	
+
 	if(pbsInfo->m_uiChannelCount > 0)
 	{
 		ret = dev->drv->blindscan_readchannelinfo(dev, dev->bs_setting.channels_Temp);
@@ -469,9 +466,9 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Exit(int dev_no)
 	
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
 	
-	if(!dev->drv->blindscan_getscanstatus)
+	if((!dev->drv->blindscan_getscanstatus) && (!dev->drv->blindscan_cancel))
 	{
-		AM_DEBUG(1, "fronend %d no not support blindscan_getscanstatus", dev_no);
+		AM_DEBUG(1, "fronend %d no not support blindscan_getscanstatus or blindscan_cancel", dev_no);
 		return AM_FEND_ERR_NOT_SUPPORTED;
 	}	
 
@@ -491,8 +488,15 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Exit(int dev_no)
 			}
 		}while(100 != pbsInfo->m_uiProgress);
 	}
+
+	if(ret != AM_SUCCESS)
+	{
+		pthread_mutex_unlock(&dev->lock);
+		return ret;
+	}
 	
 	/*driver need to set in demod mode*/
+	ret = dev->drv->blindscan_cancel(dev);
 
 	usleep(10 * 1000);
 	
@@ -523,7 +527,8 @@ static unsigned short AM_FEND_IBlindscanAPI_GetProgress(int dev_no)
 static void* fend_blindscan_thread(void *arg)
 {
 	int dev_no = *((int *)arg);
-	AM_FEND_Device_t *dev = NULL;	
+	AM_FEND_Device_t *dev = NULL;
+	AM_FEND_BlindEvent_t evt;
 	AM_ErrorCode_t ret = AM_FAILURE;
 	unsigned short index = 0;
 	enum AM_FEND_DVBSx_BlindScanAPI_Status BS_Status = DVBSx_BS_Status_Init;
@@ -542,18 +547,25 @@ static void* fend_blindscan_thread(void *arg)
 			case DVBSx_BS_Status_Init:			
 				{
 					BS_Status = DVBSx_BS_Status_Start;
+					AM_DEBUG(1, "fend_blindscan_thread %d", DVBSx_BS_Status_Init);					
 					break;
 				}
 
 			case DVBSx_BS_Status_Start:		
-				{													
-					ret = AM_FEND_IBlindScanAPI_Start(dev_no);
+				{			
+					ret = AM_FEND_IBlindScanAPI_Start(dev_no, &evt.freq);
+					AM_DEBUG(1, "fend_blindscan_thread AM_FEND_IBlindScanAPI_Start %d", ret);
 					if(ret != AM_SUCCESS)
 					{
 						BS_Status = DVBSx_BS_Status_Exit;
 					}
 					else
-					{
+					{	
+						if(dev->blindscan_cb)
+						{
+							evt.status = AM_FEND_BLIND_START;
+							dev->blindscan_cb(dev->dev_no, &evt, dev->blindscan_cb_user_data);
+						}
 						BS_Status = DVBSx_BS_Status_Wait;
 					}
 					break;
@@ -562,7 +574,7 @@ static void* fend_blindscan_thread(void *arg)
 			case DVBSx_BS_Status_Wait: 		
 				{
 					ret = AM_FEND_IBlindScanAPI_GetCurrentScanStatus(dev_no);
-
+					AM_DEBUG(1, "fend_blindscan_thread AM_FEND_IBlindScanAPI_GetCurrentScanStatus %d", ret);
 					if(ret == AM_SUCCESS)
 					{
 						BS_Status = DVBSx_BS_Status_Adjust;
@@ -583,6 +595,7 @@ static void* fend_blindscan_thread(void *arg)
 			case DVBSx_BS_Status_Adjust:		
 				{
 					ret = AM_FEND_IBlindScanAPI_Adjust(dev_no);
+					AM_DEBUG(1, "fend_blindscan_thread AM_FEND_IBlindScanAPI_Adjust %d", ret);
 					if(ret != AM_SUCCESS)
 					{
 						BS_Status = DVBSx_BS_Status_Exit;
@@ -596,23 +609,31 @@ static void* fend_blindscan_thread(void *arg)
 
 			case DVBSx_BS_Status_User_Process:	
 				{
+					evt.process = (unsigned int)AM_FEND_IBlindscanAPI_GetProgress(dev_no);
 					/*
 					------------Custom code start-------------------
 					customer can add the callback function here such as adding TP information to TP list or lock the TP for parsing PSI
 					Add custom code here; Following code is an example
 					*/
-
-					if(dev->cb)
+					AM_DEBUG(1, "fend_blindscan_thread custom cb");
+					if(dev->blindscan_cb)
 					{
-						dev->cb(dev->dev_no, NULL, dev->user_data);
+						evt.status = AM_FEND_BLIND_UPDATE;
+						dev->blindscan_cb(dev->dev_no, &evt, dev->blindscan_cb_user_data);
 					}
 
 					/*------------Custom code end -------------------*/
-
-					if ( (AM_FEND_IBlindscanAPI_GetProgress(dev_no) < 100))
+					if ( (evt.process < 100))
 						BS_Status = DVBSx_BS_Status_Start;
 					else											
-						BS_Status = DVBSx_BS_Status_Cancel;
+						BS_Status = DVBSx_BS_Status_WaitExit;
+					
+					break;
+				}
+
+			case DVBSx_BS_Status_WaitExit:
+				{
+					usleep(200*1000);
 					break;
 				}
 
@@ -620,6 +641,8 @@ static void* fend_blindscan_thread(void *arg)
 				{ 
 					ret = AM_FEND_IBlindScanAPI_Exit(dev_no);
 					BS_Status = DVBSx_BS_Status_Exit;
+
+					AM_DEBUG(1, "AM_FEND_IBlindScanAPI_Exit");
 					break;
 				}
 
@@ -1570,7 +1593,7 @@ int AM_FEND_CalcTerrCNPercentNorDig(float cn, int ber, fe_modulation_t constella
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend.h)
  */
-AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_Callback_t cb, void *user_data, unsigned int start_freq, unsigned int stop_freq)
+AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_BlindCallback_t cb, void *user_data, unsigned int start_freq, unsigned int stop_freq)
 {
 	AM_FEND_Device_t *dev = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -1631,10 +1654,10 @@ AM_ErrorCode_t AM_FEND_BlindExit(int dev_no)
 	
 	/*Stop the thread*/
 	dev->enable_blindscan_thread = AM_FALSE;
-	pthread_join(dev->thread, NULL);
+	pthread_join(dev->blindscan_thread, NULL);
 	
 	pthread_mutex_unlock(&am_gAdpLock);
-	
+
 	return ret;
 }
 

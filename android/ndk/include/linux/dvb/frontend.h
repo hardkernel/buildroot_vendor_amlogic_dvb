@@ -399,7 +399,6 @@ struct dvbsx_blindscaninfo
 #define FE_GET_BLINDSCANSTATUS			_IOR('o', 85, struct dvbsx_blindscaninfo)
 #define FE_SET_BLINDSCANCANCEl				_IO('o', 86)
 #define FE_READ_BLINDSCANCHANNELINFO		_IOR('o', 87, struct dvb_frontend_parameters)
-#define FE_SET_BLINDSCANRESET				_IO('o', 88)
 
 /**
  * When set, this flag will disable any zigzagging or other "normal" tuning

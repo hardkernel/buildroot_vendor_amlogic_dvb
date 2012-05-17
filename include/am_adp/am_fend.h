@@ -56,7 +56,6 @@ enum AM_FEND_EventType
 {
 	AM_FEND_EVT_BASE=AM_EVT_TYPE_BASE(AM_MOD_FEND),
 	AM_FEND_EVT_STATUS_CHANGED,    /**< 前端状态发生改变，参数为struct dvb_frontend_event*/
-	AM_FEND_EVT_BLINDSCAN_UPDATE, 
 	AM_FEND_EVT_END
 };
 
@@ -82,6 +81,28 @@ typedef struct
 
 /**\brief DVB前端监控回调函数*/
 typedef void (*AM_FEND_Callback_t) (int dev_no, struct dvb_frontend_event *evt, void *user_data);
+
+/**\brief 卫星盲扫状态*/
+typedef enum
+{
+	AM_FEND_BLIND_START,   /**< 卫星盲扫开始*/
+	AM_FEND_BLIND_UPDATE  /**< 卫星盲扫更新*/
+} AM_FEND_BlindStatus_t;
+
+/**\brief 卫星盲扫事件*/
+typedef struct
+{
+	AM_FEND_BlindStatus_t    status; /**< 卫星盲扫状态*/
+	union
+	{
+		unsigned int freq;
+		unsigned int process;
+	};
+} AM_FEND_BlindEvent_t;
+
+/**\brief 卫星盲扫监控回调函数*/
+typedef void (*AM_FEND_BlindCallback_t) (int dev_no, AM_FEND_BlindEvent_t *evt, void *user_data);
+
 
 /****************************************************************************
  * Function prototypes  
@@ -298,7 +319,7 @@ extern int AM_FEND_CalcTerrCNPercentNorDig(float cn, int ber, fe_modulation_t co
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend.h)
  */
-extern AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_Callback_t cb, void *user_data, unsigned int start_freq, unsigned int stop_freq);
+extern AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_BlindCallback_t cb, void *user_data, unsigned int start_freq, unsigned int stop_freq);
 
 /**\brief 卫星盲扫结束
  * \param dev_no 前端设备号
