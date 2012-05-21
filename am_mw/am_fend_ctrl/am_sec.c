@@ -18,7 +18,9 @@
 #include "am_fend.h"
 #include "am_fend_diseqc_cmd.h"
 
+#include <unistd.h>
 #include <string.h>
+#include <math.h>
 #include <assert.h>
 
 /****************************************************************************
@@ -52,6 +54,10 @@ static struct list_head sec_command_list;
 static struct list_head sec_command_cur;
 
 static long am_sec_fend_data[NUM_DATA_ENTRIES];
+
+static AM_Bool_t am_sec_fend_set = AM_FALSE;
+
+static int am_sec_timeoutcount; // needed for timeout
 
 /****************************************************************************
  * Static functions
@@ -169,6 +175,318 @@ static int AM_SEC_SetFendData(AM_SEC_FEND_DATA num, long val)
 	return -1;
 }
 
+static void AM_SEC_Set_Set_Frontend(AM_Bool_t fend_set)
+{
+	am_sec_fend_set = fend_set;
+	return;
+}
+
+static AM_Bool_t AM_SEC_If_Tone_Goto(eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	long data = -1;
+	
+	if(sec_cmd->cmd == IF_TONE_GOTO)
+	{
+		AM_SEC_GetFendData(CUR_TONE, &data);
+		if ( sec_cmd->compare.tone == data)
+			return AM_TRUE;
+	}
+
+	return AM_FALSE;
+}
+
+static void AM_SEC_Set_Tone(int dev_no, eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	long data = -1;
+
+	data = sec_cmd->tone;
+	
+	if(sec_cmd->cmd == SET_TONE)
+	{
+		AM_SEC_SetFendData(CUR_TONE, data);
+		AM_FEND_SetTone(dev_no, data);
+	}
+
+	return;
+}
+
+static AM_Bool_t AM_SEC_If_Voltage_Goto(eSecCommand_t *sec_cmd, AM_Bool_t increased)
+{
+	assert(sec_cmd);
+	long data1 = -1, data2 = -1;
+	
+	if(sec_cmd->cmd == IF_VOLTAGE_GOTO)
+	{
+		AM_SEC_GetFendData(CUR_VOLTAGE, &data1);
+		AM_SEC_GetFendData(CUR_VOLTAGE_INC, &data2);
+		if(sec_cmd->compare.voltage == data1)
+		{
+			if(sec_cmd->compare.voltage != SEC_VOLTAGE_OFF)
+			{
+				if(increased == data2)
+					return AM_TRUE;
+			}
+			else
+			{
+				return AM_TRUE;
+			}
+		}
+	}
+
+	return AM_FALSE;
+}
+
+static AM_Bool_t AM_SEC_If_Not_Voltage_Goto(eSecCommand_t *sec_cmd, AM_Bool_t increased)
+{
+	assert(sec_cmd);
+	long data1 = -1, data2 = -1;
+	
+	if(sec_cmd->cmd == IF_NOT_VOLTAGE_GOTO)
+	{
+		AM_SEC_GetFendData(CUR_VOLTAGE, &data1);
+		AM_SEC_GetFendData(CUR_VOLTAGE_INC, &data2);
+		if  (sec_cmd->compare.voltage != data1)
+		{
+			if(sec_cmd->compare.voltage == SEC_VOLTAGE_OFF)
+			{
+				return AM_TRUE;
+			}
+			else
+			{			
+				if(increased != data2)
+					return AM_TRUE;			
+			}
+		}
+	}
+
+	return AM_FALSE;
+}
+
+static void AM_SEC_Set_Voltage(int dev_no, eSecCommand_t *sec_cmd, AM_Bool_t increased)
+{
+	assert(sec_cmd);
+	long data = -1;
+	
+	data = sec_cmd->voltage;
+	
+	if(sec_cmd->cmd == SET_VOLTAGE)
+	{
+		if(data == SEC_VOLTAGE_OFF)
+		{
+			AM_SEC_SetFendData(CSW, -1);
+			AM_SEC_SetFendData(UCSW, -1);
+			AM_SEC_SetFendData(TONEBURST, -1);		
+		}
+
+		AM_SEC_SetFendData(CUR_VOLTAGE_INC, increased);
+		AM_FEND_EnableHighLnbVoltage(dev_no, increased);
+		AM_SEC_SetFendData(CUR_VOLTAGE, data);
+		AM_FEND_SetVoltage(dev_no, data);
+	}
+
+	return;
+}
+
+static void AM_SEC_Set_Invalid_Cur_SwitchPara(eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	
+	if(sec_cmd->cmd == INVALIDATE_CURRENT_SWITCHPARMS)
+	{
+		AM_SEC_SetFendData(CSW, -1);
+		AM_SEC_SetFendData(UCSW, -1);
+		AM_SEC_SetFendData(TONEBURST, -1);
+	}
+
+	return;
+}
+
+static void AM_SEC_Set_Update_Cur_SwitchPara(eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	long data1 = -1, data2 = -1, data3 = -1;
+	
+	if(sec_cmd->cmd == UPDATE_CURRENT_SWITCHPARMS)
+	{
+
+		AM_SEC_GetFendData(NEW_CSW, &data1);
+		AM_SEC_GetFendData(NEW_UCSW, &data2);
+		AM_SEC_GetFendData(NEW_TONEBURST, &data3);	
+
+		AM_SEC_SetFendData(CSW, data1);
+		AM_SEC_SetFendData(UCSW, data2);
+		AM_SEC_SetFendData(TONEBURST, data3);		
+	}
+
+	return;
+}
+
+static void AM_SEC_Set_Toneburst(int dev_no, eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	long data = -1;
+	
+	data = sec_cmd->toneburst;
+	
+	if(sec_cmd->cmd == SEND_TONEBURST)
+	{
+		if(data == A)
+		{
+			AM_FEND_DiseqcSendBurst(dev_no, SEC_MINI_A);
+		}else if(data == B)
+		{
+			AM_FEND_DiseqcSendBurst(dev_no, SEC_MINI_B);
+		}
+	}
+	
+	return;
+}
+
+static void AM_SEC_Set_Diseqc(int dev_no, eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	eDVBDiseqcCommand_t diseqc;
+	
+	diseqc = sec_cmd->diseqc;
+	
+	if(sec_cmd->cmd == SEND_DISEQC)
+	{	
+		struct dvb_diseqc_master_cmd cmd;
+		memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
+		
+		memcpy(cmd.msg, diseqc.data, diseqc.len);
+		cmd.msg_len = diseqc.len;
+		
+		AM_FEND_DiseqcSendMasterCmd(dev_no, &cmd);	
+	}
+	
+	return;
+}
+
+static AM_Bool_t AM_SEC_If_Rotorpos_Valid_Goto(eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	long data1 = -1, data2 = -1;
+	
+	if(sec_cmd->cmd == IF_ROTORPOS_VALID_GOTO)
+	{
+		AM_SEC_GetFendData(ROTOR_CMD, &data1);
+		AM_SEC_GetFendData(ROTOR_POS, &data2);
+		if((data1 != -1) && (data2 != -1))
+		{
+			return AM_TRUE;
+		}
+	}
+
+	return AM_FALSE;
+}
+
+static void AM_SEC_Set_Invalid_Cur_RotorPara(eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	
+	if(sec_cmd->cmd == INVALIDATE_CURRENT_ROTORPARMS)
+	{
+		AM_SEC_SetFendData(ROTOR_CMD, -1);
+		AM_SEC_SetFendData(ROTOR_POS, -1);
+	}
+
+	return;
+}
+
+static void AM_SEC_Set_Update_Cur_RotorPara(eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	long data1 = -1, data2 = -1;
+	
+	if(sec_cmd->cmd == UPDATE_CURRENT_ROTORPARAMS)
+	{
+
+		AM_SEC_GetFendData(NEW_ROTOR_CMD, &data1);
+		AM_SEC_GetFendData(NEW_ROTOR_POS, &data2);
+
+		AM_SEC_SetFendData(ROTOR_CMD, data1);
+		AM_SEC_SetFendData(ROTOR_POS, data2);
+	}
+
+	return;
+}
+
+static AM_Bool_t AM_SEC_If_Tuner_Locked_Goto(eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	rotor_t cmd = sec_cmd->measure;
+	
+	if(sec_cmd->cmd == IF_TUNER_LOCKED_GOTO)
+	{
+		--am_sec_timeoutcount;
+		return AM_TRUE;
+	}
+
+	return AM_FALSE;
+}
+
+static void AM_SEC_Set_RotorMoving(eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	
+	if(sec_cmd->cmd == SET_ROTOR_MOVING)
+	{
+		sec_control.m_rotorMoving = AM_TRUE;
+	}
+
+	return;
+}
+
+static void AM_SEC_Set_RotorStoped(eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	
+	if(sec_cmd->cmd == SET_ROTOR_STOPPED)
+	{
+		sec_control.m_rotorMoving = AM_FALSE;
+	}
+
+	return;
+}
+
+static AM_Bool_t AM_SEC_Need_Turn_Fast(int turn_speed)
+{
+	if (turn_speed == FAST)
+		return AM_TRUE;
+	else if (turn_speed != SLOW)
+	{
+		/*no use*/
+		return AM_TRUE;
+	}
+	return AM_FALSE;
+}
+
+static void AM_SEC_Set_Timeout(eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	
+	if(sec_cmd->cmd == SET_TIMEOUT)
+	{
+		am_sec_timeoutcount = sec_cmd->val;
+	}
+
+	return;
+}
+
+static AM_Bool_t AM_SEC_If_Timeout_Goto(eSecCommand_t *sec_cmd)
+{
+	assert(sec_cmd);
+	
+	if((sec_cmd->cmd == IF_TIMEOUT_GOTO) && (!am_sec_timeoutcount))
+	{
+		return AM_TRUE;
+	}
+
+	return AM_FALSE;
+}
 
 static int AM_SEC_CanTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para)
 {
@@ -284,6 +602,8 @@ AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEquipmentC
 	assert(para);
 	
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	memset(&sec_control, 0, sizeof(AM_SEC_DVBSatelliteEquipmentControl_t));
 	
 	/* LNB Specific Parameters */
 	sec_control.m_lnbs.m_lof_lo = para->m_lnbs.m_lof_lo;
@@ -371,19 +691,676 @@ AM_ErrorCode_t AM_SEC_GetSetting(int dev_no, AM_SEC_DVBSatelliteEquipmentControl
 	return ret;
 }
 
-AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, unsigned int tunetimeout)
+AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, unsigned int *freq, unsigned int tunetimeout)
 {
 	assert(para);
+	assert(freq);
 	
 	AM_ErrorCode_t ret = AM_SUCCESS;
-
+	eSecCommand_t sec_cmd;
+	
 	if(AM_SEC_CanTune(dev_no, para))
 	{
+		AM_SEC_DVBSatelliteLNBParameters_t lnb_param = sec_control.m_lnbs;
+		AM_SEC_DVBSatelliteDiseqcParameters_t di_param = lnb_param.m_diseqc_parameters;
+		AM_SEC_DVBSatelliteRotorParameters_t rotor_param = lnb_param.m_rotor_parameters;
 
+		AM_SEC_DVBSatelliteSwitchParameters_t sw_param = lnb_param.m_cursat_parameters;
+		AM_Bool_t doSetFrontend = AM_TRUE;
+		AM_Bool_t doSetVoltageToneFrontend = AM_TRUE;
+		AM_Bool_t forceChanged = AM_FALSE;
+		AM_Bool_t needDiSEqCReset = AM_FALSE;
+		long band=0,
+			voltage = SEC_VOLTAGE_OFF,
+			tone = SEC_TONE_OFF,
+			csw = di_param.m_committed_cmd,
+			ucsw = di_param.m_uncommitted_cmd,
+			toneburst = di_param.m_toneburst_param,
+			lastcsw = -1,
+			lastucsw = -1,
+			lastToneburst = -1,
+			lastRotorCmd = -1,
+			curRotorPos = -1,
+			satposDependPtr = -1;
+		AM_SEC_Diseqc_Mode diseqc_mode = di_param.m_diseqc_mode;
+		AM_SEC_Voltage_Mode voltage_mode = sw_param.m_voltage_mode;
+		AM_Bool_t diseqc13V = voltage_mode == HV_13;
+		AM_Bool_t is_unicable = lnb_param.SatCR_idx != -1;
+
+		AM_Bool_t useGotoXX = AM_FALSE;
+		int RotorCmd=-1;
+		int send_mask = 0;
+
+		lnb_param.guard_offset = 0; //HACK
+
+		AM_SEC_Set_Set_Frontend(AM_FALSE);
+
+		AM_SEC_SetFendData(SATCR, lnb_param.SatCR_idx);
+
+		if (diseqc13V)
+			voltage_mode = HV;
+
+		AM_SEC_GetFendData(CSW, &lastcsw);
+		AM_SEC_GetFendData(UCSW, &lastucsw);
+		AM_SEC_GetFendData(TONEBURST, &lastToneburst);
+		AM_SEC_GetFendData(ROTOR_CMD, &lastRotorCmd);
+		AM_SEC_GetFendData(ROTOR_POS, &curRotorPos);
+
+		if (lastcsw == lastucsw && lastToneburst == lastucsw && lastucsw == -1)
+			needDiSEqCReset = AM_TRUE;
+
+		/* Dishpro bandstacking HACK */
+		if (lnb_param.m_lof_threshold == 1000)
+		{
+			if (!(para->polarisation & AM_FEND_POLARISATION_V))
+			{
+				band |= 1;
+			}
+			band |= 2; /* voltage always 18V for Dishpro */
+		}
+		else
+		{
+			if ( para->para.frequency > lnb_param.m_lof_threshold )
+				band |= 1;
+			if (!(para->polarisation & AM_FEND_POLARISATION_V))
+				band |= 2;
+		}
+
+		int lof = (band&1)?lnb_param.m_lof_hi:lnb_param.m_lof_lo;
+
+		if(!is_unicable)
+		{
+			// calc Frequency
+			int local= abs(para->para.frequency
+				- lof);
+			*freq = ((((local * 2) / 125) + 1) / 2) * 125;
+			AM_SEC_SetFendData(FREQ_OFFSET, para->para.frequency - *freq);
+
+			/* Dishpro bandstacking HACK */
+			if (lnb_param.m_lof_threshold == 1000)
+				voltage = SEC_VOLTAGE_18;
+			else if ( voltage_mode == _14V
+				|| ( para->polarisation & AM_FEND_POLARISATION_V
+					&& voltage_mode == HV )  )
+				voltage = SEC_VOLTAGE_13;
+			else if ( voltage_mode == _18V
+				|| ( !(para->polarisation & AM_FEND_POLARISATION_V)
+					&& voltage_mode == HV )  )
+				voltage = SEC_VOLTAGE_18;
+			if ( (sw_param.m_22khz_signal == ON)
+				|| ( sw_param.m_22khz_signal == HILO && (band&1) ) )
+				tone = SEC_TONE_ON;
+			else if ( (sw_param.m_22khz_signal == OFF)
+				|| ( sw_param.m_22khz_signal == HILO && !(band&1) ) )
+				tone = SEC_TONE_OFF;
+		}
+		else
+		{
+			int tmp1 = abs(para->para.frequency
+					-lof)
+					+ lnb_param.SatCRvco
+					- 1400000
+					+ lnb_param.guard_offset;
+			int tmp2 = ((((tmp1 * 2) / 4000) + 1) / 2) * 4000;
+			*freq = lnb_param.SatCRvco - (tmp1-tmp2) + lnb_param.guard_offset;
+			lnb_param.UnicableTuningWord = ((tmp2 / 4000) 
+					| ((band & 1) ? 0x400 : 0)			//HighLow
+					| ((band & 2) ? 0x800 : 0)			//VertHor
+					| ((lnb_param.LNBNum & 1) ? 0 : 0x1000)			//Umschaltung LNB1 LNB2
+					| (lnb_param.SatCR_idx << 13));		//Adresse des SatCR
+			AM_DEBUG(1, "[prepare] UnicableTuningWord %#04x",lnb_param.UnicableTuningWord);
+			AM_DEBUG(1, "[prepare] guard_offset %d",lnb_param.guard_offset);
+			AM_SEC_SetFendData(FREQ_OFFSET, (lnb_param.UnicableTuningWord & 0x3FF) *4000 + 1400000 + lof - (2 * (lnb_param.SatCRvco - (tmp1-tmp2))) );
+			voltage = SEC_VOLTAGE_13;
+		}
+
+		if (diseqc_mode >= V1_0)
+		{
+			if ( di_param.m_committed_cmd < SENDNO )
+				csw = 0xF0 | (csw << 2);
+
+			if (di_param.m_committed_cmd <= SENDNO)
+				csw |= band;
+
+			AM_Bool_t send_csw =
+				(di_param.m_committed_cmd != SENDNO);
+			AM_Bool_t changed_csw = send_csw && (forceChanged || csw != lastcsw);
+
+			AM_Bool_t send_ucsw =
+				(di_param.m_uncommitted_cmd && diseqc_mode > V1_0);
+			AM_Bool_t changed_ucsw = send_ucsw && (forceChanged || ucsw != lastucsw);
+
+			AM_Bool_t send_burst =
+				(di_param.m_toneburst_param != NO);
+			AM_Bool_t changed_burst = send_burst && (forceChanged || toneburst != lastToneburst);
+
+			/* send_mask
+				1 must send csw
+				2 must send ucsw
+				4 send toneburst first
+				8 send toneburst at end */
+			if (changed_burst) // toneburst first and toneburst changed
+			{
+				if (di_param.m_command_order&1)
+				{
+					send_mask |= 4;
+					if ( send_csw )
+						send_mask |= 1;
+					if ( send_ucsw )
+						send_mask |= 2;
+				}
+				else
+					send_mask |= 8;
+			}
+			if (changed_ucsw)
+			{
+				send_mask |= 2;
+				if ((di_param.m_command_order&4) && send_csw)
+					send_mask |= 1;
+				if (di_param.m_command_order==4 && send_burst)
+					send_mask |= 8;
+			}
+			if (changed_csw)
+			{
+				if ( di_param.m_use_fast
+					&& di_param.m_committed_cmd < SENDNO
+					&& (lastcsw & 0xF0)
+					&& ((csw / 4) == (lastcsw / 4)) )
+					AM_DEBUG(1, "dont send committed cmd (fast diseqc)");
+				else
+				{
+					send_mask |= 1;
+					if (!(di_param.m_command_order&4) && send_ucsw)
+						send_mask |= 2;
+					if (!(di_param.m_command_order&1) && send_burst)
+						send_mask |= 8;
+				}
+			}
+
+#if 0
+			AM_DEBUG(1, "sendmask: ");
+			for (int i=3; i >= 0; --i)
+				if ( send_mask & (1<<i) )
+					AM_DEBUG(1, "1");
+				else
+					AM_DEBUG(1, "0");
+			AM_DEBUG(1, "");
+#endif
+
+			if ( diseqc_mode == V1_2 )
+			{
+				if (sw_param.m_rotorPosNum) // we have stored rotor pos?
+					RotorCmd=sw_param.m_rotorPosNum;
+				else  // we must calc gotoxx cmd
+				{
+					useGotoXX = AM_TRUE;
+
+					double	SatLon = abs(rotor_param.m_gotoxx_parameters.m_sat_longitude)/10.00,
+							SiteLat = rotor_param.m_gotoxx_parameters.m_latitude,
+							SiteLon = rotor_param.m_gotoxx_parameters.m_longitude;
+
+					if ( rotor_param.m_gotoxx_parameters.m_la_direction == SOUTH )
+						SiteLat = -SiteLat;
+
+					if ( rotor_param.m_gotoxx_parameters.m_lo_direction == WEST )
+						SiteLon = 360 - SiteLon;
+
+					AM_DEBUG(1, "siteLatitude = %lf, siteLongitude = %lf, %lf degrees", SiteLat, SiteLon, SatLon );
+					double satHourAngle =
+						calcSatHourangle( SatLon, SiteLat, SiteLon );
+					AM_DEBUG(1, "PolarmountHourAngle=%lf", satHourAngle );
+
+					static int gotoXTable[10] =
+						{ 0x00, 0x02, 0x03, 0x05, 0x06, 0x08, 0x0A, 0x0B, 0x0D, 0x0E };
+
+					if (SiteLat >= 0) // Northern Hemisphere
+					{
+						int tmp=(int)round( fabs( 180 - satHourAngle ) * 10.0 );
+						RotorCmd = (tmp/10)*0x10 + gotoXTable[ tmp % 10 ];
+
+						if (satHourAngle < 180) // the east
+							RotorCmd |= 0xE000;
+						else					// west
+							RotorCmd |= 0xD000;
+					}
+					else // Southern Hemisphere
+					{
+						if (satHourAngle < 180) // the east
+						{
+							int tmp=(int)round( fabs( satHourAngle ) * 10.0 );
+							RotorCmd = (tmp/10)*0x10 + gotoXTable[ tmp % 10 ];
+							RotorCmd |= 0xD000;
+						}
+						else // west
+						{
+							int tmp=(int)round( fabs( 360 - satHourAngle ) * 10.0 );
+							RotorCmd = (tmp/10)*0x10 + gotoXTable[ tmp % 10 ];
+							RotorCmd |= 0xE000;
+						}
+					}
+					AM_DEBUG(1, "RotorCmd = %04x", RotorCmd);				
+				}
+			}
+
+			if ( send_mask )
+			{
+				int diseqc_repeats = diseqc_mode > V1_0 ? di_param.m_repeats : 0;
+				int vlt = SEC_VOLTAGE_OFF;
+				pair_t compare;
+				compare.steps = +3;
+				compare.tone = SEC_TONE_OFF;
+				AM_SEC_SetSecCommandByCompare( &sec_cmd, IF_TONE_GOTO, compare );
+				if(!AM_SEC_If_Tone_Goto(&sec_cmd))
+				{
+					AM_SEC_SetSecCommandByVal( &sec_cmd, SET_TONE, SEC_TONE_OFF );
+					AM_SEC_Set_Tone(dev_no, &sec_cmd);
+					usleep(sec_control.m_params[DELAY_AFTER_CONT_TONE_DISABLE_BEFORE_DISEQC] * 1000);
+				}
+
+				if (diseqc13V)
+					vlt = SEC_VOLTAGE_13;
+				else if ( RotorCmd != -1 && RotorCmd != lastRotorCmd )
+				{
+					if (rotor_param.m_inputpower_parameters.m_use && !is_unicable)
+						vlt = SEC_VOLTAGE_18;  // in input power mode set 18V for measure input power
+					else
+						vlt = SEC_VOLTAGE_13;  // in normal mode start turning with 13V
+				}
+				else
+					vlt = voltage;
+
+				// check if voltage is already correct..
+				compare.voltage = vlt;
+				compare.steps = +7;
+				AM_SEC_SetSecCommandByCompare(&sec_cmd, IF_VOLTAGE_GOTO, compare );
+				if(!AM_SEC_If_Voltage_Goto(&sec_cmd, lnb_param.m_increased_voltage))
+				{
+					// check if voltage is disabled
+					compare.voltage = SEC_VOLTAGE_OFF;
+					compare.steps = +4;
+					AM_SEC_SetSecCommandByCompare(&sec_cmd, IF_VOLTAGE_GOTO, compare );
+					if(!AM_SEC_If_Voltage_Goto(&sec_cmd, lnb_param.m_increased_voltage))
+					{
+						// voltage is changed... use DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_SWITCH_CMDS
+						AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, vlt );
+						AM_SEC_Set_Voltage(dev_no, &sec_cmd, lnb_param.m_increased_voltage);
+						usleep(sec_control.m_params[DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_SWITCH_CMDS] * 1000);
+						/*GOTO, +3*/
+					}
+					else
+					{
+						// voltage was disabled.. use DELAY_AFTER_ENABLE_VOLTAGE_BEFORE_SWITCH_CMDS
+						AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, vlt );
+						AM_SEC_Set_Voltage(dev_no, &sec_cmd, lnb_param.m_increased_voltage);
+						usleep(sec_control.m_params[DELAY_AFTER_ENABLE_VOLTAGE_BEFORE_SWITCH_CMDS] * 1000);
+					}
+				}
+
+				AM_SEC_SetSecCommand( &sec_cmd, INVALIDATE_CURRENT_SWITCHPARMS );
+				AM_SEC_Set_Invalid_Cur_SwitchPara(&sec_cmd);
+				if (needDiSEqCReset)
+				{
+					AM_FEND_Diseqccmd_ResetDiseqcMicro(dev_no);
+					usleep(sec_control.m_params[DELAY_AFTER_DISEQC_RESET_CMD] * 1000);
+					
+					// diseqc peripherial powersupply on
+					AM_FEND_Diseqccmd_PoweronSwitch(dev_no);
+					usleep(sec_control.m_params[DELAY_AFTER_DISEQC_PERIPHERIAL_POWERON_CMD] * 1000);
+				}
+
+				int seq_repeat = 0;
+				for (seq_repeat = 0; seq_repeat < (di_param.m_seq_repeat?2:1); ++seq_repeat)
+				{
+					if ( send_mask & 4 )
+					{
+						AM_SEC_SetSecCommandByVal( &sec_cmd, SEND_TONEBURST, di_param.m_toneburst_param );
+						AM_SEC_Set_Toneburst(dev_no, & sec_cmd);
+						usleep(sec_control.m_params[DELAY_AFTER_TONEBURST] * 1000);
+					}
+
+					int loops=0;
+
+					if ( send_mask & 1 )
+						++loops;
+					if ( send_mask & 2 )
+						++loops;
+
+					loops <<= diseqc_repeats;
+
+					int i = 0;
+					for ( i = 0; i < loops;)  // fill commands...
+					{
+						eDVBDiseqcCommand_t diseqc;
+						memset(diseqc.data, 0, MAX_DISEQC_LENGTH);
+						diseqc.len = 4;
+						diseqc.data[0] = i ? 0xE1 : 0xE0;
+						diseqc.data[1] = 0x10;
+						if ( (send_mask & 2) && (di_param.m_command_order & 4) )
+						{
+							diseqc.data[2] = 0x39;
+							diseqc.data[3] = ucsw;
+						}
+						else if ( send_mask & 1 )
+						{
+							diseqc.data[2] = 0x38;
+							diseqc.data[3] = csw;
+						}
+						else  // no committed command confed.. so send uncommitted..
+						{
+							diseqc.data[2] = 0x39;
+							diseqc.data[3] = ucsw;
+						}
+						AM_SEC_SetSecCommandByDiseqc(&sec_cmd, SEND_DISEQC, diseqc);
+						AM_SEC_Set_Diseqc(dev_no, &sec_cmd);
+
+						i++;
+						if ( i < loops )
+						{
+							int cmd=0;
+							if (diseqc.data[2] == 0x38 && (send_mask & 2))
+								cmd=0x39;
+							else if (diseqc.data[2] == 0x39 && (send_mask & 1))
+								cmd=0x38;
+							int tmp = sec_control.m_params[DELAY_BETWEEN_DISEQC_REPEATS] * 1000;
+							if (cmd)
+							{
+								int delay = diseqc_repeats ? (tmp - 54) / 2 : tmp;  // standard says 100msek between two repeated commands
+								usleep(delay);
+								diseqc.data[2]=cmd;
+								diseqc.data[3]=(cmd==0x38) ? csw : ucsw;
+								AM_SEC_SetSecCommandByDiseqc(&sec_cmd, SEND_DISEQC, diseqc);
+								AM_SEC_Set_Diseqc(dev_no, &sec_cmd);
+								++i;
+								if ( i < loops )
+									usleep(delay);
+								else
+									usleep(sec_control.m_params[DELAY_AFTER_LAST_DISEQC_CMD] * 1000);
+							}
+							else  // delay 120msek when no command is in repeat gap
+								usleep(tmp);
+						}
+						else
+							usleep(sec_control.m_params[DELAY_AFTER_LAST_DISEQC_CMD] * 1000);
+					}
+
+					if ( send_mask & 8 )  // toneburst at end of sequence
+					{
+						AM_SEC_SetSecCommandByVal( &sec_cmd, SEND_TONEBURST, di_param.m_toneburst_param );
+						AM_SEC_Set_Toneburst(dev_no, & sec_cmd);						
+						usleep(sec_control.m_params[DELAY_AFTER_TONEBURST] * 1000);
+					}
+
+					if (di_param.m_seq_repeat && seq_repeat == 0)
+						usleep(sec_control.m_params[DELAY_BEFORE_SEQUENCE_REPEAT] * 1000);
+				}
+			}
+		}
+		else
+		{
+			AM_SEC_SetSecCommand( &sec_cmd, INVALIDATE_CURRENT_SWITCHPARMS );
+			AM_SEC_Set_Invalid_Cur_SwitchPara(&sec_cmd);
+			csw = band;
+		}
+
+		AM_SEC_SetFendData(NEW_CSW, csw);
+		AM_SEC_SetFendData(NEW_UCSW, ucsw);
+		AM_SEC_SetFendData(NEW_TONEBURST, di_param.m_toneburst_param);
+
+		if(is_unicable)
+		{
+			// check if voltage is disabled
+			pair_t compare;
+			compare.steps = +3;
+			compare.voltage = SEC_VOLTAGE_OFF;
+			AM_SEC_SetSecCommandByCompare(&sec_cmd, IF_NOT_VOLTAGE_GOTO, compare );
+			if(!AM_SEC_If_Not_Voltage_Goto(&sec_cmd, lnb_param.m_increased_voltage))
+			{
+				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, SEC_VOLTAGE_13 );
+				AM_SEC_Set_Voltage(dev_no, &sec_cmd, lnb_param.m_increased_voltage);	
+				usleep(sec_control.m_params[DELAY_AFTER_ENABLE_VOLTAGE_BEFORE_SWITCH_CMDS] * 1000);
+			}
+
+			AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, SEC_VOLTAGE_18 );
+			AM_SEC_Set_Voltage(dev_no, &sec_cmd, lnb_param.m_increased_voltage);			
+			AM_SEC_SetSecCommandByVal( &sec_cmd, SET_TONE, SEC_TONE_OFF );
+			AM_SEC_Set_Tone(dev_no, &sec_cmd);
+			usleep(sec_control.m_params[DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_SWITCH_CMDS] * 1000);  // wait 20 ms after voltage change
+
+			eDVBDiseqcCommand_t diseqc;
+			memset(diseqc.data, 0, MAX_DISEQC_LENGTH);
+			diseqc.len = 5;
+			diseqc.data[0] = 0xE0;
+			diseqc.data[1] = 0x10;
+			diseqc.data[2] = 0x5A;
+			diseqc.data[3] = lnb_param.UnicableTuningWord >> 8;
+			diseqc.data[4] = lnb_param.UnicableTuningWord;
+
+			AM_SEC_SetSecCommandByDiseqc(&sec_cmd, SEND_DISEQC, diseqc);
+			AM_SEC_Set_Diseqc(dev_no, &sec_cmd);
+			usleep(sec_control.m_params[DELAY_AFTER_LAST_DISEQC_CMD] * 1000);
+			AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, SEC_VOLTAGE_13 );
+			AM_SEC_Set_Voltage(dev_no, &sec_cmd, lnb_param.m_increased_voltage);	
+			if ( RotorCmd != -1 && RotorCmd != lastRotorCmd && !rotor_param.m_inputpower_parameters.m_use)
+				usleep(sec_control.m_params[DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_MOTOR_CMD] * 1000);  // wait 150msec after voltage change
+		}
+
+		AM_DEBUG(1, "RotorCmd %02x, lastRotorCmd %02lx", RotorCmd, lastRotorCmd);
+		if ( RotorCmd != -1 && RotorCmd != lastRotorCmd )
+		{
+			AM_Bool_t no_need_sendrotorstop_and_recheck_vol = AM_FALSE;
+			int mrt = sec_control.m_params[MOTOR_RUNNING_TIMEOUT]; // in seconds!
+			pair_t compare;
+			if (!send_mask && !is_unicable)
+			{
+				compare.steps = +3;
+				compare.tone = SEC_TONE_OFF;
+				AM_SEC_SetSecCommandByCompare( &sec_cmd, IF_TONE_GOTO, compare );
+				if(!AM_SEC_If_Tone_Goto(&sec_cmd))
+				{
+					AM_SEC_SetSecCommandByVal( &sec_cmd, SET_TONE, SEC_TONE_OFF );
+					AM_SEC_Set_Tone(dev_no, &sec_cmd);
+					usleep(sec_control.m_params[DELAY_AFTER_CONT_TONE_DISABLE_BEFORE_DISEQC] * 1000); 
+				}
+				
+				compare.voltage = SEC_VOLTAGE_OFF;
+				compare.steps = +4;
+				AM_SEC_SetSecCommandByCompare(&sec_cmd, IF_NOT_VOLTAGE_GOTO, compare );
+				// the next is a check if voltage is switched off.. then we first set a voltage :)
+				// else we set voltage after all diseqc stuff..
+				if(!AM_SEC_If_Not_Voltage_Goto(&sec_cmd, lnb_param.m_increased_voltage))
+				{
+					if (rotor_param.m_inputpower_parameters.m_use)
+					{
+						AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, SEC_VOLTAGE_18 );
+						AM_SEC_Set_Voltage(dev_no, &sec_cmd, lnb_param.m_increased_voltage); // set 18V for measure input power
+					}
+					else
+					{
+						AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, SEC_VOLTAGE_13 );
+						AM_SEC_Set_Voltage(dev_no, &sec_cmd, lnb_param.m_increased_voltage);	 // in normal mode start turning with 13V
+					}
+
+					usleep(sec_control.m_params[DELAY_AFTER_ENABLE_VOLTAGE_BEFORE_MOTOR_CMD] * 1000);  // wait 750ms when voltage was disabled
+				}
+				no_need_sendrotorstop_and_recheck_vol = AM_TRUE;  // no need to send stop rotor cmd and recheck voltage
+			}
+			else
+				usleep(sec_control.m_params[DELAY_BETWEEN_SWITCH_AND_MOTOR_CMD] * 1000);  // wait 700ms when diseqc changed
+
+			eDVBDiseqcCommand_t diseqc;
+			memset(diseqc.data, 0, MAX_DISEQC_LENGTH);
+
+			AM_SEC_SetSecCommandByVal( &sec_cmd, IF_ROTORPOS_VALID_GOTO, +5 );
+			if(AM_SEC_If_Rotorpos_Valid_Goto(&sec_cmd))
+			{
+				AM_FEND_Diseqccmd_SetPositionerHalt(dev_no);
+				usleep(50 * 1000);
+				AM_FEND_Diseqccmd_SetPositionerHalt(dev_no);
+				// wait 150msec after send rotor stop cmd
+				usleep(sec_control.m_params[DELAY_AFTER_MOTOR_STOP_CMD] * 1000);
+			}
+
+			diseqc.data[0] = 0xE0;
+			diseqc.data[1] = 0x31;		// positioner
+			if ( useGotoXX )
+			{
+				diseqc.len = 5;
+				diseqc.data[2] = 0x6E;	// drive to angular position
+				diseqc.data[3] = ((RotorCmd & 0xFF00) / 0x100);
+				diseqc.data[4] = RotorCmd & 0xFF;
+			}
+
+		// use measure rotor input power to detect motor state
+			if ( rotor_param.m_inputpower_parameters.m_use)
+			{			
+				AM_Bool_t turn_fast = AM_SEC_Need_Turn_Fast(rotor_param.m_inputpower_parameters.m_turning_speed) && !is_unicable;
+				rotor_t cmd;
+				pair_t compare;
+				if (turn_fast)
+					compare.voltage = SEC_VOLTAGE_18;
+				else
+					compare.voltage = SEC_VOLTAGE_13;
+				compare.steps = +3;
+				/*no use*/
+			}
+		// use normal motor turning mode
+			else
+			{
+				if (curRotorPos != -1)
+				{
+					mrt = abs(curRotorPos - rotor_param.m_gotoxx_parameters.m_sat_longitude);
+					if (mrt > 1800)
+						mrt = 3600 - mrt;
+					if (mrt % 10)
+						mrt += 10; // round a little bit
+					mrt *= 2000;  // (we assume a very slow rotor with just 0.5 degree per second here)
+					mrt /= 10000;
+					mrt += 3; // a little bit overhead
+				}
+				doSetVoltageToneFrontend=AM_FALSE;
+				doSetFrontend=AM_FALSE;
+				rotor_t cmd;
+				pair_t compare;
+				compare.voltage = SEC_VOLTAGE_13;
+				compare.steps = +3;
+				AM_SEC_SetSecCommandByCompare(&sec_cmd, IF_VOLTAGE_GOTO, compare );
+				if(!AM_SEC_If_Voltage_Goto(&sec_cmd, lnb_param.m_increased_voltage))
+				{
+					AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, compare.voltage );
+					AM_SEC_Set_Voltage(dev_no, &sec_cmd, lnb_param.m_increased_voltage);
+					usleep(sec_control.m_params[DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_MOTOR_CMD] * 1000);  // wait 150msec after voltage change
+				}
+
+				AM_SEC_SetSecCommand( &sec_cmd, INVALIDATE_CURRENT_ROTORPARMS );
+				AM_SEC_Set_Invalid_Cur_RotorPara(&sec_cmd);
+				AM_SEC_SetSecCommand( &sec_cmd, SET_ROTOR_MOVING); 
+				AM_SEC_Set_RotorStoped(&sec_cmd);
+				if ( useGotoXX )
+				{
+					AM_SEC_SetSecCommandByDiseqc(&sec_cmd, SEND_DISEQC, diseqc);
+					AM_SEC_Set_Diseqc(dev_no, &sec_cmd);				
+				}
+				else
+				{
+					AM_FEND_Diseqccmd_GotoPositioner(dev_no, RotorCmd); // goto stored sat position
+				}
+				usleep( 1000 * 1000 ); // sleep one second before change voltage or tone
+
+				compare.voltage = voltage;
+				compare.steps = +3;
+				AM_SEC_SetSecCommandByCompare(&sec_cmd, IF_VOLTAGE_GOTO, compare );
+				if(!AM_SEC_If_Voltage_Goto(&sec_cmd, lnb_param.m_increased_voltage))// correct final voltage?
+				{
+					usleep( 2000 * 1000 );  // wait 2 second before set high voltage
+					AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, voltage );
+					AM_SEC_Set_Voltage(dev_no, &sec_cmd, lnb_param.m_increased_voltage);					
+				}
+
+				compare.tone = tone;
+				AM_SEC_SetSecCommandByCompare(&sec_cmd, IF_TONE_GOTO, compare );
+				if(!AM_SEC_If_Tone_Goto(&sec_cmd))				
+				{
+					AM_SEC_SetSecCommandByVal( &sec_cmd, SET_TONE, tone );
+					AM_SEC_Set_Tone(dev_no, &sec_cmd);				
+					usleep(sec_control.m_params[DELAY_AFTER_FINAL_CONT_TONE_CHANGE] * 1000);
+				}
+				AM_SEC_Set_Set_Frontend(AM_TRUE);
+
+				cmd.direction=1;  // check for running rotor
+				cmd.deltaA=0;
+				cmd.steps = +3;
+				cmd.okcount=0;
+
+				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_TIMEOUT, mrt*4 ); // mrt is in seconds... our SLEEP time is 250ms.. so * 4
+				AM_SEC_Set_Timeout(&sec_cmd);
+
+				while(1)
+				{
+					usleep( 250 * 1000 );  // 250msec delay
+
+					AM_SEC_SetSecCommandByMeasure( &sec_cmd, IF_TUNER_LOCKED_GOTO, cmd); 
+					if(AM_SEC_If_Tuner_Locked_Goto(&sec_cmd))
+					{
+						break;
+					}
+
+					AM_SEC_SetSecCommand( &sec_cmd, IF_TIMEOUT_GOTO); 
+					if(AM_SEC_If_Timeout_Goto(&sec_cmd))
+					{
+						/*tune timeout?*/
+						AM_SEC_Set_Set_Frontend(AM_TRUE);					
+						break;
+					}					
+				}
+
+				AM_SEC_SetSecCommand( &sec_cmd, UPDATE_CURRENT_ROTORPARAMS); 
+				AM_SEC_Set_Update_Cur_RotorPara(&sec_cmd);
+				AM_SEC_SetSecCommand( &sec_cmd, SET_ROTOR_STOPPED); 
+				AM_SEC_Set_RotorStoped(&sec_cmd);
+
+				AM_DEBUG(1, "set rotor timeout to %d seconds", mrt);
+			}
+			AM_SEC_SetFendData(NEW_ROTOR_CMD, RotorCmd);
+			AM_SEC_SetFendData(NEW_ROTOR_POS, rotor_param.m_gotoxx_parameters.m_sat_longitude);			
+		}
+
+		if (doSetVoltageToneFrontend && !is_unicable)
+		{
+			pair_t compare;
+			compare.voltage = voltage;
+			compare.steps = +3;
+			AM_SEC_SetSecCommandByCompare(&sec_cmd, IF_VOLTAGE_GOTO, compare );
+			if(!AM_SEC_If_Voltage_Goto(&sec_cmd, lnb_param.m_increased_voltage))// voltage already correct ?	
+			{
+				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, voltage );
+				AM_SEC_Set_Voltage(dev_no, &sec_cmd, lnb_param.m_increased_voltage);	
+				usleep(sec_control.m_params[DELAY_AFTER_FINAL_VOLTAGE_CHANGE] * 1000);
+			}
+			
+			compare.tone = tone;
+			AM_SEC_SetSecCommandByCompare(&sec_cmd, IF_TONE_GOTO, compare );
+			if(!AM_SEC_If_Tone_Goto(&sec_cmd))
+			{
+				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_TONE, tone );
+				AM_SEC_Set_Tone(dev_no, &sec_cmd);	
+				usleep(sec_control.m_params[DELAY_AFTER_FINAL_CONT_TONE_CHANGE] * 1000);
+			} 
+		}
+
+		AM_SEC_SetSecCommand( &sec_cmd, UPDATE_CURRENT_SWITCHPARMS);
+		AM_SEC_Set_Update_Cur_SwitchPara(&sec_cmd);
+
+		if (doSetFrontend)
+		{
+			/*tune timeout?*/
+			AM_SEC_Set_Set_Frontend(AM_TRUE);
+		}
+
+		return ret;
 
 	}
-			
-	return ret;
+	
+	return AM_FENDCTRL_ERR_END;
 }
 
 AM_ErrorCode_t AM_SEC_PrepareTurnOffSatCR(int dev_no, int satcr)
@@ -391,6 +1368,11 @@ AM_ErrorCode_t AM_SEC_PrepareTurnOffSatCR(int dev_no, int satcr)
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
 	return ret;
+}
+
+AM_Bool_t AM_SEC_Get_Set_Frontend(void)
+{
+	return am_sec_fend_set;
 }
 
 void AM_SEC_SetCommandString(eDVBDiseqcCommand_t *diseqc_cmd, const char *str)

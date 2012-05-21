@@ -13,6 +13,10 @@
 
 #include "list.h"
 
+#include "am_types.h"
+
+#include "am_fend_ctrl.h"
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -116,6 +120,7 @@ typedef enum {
 	SATPOS_DEPENDS_PTR,   // pointer to FE with configured rotor (with twin/quattro lnb)
 	FREQ_OFFSET,          // current frequency offset
 	CUR_VOLTAGE,          // current voltage
+	CUR_VOLTAGE_INC, // current voltage increased
 	CUR_TONE,             // current continuous tone
 	SATCR,                // current SatCR
 	NUM_DATA_ENTRIES
@@ -124,6 +129,11 @@ typedef enum {
 /****************************************************************************
  * Function prototypes  
  ***************************************************************************/
+
+AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, unsigned int *freq, unsigned int tunetimeout);
+
+AM_Bool_t AM_SEC_Get_Set_Frontend(void);
+
 void AM_SEC_SetCommandString(eDVBDiseqcCommand_t *diseqc_cmd, const char *str);
 
 #ifdef __cplusplus

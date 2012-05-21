@@ -69,6 +69,7 @@ typedef enum
 	AM_FEND_DEMOD_DVBC,  /**< DVB-C*/
 	AM_FEND_DEMOD_DVBT,  /**< DVB-T*/
 	AM_FEND_DEMOD_DVBS,  /**< DVB-S*/
+	AM_FEND_DEMOD_ATSC, /**< ATSC*/
 	AM_FEND_DEMOD_ISDBT,  /**< ISDB-T*/
 	AM_FEND_DEMOD_COUNT
 } AM_FEND_DemodMode_t;
