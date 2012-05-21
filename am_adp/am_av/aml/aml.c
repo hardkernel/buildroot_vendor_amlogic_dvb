@@ -3881,6 +3881,7 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 			cmd = ((AM_AV_VideoDisplayMode_t)val)?"1":"0";
 		break;
 		case AV_VIDEO_PARA_CLEAR_VBUF:
+#if 0
 #ifdef AMSTREAM_IOC_CLEAR_VBUF
 			{
 				int fd = open(AMVIDEO_FILE, O_RDWR);
@@ -3891,6 +3892,9 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 				}
 			}
 #endif
+#endif
+			name = VID_DISABLE_FILE;
+			cmd = "2";
 		break;
 	}
 	

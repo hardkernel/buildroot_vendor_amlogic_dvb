@@ -96,6 +96,7 @@ typedef struct AM_SEC_DVBSatelliteRotorGotoxxParameters
 	AM_SEC_Rotor_Direction m_la_direction;	// NORT, SOUTH
 	double m_longitude;	// longitude for gotoXX? function
 	double m_latitude;	// latitude for gotoXX? function
+	int m_sat_longitude;	// longitude for gotoXX? function of satellite unit-0.1 degree
 }AM_SEC_DVBSatelliteRotorGotoxxParameters_t;
 
 /**\brief 卫星设备（Motor）控制参数*/ 
@@ -164,7 +165,7 @@ typedef enum{
 typedef struct AM_SEC_DVBSatelliteEquipmentControl
 {
 	AM_SEC_DVBSatelliteLNBParameters_t m_lnbs; // i think its enough
-	int m_rotorMoving;
+	AM_Bool_t m_rotorMoving;
 	AM_Bool_t m_canMeasureInputPower;
 
 	AM_SEC_Cmd_Param_t m_params[SEC_CMD_MAX_PARAMS];
@@ -172,10 +173,10 @@ typedef struct AM_SEC_DVBSatelliteEquipmentControl
 
 typedef struct AM_FENDCTRL_DVBFrontendParametersSatellite
 {
+	struct dvb_frontend_parameters para;
+
 	AM_Bool_t no_rotor_command_on_tune;
 	AM_FEND_Polarisation_t polarisation;
-
-	struct dvb_frontend_parameters para;
 }AM_FENDCTRL_DVBFrontendParametersSatellite_t;
 
 typedef struct AM_FENDCTRL_DVBFrontendParametersCable
@@ -193,8 +194,6 @@ typedef struct AM_FENDCTRL_DVBFrontendParametersATSC
 	struct dvb_frontend_parameters para;
 }AM_FENDCTRL_DVBFrontendParametersATSC_t;
 
-typedef enum {DVBS = 0, DVBC = 1, DVBT = 2, ATSC = 3}AM_FENDCTRL_Fendtype;
-
 /**\brief 前端控制模块设置参数*/
 typedef struct AM_FENDCTRL_DVBFrontendParameters{
 	union
@@ -204,7 +203,7 @@ typedef struct AM_FENDCTRL_DVBFrontendParameters{
 		AM_FENDCTRL_DVBFrontendParametersTerrestrial_t terrestrial;
 		AM_FENDCTRL_DVBFrontendParametersATSC_t atsc;
 	};	
-	AM_FENDCTRL_Fendtype m_type;
+	AM_FEND_DemodMode_t m_type;
 }AM_FENDCTRL_DVBFrontendParameters_t;
 
 /* sec control interface */ 
