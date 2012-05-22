@@ -12,6 +12,7 @@
 
 #include <am_debug.h>
 #include <am_fend.h>
+#include <am_fend_diseqc_cmd.h>
 #include <string.h>
 #include <stdio.h>
 #include <am_misc.h>
@@ -71,7 +72,9 @@ static void blindscan_cb(int dev_no, AM_FEND_BlindEvent_t *evt, void *user_data)
 
 static void sec(int dev_no)
 {
-	int sec;
+	int sec = -1;
+	AM_Bool_t sec_exit = AM_FALSE;
+	
 	printf("sec_control\n");
 	while(1)
 	{
@@ -108,6 +111,7 @@ static void sec(int dev_no)
 		printf("Diseqccmd_SetODUChannel-29\n");
 		printf("Diseqccmd_SetODUPowerOff-30\n");	
 		printf("Diseqccmd_SetODUUbxSignalOn-31\n");
+		printf("Exit sec-32\n");
 		printf("-----------------------------\n");
 		printf("select\n");
 		scanf("%d", &sec);
@@ -339,10 +343,22 @@ static void sec(int dev_no)
 			case 31:
 				AM_FEND_Diseqccmd_SetODUUbxSignalOn(dev_no);
                             break;                           
+
+			case 32:
+				sec_exit = AM_TRUE;
+				break;
 				
 			default:
 				break;
 		}
+
+		sec = -1;
+
+		if(sec_exit == AM_TRUE)
+		{
+			break;
+		}
+		
 	}
 
 	return;

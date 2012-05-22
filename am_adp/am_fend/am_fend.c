@@ -526,7 +526,7 @@ static unsigned short AM_FEND_IBlindscanAPI_GetProgress(int dev_no)
 /**\brief 前端设备盲扫处理线程*/
 static void* fend_blindscan_thread(void *arg)
 {
-	int dev_no = *((int *)arg);
+	int dev_no = (int)arg;
 	AM_FEND_Device_t *dev = NULL;
 	AM_FEND_BlindEvent_t evt;
 	AM_ErrorCode_t ret = AM_FAILURE;
@@ -1599,6 +1599,13 @@ AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_BlindCallback_t cb, void *u
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	int rc;
 
+	if(start_freq == stop_freq)
+	{
+		AM_DEBUG(1, "AM_FEND_BlindScan start_freq equal stop_freq\n");
+		ret = AM_FEND_ERR_BLINDSCAN;
+		return ret;
+	}
+
 	/*this function set the parameters blind scan process needed.*/	
 	AM_FEND_IBlindScanAPI_Initialize(dev_no);
 
@@ -1625,7 +1632,7 @@ AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_BlindCallback_t cb, void *u
 
 	dev->enable_blindscan_thread = AM_TRUE;
 	
-	rc = pthread_create(&dev->blindscan_thread, NULL, fend_blindscan_thread, &dev_no);
+	rc = pthread_create(&dev->blindscan_thread, NULL, fend_blindscan_thread, (void *)dev_no);
 	if(rc)
 	{
 		AM_DEBUG(1, "%s", strerror(rc));

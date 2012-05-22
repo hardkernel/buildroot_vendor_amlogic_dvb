@@ -704,8 +704,8 @@ AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParameter
 		AM_SEC_DVBSatelliteLNBParameters_t lnb_param = sec_control.m_lnbs;
 		AM_SEC_DVBSatelliteDiseqcParameters_t di_param = lnb_param.m_diseqc_parameters;
 		AM_SEC_DVBSatelliteRotorParameters_t rotor_param = lnb_param.m_rotor_parameters;
-
 		AM_SEC_DVBSatelliteSwitchParameters_t sw_param = lnb_param.m_cursat_parameters;
+		
 		AM_Bool_t doSetFrontend = AM_TRUE;
 		AM_Bool_t doSetVoltageToneFrontend = AM_TRUE;
 		AM_Bool_t forceChanged = AM_FALSE;

@@ -57,8 +57,8 @@ static void fend_cb(int dev_no, struct dvb_frontend_event *evt, void *user_data)
 
 static void sec(int dev_no)
 {
-	int sec;
-
+	int sec = -1;
+	AM_Bool_t sec_exit = AM_FALSE;
 	AM_SEC_DVBSatelliteEquipmentControl_t para; 
 	
 	printf("sec_control\n");
@@ -75,6 +75,7 @@ static void sec(int dev_no)
 		printf("Set Diseqc-7\n");
 		printf("Set Rotor-8\n");
 		printf("Set unicable-9\n");
+		printf("Exit sec-10\n");
 		printf("-----------------------------\n");
 		printf("select\n");
 		scanf("%d", &sec);
@@ -230,10 +231,22 @@ static void sec(int dev_no)
 					#endif
 					break;
 				}                  
+
+			case 10:
+				sec_exit = AM_TRUE;
+				break;
 				
 			default:
 				break;
 		}
+
+		sec = -1;
+
+		if(sec_exit == AM_TRUE)
+		{
+			break;
+		}
+		
 	}
 	
 	return;
