@@ -24,6 +24,9 @@ extern "C"
 /*最大支持的音频个数*/
 #define AM_SCAN_MAX_AUD_CNT 32
 
+/*卫星盲扫最大缓冲TP个数*/
+#define AM_SCAN_MAX_BS_TP_CNT 128
+
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
@@ -70,10 +73,6 @@ enum
 	AM_SCAN_STAGE_WAIT_START,
 	AM_SCAN_STAGE_NIT,
 	AM_SCAN_STAGE_TS,
-	AM_SCAN_STAGE_BLIND_HL,
-	AM_SCAN_STAGE_BLIND_VL,
-	AM_SCAN_STAGE_BLIND_HH,
-	AM_SCAN_STAGE_BLIND_VH,
 	AM_SCAN_STAGE_DONE
 };
 
@@ -177,16 +176,18 @@ typedef struct
 	int					status;		/**< 搜索状态, AM_SCAN_FE_ATV等*/
 	AM_Bool_t			dtv_locked;	/**< 数字是否以锁住频点，用于ATSC，避免重复设置数字和模拟频率*/
 	int					atv_freq;	/**< 模拟频率*/
-	AM_SCAN_FEPara_t	dtv_para 	/**< 数字参数*/;
+	AM_FENDCTRL_DVBFrontendParameters_t	dtv_para 	/**< 数字参数*/;
 }AM_SCAN_FrontEndPara_t;
 
 /**\brief 卫星盲扫控制数据*/
 typedef struct
 {
-	int							start_freq;	/**< 起始频率*/
-	int							stop_freq;	/**< 结束频率*/
-	int							stage;		/**< HL,HH,VL,VH*/
-	AM_SCAN_BlindScanProgress_t	progress;	/**< Blind Scan 进度*/
+	int								start_freq;	/**< 起始频率*/
+	int								stop_freq;	/**< 结束频率*/
+	int								stage;		/**< HL,HH,VL,VH*/
+	AM_SCAN_BlindScanProgress_t		progress;	/**< Blind Scan 进度*/
+	int								searched_tp_cnt;	/**< 已搜索到的 TP 个数*/
+	struct dvb_frontend_parameters	searched_tps[AM_SCAN_MAX_BS_TP_CNT];	/**< 已搜索到的TP*/
 }AM_SCAN_BlindScanCtrl_t;
 
 

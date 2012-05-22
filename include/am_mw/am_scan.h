@@ -114,19 +114,12 @@ enum AM_SCAN_TSType
 	AM_SCAN_TS_ANALOG
 };
 
-/**\brief 前端参数*/
-typedef struct
-{
-	struct dvb_frontend_parameters	para;	/**< 锁频参数*/
-	int								polar;	/**< 卫星极化方式，见AM_FEND_Polarisation_t，< 0 表示无效*/	
-}AM_SCAN_FEPara_t;
-
 /**\brief 频点进度数据*/
 typedef struct
 {
 	int								index;		/**< 当前搜索频点索引*/
 	int								total;		/**< 总共需要搜索的频点个数*/
-	AM_SCAN_FEPara_t  				fend_para;	/**< 当前搜索的频点信息*/
+	AM_FENDCTRL_DVBFrontendParameters_t	fend_para;	/**< 当前搜索的频点信息*/
 }AM_SCAN_TSProgress_t;
 
 /**\brief 搜索进度数据*/
@@ -142,7 +135,9 @@ typedef struct
 	int	progress;	/**< 盲扫总进度，0-100*/
 	int	polar;		/**< 当前盲扫的极化方式设置，见AM_FEND_Polarisation_t，-1表示未知当前设置的极化方式*/
 	int lo;			/**< 当前盲扫的本振频率，见AM_FEND_Localoscollatorfreq_t， -1表示未知当前的本振*/
-	struct dvb_frontend_parameters 	fend_para;	/**< 当前搜索的频点信息*/
+	int freq;		/**< 当前搜索的频点*/
+	int new_tp_cnt;	/**< 本次通知搜索到的新TP个数, <=0表示本次无新搜索到的TP*/
+	struct dvb_frontend_parameters	*new_tps;	/**< 本次通知搜索到的新TP信息*/
 }AM_SCAN_BlindScanProgress_t;
 
 /**\brief 当前搜索的频点信号信息*/
@@ -183,7 +178,7 @@ typedef struct AM_SCAN_TS_s
 	int								snr;		/**< SNR*/
 	int								ber;		/**< BER*/
 	int								strength;	/**< Strength*/
-	AM_SCAN_FEPara_t 				fend_para;	/**< 频点信息*/
+	AM_FENDCTRL_DVBFrontendParameters_t fend_para;	/**< 频点信息*/
 	dvbpsi_pat_t 					*pats;		/**< 搜索到的PAT表*/
 	dvbpsi_cat_t 					*cats;		/**< 搜索到的CAT表*/
 	dvbpsi_pmt_t 					*pmts;		/**< 搜索到的PMT表*/
@@ -244,7 +239,7 @@ typedef struct
 	AM_SCAN_SatellitePara_t			sat_para;			/**< 卫星参数配置,只有当source位Satellite时有效*/
 	
 	int								start_para_cnt;		/**< 前端参数个数*/
-	AM_SCAN_FEPara_t				*start_para;		/**< 前端参数列表，自动搜索时对应主频点列表，
+	AM_FENDCTRL_DVBFrontendParameters_t	*start_para;		/**< 前端参数列表，自动搜索时对应主频点列表，
  											手动搜索时为单个频点，全频段搜索时可自定义频点列表或留空使用默认值*/
  	
  	int								atv_freq_cnt;		/**< 模拟频点个数*/
