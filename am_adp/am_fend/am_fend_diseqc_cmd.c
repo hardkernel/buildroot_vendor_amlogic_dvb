@@ -55,7 +55,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_ResetDiseqcMicro(int dev_no)
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_LNBSWITCHSMATV;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYDEVICE;
 	cmd.msg[2] = 0x00;
 
 	cmd.msg_len = 3;
@@ -81,7 +81,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_StandbySwitch(int dev_no)
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_LNBSWITCHSMATV;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYDEVICE;
 	cmd.msg[2] = 0x02;
 
 	cmd.msg_len = 3;
@@ -107,7 +107,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_PoweronSwitch(int dev_no)
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_LNBSWITCHSMATV;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYDEVICE;
 	cmd.msg[2] = 0x03;
 
 	cmd.msg_len = 3;

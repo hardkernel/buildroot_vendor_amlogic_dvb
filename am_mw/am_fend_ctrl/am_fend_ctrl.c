@@ -54,18 +54,27 @@ AM_ErrorCode_t AM_FENDCTRL_SetPara(int dev_no, const AM_FENDCTRL_DVBFrontendPara
 
 	switch(para->m_type)
 	{
-		case DVBS:
-			/* process sec */
-			
-			ret = AM_FEND_SetPara(dev_no, &(para->sat.para));
-			break;
-		case DVBC:
+		case AM_FEND_DEMOD_DVBS:
+			{
+				struct dvb_frontend_parameters convert_para;
+
+				memcpy(&convert_para, &(para->sat.para), sizeof(struct dvb_frontend_parameters));
+				/* process sec */
+				ret = AM_SEC_Prepare(dev_no, &(para->sat), &(convert_para.frequency), 5000);
+				
+				if((ret == AM_SUCCESS) && (AM_SEC_Get_Set_Frontend()))
+				{
+					ret = AM_FEND_SetPara(dev_no, &(convert_para));
+				}
+				break;
+			}
+		case AM_FEND_DEMOD_DVBC:
 			ret = AM_FEND_SetPara(dev_no, &(para->cable.para));
 			break;
-		case DVBT:
+		case AM_FEND_DEMOD_DVBT:
 			ret = AM_FEND_SetPara(dev_no, &(para->terrestrial.para));
 			break;
-		case ATSC:
+		case AM_FEND_DEMOD_ATSC:
 			ret = AM_FEND_SetPara(dev_no, &(para->atsc.para));
 			break;	
 		default:
@@ -92,18 +101,28 @@ AM_ErrorCode_t AM_FENDCTRL_Lock(int dev_no, const AM_FENDCTRL_DVBFrontendParamet
 
 	switch(para->m_type)
 	{
-		case DVBS:
+		case AM_FEND_DEMOD_DVBS:
 			/* process sec */
-			
-			AM_FEND_Lock(dev_no, &(para->sat.para), status);
+			{
+				struct dvb_frontend_parameters convert_para;
+
+				memcpy(&convert_para, &(para->sat.para), sizeof(struct dvb_frontend_parameters));
+				/* process sec */
+				ret = AM_SEC_Prepare(dev_no, &(para->sat), &(convert_para.frequency), 5000);
+				
+				if((ret == AM_SUCCESS) && (AM_SEC_Get_Set_Frontend()))
+				{			
+					AM_FEND_Lock(dev_no, &(convert_para), status);
+				}
+			}
 			break;
-		case DVBC:
+		case AM_FEND_DEMOD_DVBC:
 			AM_FEND_Lock(dev_no, &(para->cable.para), status);
 			break;
-		case DVBT:
+		case AM_FEND_DEMOD_DVBT:
 			AM_FEND_Lock(dev_no, &(para->terrestrial.para), status);
 			break;
-		case ATSC:
+		case AM_FEND_DEMOD_ATSC:
 			AM_FEND_Lock(dev_no, &(para->atsc.para), status);
 			break;	
 		default:
@@ -112,4 +131,5 @@ AM_ErrorCode_t AM_FENDCTRL_Lock(int dev_no, const AM_FENDCTRL_DVBFrontendParamet
 
 	return ret;
 }
+
 

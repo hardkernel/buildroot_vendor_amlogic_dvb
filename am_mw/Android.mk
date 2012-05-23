@@ -69,7 +69,8 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/atsc/atsc_descriptor.c\
 		   am_si/atsc/huffman_decode.c\
 		   am_fend_ctrl/am_sec.c\
-		   am_fend_ctrl/am_fend_ctrl.c
+		   am_fend_ctrl/am_fend_ctrl.c\
+		   am_fend_ctrl/am_rotor_calc.c
 
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M
