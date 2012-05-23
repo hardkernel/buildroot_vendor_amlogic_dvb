@@ -44,6 +44,15 @@
 #define M_DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_SWITCH_CMDS (50)
 #define M_DELAY_AFTER_DISEQC_RESET_CMD (50)
 #define M_DELAY_AFTER_DISEQC_PERIPHERIAL_POWERON_CMD (150)
+
+#define M_CENTRE_START_FREQ (950000)
+#define M_CENTRE_END_FREQ (2150000)
+
+#define M_C_TP_START_FREQ (3700000)
+#define M_C_TP_END_FREQ (4200000)
+
+#define M_KU_TP_START_FREQ (10750000)
+#define M_KU_TP_END_FREQ (12750000)
 	
 /****************************************************************************
  * Static data
@@ -488,10 +497,9 @@ static AM_Bool_t AM_SEC_If_Timeout_Goto(eSecCommand_t *sec_cmd)
 	return AM_FALSE;
 }
 
-static int AM_SEC_CanTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para)
-{
-	assert(para);
-	
+static int AM_SEC_CanBlindScanOrTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t *b_para,
+											const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para)
+{	
 	int score=0;
 	long linked_csw=-1, linked_ucsw=-1, linked_toneburst=-1, rotor_pos=-1;
 
@@ -514,20 +522,30 @@ static int AM_SEC_CanTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSat
 		ucsw = di_param.m_uncommitted_cmd,
 		toneburst = di_param.m_toneburst_param;
 
-	/* Dishpro bandstacking HACK */
-	if (lnb_param.m_lof_threshold == 1000)
+	if(para != NULL)
 	{
-		if (!(para->polarisation & AM_FEND_POLARISATION_V))
+		/* Dishpro bandstacking HACK */
+		if (lnb_param.m_lof_threshold == 1000)
 		{
-			band |= 1;
+			if (!(para->polarisation & AM_FEND_POLARISATION_V))
+			{
+				band |= 1;
+			}
+			band |= 2; /* voltage always 18V for Dishpro */
 		}
-		band |= 2; /* voltage always 18V for Dishpro */
+		else
+		{
+			if ( para->para.frequency > lnb_param.m_lof_threshold )
+				band |= 1;
+			if (!(para->polarisation & AM_FEND_POLARISATION_V))
+				band |= 2;
+		}
 	}
-	else
+	else if(b_para != NULL)
 	{
-		if ( para->para.frequency > lnb_param.m_lof_threshold )
+		if ( b_para->ocaloscollatorfreq & AM_FEND_LOCALOSCILLATORFREQ_H)
 			band |= 1;
-		if (!(para->polarisation & AM_FEND_POLARISATION_V))
+		if (!(b_para->polarisation & AM_FEND_POLARISATION_V))
 			band |= 2;
 	}
 
@@ -566,7 +584,7 @@ static int AM_SEC_CanTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSat
 		AM_DEBUG(1, "ret2 %d", ret);
 	}
 
-	if (ret && !is_unicable)
+	if ((para != NULL) && ret && !is_unicable)
 	{
 		int lof = para->para.frequency > lnb_param.m_lof_threshold ?
 			lnb_param.m_lof_hi : lnb_param.m_lof_lo;
@@ -586,120 +604,13 @@ static int AM_SEC_CanTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSat
 	return score;
 }
 
-/****************************************************************************
- * API functions
- ***************************************************************************/
-
-/**\brief 设定卫星设备控制参数
- * \param dev_no 前端设备号
- * \param[in] para 卫星设备控制参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_fend_ctrl.h)
- */
-AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEquipmentControl_t *para)
+static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t *b_para,
+										const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, unsigned int *freq, unsigned int tunetimeout)
 {
-	assert(para);
-	
-	AM_ErrorCode_t ret = AM_SUCCESS;
-
-	memset(&sec_control, 0, sizeof(AM_SEC_DVBSatelliteEquipmentControl_t));
-	
-	/* LNB Specific Parameters */
-	sec_control.m_lnbs.m_lof_lo = para->m_lnbs.m_lof_lo;
-	sec_control.m_lnbs.m_lof_hi = para->m_lnbs.m_lof_hi;
-	sec_control.m_lnbs.m_lof_threshold = para->m_lnbs.m_lof_threshold;
-	sec_control.m_lnbs.m_increased_voltage = para->m_lnbs.m_increased_voltage;
-	sec_control.m_lnbs.m_prio = para->m_lnbs.m_prio;
-	sec_control.m_lnbs.LNBNum = para->m_lnbs.LNBNum;
-
-	/* DiSEqC Specific Parameters */
-	sec_control.m_lnbs.m_diseqc_parameters.m_diseqc_mode = para->m_lnbs.m_diseqc_parameters.m_diseqc_mode;
-	sec_control.m_lnbs.m_diseqc_parameters.m_toneburst_param = para->m_lnbs.m_diseqc_parameters.m_toneburst_param;
-	sec_control.m_lnbs.m_diseqc_parameters.m_repeats = para->m_lnbs.m_diseqc_parameters.m_repeats;
-	sec_control.m_lnbs.m_diseqc_parameters.m_committed_cmd = para->m_lnbs.m_diseqc_parameters.m_committed_cmd;
-	sec_control.m_lnbs.m_diseqc_parameters.m_uncommitted_cmd = para->m_lnbs.m_diseqc_parameters.m_uncommitted_cmd;
-	sec_control.m_lnbs.m_diseqc_parameters.m_command_order = para->m_lnbs.m_diseqc_parameters.m_command_order;	
-	sec_control.m_lnbs.m_diseqc_parameters.m_use_fast = para->m_lnbs.m_diseqc_parameters.m_use_fast;
-	sec_control.m_lnbs.m_diseqc_parameters.m_seq_repeat = para->m_lnbs.m_diseqc_parameters.m_seq_repeat;	
-	
-	/* Rotor Specific Parameters */
-	sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude =
-		para->m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude;	
-	sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude =
-		para->m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude;
-	sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction =
-		para->m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction;	
-	sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction =
-		para->m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction;
-
-	sec_control.m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_use = 
-		para->m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_use;
-	sec_control.m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_delta = 
-		para->m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_delta;
-	sec_control.m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_turning_speed = 
-		para->m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_turning_speed;
-	
-	/* Unicable Specific Parameters */
-	sec_control.m_lnbs.SatCR_idx = para->m_lnbs.SatCR_idx;
-	sec_control.m_lnbs.SatCRvco = para->m_lnbs.SatCRvco;
-	sec_control.m_lnbs.SatCR_positions = para->m_lnbs.SatCR_positions;
-
-	/* Satellite Specific Parameters */
-	sec_control.m_lnbs.m_cursat_parameters.m_voltage_mode = para->m_lnbs.m_cursat_parameters.m_voltage_mode;
-	sec_control.m_lnbs.m_cursat_parameters.m_22khz_signal = para->m_lnbs.m_cursat_parameters.m_22khz_signal;
-	sec_control.m_lnbs.m_cursat_parameters.m_rotorPosNum = para->m_lnbs.m_cursat_parameters.m_rotorPosNum;
-
-	/* for the moment, this value is default setting */
-	sec_control.m_params[DELAY_AFTER_CONT_TONE_DISABLE_BEFORE_DISEQC] = M_DELAY_AFTER_CONT_TONE_DISABLE_BEFORE_DISEQC;
-	sec_control.m_params[DELAY_AFTER_FINAL_CONT_TONE_CHANGE] = M_DELAY_AFTER_FINAL_CONT_TONE_CHANGE;
-	sec_control.m_params[DELAY_AFTER_FINAL_VOLTAGE_CHANGE] = M_DELAY_AFTER_FINAL_VOLTAGE_CHANGE;
-	sec_control.m_params[DELAY_BETWEEN_DISEQC_REPEATS] = M_DELAY_BETWEEN_DISEQC_REPEATS;
-	sec_control.m_params[DELAY_AFTER_LAST_DISEQC_CMD] = M_DELAY_AFTER_LAST_DISEQC_CMD;
-	sec_control.m_params[DELAY_AFTER_TONEBURST] = M_DELAY_AFTER_TONEBURST;
-	sec_control.m_params[DELAY_AFTER_ENABLE_VOLTAGE_BEFORE_SWITCH_CMDS] = M_DELAY_AFTER_ENABLE_VOLTAGE_BEFORE_SWITCH_CMDS;
-	sec_control.m_params[DELAY_BETWEEN_SWITCH_AND_MOTOR_CMD] = M_DELAY_BETWEEN_SWITCH_AND_MOTOR_CMD;
-	sec_control.m_params[DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_MEASURE_IDLE_INPUTPOWER] = M_DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_MEASURE_IDLE_INPUTPOWER;
-	sec_control.m_params[DELAY_AFTER_ENABLE_VOLTAGE_BEFORE_MOTOR_CMD] = M_DELAY_AFTER_ENABLE_VOLTAGE_BEFORE_MOTOR_CMD;
-	sec_control.m_params[DELAY_AFTER_MOTOR_STOP_CMD] = M_DELAY_AFTER_MOTOR_STOP_CMD;
-	sec_control.m_params[DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_MOTOR_CMD] = M_DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_MOTOR_CMD;
-	sec_control.m_params[DELAY_BEFORE_SEQUENCE_REPEAT] = M_DELAY_BEFORE_SEQUENCE_REPEAT;
-	sec_control.m_params[MOTOR_COMMAND_RETRIES] = M_MOTOR_COMMAND_RETRIES;
-	sec_control.m_params[MOTOR_RUNNING_TIMEOUT] = M_MOTOR_RUNNING_TIMEOUT;
-	sec_control.m_params[DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_SWITCH_CMDS] = M_DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_SWITCH_CMDS;
-	sec_control.m_params[DELAY_AFTER_DISEQC_RESET_CMD] = M_DELAY_AFTER_DISEQC_RESET_CMD;
-	sec_control.m_params[DELAY_AFTER_DISEQC_PERIPHERIAL_POWERON_CMD] = M_DELAY_AFTER_DISEQC_PERIPHERIAL_POWERON_CMD;
-
-	return ret;
-}
-
-/**\brief 获取卫星设备控制参数
- * \param dev_no 前端设备号
- * \param[out] para 卫星设备控制参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_fend_ctrl.h)
- */
-AM_ErrorCode_t AM_SEC_GetSetting(int dev_no, AM_SEC_DVBSatelliteEquipmentControl_t *para)
-{
-	assert(para);
-	
-	AM_ErrorCode_t ret = AM_SUCCESS;
-
-	memcpy(para, &sec_control, sizeof(AM_SEC_DVBSatelliteEquipmentControl_t));
-	
-	return ret;
-}
-
-AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, unsigned int *freq, unsigned int tunetimeout)
-{
-	assert(para);
-	assert(freq);
-	
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	eSecCommand_t sec_cmd;
 	
-	if(AM_SEC_CanTune(dev_no, para))
+	if(AM_SEC_CanBlindScanOrTune(dev_no, b_para, para))
 	{
 		AM_SEC_DVBSatelliteLNBParameters_t lnb_param = sec_control.m_lnbs;
 		AM_SEC_DVBSatelliteDiseqcParameters_t di_param = lnb_param.m_diseqc_parameters;
@@ -749,42 +660,85 @@ AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParameter
 		if (lastcsw == lastucsw && lastToneburst == lastucsw && lastucsw == -1)
 			needDiSEqCReset = AM_TRUE;
 
-		/* Dishpro bandstacking HACK */
-		if (lnb_param.m_lof_threshold == 1000)
+		if((b_para == NULL) && (para != NULL) && (freq != NULL))
 		{
-			if (!(para->polarisation & AM_FEND_POLARISATION_V))
-			{
-				band |= 1;
-			}
-			band |= 2; /* voltage always 18V for Dishpro */
-		}
-		else
-		{
-			if ( para->para.frequency > lnb_param.m_lof_threshold )
-				band |= 1;
-			if (!(para->polarisation & AM_FEND_POLARISATION_V))
-				band |= 2;
-		}
-
-		int lof = (band&1)?lnb_param.m_lof_hi:lnb_param.m_lof_lo;
-
-		if(!is_unicable)
-		{
-			// calc Frequency
-			int local= abs(para->para.frequency
-				- lof);
-			*freq = ((((local * 2) / 125) + 1) / 2) * 125;
-			AM_SEC_SetFendData(FREQ_OFFSET, para->para.frequency - *freq);
-
 			/* Dishpro bandstacking HACK */
 			if (lnb_param.m_lof_threshold == 1000)
-				voltage = SEC_VOLTAGE_18;
-			else if ( voltage_mode == _14V
-				|| ( para->polarisation & AM_FEND_POLARISATION_V
+			{
+				if (!(para->polarisation & AM_FEND_POLARISATION_V))
+				{
+					band |= 1;
+				}
+				band |= 2; /* voltage always 18V for Dishpro */
+			}
+			else
+			{
+				if ( para->para.frequency > lnb_param.m_lof_threshold )
+					band |= 1;
+				if (!(para->polarisation & AM_FEND_POLARISATION_V))
+					band |= 2;
+			}
+
+			int lof = (band&1)?lnb_param.m_lof_hi:lnb_param.m_lof_lo;
+
+			if(!is_unicable)
+			{
+				// calc Frequency
+				int local= abs(para->para.frequency
+					- lof);
+				*freq = ((((local * 2) / 125) + 1) / 2) * 125;
+				AM_SEC_SetFendData(FREQ_OFFSET, para->para.frequency - *freq);
+
+				/* Dishpro bandstacking HACK */
+				if (lnb_param.m_lof_threshold == 1000)
+					voltage = SEC_VOLTAGE_18;
+				else if ( voltage_mode == _14V
+					|| ( para->polarisation & AM_FEND_POLARISATION_V
+						&& voltage_mode == HV )  )
+					voltage = SEC_VOLTAGE_13;
+				else if ( voltage_mode == _18V
+					|| ( !(para->polarisation & AM_FEND_POLARISATION_V)
+						&& voltage_mode == HV )  )
+					voltage = SEC_VOLTAGE_18;
+				if ( (sw_param.m_22khz_signal == ON)
+					|| ( sw_param.m_22khz_signal == HILO && (band&1) ) )
+					tone = SEC_TONE_ON;
+				else if ( (sw_param.m_22khz_signal == OFF)
+					|| ( sw_param.m_22khz_signal == HILO && !(band&1) ) )
+					tone = SEC_TONE_OFF;
+			}
+			else
+			{
+				int tmp1 = abs(para->para.frequency
+						-lof)
+						+ lnb_param.SatCRvco
+						- 1400000
+						+ lnb_param.guard_offset;
+				int tmp2 = ((((tmp1 * 2) / 4000) + 1) / 2) * 4000;
+				*freq = lnb_param.SatCRvco - (tmp1-tmp2) + lnb_param.guard_offset;
+				lnb_param.UnicableTuningWord = ((tmp2 / 4000) 
+						| ((band & 1) ? 0x400 : 0)			//HighLow
+						| ((band & 2) ? 0x800 : 0)			//VertHor
+						| ((lnb_param.LNBNum & 1) ? 0 : 0x1000)			//Umschaltung LNB1 LNB2
+						| (lnb_param.SatCR_idx << 13));		//Adresse des SatCR
+				AM_DEBUG(1, "[prepare] UnicableTuningWord %#04x",lnb_param.UnicableTuningWord);
+				AM_DEBUG(1, "[prepare] guard_offset %d",lnb_param.guard_offset);
+				AM_SEC_SetFendData(FREQ_OFFSET, (lnb_param.UnicableTuningWord & 0x3FF) *4000 + 1400000 + lof - (2 * (lnb_param.SatCRvco - (tmp1-tmp2))) );
+				voltage = SEC_VOLTAGE_13;
+			}
+		}else if(b_para != NULL)
+		{
+			if ( b_para->ocaloscollatorfreq & AM_FEND_LOCALOSCILLATORFREQ_H)
+				band |= 1;
+			if (!(b_para->polarisation & AM_FEND_POLARISATION_V))
+				band |= 2;
+			
+			if ( voltage_mode == _14V
+				|| ( b_para->polarisation & AM_FEND_POLARISATION_V
 					&& voltage_mode == HV )  )
 				voltage = SEC_VOLTAGE_13;
 			else if ( voltage_mode == _18V
-				|| ( !(para->polarisation & AM_FEND_POLARISATION_V)
+				|| ( !(b_para->polarisation & AM_FEND_POLARISATION_V)
 					&& voltage_mode == HV )  )
 				voltage = SEC_VOLTAGE_18;
 			if ( (sw_param.m_22khz_signal == ON)
@@ -792,28 +746,9 @@ AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParameter
 				tone = SEC_TONE_ON;
 			else if ( (sw_param.m_22khz_signal == OFF)
 				|| ( sw_param.m_22khz_signal == HILO && !(band&1) ) )
-				tone = SEC_TONE_OFF;
+				tone = SEC_TONE_OFF;			
 		}
-		else
-		{
-			int tmp1 = abs(para->para.frequency
-					-lof)
-					+ lnb_param.SatCRvco
-					- 1400000
-					+ lnb_param.guard_offset;
-			int tmp2 = ((((tmp1 * 2) / 4000) + 1) / 2) * 4000;
-			*freq = lnb_param.SatCRvco - (tmp1-tmp2) + lnb_param.guard_offset;
-			lnb_param.UnicableTuningWord = ((tmp2 / 4000) 
-					| ((band & 1) ? 0x400 : 0)			//HighLow
-					| ((band & 2) ? 0x800 : 0)			//VertHor
-					| ((lnb_param.LNBNum & 1) ? 0 : 0x1000)			//Umschaltung LNB1 LNB2
-					| (lnb_param.SatCR_idx << 13));		//Adresse des SatCR
-			AM_DEBUG(1, "[prepare] UnicableTuningWord %#04x",lnb_param.UnicableTuningWord);
-			AM_DEBUG(1, "[prepare] guard_offset %d",lnb_param.guard_offset);
-			AM_SEC_SetFendData(FREQ_OFFSET, (lnb_param.UnicableTuningWord & 0x3FF) *4000 + 1400000 + lof - (2 * (lnb_param.SatCRvco - (tmp1-tmp2))) );
-			voltage = SEC_VOLTAGE_13;
-		}
-
+		
 		if (diseqc_mode >= V1_0)
 		{
 			if ( di_param.m_committed_cmd < SENDNO )
@@ -1361,6 +1296,187 @@ AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParameter
 	}
 	
 	return AM_FENDCTRL_ERR_END;
+}
+
+/****************************************************************************
+ * API functions
+ ***************************************************************************/
+
+/**\brief 设定卫星设备控制参数
+ * \param dev_no 前端设备号
+ * \param[in] para 卫星设备控制参数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEquipmentControl_t *para)
+{
+	assert(para);
+	
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	memset(&sec_control, 0, sizeof(AM_SEC_DVBSatelliteEquipmentControl_t));
+	
+	/* LNB Specific Parameters */
+	sec_control.m_lnbs.m_lof_lo = para->m_lnbs.m_lof_lo;
+	sec_control.m_lnbs.m_lof_hi = para->m_lnbs.m_lof_hi;
+	sec_control.m_lnbs.m_lof_threshold = para->m_lnbs.m_lof_threshold;
+	sec_control.m_lnbs.m_increased_voltage = para->m_lnbs.m_increased_voltage;
+	sec_control.m_lnbs.m_prio = para->m_lnbs.m_prio;
+	sec_control.m_lnbs.LNBNum = para->m_lnbs.LNBNum;
+
+	/* DiSEqC Specific Parameters */
+	sec_control.m_lnbs.m_diseqc_parameters.m_diseqc_mode = para->m_lnbs.m_diseqc_parameters.m_diseqc_mode;
+	sec_control.m_lnbs.m_diseqc_parameters.m_toneburst_param = para->m_lnbs.m_diseqc_parameters.m_toneburst_param;
+	sec_control.m_lnbs.m_diseqc_parameters.m_repeats = para->m_lnbs.m_diseqc_parameters.m_repeats;
+	sec_control.m_lnbs.m_diseqc_parameters.m_committed_cmd = para->m_lnbs.m_diseqc_parameters.m_committed_cmd;
+	sec_control.m_lnbs.m_diseqc_parameters.m_uncommitted_cmd = para->m_lnbs.m_diseqc_parameters.m_uncommitted_cmd;
+	sec_control.m_lnbs.m_diseqc_parameters.m_command_order = para->m_lnbs.m_diseqc_parameters.m_command_order;	
+	sec_control.m_lnbs.m_diseqc_parameters.m_use_fast = para->m_lnbs.m_diseqc_parameters.m_use_fast;
+	sec_control.m_lnbs.m_diseqc_parameters.m_seq_repeat = para->m_lnbs.m_diseqc_parameters.m_seq_repeat;	
+	
+	/* Rotor Specific Parameters */
+	sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude =
+		para->m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude;	
+	sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude =
+		para->m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude;
+	sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction =
+		para->m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction;	
+	sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction =
+		para->m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction;
+
+	sec_control.m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_use = 
+		para->m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_use;
+	sec_control.m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_delta = 
+		para->m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_delta;
+	sec_control.m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_turning_speed = 
+		para->m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_turning_speed;
+	
+	/* Unicable Specific Parameters */
+	sec_control.m_lnbs.SatCR_idx = para->m_lnbs.SatCR_idx;
+	sec_control.m_lnbs.SatCRvco = para->m_lnbs.SatCRvco;
+	sec_control.m_lnbs.SatCR_positions = para->m_lnbs.SatCR_positions;
+
+	/* Satellite Specific Parameters */
+	sec_control.m_lnbs.m_cursat_parameters.m_voltage_mode = para->m_lnbs.m_cursat_parameters.m_voltage_mode;
+	sec_control.m_lnbs.m_cursat_parameters.m_22khz_signal = para->m_lnbs.m_cursat_parameters.m_22khz_signal;
+	sec_control.m_lnbs.m_cursat_parameters.m_rotorPosNum = para->m_lnbs.m_cursat_parameters.m_rotorPosNum;
+
+	/* for the moment, this value is default setting */
+	sec_control.m_params[DELAY_AFTER_CONT_TONE_DISABLE_BEFORE_DISEQC] = M_DELAY_AFTER_CONT_TONE_DISABLE_BEFORE_DISEQC;
+	sec_control.m_params[DELAY_AFTER_FINAL_CONT_TONE_CHANGE] = M_DELAY_AFTER_FINAL_CONT_TONE_CHANGE;
+	sec_control.m_params[DELAY_AFTER_FINAL_VOLTAGE_CHANGE] = M_DELAY_AFTER_FINAL_VOLTAGE_CHANGE;
+	sec_control.m_params[DELAY_BETWEEN_DISEQC_REPEATS] = M_DELAY_BETWEEN_DISEQC_REPEATS;
+	sec_control.m_params[DELAY_AFTER_LAST_DISEQC_CMD] = M_DELAY_AFTER_LAST_DISEQC_CMD;
+	sec_control.m_params[DELAY_AFTER_TONEBURST] = M_DELAY_AFTER_TONEBURST;
+	sec_control.m_params[DELAY_AFTER_ENABLE_VOLTAGE_BEFORE_SWITCH_CMDS] = M_DELAY_AFTER_ENABLE_VOLTAGE_BEFORE_SWITCH_CMDS;
+	sec_control.m_params[DELAY_BETWEEN_SWITCH_AND_MOTOR_CMD] = M_DELAY_BETWEEN_SWITCH_AND_MOTOR_CMD;
+	sec_control.m_params[DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_MEASURE_IDLE_INPUTPOWER] = M_DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_MEASURE_IDLE_INPUTPOWER;
+	sec_control.m_params[DELAY_AFTER_ENABLE_VOLTAGE_BEFORE_MOTOR_CMD] = M_DELAY_AFTER_ENABLE_VOLTAGE_BEFORE_MOTOR_CMD;
+	sec_control.m_params[DELAY_AFTER_MOTOR_STOP_CMD] = M_DELAY_AFTER_MOTOR_STOP_CMD;
+	sec_control.m_params[DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_MOTOR_CMD] = M_DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_MOTOR_CMD;
+	sec_control.m_params[DELAY_BEFORE_SEQUENCE_REPEAT] = M_DELAY_BEFORE_SEQUENCE_REPEAT;
+	sec_control.m_params[MOTOR_COMMAND_RETRIES] = M_MOTOR_COMMAND_RETRIES;
+	sec_control.m_params[MOTOR_RUNNING_TIMEOUT] = M_MOTOR_RUNNING_TIMEOUT;
+	sec_control.m_params[DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_SWITCH_CMDS] = M_DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_SWITCH_CMDS;
+	sec_control.m_params[DELAY_AFTER_DISEQC_RESET_CMD] = M_DELAY_AFTER_DISEQC_RESET_CMD;
+	sec_control.m_params[DELAY_AFTER_DISEQC_PERIPHERIAL_POWERON_CMD] = M_DELAY_AFTER_DISEQC_PERIPHERIAL_POWERON_CMD;
+
+	return ret;
+}
+
+/**\brief 获取卫星设备控制参数
+ * \param dev_no 前端设备号
+ * \param[out] para 卫星设备控制参数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+AM_ErrorCode_t AM_SEC_GetSetting(int dev_no, AM_SEC_DVBSatelliteEquipmentControl_t *para)
+{
+	assert(para);
+	
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	memcpy(para, &sec_control, sizeof(AM_SEC_DVBSatelliteEquipmentControl_t));
+	
+	return ret;
+}
+
+/**\brief 准备盲扫卫星设备控制
+ * \param dev_no 前端设备号
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+AM_ErrorCode_t AM_SEC_PrepareBlindScan(int dev_no)
+{
+	assert(b_para);
+	
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	ret = AM_SEC_Prepare(dev_no, &(sec_control.m_lnbs.b_para), NULL, NULL, 0);
+
+	return ret;
+}
+
+/**\brief 中频转换传输频率
+ * \param centre_freq unit KHZ
+ * \param[out] tp_freq unit KHZ
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+AM_ErrorCode_t AM_SEC_FreqConvert(unsigned int centre_freq, unsigned int *tp_freq)
+{
+	assert(tp_freq);
+
+	AM_ErrorCode_t ret = AM_FENDCTRL_ERROR_BASE;
+
+	if(sec_control.m_lnbs.b_para.ocaloscollatorfreq == AM_FEND_LOCALOSCILLATORFREQ_H)
+	{
+		if((sec_control.m_lnbs.m_lof_hi >= (M_KU_TP_START_FREQ - M_CENTRE_END_FREQ)) 
+			&& (sec_control.m_lnbs.m_lof_hi <= (M_KU_TP_END_FREQ - M_CENTRE_START_FREQ)))
+		{
+			*tp_freq = sec_control.m_lnbs.m_lof_hi + centre_freq;
+			ret = AM_SUCCESS;
+		}
+		else if((sec_control.m_lnbs.m_lof_hi >= (M_C_TP_START_FREQ + M_CENTRE_START_FREQ)) 
+			&& (sec_control.m_lnbs.m_lof_hi <= (M_C_TP_END_FREQ + M_CENTRE_END_FREQ)))
+		{
+			*tp_freq = centre_freq - sec_control.m_lnbs.m_lof_hi;
+			ret = AM_SUCCESS;
+		}
+	}
+	else if(sec_control.m_lnbs.b_para.ocaloscollatorfreq == AM_FEND_LOCALOSCILLATORFREQ_L)
+	{
+		if((sec_control.m_lnbs.m_lof_lo >= (M_KU_TP_START_FREQ - M_CENTRE_END_FREQ)) 
+			&& (sec_control.m_lnbs.m_lof_lo <= (M_KU_TP_END_FREQ - M_CENTRE_START_FREQ)))
+		{
+			*tp_freq = sec_control.m_lnbs.m_lof_lo + centre_freq;
+			ret = AM_SUCCESS;
+		}
+		else if((sec_control.m_lnbs.m_lof_lo >= (M_C_TP_START_FREQ + M_CENTRE_START_FREQ)) 
+			&& (sec_control.m_lnbs.m_lof_lo <= (M_C_TP_END_FREQ + M_CENTRE_END_FREQ)))
+		{
+			*tp_freq = centre_freq - sec_control.m_lnbs.m_lof_lo ;
+			ret = AM_SUCCESS;
+		}	
+	}
+
+	return ret;
+}
+
+AM_ErrorCode_t AM_SEC_PrepareTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, unsigned int *freq, unsigned int tunetimeout)
+{
+	assert(para);
+	assert(freq);
+	
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	ret = AM_SEC_Prepare(dev_no, NULL, para, freq, tunetimeout);
+
+	return ret;
 }
 
 AM_ErrorCode_t AM_SEC_PrepareTurnOffSatCR(int dev_no, int satcr)

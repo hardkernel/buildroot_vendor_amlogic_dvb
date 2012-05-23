@@ -130,7 +130,7 @@ typedef enum {
  * Function prototypes  
  ***************************************************************************/
 
-AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, unsigned int *freq, unsigned int tunetimeout);
+AM_ErrorCode_t AM_SEC_PrepareTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, unsigned int *freq, unsigned int tunetimeout);
 
 AM_Bool_t AM_SEC_Get_Set_Frontend(void);
 

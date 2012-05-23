@@ -15,6 +15,7 @@
 #include <am_fend_diseqc_cmd.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <am_misc.h>
 
 /****************************************************************************
@@ -217,7 +218,7 @@ static void sec(int dev_no)
 					scanf("%d", &lnbport);
 					printf("polarisation:H-0/V-1/NO-2\n");
 					scanf("%d", &polarisation);
-					printf("polarisation:L-0/H-1/NO-2\n");
+					printf("local_oscillator_freq:L-0/H-1/NO-2\n");
 					scanf("%d", &local_oscillator_freq);				
 					AM_FEND_Diseqccmd_SetLNBPort4(dev_no, lnbport, polarisation, local_oscillator_freq);
 					break;
@@ -358,6 +359,8 @@ static void sec(int dev_no)
 		{
 			break;
 		}
+
+		usleep(15 *1000);
 		
 	}
 
