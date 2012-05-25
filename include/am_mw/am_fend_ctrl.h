@@ -69,8 +69,8 @@ typedef struct AM_SEC_DVBSatelliteDiseqcParameters
 	unsigned char m_uncommitted_cmd;	// state of the 4 uncommitted switches..
 }AM_SEC_DVBSatelliteDiseqcParameters_t;
 
-typedef enum {	HILO=0, ON=1, OFF=2	}AM_SEC_22khz_Signal; // 22 Khz
-typedef enum {	HV=0, _14V=1, _18V=2, _0V=3, HV_13=4 }AM_SEC_Voltage_Mode; // 14/18 V
+typedef enum {	ON=0, OFF=1, HILO=2}AM_SEC_22khz_Signal; // 22 Khz
+typedef enum {	_14V=0, _18V=1, _0V=2, HV=3, HV_13=4 }AM_SEC_Voltage_Mode; // 14/18 V
 
 /**\brief 卫星设备（switch）控制参数*/ 
 typedef struct AM_SEC_DVBSatelliteSwitchParameters
