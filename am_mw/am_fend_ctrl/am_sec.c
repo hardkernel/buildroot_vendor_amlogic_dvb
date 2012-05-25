@@ -1559,7 +1559,7 @@ AM_ErrorCode_t AM_SEC_PrepareBlindScan(int dev_no)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend_ctrl.h)
  */
-AM_ErrorCode_t AM_SEC_FreqConvert(unsigned int centre_freq, unsigned int *tp_freq)
+AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned int *tp_freq)
 {
 	assert(tp_freq);
 
