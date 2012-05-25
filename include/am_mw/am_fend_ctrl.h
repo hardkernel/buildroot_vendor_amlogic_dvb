@@ -249,13 +249,14 @@ extern AM_ErrorCode_t AM_SEC_GetSetting(int dev_no, AM_SEC_DVBSatelliteEquipment
 extern AM_ErrorCode_t AM_SEC_PrepareBlindScan(int dev_no);
 
 /**\brief 中频转换传输频率
+ * \param dev_no 前端设备号
  * \param centre_freq unit KHZ
  * \param[out] tp_freq unit KHZ
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend_ctrl.h)
  */
-extern AM_ErrorCode_t AM_SEC_FreqConvert(unsigned int centre_freq, unsigned int *tp_freq);
+extern AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned int *tp_freq);
 
 /* frontend control interface */ 
 
