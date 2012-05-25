@@ -57,6 +57,8 @@
 /****************************************************************************
  * Static data
  ***************************************************************************/
+static AM_Bool_t sec_init_flag = AM_FALSE;
+
 static AM_SEC_DVBSatelliteEquipmentControl_t sec_control;
 
 static struct list_head sec_command_list;
@@ -71,6 +73,27 @@ static int am_sec_timeoutcount; // needed for timeout
 /****************************************************************************
  * Static functions
  ***************************************************************************/
+static AM_ErrorCode_t AM_SEC_Init(void)
+{
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+
+	int num = 0; 
+	for ( num = 0; num < NUM_DATA_ENTRIES; num++)
+	{
+		am_sec_fend_data[num] = -1;
+	}
+	
+	return ret;
+}
+
+static AM_ErrorCode_t AM_SEC_DeInit(void)
+{
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	return ret;
+}
+
 static void AM_SEC_SetSecCommand( eSecCommand_t *sec_cmd, int cmd )
 {
 	assert(sec_cmd);
@@ -198,6 +221,9 @@ static AM_Bool_t AM_SEC_If_Tone_Goto(eSecCommand_t *sec_cmd)
 	if(sec_cmd->cmd == IF_TONE_GOTO)
 	{
 		AM_SEC_GetFendData(CUR_TONE, &data);
+	
+		AM_DEBUG(1, "AM_SEC_If_Tone_Goto CUR_TONE:%ld need set tone:%d \n", data, sec_cmd->compare.tone);
+		
 		if ( sec_cmd->compare.tone == data)
 			return AM_TRUE;
 	}
@@ -214,6 +240,8 @@ static void AM_SEC_Set_Tone(int dev_no, eSecCommand_t *sec_cmd)
 	
 	if(sec_cmd->cmd == SET_TONE)
 	{
+		AM_DEBUG(1, "AM_SEC_Set_Tone %ld\n", data);
+		
 		AM_SEC_SetFendData(CUR_TONE, data);
 		AM_FEND_SetTone(dev_no, data);
 	}
@@ -230,6 +258,9 @@ static AM_Bool_t AM_SEC_If_Voltage_Goto(eSecCommand_t *sec_cmd, AM_Bool_t increa
 	{
 		AM_SEC_GetFendData(CUR_VOLTAGE, &data1);
 		AM_SEC_GetFendData(CUR_VOLTAGE_INC, &data2);
+		
+		AM_DEBUG(1, "AM_SEC_If_Voltage_Goto CUR_VOLTAGE:%ld CUR_VOLTAGE_INC:%ld need set voltage:%d need increased:%d\n", data1, data2, sec_cmd->compare.voltage, increased);
+		
 		if(sec_cmd->compare.voltage == data1)
 		{
 			if(sec_cmd->compare.voltage != SEC_VOLTAGE_OFF)
@@ -256,6 +287,9 @@ static AM_Bool_t AM_SEC_If_Not_Voltage_Goto(eSecCommand_t *sec_cmd, AM_Bool_t in
 	{
 		AM_SEC_GetFendData(CUR_VOLTAGE, &data1);
 		AM_SEC_GetFendData(CUR_VOLTAGE_INC, &data2);
+		
+		AM_DEBUG(1, "AM_SEC_If_Not_Voltage_Goto CUR_VOLTAGE:%ld CUR_VOLTAGE_INC:%ld need set voltage:%d need increased:%d\n", data1, data2, sec_cmd->compare.voltage, increased);
+
 		if  (sec_cmd->compare.voltage != data1)
 		{
 			if(sec_cmd->compare.voltage == SEC_VOLTAGE_OFF)
@@ -288,6 +322,8 @@ static void AM_SEC_Set_Voltage(int dev_no, eSecCommand_t *sec_cmd, AM_Bool_t inc
 			AM_SEC_SetFendData(UCSW, -1);
 			AM_SEC_SetFendData(TONEBURST, -1);		
 		}
+
+		AM_DEBUG(1, "AM_SEC_Set_Voltage %ld\n", data);
 
 		AM_SEC_SetFendData(CUR_VOLTAGE_INC, increased);
 		AM_FEND_EnableHighLnbVoltage(dev_no, increased);
@@ -341,6 +377,8 @@ static void AM_SEC_Set_Toneburst(int dev_no, eSecCommand_t *sec_cmd)
 	
 	if(sec_cmd->cmd == SEND_TONEBURST)
 	{
+		AM_DEBUG(1, "AM_SEC_Set_Toneburst %ld\n", data);
+		
 		if(data == A)
 		{
 			AM_FEND_DiseqcSendBurst(dev_no, SEC_MINI_A);
@@ -367,6 +405,14 @@ static void AM_SEC_Set_Diseqc(int dev_no, eSecCommand_t *sec_cmd)
 		
 		memcpy(cmd.msg, diseqc.data, diseqc.len);
 		cmd.msg_len = diseqc.len;
+
+		AM_DEBUG(1, "AM_SEC_Set_Diseqc:\n");
+		int i = 0;
+		for (i = 0; i < diseqc.len; i++)
+		{
+			AM_DEBUG(1, "%02x", diseqc.data[i]);
+		}
+		AM_DEBUG(1, "\n");
 		
 		AM_FEND_DiseqcSendMasterCmd(dev_no, &cmd);	
 	}
@@ -383,6 +429,7 @@ static AM_Bool_t AM_SEC_If_Rotorpos_Valid_Goto(eSecCommand_t *sec_cmd)
 	{
 		AM_SEC_GetFendData(ROTOR_CMD, &data1);
 		AM_SEC_GetFendData(ROTOR_POS, &data2);
+		
 		if((data1 != -1) && (data2 != -1))
 		{
 			return AM_TRUE;
@@ -577,7 +624,7 @@ static int AM_SEC_CanBlindScanOrTune(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 		if ( (csw != linked_csw) ||
 			( diseqc && (ucsw != linked_ucsw || toneburst != linked_toneburst) ) )
 		{
-			ret = 0;
+			//ret = 0;
 		}
 		else
 			ret += 15;
@@ -609,6 +656,14 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	eSecCommand_t sec_cmd;
+
+	if(sec_init_flag == AM_FALSE)
+	{
+		sec_init_flag == AM_TRUE;
+		AM_SEC_Init();
+	}
+
+	//AM_SEC_DumpSetting();
 	
 	if(AM_SEC_CanBlindScanOrTune(dev_no, b_para, para))
 	{
@@ -662,6 +717,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 
 		if((b_para == NULL) && (para != NULL) && (freq != NULL))
 		{
+			AM_DEBUG(1, "Tune Prepare\n");
 			/* Dishpro bandstacking HACK */
 			if (lnb_param.m_lof_threshold == 1000)
 			{
@@ -681,12 +737,15 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 
 			int lof = (band&1)?lnb_param.m_lof_hi:lnb_param.m_lof_lo;
 
+			AM_DEBUG(1, "is_unicable %d\n", is_unicable);
 			if(!is_unicable)
 			{
 				// calc Frequency
 				int local= abs(para->para.frequency
 					- lof);
 				*freq = ((((local * 2) / 125) + 1) / 2) * 125;
+				AM_DEBUG(1, " tp:%d lof:%d\n", para->para.frequency, lof);
+				AM_DEBUG(1, " local:%d freq:%d\n", local, *freq);
 				AM_SEC_SetFendData(FREQ_OFFSET, para->para.frequency - *freq);
 
 				/* Dishpro bandstacking HACK */
@@ -728,6 +787,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 			}
 		}else if(b_para != NULL)
 		{
+			AM_DEBUG(1, "Blind Prepare\n");
 			if ( b_para->ocaloscollatorfreq & AM_FEND_LOCALOSCILLATORFREQ_H)
 				band |= 1;
 			if (!(b_para->polarisation & AM_FEND_POLARISATION_V))
@@ -748,6 +808,9 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 				|| ( sw_param.m_22khz_signal == HILO && !(band&1) ) )
 				tone = SEC_TONE_OFF;			
 		}
+
+		AM_DEBUG(1, "band:%ld voltage:%ld tone:%ld\n", band, voltage, tone);
+		AM_DEBUG(1, "diseqc_mode:%d\n", diseqc_mode);
 		
 		if (diseqc_mode >= V1_0)
 		{
@@ -768,6 +831,9 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 			AM_Bool_t send_burst =
 				(di_param.m_toneburst_param != NO);
 			AM_Bool_t changed_burst = send_burst && (forceChanged || toneburst != lastToneburst);
+
+			AM_DEBUG(1, "send_csw:%d changed_csw:%d send_ucsw:%d changed_ucsw:%d send_burst:%d changed_burst:%d\n", 
+							send_csw, changed_csw, send_ucsw, changed_ucsw, send_burst, changed_burst);
 
 			/* send_mask
 				1 must send csw
@@ -812,9 +878,10 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 				}
 			}
 
-#if 0
+#if 1
 			AM_DEBUG(1, "sendmask: ");
-			for (int i=3; i >= 0; --i)
+			int i = 3;
+			for (i = 3; i >= 0; --i)
 				if ( send_mask & (1<<i) )
 					AM_DEBUG(1, "1");
 				else
@@ -959,6 +1026,8 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 						++loops;
 					if ( send_mask & 2 )
 						++loops;
+
+					AM_DEBUG(1, "loops:%d", loops);
 
 					loops <<= diseqc_repeats;
 
@@ -1298,9 +1367,68 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 	return AM_FENDCTRL_ERR_END;
 }
 
+
+static AM_ErrorCode_t AM_SEC_DumpSetting(void)
+{	
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_DEBUG(1, "AM_SEC_DumpSetting Start\n");
+	AM_DEBUG(1, "-----------------------\n");
+	
+	/* LNB Specific Parameters */
+	AM_DEBUG(1, "LNB Specific Parameters:\n");
+	AM_DEBUG(1, "m_lof_lo %d\n", sec_control.m_lnbs.m_lof_lo);
+	AM_DEBUG(1, "m_lof_hi %d\n", sec_control.m_lnbs.m_lof_hi);
+	AM_DEBUG(1, "m_lof_threshold %d\n", sec_control.m_lnbs.m_lof_threshold);
+	AM_DEBUG(1, "m_increased_voltage %d\n", sec_control.m_lnbs.m_increased_voltage);
+	AM_DEBUG(1, "m_prio %d\n", sec_control.m_lnbs.m_prio);
+
+	/* DiSEqC Specific Parameters */
+	AM_DEBUG(1, "DiSEqC Specific Parameters:\n");
+	AM_DEBUG(1, "m_diseqc_mode %d\n", sec_control.m_lnbs.m_diseqc_parameters.m_diseqc_mode);
+	AM_DEBUG(1, "m_toneburst_param %d\n", sec_control.m_lnbs.m_diseqc_parameters.m_toneburst_param);
+	AM_DEBUG(1, "m_repeats %d\n", sec_control.m_lnbs.m_diseqc_parameters.m_repeats);
+	AM_DEBUG(1, "m_committed_cmd %d\n", sec_control.m_lnbs.m_diseqc_parameters.m_committed_cmd);
+	AM_DEBUG(1, "m_uncommitted_cmd %d\n", sec_control.m_lnbs.m_diseqc_parameters.m_uncommitted_cmd);
+	AM_DEBUG(1, "m_command_order %d\n", sec_control.m_lnbs.m_diseqc_parameters.m_command_order);
+	AM_DEBUG(1, "m_use_fast %d\n", sec_control.m_lnbs.m_diseqc_parameters.m_use_fast);
+	AM_DEBUG(1, "m_seq_repeat %d\n", sec_control.m_lnbs.m_diseqc_parameters.m_seq_repeat);
+	
+	/* Rotor Specific Parameters */
+	AM_DEBUG(1, "Rotor Specific Parameters m_rotor_parameters:\n");
+	AM_DEBUG(1, "m_longitude %f\n", sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude);
+	AM_DEBUG(1, "m_latitude %f\n", sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude);
+	AM_DEBUG(1, "m_lo_direction %d\n", sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction);
+	AM_DEBUG(1, "m_la_direction %d\n", sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction);
+
+	AM_DEBUG(1, "Rotor Specific Parameters m_inputpower_parameters:\n");
+	AM_DEBUG(1, "m_use %d\n", sec_control.m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_use);
+	AM_DEBUG(1, "m_delta %d\n", sec_control.m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_delta);
+	AM_DEBUG(1, "m_turning_speed %d\n", sec_control.m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_turning_speed);
+	
+	/* Unicable Specific Parameters */
+	AM_DEBUG(1, "Unicable Specific Parameters:\n");
+	AM_DEBUG(1, "SatCR_idx %d\n", sec_control.m_lnbs.SatCR_idx);
+	AM_DEBUG(1, "SatCRvco %d\n", sec_control.m_lnbs.SatCRvco);
+	AM_DEBUG(1, "SatCR_positions %d\n", sec_control.m_lnbs.SatCR_positions);
+	AM_DEBUG(1, "LNBNum %d\n", sec_control.m_lnbs.LNBNum);
+	
+	/* Satellite Specific Parameters */
+	AM_DEBUG(1, "Satellite Specific Parameters:\n");
+	AM_DEBUG(1, "m_voltage_mode %d\n", sec_control.m_lnbs.m_cursat_parameters.m_voltage_mode);
+	AM_DEBUG(1, "m_22khz_signal %d\n", sec_control.m_lnbs.m_cursat_parameters.m_22khz_signal);
+	AM_DEBUG(1, "m_rotorPosNum %d\n", sec_control.m_lnbs.m_cursat_parameters.m_rotorPosNum);
+
+	AM_DEBUG(1, "-----------------------\n");
+	AM_DEBUG(1, "AM_SEC_DumpSetting End\n");
+	
+	return ret;
+}
+
 /****************************************************************************
  * API functions
  ***************************************************************************/
+
 
 /**\brief 设定卫星设备控制参数
  * \param dev_no 前端设备号
@@ -1323,7 +1451,6 @@ AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEquipmentC
 	sec_control.m_lnbs.m_lof_threshold = para->m_lnbs.m_lof_threshold;
 	sec_control.m_lnbs.m_increased_voltage = para->m_lnbs.m_increased_voltage;
 	sec_control.m_lnbs.m_prio = para->m_lnbs.m_prio;
-	sec_control.m_lnbs.LNBNum = para->m_lnbs.LNBNum;
 
 	/* DiSEqC Specific Parameters */
 	sec_control.m_lnbs.m_diseqc_parameters.m_diseqc_mode = para->m_lnbs.m_diseqc_parameters.m_diseqc_mode;
@@ -1356,6 +1483,7 @@ AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEquipmentC
 	sec_control.m_lnbs.SatCR_idx = para->m_lnbs.SatCR_idx;
 	sec_control.m_lnbs.SatCRvco = para->m_lnbs.SatCRvco;
 	sec_control.m_lnbs.SatCR_positions = para->m_lnbs.SatCR_positions;
+	sec_control.m_lnbs.LNBNum = para->m_lnbs.LNBNum;
 
 	/* Satellite Specific Parameters */
 	sec_control.m_lnbs.m_cursat_parameters.m_voltage_mode = para->m_lnbs.m_cursat_parameters.m_voltage_mode;
@@ -1381,6 +1509,8 @@ AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEquipmentC
 	sec_control.m_params[DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_SWITCH_CMDS] = M_DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_SWITCH_CMDS;
 	sec_control.m_params[DELAY_AFTER_DISEQC_RESET_CMD] = M_DELAY_AFTER_DISEQC_RESET_CMD;
 	sec_control.m_params[DELAY_AFTER_DISEQC_PERIPHERIAL_POWERON_CMD] = M_DELAY_AFTER_DISEQC_PERIPHERIAL_POWERON_CMD;
+
+	//AM_SEC_DumpSetting();
 
 	return ret;
 }
@@ -1482,6 +1612,32 @@ AM_ErrorCode_t AM_SEC_PrepareTune(int dev_no, const AM_FENDCTRL_DVBFrontendParam
 AM_ErrorCode_t AM_SEC_PrepareTurnOffSatCR(int dev_no, int satcr)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
+	eSecCommand_t sec_cmd;
+	AM_SEC_DVBSatelliteLNBParameters_t lnb_param = sec_control.m_lnbs;
+	
+	// check if voltage is disabled
+	pair_t compare;
+	compare.steps = +8;	//only close frontend
+	compare.voltage = SEC_VOLTAGE_OFF;
+
+	AM_SEC_SetSecCommandByCompare(&sec_cmd, IF_VOLTAGE_GOTO, compare );
+	if(!AM_SEC_If_Voltage_Goto(&sec_cmd, lnb_param.m_increased_voltage))
+	{
+		AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, SEC_VOLTAGE_13 );
+		AM_SEC_Set_Voltage(dev_no, &sec_cmd, lnb_param.m_increased_voltage);
+		usleep(sec_control.m_params[DELAY_AFTER_ENABLE_VOLTAGE_BEFORE_SWITCH_CMDS] * 1000);
+
+		AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, SEC_VOLTAGE_18 );
+		AM_SEC_Set_Voltage(dev_no, &sec_cmd, AM_TRUE);
+		AM_SEC_SetSecCommandByVal( &sec_cmd, SET_TONE, SEC_TONE_OFF );
+		AM_SEC_Set_Tone(dev_no, &sec_cmd);			
+		usleep(sec_control.m_params[DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_SWITCH_CMDS] * 1000);
+
+		AM_FEND_Diseqccmd_SetODUPowerOff(dev_no, satcr); 
+		usleep(sec_control.m_params[DELAY_AFTER_LAST_DISEQC_CMD] * 1000);
+		AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, SEC_VOLTAGE_13 );
+		AM_SEC_Set_Voltage(dev_no, &sec_cmd, lnb_param.m_increased_voltage);		
+	}
 
 	return ret;
 }

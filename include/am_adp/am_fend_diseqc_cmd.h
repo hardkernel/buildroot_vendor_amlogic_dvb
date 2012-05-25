@@ -247,7 +247,15 @@ extern AM_ErrorCode_t AM_FEND_Diseqccmd_SetChannelFreq(int dev_no, int freq);
  *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)
  */
 extern AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerHalt(int dev_no);
-                                                                  
+
+/**\brief 允许定位器(positioner)限制 (Diseqc1.2 M)
+ * \param dev_no 前端设备号 
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)
+ */
+extern AM_ErrorCode_t AM_FEND_Diseqccmd_EnablePositionerLimit(int dev_no);
+																  
 /**\brief 禁止定位器(positioner)限制 (Diseqc1.2 M)
  * \param dev_no 前端设备号 
  * \return
