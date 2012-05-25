@@ -57,8 +57,8 @@ static void fend_cb(int dev_no, struct dvb_frontend_event *evt, void *user_data)
 
 static void sec(int dev_no)
 {
-	int sec;
-
+	int sec = -1;
+	AM_Bool_t sec_exit = AM_FALSE;
 	AM_SEC_DVBSatelliteEquipmentControl_t para; 
 	
 	printf("sec_control\n");
@@ -75,6 +75,7 @@ static void sec(int dev_no)
 		printf("Set Diseqc-7\n");
 		printf("Set Rotor-8\n");
 		printf("Set unicable-9\n");
+		printf("Exit sec-10\n");
 		printf("-----------------------------\n");
 		printf("select\n");
 		scanf("%d", &sec);
@@ -148,41 +149,47 @@ static void sec(int dev_no)
 					scanf("%d", &(diseqc));	
 					para.m_lnbs.m_diseqc_parameters.m_diseqc_mode = diseqc;
 
-					printf("m_committed_cmd AA=0, AB=1, BA=2, BB=3, SENDNO=4\n");
-					scanf("%d", &(diseqc));	
-					para.m_lnbs.m_diseqc_parameters.m_committed_cmd = diseqc;
+					if(diseqc > 0)
+					{
+						printf("m_committed_cmd AA=0, AB=1, BA=2, BB=3, SENDNO=4\n");
+						scanf("%d", &(diseqc));	
+						para.m_lnbs.m_diseqc_parameters.m_committed_cmd = diseqc;
 
-					printf("m_committed_cmd SENDNO=4 0xF0 .. 0xFF\n");
-					scanf("%x", &(diseqc));		
-					para.m_lnbs.m_diseqc_parameters.m_uncommitted_cmd = diseqc;
+						printf("m_toneburst_param NO=0, A=1, B=2\n");
+						scanf("%d", &(diseqc));		
+						para.m_lnbs.m_diseqc_parameters.m_toneburst_param =diseqc;
 
-					printf("m_toneburst_param NO=0, A=1, B=2\n");
-					scanf("%d", &(diseqc));		
-					para.m_lnbs.m_diseqc_parameters.m_toneburst_param =diseqc;
+						if(diseqc > 1)
+						{
+							printf("m_committed_cmd SENDNO=4 0xF0 .. 0xFF\n");
+							scanf("%x", &(diseqc));		
+							para.m_lnbs.m_diseqc_parameters.m_uncommitted_cmd = diseqc;
 
-					printf("m_repeats\n");
-					scanf("%d", &(diseqc));	
-					para.m_lnbs.m_diseqc_parameters.m_repeats = diseqc;
+							printf("m_repeats\n");
+							scanf("%d", &(diseqc));	
+							para.m_lnbs.m_diseqc_parameters.m_repeats = diseqc;
 
-					printf("m_command_order\n");
-					printf("diseqc 1.0)\n");
-					printf("0) commited, toneburst");
-					printf("1) toneburst, committed");
-					printf("diseqc > 1.0)");
-					printf("2) committed, uncommitted, toneburst");
-					printf("3) toneburst, committed, uncommitted");
-					printf("4) uncommitted, committed, toneburst");
-					printf("5) toneburst, uncommitted, committed");
-					scanf("%x", &(diseqc));	
-					para.m_lnbs.m_diseqc_parameters.m_command_order = diseqc;
+							printf("m_command_order\n");
+							printf("diseqc 1.0)\n");
+							printf("0) commited, toneburst\n");
+							printf("1) toneburst, committed\n");
+							printf("diseqc > 1.0)\n");
+							printf("2) committed, uncommitted, toneburst\n");
+							printf("3) toneburst, committed, uncommitted\n");
+							printf("4) uncommitted, committed, toneburst\n");
+							printf("5) toneburst, uncommitted, committed\n");
+							scanf("%x", &(diseqc));	
+							para.m_lnbs.m_diseqc_parameters.m_command_order = diseqc;
 
-					printf("m_seq_repeat disable-0/enable-1\n");
-					scanf("%d", &(diseqc));	
-					para.m_lnbs.m_diseqc_parameters.m_seq_repeat = diseqc;
-
-					printf("m_use_fast disable-0/enable-1\n");
-					scanf("%d", &(diseqc));		
-					para.m_lnbs.m_diseqc_parameters.m_use_fast = diseqc;
+							printf("m_seq_repeat disable-0/enable-1\n");
+							scanf("%d", &(diseqc));	
+							para.m_lnbs.m_diseqc_parameters.m_seq_repeat = diseqc;
+						}
+						
+						printf("m_use_fast disable-0/enable-1\n");
+						scanf("%d", &(diseqc));		
+						para.m_lnbs.m_diseqc_parameters.m_use_fast = diseqc;
+					}
 					break;
 				}
 				
@@ -216,24 +223,37 @@ static void sec(int dev_no)
 					printf("SatCR_idx  0-(max_satcr-1)\n");
 					scanf("%d", &(para.m_lnbs.SatCR_idx));	
 
-					#if 0
-					printf("SatCR_positions \n");
-					scanf("%d", &(para.m_lnbs.SatCR_positions));			
-					#endif
-					
-					printf("SatCRvco (MHz)\n");
-					scanf("%d", &(para.m_lnbs.SatCRvco));
+					if(para.m_lnbs.SatCR_idx >= 0 && para.m_lnbs.SatCR_idx <= 7)
+					{
+						#if 0
+						printf("SatCR_positions \n");
+						scanf("%d", &(para.m_lnbs.SatCR_positions));			
+						#endif
+						
+						printf("SatCRvco (MHz)\n");
+						scanf("%d", &(para.m_lnbs.SatCRvco));
 
-					#if 0
-					printf("LNBNum\n");
-					scanf("%d", &(para.m_lnbs.LNBNum));	
-					#endif
+						printf("LNBNum\n");
+						scanf("%d", &(para.m_lnbs.LNBNum));	
+					}
 					break;
 				}                  
+
+			case 10:
+				sec_exit = AM_TRUE;
+				break;
 				
 			default:
 				break;
 		}
+
+		sec = -1;
+
+		if(sec_exit == AM_TRUE)
+		{
+			break;
+		}
+		
 	}
 	
 	return;
@@ -364,6 +384,11 @@ int main(int argc, char **argv)
 				fenctrl_para.terrestrial.para.u.ofdm.transmission_mode = TRANSMISSION_MODE_AUTO;
 			}else{
 				printf("dvb sx test\n");
+
+				int polar;
+				printf("polar: ");
+				scanf("%d", &(polar));
+				fenctrl_para.sat.polarisation = polar;
 
 				fenctrl_para.sat.para.frequency = freq;
 

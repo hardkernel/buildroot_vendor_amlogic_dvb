@@ -60,7 +60,7 @@ AM_ErrorCode_t AM_FENDCTRL_SetPara(int dev_no, const AM_FENDCTRL_DVBFrontendPara
 
 				memcpy(&convert_para, &(para->sat.para), sizeof(struct dvb_frontend_parameters));
 				/* process sec */
-				ret = AM_SEC_Prepare(dev_no, &(para->sat), &(convert_para.frequency), 5000);
+				ret = AM_SEC_PrepareTune(dev_no, &(para->sat), &(convert_para.frequency), 5000);
 				
 				if((ret == AM_SUCCESS) && (AM_SEC_Get_Set_Frontend()))
 				{
@@ -105,11 +105,11 @@ AM_ErrorCode_t AM_FENDCTRL_Lock(int dev_no, const AM_FENDCTRL_DVBFrontendParamet
 			/* process sec */
 			{
 				struct dvb_frontend_parameters convert_para;
-
+				printf("$$$$$$$$$$$$$$lock tp freq %d\n", para->sat.para.frequency);
 				memcpy(&convert_para, &(para->sat.para), sizeof(struct dvb_frontend_parameters));
 				/* process sec */
-				ret = AM_SEC_Prepare(dev_no, &(para->sat), &(convert_para.frequency), 5000);
-				
+				ret = AM_SEC_PrepareTune(dev_no, &(para->sat), &(convert_para.frequency), 5000);
+				printf("$$$$$$$$$$$$$lock centre freq %d\n", convert_para.frequency);
 				if((ret == AM_SUCCESS) && (AM_SEC_Get_Set_Frontend()))
 				{			
 					AM_FEND_Lock(dev_no, &(convert_para), status);

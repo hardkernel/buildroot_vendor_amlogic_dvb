@@ -4349,7 +4349,6 @@ aml_set_vpath(AM_AV_Device_t *dev)
 		}
 		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "1");
 		AM_FileEcho("/sys/class/graphics/fb1/free_scale", "1");
-
 #ifdef ANDROID
 		{
 			AM_FileEcho("/sys/class/graphics/fb0/request2XScale", "2");
@@ -4361,17 +4360,14 @@ aml_set_vpath(AM_AV_Device_t *dev)
 		}
 #endif
 	}else{
-		//AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
-		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "0");
-		AM_FileEcho("/sys/class/graphics/fb1/free_scale", "0");
+		AM_Bool_t blank = AM_TRUE;
+		char m1080scale[8];
+		char mode[16];
+		char *reqcmd, *osd1axis, *osd1cmd;
+		AM_Bool_t scale=AM_TRUE;
 
 #ifdef ANDROID
 		{
-			char m1080scale[8];
-			char mode[16];
-			char *reqcmd, *osd1axis, *osd1cmd;
-			AM_Bool_t scale=AM_TRUE;
-
 			property_get("ro.platform.has.1080scale",m1080scale,"fail");
 			if(!strncmp(m1080scale, "fail", 4)){
 				scale = AM_FALSE;
@@ -4399,8 +4395,18 @@ aml_set_vpath(AM_AV_Device_t *dev)
 				reqcmd   = "2";
 				osd1axis = NULL;
 				osd1cmd  = "0";
+				blank    = AM_FALSE;
 			}
+		}
+#endif
+		if(blank){
+			AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
+		}
+		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "0");
+		AM_FileEcho("/sys/class/graphics/fb1/free_scale", "0");
 
+#ifdef ANDROID
+		{
 			if(scale){
 				AM_FileEcho("/sys/class/graphics/fb0/request2XScale", reqcmd);
 				if(osd1axis){
@@ -4409,8 +4415,8 @@ aml_set_vpath(AM_AV_Device_t *dev)
 				AM_FileEcho("/sys/class/graphics/fb1/scale", osd1cmd);
 			}
 
-			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "1");
-			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "2");
+			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "3");
+			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "14");
 			AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","0");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");

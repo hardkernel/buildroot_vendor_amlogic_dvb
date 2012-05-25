@@ -8,6 +8,10 @@
  * \date 2012-03-20: create the document
  ***************************************************************************/
 
+#define AM_DEBUG_LEVEL 3
+
+#include <am_debug.h>
+
 #include "am_fend_diseqc_cmd.h"
 #include "am_fend.h"
 
@@ -758,7 +762,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerHalt(int dev_no)
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYPOSITIONER;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
 	cmd.msg[2] = 0x60;
 
 	cmd.msg_len = 3;
@@ -769,7 +773,34 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerHalt(int dev_no)
 
 	return ret;
 }
-                                                                  
+
+/**\brief 允许定位器(positioner)限制 (Diseqc1.2 M)
+ * \param dev_no 前端设备号 
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)
+ */
+AM_ErrorCode_t AM_FEND_Diseqccmd_EnablePositionerLimit(int dev_no)
+{
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	
+	struct dvb_diseqc_master_cmd cmd;
+	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
+
+	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
+	cmd.msg[2] = 0x6A;
+	cmd.msg[3] = 0x00;
+
+	cmd.msg_len = 4;
+	
+	if(AM_FEND_DiseqcSendMasterCmd(dev_no, &cmd) != AM_SUCCESS){
+		ret = AM_FEND_DISEQCCMD_ERROR_BASE;
+	}
+
+	return ret;
+}
+																  
 /**\brief 禁止定位器(positioner)限制 (Diseqc1.2 M)
  * \param dev_no 前端设备号 
  * \return
@@ -784,7 +815,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_DisablePositionerLimit(int dev_no)
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYPOSITIONER;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
 	cmd.msg[2] = 0x63;
 
 	cmd.msg_len = 3;
@@ -810,7 +841,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerELimit(int dev_no)
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYPOSITIONER;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
 	cmd.msg[2] = 0x66;
 
 	cmd.msg_len = 3;
@@ -836,7 +867,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerWLimit(int dev_no)
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYPOSITIONER;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
 	cmd.msg[2] = 0x67;
 
 	cmd.msg_len = 3;
@@ -919,7 +950,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_StorePosition(int dev_no, unsigned char positio
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYPOSITIONER;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
 	cmd.msg[2] = 0x6A;
 	cmd.msg[3] = position;
 
@@ -947,7 +978,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_GotoPositioner(int dev_no, unsigned char positi
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYPOSITIONER;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
 	cmd.msg[2] = 0x6B;
 	cmd.msg[3] = position;
 
@@ -982,6 +1013,8 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_GotoAngularPositioner(int dev_no, double local_
 
 	double a = atan(tan(local_longitude - satellite_longitude)/sin(local_latitude));
 	int sign = 1;
+
+	AM_DEBUG(1, "GotoAngular=%lf", a );
 	
 	if(a >= 1E-7){
 		sign = 1;
