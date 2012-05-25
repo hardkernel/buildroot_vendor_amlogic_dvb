@@ -59,6 +59,8 @@
  ***************************************************************************/
 static AM_Bool_t sec_init_flag = AM_FALSE;
 
+static AM_Bool_t sec_blind_flag = AM_FALSE;
+
 static AM_SEC_DVBSatelliteEquipmentControl_t sec_control;
 
 static struct list_head sec_command_list;
@@ -1540,10 +1542,10 @@ AM_ErrorCode_t AM_SEC_GetSetting(int dev_no, AM_SEC_DVBSatelliteEquipmentControl
  *   - 其他值 错误代码(见am_fend_ctrl.h)
  */
 AM_ErrorCode_t AM_SEC_PrepareBlindScan(int dev_no)
-{
-	assert(b_para);
-	
+{	
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	sec_blind_flag = AM_TRUE;
 
 	ret = AM_SEC_Prepare(dev_no, &(sec_control.m_lnbs.b_para), NULL, NULL, 0);
 
@@ -1562,8 +1564,28 @@ AM_ErrorCode_t AM_SEC_FreqConvert(unsigned int centre_freq, unsigned int *tp_fre
 	assert(tp_freq);
 
 	AM_ErrorCode_t ret = AM_FENDCTRL_ERROR_BASE;
+	AM_FEND_Localoscollatorfreq_t cur_ocaloscollatorfreq;
 
-	if(sec_control.m_lnbs.b_para.ocaloscollatorfreq == AM_FEND_LOCALOSCILLATORFREQ_H)
+	if(sec_blind_flag == AM_FALSE)
+	{
+		long data = -1;
+	
+		AM_SEC_GetFendData(CUR_TONE, &data);
+		if(data == SEC_TONE_ON)
+		{
+			cur_ocaloscollatorfreq = AM_FEND_LOCALOSCILLATORFREQ_H;
+		}
+		else if(data == SEC_TONE_OFF)
+		{
+			cur_ocaloscollatorfreq = AM_FEND_LOCALOSCILLATORFREQ_L;
+		}
+	}
+	else
+	{
+		cur_ocaloscollatorfreq = sec_control.m_lnbs.b_para.ocaloscollatorfreq;
+	}
+
+	if(cur_ocaloscollatorfreq == AM_FEND_LOCALOSCILLATORFREQ_H)
 	{
 		if((sec_control.m_lnbs.m_lof_hi >= (M_KU_TP_START_FREQ - M_CENTRE_END_FREQ)) 
 			&& (sec_control.m_lnbs.m_lof_hi <= (M_KU_TP_END_FREQ - M_CENTRE_START_FREQ)))
@@ -1578,7 +1600,7 @@ AM_ErrorCode_t AM_SEC_FreqConvert(unsigned int centre_freq, unsigned int *tp_fre
 			ret = AM_SUCCESS;
 		}
 	}
-	else if(sec_control.m_lnbs.b_para.ocaloscollatorfreq == AM_FEND_LOCALOSCILLATORFREQ_L)
+	else if(cur_ocaloscollatorfreq == AM_FEND_LOCALOSCILLATORFREQ_L)
 	{
 		if((sec_control.m_lnbs.m_lof_lo >= (M_KU_TP_START_FREQ - M_CENTRE_END_FREQ)) 
 			&& (sec_control.m_lnbs.m_lof_lo <= (M_KU_TP_END_FREQ - M_CENTRE_START_FREQ)))
@@ -1593,7 +1615,7 @@ AM_ErrorCode_t AM_SEC_FreqConvert(unsigned int centre_freq, unsigned int *tp_fre
 			ret = AM_SUCCESS;
 		}	
 	}
-
+	
 	return ret;
 }
 
@@ -1603,6 +1625,8 @@ AM_ErrorCode_t AM_SEC_PrepareTune(int dev_no, const AM_FENDCTRL_DVBFrontendParam
 	assert(freq);
 	
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	sec_blind_flag = AM_FALSE;
 
 	ret = AM_SEC_Prepare(dev_no, NULL, para, freq, tunetimeout);
 
