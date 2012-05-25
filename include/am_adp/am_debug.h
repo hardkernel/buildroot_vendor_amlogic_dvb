@@ -36,7 +36,7 @@ extern "C"
 /**\brief 输出调试信息
  *如果_level小于等于文件中定义的宏AM_DEBUG_LEVEL,则输出调试信息。
  */
- #ifndef ANDROID
+ #ifndef ANDROID_T
 #define AM_DEBUG(_level,_fmt...) \
 	AM_MACRO_BEGIN\
 	if ((_level)<=(AM_DEBUG_LEVEL))\
