@@ -775,6 +775,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 						+ lnb_param.SatCRvco
 						- 1400000
 						+ lnb_param.guard_offset;
+				AM_DEBUG(1, "[prepare] UnicableTuningWord %#04x",lnb_param.UnicableTuningWord);
 				int tmp2 = ((((tmp1 * 2) / 4000) + 1) / 2) * 4000;
 				*freq = lnb_param.SatCRvco - (tmp1-tmp2) + lnb_param.guard_offset;
 				lnb_param.UnicableTuningWord = ((tmp2 / 4000) 
