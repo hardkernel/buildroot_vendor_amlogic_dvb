@@ -134,7 +134,7 @@ AM_ErrorCode_t AM_SEC_PrepareTune(int dev_no, const AM_FENDCTRL_DVBFrontendParam
 
 AM_Bool_t AM_SEC_Get_Set_Frontend(void);
 
-void AM_SEC_SetCommandString(eDVBDiseqcCommand_t *diseqc_cmd, const char *str);
+void AM_SEC_SetCommandString(int dev_no, const char *str);
 
 #ifdef __cplusplus
 }

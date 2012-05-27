@@ -3,7 +3,7 @@ BASE=../..
 include $(BASE)/rule/def.mk
 
 O_TARGET=am_fend
-am_fend_SRCS=am_fend.c am_fend_diseqc_cmd.c
+am_fend_SRCS=am_fend.c am_fend_diseqc_cmd.c am_rotor_calc.c
 
 ifeq ($(EMU_FEND), y)
 	SUBDIRS+=emu

@@ -199,15 +199,6 @@ static void sec(int dev_no)
 				{
 					if((para.m_lnbs.m_diseqc_parameters.m_diseqc_mode == 3) && (para.m_lnbs.m_cursat_parameters.m_rotorPosNum == 0))
 					{
-						int direction;
-						printf("m_lo_direction EAST-2 WEST-3 \n");
-						scanf("%d", &(direction));	
-						para.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction = direction;
-
-						printf("m_la_direction NORT-0 SOUTH-1\n");
-						scanf("%d", &(direction));		
-						para.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction = direction;
-
 						float degree;
 						printf("m_longitude degree\n");
 						scanf("%f", &(degree));		
