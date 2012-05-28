@@ -56,6 +56,7 @@ typedef struct _MagazineState
 
     // Packet X/0
     BOOLEAN     bReceiving;
+    BOOLEAN     bNewData;
     INT16U 	wControlBits;
     INT8U 	uCharacterSubset;
     INT8U 	uCharacterRegion;

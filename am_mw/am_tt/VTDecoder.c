@@ -150,6 +150,7 @@ void ResetDecoder(void)
         {
             // Doing this is enough for zeroing the state
             m_MagazineState[i].bReceiving = FALSE;
+            m_MagazineState[i].bNewData = FALSE;
         }
         m_LastMagazine = 0;
         m_LastPageCode = 0;
@@ -239,9 +240,10 @@ void VTDecodeLine(INT8U *data)
         // Check if there is a finished page
 
         uProcessMagazine = m_bMagazineSerial ? m_LastMagazine : uMagazine;
-        //if (m_MagazineState[uProcessMagazine].bReceiving)
+        if (m_MagazineState[uProcessMagazine].bReceiving || m_MagazineState[uProcessMagazine].bNewData)
         {
             m_MagazineState[uProcessMagazine].bReceiving = FALSE;
+            m_MagazineState[uProcessMagazine].bNewData = FALSE;
             VTCompleteMagazine(&m_MagazineState[uProcessMagazine]);
         }
 
@@ -286,13 +288,15 @@ void VTDecodeLine(INT8U *data)
             // Work out the page sub-code
             uPageSubCode = (uS1 | ((uS2 & 0x7) << 4) | (uS3 << 8) | ((uS4 & 0x3) << 12));
 
-            if(m_LastPageCode && (m_LastMagazine == uMagazine) && (m_LastPageCode != MAKELONG(uPageHex, uPageSubCode))){
+            if(m_LastPageCode && (m_LastMagazine == uMagazine) && (m_LastPageCode != MAKELONG(uPageHex, uPageSubCode)) && m_MagazineState[m_LastMagazine].bNewData){
                 m_MagazineState[m_LastMagazine].bReceiving = FALSE;
+                m_MagazineState[m_LastMagazine].bNewData = FALSE;
                 VTCompleteMagazine(&m_MagazineState[m_LastMagazine]);
             }
 
             pthread_mutex_lock(&m_MagazineStateMutex);
             m_MagazineState[uMagazine].bReceiving = FALSE;
+            m_MagazineState[uMagazine].bNewData = FALSE;
             pthread_mutex_unlock(&m_MagazineStateMutex);
 
             if (CheckTeletextPageInRange(uPageHex) != TRUE)
@@ -339,6 +343,7 @@ void VTDecodeLine(INT8U *data)
             pthread_mutex_lock(&m_MagazineStateMutex);
 
             m_MagazineState[uMagazine].bReceiving = TRUE;
+            m_MagazineState[uMagazine].bNewData = FALSE;
             m_MagazineState[uMagazine].wPageHex = uPageHex;
             m_MagazineState[uMagazine].wPageSubCode = uPageSubCode;
             m_MagazineState[uMagazine].wControlBits = uControlBits;
@@ -390,7 +395,10 @@ void VTDecodeLine(INT8U *data)
                     {
                         // Assume that a new header was missed and close the magazine
                         m_MagazineState[uMagazine].bReceiving = FALSE;
-                        VTCompleteMagazine(&m_MagazineState[uProcessMagazine]);
+                        if (m_MagazineState[uMagazine].bReceiving != FALSE)
+                        {
+                        	VTCompleteMagazine(&m_MagazineState[uProcessMagazine]);
+                        }
                     }
                     else
                     {
@@ -403,6 +411,11 @@ void VTDecodeLine(INT8U *data)
                             uTTUpdate = DecodePageRow(uPageCode, uPacketNumber, m_MagazineState[uMagazine].Line[uLine]);
                         }
 #endif
+                    }
+
+                    if (m_MagazineState[uMagazine].bReceiving == FALSE)
+                    {
+                    	m_MagazineState[uMagazine].bNewData = TRUE;
                     }
                 }
 
@@ -441,7 +454,11 @@ void VTDecodeLine(INT8U *data)
                     {
                         // Assume that a new header was missed and close the magazine
                         m_MagazineState[uMagazine].bReceiving = FALSE;
-                        VTCompleteMagazine(&m_MagazineState[uProcessMagazine]);
+
+                        if (m_MagazineState[uMagazine].bReceiving != FALSE)
+                        {
+                            VTCompleteMagazine(&m_MagazineState[uProcessMagazine]);
+                        }
                     }
                     else
                     {
@@ -486,6 +503,11 @@ void VTDecodeLine(INT8U *data)
                             }
                         }
                     }
+                }
+
+                if (m_MagazineState[uMagazine].bReceiving == FALSE)
+                {
+      	            m_MagazineState[uMagazine].bNewData = TRUE;
                 }
             }
             pthread_mutex_unlock(&m_MagazineStateMutex);
