@@ -35,12 +35,13 @@
 
 #define MAX_PAGELIST         (64)
 
-static INT8U				m_LastMagazine;
+static INT8U			m_LastMagazine;
+static INT32U                   m_LastPageCode;
 static TMagazineState      	m_MagazineState[8];
-static BOOLEAN				m_bMagazineSerial;
+static BOOLEAN			m_bMagazineSerial;
 
 static INT8U               	m_CommonHeader[32];
-static INT32U				m_ReceivedPages;
+static INT32U			m_ReceivedPages;
 
 static struct TVTPage*      m_NonVisiblePageList;
 static struct TVTPage*      m_VisiblePageList[800];
@@ -151,6 +152,7 @@ void ResetDecoder(void)
             m_MagazineState[i].bReceiving = FALSE;
         }
         m_LastMagazine = 0;
+        m_LastPageCode = 0;
     }
     pthread_mutex_unlock(&m_MagazineStateMutex);
 
@@ -237,7 +239,7 @@ void VTDecodeLine(INT8U *data)
         // Check if there is a finished page
 
         uProcessMagazine = m_bMagazineSerial ? m_LastMagazine : uMagazine;
-        if (m_MagazineState[uProcessMagazine].bReceiving)
+        //if (m_MagazineState[uProcessMagazine].bReceiving)
         {
             m_MagazineState[uProcessMagazine].bReceiving = FALSE;
             VTCompleteMagazine(&m_MagazineState[uProcessMagazine]);
@@ -262,21 +264,11 @@ void VTDecodeLine(INT8U *data)
         case 0: // page header
 
             // Initialize the magazine
-
-            pthread_mutex_lock(&m_MagazineStateMutex);
-            m_MagazineState[uMagazine].bReceiving = FALSE;
-            pthread_mutex_unlock(&m_MagazineStateMutex);
-
-
+            
             // Work out the page number
             uPageHex = UnhamTwo84_LSBF(data + 2, &bError);
             uPageHex |= (uMagazine == 0 ? 0x800 : uMagazine * 0x100);
-
-            if (CheckTeletextPageInRange(uPageHex) != TRUE)
-            {
-                return;
-            }
-
+            
             // Caution: Remember that these offsets are zero based while indexes
             // in the ETS Teletext specification (ETS 300 706) are one based.
             uS1 = Unham84(data[4], &bError);
@@ -293,9 +285,22 @@ void VTDecodeLine(INT8U *data)
             }
             // Work out the page sub-code
             uPageSubCode = (uS1 | ((uS2 & 0x7) << 4) | (uS3 << 8) | ((uS4 & 0x3) << 12));
+
+            if(m_LastPageCode && (m_LastMagazine == uMagazine) && (m_LastPageCode != MAKELONG(uPageHex, uPageSubCode))){
+                m_MagazineState[m_LastMagazine].bReceiving = FALSE;
+                VTCompleteMagazine(&m_MagazineState[m_LastMagazine]);
+            }
+
+            pthread_mutex_lock(&m_MagazineStateMutex);
+            m_MagazineState[uMagazine].bReceiving = FALSE;
+            pthread_mutex_unlock(&m_MagazineStateMutex);
+
+            if (CheckTeletextPageInRange(uPageHex) != TRUE)
+            {
+                return;
+            }
+
             //M_TELETEXT_DIAG(("start received The magzine[%d] and uPageHex[0x%x] subpagecode [0x%x]\n",uMagazine,uPageHex,uPageSubCode));
-
-
 
             // Get the page control bits
             uControlBits = (uMagazine | (uS2 & 0x8) | ((uS4 & 0xC) << 2) | (uC7_14 << 6));
@@ -344,6 +349,7 @@ void VTDecodeLine(INT8U *data)
             m_MagazineState[uMagazine].LinkReceived = 0x00;
 
             m_LastMagazine = uMagazine;
+            m_LastPageCode = MAKELONG(uPageHex, uPageSubCode);
             pthread_mutex_unlock(&m_MagazineStateMutex);
 
             break;
@@ -375,7 +381,7 @@ void VTDecodeLine(INT8U *data)
         case 25:
             {
                 pthread_mutex_lock(&m_MagazineStateMutex);
-                if (m_MagazineState[uMagazine].bReceiving != FALSE)
+                //if (m_MagazineState[uMagazine].bReceiving != FALSE)
                 {
                     uLine = uPacketNumber - 1;
 
@@ -424,7 +430,7 @@ void VTDecodeLine(INT8U *data)
 
         case 27:
             pthread_mutex_lock(&m_MagazineStateMutex);
-            if (m_MagazineState[uMagazine].bReceiving != FALSE)
+            //if (m_MagazineState[uMagazine].bReceiving != FALSE)
             {
                 // Packet X/27/0 for FLOF Editorial Linking
                 if (uDesignationCode == 0)
