@@ -1,7 +1,36 @@
+/***************************************************************************
+ *  Copyright C 2012 by Amlogic, Inc. All Rights Reserved.
+ */
+/**\file
+ * \brief motor方位角计算库
+ *
+ * \author jiang zhongming <zhongming.jiang@amlogic.com>
+ * \date 2010-05-22: create the document
+ ***************************************************************************/
+
+#define AM_DEBUG_LEVEL 0
+
+#include <am_debug.h>
+
+#include "am_rotor_calc.h"
+
 #include <math.h>
+#include <stdio.h>
+
+/****************************************************************************
+ * Macro definitions
+ ***************************************************************************/
+
+/****************************************************************************
+ * Static data
+ ***************************************************************************/
+
+/****************************************************************************
+ * Static functions
+ ***************************************************************************/
 
 /*----------------------------------------------------------------------------*/
-double factorial_div( double value, int x)
+static double factorial_div( double value, int x)
 {
 	if(!x)
 		return 1;
@@ -12,11 +41,12 @@ double factorial_div( double value, int x)
 			value = value / x--;
 		}
 	}
+	AM_DEBUG(1, "factorial_div %f\n", value);
 	return value;
 }
 
 /*----------------------------------------------------------------------------*/
-double powerd( double x, int y)
+static double powerd( double x, int y)
 {
 	int i=0;
 	double ans=1.0;
@@ -31,11 +61,12 @@ double powerd( double x, int y)
 			ans = ans * x;
 		}
 	}
+	AM_DEBUG(1, "powerd %f\n", ans);
 	return ans;
 }
 
 /*----------------------------------------------------------------------------*/
-double SIN( double x)
+static double SIN( double x)
 {
 	int i=0;
 	int j=1;
@@ -76,17 +107,19 @@ double SIN( double x)
 		y1 = y1 + diff;
 		j = -1 * j;
 	}
+	AM_DEBUG(1, "SIN %f\n", sign * y1);
 	return ( sign * y1 );
 }
 
 /*----------------------------------------------------------------------------*/
-double COS(double x)
+static double COS(double x)
 {
+	AM_DEBUG(1, "COS %f\n", SIN(90 * M_PI / 180 - x));
 	return SIN(90 * M_PI / 180 - x);
 }
 
 /*----------------------------------------------------------------------------*/
-double ATAN( double x)
+static double ATAN( double x)
 {
 	int i=0; /* counter for terms in binomial series */
 	int j=1; /* sign of nth term in series */
@@ -117,26 +150,31 @@ double ATAN( double x)
 		y = y + deltay;
 		j = -1 * j;
 	}
+	AM_DEBUG(1, "ATAN %f\n", sign * (y + addangle));
 	return (sign * (y + addangle) );
 }
 
-double ASIN(double x)
+static double ASIN(double x)
 {
+	AM_DEBUG(1, "ASIN %f\n", 2 * ATAN( x / (1 + sqrt(1.0 - x*x))));
 	return 2 * ATAN( x / (1 + sqrt(1.0 - x*x)));
 }
 
-double Radians( double number )
+static double Radians( double number )
 {
+	AM_DEBUG(1, "Radians %f\n", number*M_PI/180);
 	return number*M_PI/180;
 }
 
-double Deg( double number )
+static double Deg( double number )
 {
+	AM_DEBUG(1, "Deg %f\n", number*180/M_PI);
 	return number*180/M_PI;
 }
 
-double Rev( double number )
+static double Rev( double number )
 {
+	AM_DEBUG(1, "Rev %f\n", number - floor( number / 360.0 ) * 360);
 	return number - floor( number / 360.0 ) * 360;
 }
 
@@ -226,7 +264,7 @@ double calcDeclination( double SiteLat, double Azimuth, double Elevation)
 		);
 }
 
-double calcSatHourangle( double SatLon, double SiteLat, double SiteLon )
+double AM_CalcSatHourangle( double SatLon, double SiteLat, double SiteLon )
 {
 	double	Azimuth=calcAzimuth(SatLon, SiteLat, SiteLon, 0 ),
 		Elevation=calcElevation( SatLon, SiteLat, SiteLon, 0 ),
@@ -234,9 +272,12 @@ double calcSatHourangle( double SatLon, double SiteLat, double SiteLon )
 		a = - COS(Radians(Elevation)) * SIN(Radians(Azimuth)),
 		b = SIN(Radians(Elevation)) * COS(Radians(SiteLat)) -
 			COS(Radians(Elevation)) * SIN(Radians(SiteLat)) * COS(Radians(Azimuth)),
-
+	
 // Works for all azimuths (northern & southern hemisphere)
 		returnvalue = 180 + Deg(ATAN(a/b));
+
+		AM_DEBUG(1, "calcSatHourangle %f %f %f %f %f\n", Azimuth, Elevation, a, b, returnvalue);
+
 
 	if ( Azimuth > 270 )
 	{
@@ -247,6 +288,7 @@ double calcSatHourangle( double SatLon, double SiteLat, double SiteLon )
 
 	if ( Azimuth < 90 )
 		returnvalue = ( 180 - returnvalue );
-
+	AM_DEBUG(1, "calcSatHourangle %f\n", returnvalue);
 	return returnvalue;
 }
+

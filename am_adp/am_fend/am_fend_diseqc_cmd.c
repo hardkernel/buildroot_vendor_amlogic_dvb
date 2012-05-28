@@ -8,8 +8,13 @@
  * \date 2012-03-20: create the document
  ***************************************************************************/
 
+#define AM_DEBUG_LEVEL 3
+
+#include <am_debug.h>
+
 #include "am_fend_diseqc_cmd.h"
 #include "am_fend.h"
+#include "am_rotor_calc.h"
 
 #include <string.h>
 #include <unistd.h>
@@ -758,7 +763,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerHalt(int dev_no)
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYPOSITIONER;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
 	cmd.msg[2] = 0x60;
 
 	cmd.msg_len = 3;
@@ -769,7 +774,34 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerHalt(int dev_no)
 
 	return ret;
 }
-                                                                  
+
+/**\brief 允许定位器(positioner)限制 (Diseqc1.2 M)
+ * \param dev_no 前端设备号 
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)
+ */
+AM_ErrorCode_t AM_FEND_Diseqccmd_EnablePositionerLimit(int dev_no)
+{
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	
+	struct dvb_diseqc_master_cmd cmd;
+	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
+
+	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
+	cmd.msg[2] = 0x6A;
+	cmd.msg[3] = 0x00;
+
+	cmd.msg_len = 4;
+	
+	if(AM_FEND_DiseqcSendMasterCmd(dev_no, &cmd) != AM_SUCCESS){
+		ret = AM_FEND_DISEQCCMD_ERROR_BASE;
+	}
+
+	return ret;
+}
+																  
 /**\brief 禁止定位器(positioner)限制 (Diseqc1.2 M)
  * \param dev_no 前端设备号 
  * \return
@@ -784,7 +816,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_DisablePositionerLimit(int dev_no)
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYPOSITIONER;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
 	cmd.msg[2] = 0x63;
 
 	cmd.msg_len = 3;
@@ -810,7 +842,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerELimit(int dev_no)
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYPOSITIONER;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
 	cmd.msg[2] = 0x66;
 
 	cmd.msg_len = 3;
@@ -836,7 +868,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerWLimit(int dev_no)
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYPOSITIONER;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
 	cmd.msg[2] = 0x67;
 
 	cmd.msg_len = 3;
@@ -919,7 +951,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_StorePosition(int dev_no, unsigned char positio
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYPOSITIONER;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
 	cmd.msg[2] = 0x6A;
 	cmd.msg[3] = position;
 
@@ -947,7 +979,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_GotoPositioner(int dev_no, unsigned char positi
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
 
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
-	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_ANYPOSITIONER;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
 	cmd.msg[2] = 0x6B;
 	cmd.msg[3] = position;
 
@@ -960,7 +992,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_GotoPositioner(int dev_no, unsigned char positi
 	return ret;
 }
 
-/**\brief 定位器(positioner)根据经纬度定位到卫星 (USALS(another name Diseqc1.3) Diseqc extention) 
+/**\brief 定位器(positioner)根据经纬度定位到卫星 (gotoxx Diseqc extention) 
  * \param dev_no 前端设备号
  * \param local_longitude 本地经度
  * \param local_latitude 本地纬度
@@ -969,7 +1001,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_GotoPositioner(int dev_no, unsigned char positi
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)
  */
-AM_ErrorCode_t AM_FEND_Diseqccmd_GotoAngularPositioner(int dev_no, double local_longitude, double local_latitude, double satellite_longitude)
+AM_ErrorCode_t AM_FEND_Diseqccmd_GotoxxAngularPositioner(int dev_no, double local_longitude, double local_latitude, double satellite_longitude)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
@@ -982,6 +1014,8 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_GotoAngularPositioner(int dev_no, double local_
 
 	double a = atan(tan(local_longitude - satellite_longitude)/sin(local_latitude));
 	int sign = 1;
+
+	AM_DEBUG(1, "local_longitude=%f local_latitude=%f satellite_longitude=%f GotoAngular=%f", local_longitude, local_latitude, satellite_longitude, a );
 	
 	if(a >= 1E-7){
 		sign = 1;
@@ -1060,6 +1094,84 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_GotoAngularPositioner(int dev_no, double local_
 	
 	cmd.msg[3] = (remain1 << 4) | remain2;
 	cmd.msg[4] = (remain3 << 4) | remain4;		
+
+	cmd.msg_len = 5;
+	
+	if(AM_FEND_DiseqcSendMasterCmd(dev_no, &cmd) != AM_SUCCESS){
+		ret = AM_FEND_DISEQCCMD_ERROR_BASE;
+	}
+
+	return ret;
+}
+
+/**\brief 定位器(positioner)根据经纬度定位到卫星 (USALS(another name Diseqc1.3) Diseqc extention) 
+ * \param dev_no 前端设备号
+ * \param local_longitude 本地经度
+ * \param local_latitude 本地纬度
+ * \param satellite_longitude 卫星经度
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)
+ */
+AM_ErrorCode_t AM_FEND_Diseqccmd_GotoAngularPositioner(int dev_no, double local_longitude, double local_latitude, double satellite_longitude)
+{
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	int RotorCmd = 0;
+	
+	struct dvb_diseqc_master_cmd cmd;
+	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
+
+	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
+	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_POLARAZIMUTHPOSITIONER;
+	cmd.msg[2] = 0x6E;
+
+#if 0
+	if ( satellite_longitude < 0 )
+		satellite_longitude = 360 + satellite_longitude;	
+
+	if ( local_longitude < 0 )
+		local_longitude = 360 + local_longitude;
+
+
+	double satHourAngle = AM_CalcSatHourangle( satellite_longitude, local_latitude, local_longitude );
+	AM_DEBUG(1, "satHourAngle %f\n", satHourAngle);
+
+	static int gotoXTable[10] =
+		{ 0x00, 0x02, 0x03, 0x05, 0x06, 0x08, 0x0A, 0x0B, 0x0D, 0x0E };
+
+	if (local_latitude >= 0) // Northern Hemisphere
+	{
+		int tmp=(int)round( fabs( 180 - satHourAngle ) * 10.0 );
+		RotorCmd = (tmp/10)*0x10 + gotoXTable[ tmp % 10 ];
+
+		if (satHourAngle < 180) // the east
+			RotorCmd |= 0xE000;
+		else					// west
+			RotorCmd |= 0xD000;
+	}
+	else // Southern Hemisphere
+	{
+		if (satHourAngle < 180) // the east
+		{
+			int tmp=(int)round( fabs( satHourAngle ) * 10.0 );
+			RotorCmd = (tmp/10)*0x10 + gotoXTable[ tmp % 10 ];
+			RotorCmd |= 0xD000;
+		}
+		else // west
+		{
+			int tmp=(int)round( fabs( 360 - satHourAngle ) * 10.0 );
+			RotorCmd = (tmp/10)*0x10 + gotoXTable[ tmp % 10 ];
+			RotorCmd |= 0xE000;
+		}
+	}
+	AM_DEBUG(1, "RotorCmd = %04x", RotorCmd);	
+#endif
+
+	RotorCmd = AM_ProduceAngularPositioner(dev_no, local_longitude, local_latitude, satellite_longitude);
+
+	cmd.msg[3] = ((RotorCmd & 0xFF00) / 0x100);
+	cmd.msg[4] = RotorCmd & 0xFF;			
 
 	cmd.msg_len = 5;
 	
@@ -1312,6 +1424,62 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetODULoFreq(int dev_no, unsigned char ub_numbe
 	}
 
 	return ret;
+}
+
+/**\brief 根据经纬度生成到卫星方位角 (USALS(another name Diseqc1.3) Diseqc extention) 
+ * \param dev_no 前端设备号
+ * \param local_longitude 本地经度
+ * \param local_latitude 本地纬度
+ * \param satellite_longitude 卫星经度
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)
+ */
+int AM_ProduceAngularPositioner(int dev_no, double local_longitude, double local_latitude, double satellite_longitude)
+{
+	int RotorCmd = 0;
+
+	if ( satellite_longitude < 0 )
+		satellite_longitude = 360 + satellite_longitude;	
+
+	if ( local_longitude < 0 )
+		local_longitude = 360 + local_longitude;
+
+
+	double satHourAngle = AM_CalcSatHourangle( satellite_longitude, local_latitude, local_longitude );
+	AM_DEBUG(1, "satHourAngle %f\n", satHourAngle);
+
+	static int gotoXTable[10] =
+		{ 0x00, 0x02, 0x03, 0x05, 0x06, 0x08, 0x0A, 0x0B, 0x0D, 0x0E };
+
+	if (local_latitude >= 0) // Northern Hemisphere
+	{
+		int tmp=(int)round( fabs( 180 - satHourAngle ) * 10.0 );
+		RotorCmd = (tmp/10)*0x10 + gotoXTable[ tmp % 10 ];
+
+		if (satHourAngle < 180) // the east
+			RotorCmd |= 0xE000;
+		else					// west
+			RotorCmd |= 0xD000;
+	}
+	else // Southern Hemisphere
+	{
+		if (satHourAngle < 180) // the east
+		{
+			int tmp=(int)round( fabs( satHourAngle ) * 10.0 );
+			RotorCmd = (tmp/10)*0x10 + gotoXTable[ tmp % 10 ];
+			RotorCmd |= 0xD000;
+		}
+		else // west
+		{
+			int tmp=(int)round( fabs( 360 - satHourAngle ) * 10.0 );
+			RotorCmd = (tmp/10)*0x10 + gotoXTable[ tmp % 10 ];
+			RotorCmd |= 0xE000;
+		}
+	}
+	AM_DEBUG(1, "RotorCmd = %04x", RotorCmd);	
+
+	return RotorCmd;
 }
 
 

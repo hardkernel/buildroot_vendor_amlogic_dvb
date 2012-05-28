@@ -15,12 +15,15 @@
 #include <am_fend_diseqc_cmd.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <am_misc.h>
 
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
 #define FEND_DEV_NO    (0)
+
+#define MAX_DISEQC_LENGTH  16
 
 static unsigned int blindscan_process = 0;
 
@@ -70,6 +73,53 @@ static void blindscan_cb(int dev_no, AM_FEND_BlindEvent_t *evt, void *user_data)
 	}
 }
 
+static void SetDiseqcCommandString(int dev_no, const char *str)
+{
+	struct dvb_diseqc_master_cmd diseqc_cmd;
+	
+	if (!str)
+		return;
+	diseqc_cmd.msg_len=0;
+	int slen = strlen(str);
+	if (slen % 2)
+	{
+		AM_DEBUG(1, "%s", "invalid diseqc command string length (not 2 byte aligned)");
+		return;
+	}
+	if (slen > MAX_DISEQC_LENGTH*2)
+	{
+		AM_DEBUG(1, "%s", "invalid diseqc command string length (string is to long)");
+		return;
+	}
+	unsigned char val=0;
+	int i=0; 
+	for (i=0; i < slen; ++i)
+	{
+		unsigned char c = str[i];
+		switch(c)
+		{
+			case '0' ... '9': c-=48; break;
+			case 'a' ... 'f': c-=87; break;
+			case 'A' ... 'F': c-=55; break;
+			default:
+				AM_DEBUG(1, "%s", "invalid character in hex string..ignore complete diseqc command !");
+				return;
+		}
+		if ( i % 2 )
+		{
+			val |= c;
+			diseqc_cmd.msg[i/2] = val;
+		}
+		else
+			val = c << 4;
+	}
+	diseqc_cmd.msg_len = slen/2;
+
+	AM_FEND_DiseqcSendMasterCmd(dev_no, &diseqc_cmd); 
+
+	return;
+}
+
 static void sec(int dev_no)
 {
 	int sec = -1;
@@ -100,18 +150,21 @@ static void sec(int dev_no)
 		printf("Diseqccmd_SetLNBPort16-18\n");		
 		printf("Diseqccmd_SetChannelFreq-19\n");
 		printf("Diseqccmd_SetPositionerHalt-20\n");
-		printf("Diseqccmd_DisablePositionerLimit-21\n");
-		printf("Diseqccmd_SetPositionerELimit-22\n");
-		printf("Diseqccmd_SetPositionerWLimit-23\n");
-		printf("Diseqccmd_PositionerGoE-24\n");
-		printf("Diseqccmd_PositionerGoW-25\n");	
-		printf("Diseqccmd_StorePosition-26\n");
-		printf("Diseqccmd_GotoPositioner-27\n");	
-		printf("Diseqccmd_GotoAngularPositioner-28\n");			
-		printf("Diseqccmd_SetODUChannel-29\n");
-		printf("Diseqccmd_SetODUPowerOff-30\n");	
-		printf("Diseqccmd_SetODUUbxSignalOn-31\n");
-		printf("Exit sec-32\n");
+		printf("Diseqccmd_EnablePositionerLimit-21\n");
+		printf("Diseqccmd_DisablePositionerLimit-22\n");
+		printf("Diseqccmd_SetPositionerELimit-23\n");
+		printf("Diseqccmd_SetPositionerWLimit-24\n");
+		printf("Diseqccmd_PositionerGoE-25\n");
+		printf("Diseqccmd_PositionerGoW-26\n");	
+		printf("Diseqccmd_StorePosition-27\n");
+		printf("Diseqccmd_GotoPositioner-28\n");	
+		printf("Diseqccmd_GotoxxAngularPositioner-29\n");
+		printf("Diseqccmd_GotoAngularPositioner-30\n");			
+		printf("Diseqccmd_SetODUChannel-31\n");
+		printf("Diseqccmd_SetODUPowerOff-32\n");	
+		printf("Diseqccmd_SetODUUbxSignalOn-33\n");
+		printf("Diseqccmd_SetString-34\n");
+		printf("Exit sec-35\n");
 		printf("-----------------------------\n");
 		printf("select\n");
 		scanf("%d", &sec);
@@ -217,7 +270,7 @@ static void sec(int dev_no)
 					scanf("%d", &lnbport);
 					printf("polarisation:H-0/V-1/NO-2\n");
 					scanf("%d", &polarisation);
-					printf("polarisation:L-0/H-1/NO-2\n");
+					printf("local_oscillator_freq:L-0/H-1/NO-2\n");
 					scanf("%d", &local_oscillator_freq);				
 					AM_FEND_Diseqccmd_SetLNBPort4(dev_no, lnbport, polarisation, local_oscillator_freq);
 					break;
@@ -250,18 +303,22 @@ static void sec(int dev_no)
 				break;                                                                  
 
 			case 21:
-				AM_FEND_Diseqccmd_DisablePositionerLimit(dev_no);
+				AM_FEND_Diseqccmd_EnablePositionerLimit(dev_no);
 				break;
 
 			case 22:
-				AM_FEND_Diseqccmd_SetPositionerELimit(dev_no);
+				AM_FEND_Diseqccmd_DisablePositionerLimit(dev_no);
 				break;
 
 			case 23:
+				AM_FEND_Diseqccmd_SetPositionerELimit(dev_no);
+				break;
+
+			case 24:
 				AM_FEND_Diseqccmd_SetPositionerWLimit(dev_no);
 				break;
 				
-			case 24:
+			case 25:
 				{
 					unsigned char unit;
 					printf("unit continue-0 second-1-127 step-128-255: ");		
@@ -270,7 +327,7 @@ static void sec(int dev_no)
 					break;
 				}
 
-			case 25:
+			case 26:
 				{
 					unsigned char unit;
 					printf("unit continue-0 second-1-127 step-128-255: ");		
@@ -279,7 +336,7 @@ static void sec(int dev_no)
 					break;
 				}
 
-			case 26:
+			case 27:
 				{
 					unsigned char position;
 					printf("position 0-255: ");		
@@ -288,7 +345,7 @@ static void sec(int dev_no)
 					break;
 				}
 
-			case 27:
+			case 28:
 				{
 					unsigned char position;
 					printf("position 0-255: ");		
@@ -297,20 +354,33 @@ static void sec(int dev_no)
 					break;
 				}
 
-			case 28:
+			case 29:
 				{
-					float local_longitude, local_latitude, satellite_longitude;
+					double local_longitude, local_latitude, satellite_longitude;
 					printf("local_longitude: ");		
-					scanf("%f", &local_longitude);
+					scanf("%lf", &local_longitude);
 					printf("local_latitude: ");		
-					scanf("%f", &local_latitude);
+					scanf("%lf", &local_latitude);
 					printf("satellite_longitude: ");		
-					scanf("%f", &satellite_longitude);				
+					scanf("%lf", &satellite_longitude);				
+					AM_FEND_Diseqccmd_GotoxxAngularPositioner(dev_no, local_longitude, local_latitude, satellite_longitude);
+	                            break; 
+				}   
+
+			case 30:
+				{
+					double local_longitude, local_latitude, satellite_longitude;
+					printf("local_longitude: ");		
+					scanf("%lf", &local_longitude);
+					printf("local_latitude: ");		
+					scanf("%lf", &local_latitude);
+					printf("satellite_longitude: ");		
+					scanf("%lf", &satellite_longitude);				
 					AM_FEND_Diseqccmd_GotoAngularPositioner(dev_no, local_longitude, local_latitude, satellite_longitude);
 	                            break; 
 				}                                 
 
-			case 29:
+			case 31:
 				{
 					unsigned char ub_number;
 					printf("ub_number 0-7: ");		
@@ -331,7 +401,7 @@ static void sec(int dev_no)
 					break;
 				}
 
-			case 30:
+			case 32:
 				{
 					unsigned char ub_number;
 					printf("ub_number 0-7: ");		
@@ -340,11 +410,21 @@ static void sec(int dev_no)
 					break;
 				}
 
-			case 31:
+			case 33:
 				AM_FEND_Diseqccmd_SetODUUbxSignalOn(dev_no);
                             break;                           
 
-			case 32:
+			case 34:
+				{
+					char str[13] = {0};
+
+					printf("diseqc cmd str: ");		
+					scanf("%s", str);						
+					SetDiseqcCommandString(dev_no, str);
+				}
+				break;
+
+			case 35:
 				sec_exit = AM_TRUE;
 				break;
 				
@@ -358,6 +438,8 @@ static void sec(int dev_no)
 		{
 			break;
 		}
+
+		usleep(15 *1000);
 		
 	}
 

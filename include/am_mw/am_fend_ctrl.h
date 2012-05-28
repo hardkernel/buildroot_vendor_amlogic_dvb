@@ -80,7 +80,6 @@ typedef struct AM_SEC_DVBSatelliteSwitchParameters
 	unsigned char m_rotorPosNum; // 0 is disable.. then use gotoxx
 }AM_SEC_DVBSatelliteSwitchParameters_t;
 
-typedef enum { NORTH, SOUTH, EAST, WEST }AM_SEC_Rotor_Direction;
 enum { FAST, SLOW };
 
 typedef struct AM_SEC_DVBSatelliteRotorInputpowerParameters
@@ -92,8 +91,6 @@ typedef struct AM_SEC_DVBSatelliteRotorInputpowerParameters
 
 typedef struct AM_SEC_DVBSatelliteRotorGotoxxParameters
 {
-	AM_SEC_Rotor_Direction m_lo_direction;	// EAST, WEST
-	AM_SEC_Rotor_Direction m_la_direction;	// NORT, SOUTH
 	double m_longitude;	// longitude for gotoXX? function
 	double m_latitude;	// latitude for gotoXX? function
 	int m_sat_longitude;	// longitude for gotoXX? function of satellite unit-0.1 degree
@@ -108,6 +105,13 @@ typedef struct AM_SEC_DVBSatelliteRotorParameters
 }AM_SEC_DVBSatelliteRotorParameters_t;
 
 typedef enum { RELAIS_OFF=0, RELAIS_ON }AM_SEC_12V_Relais_State;
+
+/**\brief DVB-S前端控制模块盲扫设置参数*/ 
+typedef struct AM_FENDCTRL_DVBFrontendParametersBlindSatellite
+{
+	AM_FEND_Polarisation_t polarisation;
+	AM_FEND_Localoscollatorfreq_t ocaloscollatorfreq;
+}AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t;
 
 /**\brief LNB参数*/ 
 typedef struct AM_SEC_DVBSatelliteLNBParameters
@@ -137,6 +141,9 @@ typedef struct AM_SEC_DVBSatelliteLNBParameters
 	int guard_offset_old;
 	int guard_offset;
 	int LNBNum;
+
+	/*blind scan para*/
+	AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t b_para;
 }AM_SEC_DVBSatelliteLNBParameters_t;
 
 typedef enum{
@@ -171,6 +178,7 @@ typedef struct AM_SEC_DVBSatelliteEquipmentControl
 	AM_SEC_Cmd_Param_t m_params[SEC_CMD_MAX_PARAMS];
 }AM_SEC_DVBSatelliteEquipmentControl_t;
 
+/**\brief DVB-S前端控制模块设置参数*/ 
 typedef struct AM_FENDCTRL_DVBFrontendParametersSatellite
 {
 	struct dvb_frontend_parameters para;
@@ -179,16 +187,19 @@ typedef struct AM_FENDCTRL_DVBFrontendParametersSatellite
 	AM_FEND_Polarisation_t polarisation;
 }AM_FENDCTRL_DVBFrontendParametersSatellite_t;
 
+/**\brief DVB-C前端控制模块设置参数*/ 
 typedef struct AM_FENDCTRL_DVBFrontendParametersCable
 {
 	struct dvb_frontend_parameters para;
 }AM_FENDCTRL_DVBFrontendParametersCable_t;
 
+/**\brief DVB-T前端控制模块设置参数*/
 typedef struct AM_FENDCTRL_DVBFrontendParametersTerrestrial
 {
 	struct dvb_frontend_parameters para;
 }AM_FENDCTRL_DVBFrontendParametersTerrestrial_t;
 
+/**\brief ATSC前端控制模块设置参数*/
 typedef struct AM_FENDCTRL_DVBFrontendParametersATSC
 {
 	struct dvb_frontend_parameters para;
@@ -225,6 +236,24 @@ extern AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEqu
  *   - 其他值 错误代码(见am_fend_ctrl.h)
  */
 extern AM_ErrorCode_t AM_SEC_GetSetting(int dev_no, AM_SEC_DVBSatelliteEquipmentControl_t *para);
+
+/**\brief 准备盲扫卫星设备控制
+ * \param dev_no 前端设备号
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+extern AM_ErrorCode_t AM_SEC_PrepareBlindScan(int dev_no);
+
+/**\brief 中频转换传输频率
+ * \param dev_no 前端设备号
+ * \param centre_freq unit KHZ
+ * \param[out] tp_freq unit KHZ
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+extern AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned int *tp_freq);
 
 /* frontend control interface */ 
 

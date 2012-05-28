@@ -149,66 +149,68 @@ static void sec(int dev_no)
 					scanf("%d", &(diseqc));	
 					para.m_lnbs.m_diseqc_parameters.m_diseqc_mode = diseqc;
 
-					printf("m_committed_cmd AA=0, AB=1, BA=2, BB=3, SENDNO=4\n");
-					scanf("%d", &(diseqc));	
-					para.m_lnbs.m_diseqc_parameters.m_committed_cmd = diseqc;
+					if(para.m_lnbs.m_diseqc_parameters.m_diseqc_mode > 0)
+					{
+						printf("m_toneburst_param NO=0, A=1, B=2\n");
+						scanf("%d", &(diseqc));		
+						para.m_lnbs.m_diseqc_parameters.m_toneburst_param =diseqc;
+					
+						printf("m_committed_cmd AA=0, AB=1, BA=2, BB=3, SENDNO=4\n");
+						scanf("%d", &(diseqc));	
+						para.m_lnbs.m_diseqc_parameters.m_committed_cmd = diseqc;
 
-					printf("m_committed_cmd SENDNO=4 0xF0 .. 0xFF\n");
-					scanf("%x", &(diseqc));		
-					para.m_lnbs.m_diseqc_parameters.m_uncommitted_cmd = diseqc;
+						if(para.m_lnbs.m_diseqc_parameters.m_diseqc_mode > 1)
+						{
+							printf("m_committed_cmd SENDNO=4, 0xF0 .. 0xFF\n");
+							scanf("%x", &(diseqc));		
+							para.m_lnbs.m_diseqc_parameters.m_uncommitted_cmd = diseqc;
 
-					printf("m_toneburst_param NO=0, A=1, B=2\n");
-					scanf("%d", &(diseqc));		
-					para.m_lnbs.m_diseqc_parameters.m_toneburst_param =diseqc;
+							printf("m_repeats\n");
+							scanf("%d", &(diseqc));	
+							para.m_lnbs.m_diseqc_parameters.m_repeats = diseqc;
 
-					printf("m_repeats\n");
-					scanf("%d", &(diseqc));	
-					para.m_lnbs.m_diseqc_parameters.m_repeats = diseqc;
+							printf("m_command_order\n");
+							printf("diseqc 1.0)\n");
+							printf("0) commited, toneburst\n");
+							printf("1) toneburst, committed\n");
+							printf("diseqc > 1.0)\n");
+							printf("2) committed, uncommitted, toneburst\n");
+							printf("3) toneburst, committed, uncommitted\n");
+							printf("4) uncommitted, committed, toneburst\n");
+							printf("5) toneburst, uncommitted, committed\n");
+							scanf("%d", &(diseqc));	
+							para.m_lnbs.m_diseqc_parameters.m_command_order = diseqc;
 
-					printf("m_command_order\n");
-					printf("diseqc 1.0)\n");
-					printf("0) commited, toneburst");
-					printf("1) toneburst, committed");
-					printf("diseqc > 1.0)");
-					printf("2) committed, uncommitted, toneburst");
-					printf("3) toneburst, committed, uncommitted");
-					printf("4) uncommitted, committed, toneburst");
-					printf("5) toneburst, uncommitted, committed");
-					scanf("%x", &(diseqc));	
-					para.m_lnbs.m_diseqc_parameters.m_command_order = diseqc;
-
-					printf("m_seq_repeat disable-0/enable-1\n");
-					scanf("%d", &(diseqc));	
-					para.m_lnbs.m_diseqc_parameters.m_seq_repeat = diseqc;
-
-					printf("m_use_fast disable-0/enable-1\n");
-					scanf("%d", &(diseqc));		
-					para.m_lnbs.m_diseqc_parameters.m_use_fast = diseqc;
+							printf("m_seq_repeat disable-0/enable-1\n");
+							scanf("%d", &(diseqc));	
+							para.m_lnbs.m_diseqc_parameters.m_seq_repeat = diseqc;
+						}
+						else
+						{
+							printf("m_use_fast disable-0/enable-1\n");
+							scanf("%d", &(diseqc));		
+							para.m_lnbs.m_diseqc_parameters.m_use_fast = diseqc;
+						}
+					}
 					break;
 				}
 				
 			case 8:
 				{
-					int direction;
-					printf("m_lo_direction EAST-2 WEST-3 \n");
-					scanf("%d", &(direction));	
-					para.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction = direction;
+					if((para.m_lnbs.m_diseqc_parameters.m_diseqc_mode == 3) && (para.m_lnbs.m_cursat_parameters.m_rotorPosNum == 0))
+					{
+						float degree;
+						printf("m_longitude degree\n");
+						scanf("%f", &(degree));		
+						para.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude = degree;
 
-					printf("m_la_direction NORT-0 SOUTH-1\n");
-					scanf("%d", &(direction));		
-					para.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction = direction;
+						printf("m_latitude degree\n");
+						scanf("%f", &(degree));		
+						para.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude = degree;
 
-					float degree;
-					printf("m_longitude degree\n");
-					scanf("%f", &(degree));		
-					para.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude = degree;
-
-					printf("m_latitude degree\n");
-					scanf("%f", &(degree));		
-					para.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude = degree;
-
-					printf("m_sat_longitude 0.1 degree\n");
-					scanf("%d", &(para.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_sat_longitude));					
+						printf("m_sat_longitude 0.1 degree\n");
+						scanf("%d", &(para.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_sat_longitude));			
+					}		
 					break;
 				}
 				
@@ -217,18 +219,19 @@ static void sec(int dev_no)
 					printf("SatCR_idx  0-(max_satcr-1)\n");
 					scanf("%d", &(para.m_lnbs.SatCR_idx));	
 
-					#if 0
-					printf("SatCR_positions \n");
-					scanf("%d", &(para.m_lnbs.SatCR_positions));			
-					#endif
-					
-					printf("SatCRvco (MHz)\n");
-					scanf("%d", &(para.m_lnbs.SatCRvco));
+					if(para.m_lnbs.SatCR_idx >= 0 && para.m_lnbs.SatCR_idx <= 7)
+					{
+						#if 0
+						printf("SatCR_positions \n");
+						scanf("%d", &(para.m_lnbs.SatCR_positions));			
+						#endif
+						
+						printf("SatCRvco (KHz)\n");
+						scanf("%d", &(para.m_lnbs.SatCRvco));
 
-					#if 0
-					printf("LNBNum\n");
-					scanf("%d", &(para.m_lnbs.LNBNum));	
-					#endif
+						printf("LNBNum 0-1\n");
+						scanf("%d", &(para.m_lnbs.LNBNum));	
+					}
 					break;
 				}                  
 
@@ -377,6 +380,11 @@ int main(int argc, char **argv)
 				fenctrl_para.terrestrial.para.u.ofdm.transmission_mode = TRANSMISSION_MODE_AUTO;
 			}else{
 				printf("dvb sx test\n");
+
+				int polar;
+				printf("polar: ");
+				scanf("%d", &(polar));
+				fenctrl_para.sat.polarisation = polar;
 
 				fenctrl_para.sat.para.frequency = freq;
 
