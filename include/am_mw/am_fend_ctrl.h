@@ -80,7 +80,6 @@ typedef struct AM_SEC_DVBSatelliteSwitchParameters
 	unsigned char m_rotorPosNum; // 0 is disable.. then use gotoxx
 }AM_SEC_DVBSatelliteSwitchParameters_t;
 
-typedef enum { NORTH, SOUTH, EAST, WEST }AM_SEC_Rotor_Direction;
 enum { FAST, SLOW };
 
 typedef struct AM_SEC_DVBSatelliteRotorInputpowerParameters
@@ -92,8 +91,6 @@ typedef struct AM_SEC_DVBSatelliteRotorInputpowerParameters
 
 typedef struct AM_SEC_DVBSatelliteRotorGotoxxParameters
 {
-	AM_SEC_Rotor_Direction m_lo_direction;	// EAST, WEST
-	AM_SEC_Rotor_Direction m_la_direction;	// NORT, SOUTH
 	double m_longitude;	// longitude for gotoXX? function
 	double m_latitude;	// latitude for gotoXX? function
 	int m_sat_longitude;	// longitude for gotoXX? function of satellite unit-0.1 degree

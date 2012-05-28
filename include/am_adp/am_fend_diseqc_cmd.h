@@ -316,6 +316,17 @@ extern AM_ErrorCode_t AM_FEND_Diseqccmd_StorePosition(int dev_no, unsigned char 
  */
 extern AM_ErrorCode_t AM_FEND_Diseqccmd_GotoPositioner(int dev_no, unsigned char position); 
 
+/**\brief 定位器(positioner)根据经纬度定位到卫星 (gotoxx Diseqc extention) 
+ * \param dev_no 前端设备号
+ * \param local_longitude 本地经度
+ * \param local_latitude 本地纬度
+ * \param satellite_longitude 卫星经度
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)
+ */
+extern AM_ErrorCode_t AM_FEND_Diseqccmd_GotoxxAngularPositioner(int dev_no, double local_longitude, double local_latitude, double satellite_longitude);
+
 /**\brief 定位器(positioner)根据经纬度定位到卫星 (USALS(another name Diseqc1.3) Diseqc extention) 
  * \param dev_no 前端设备号
  * \param local_longitude 本地经度
@@ -381,7 +392,18 @@ extern AM_ErrorCode_t AM_FEND_Diseqccmd_SetODUConfig(int dev_no, unsigned char u
  */
 extern AM_ErrorCode_t AM_FEND_Diseqccmd_SetODULoFreq(int dev_no, unsigned char ub_number, AM_FEND_LOT_t lot);                                                                  
                                                                                
-                                                                        
+
+/**\brief 根据经纬度生成到卫星方位角 (USALS(another name Diseqc1.3) Diseqc extention) 
+ * \param dev_no 前端设备号
+ * \param local_longitude 本地经度
+ * \param local_latitude 本地纬度
+ * \param satellite_longitude 卫星经度
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)
+ */
+extern int AM_ProduceAngularPositioner(int dev_no, double local_longitude, double local_latitude, double satellite_longitude);
+																		
 #ifdef __cplusplus
 }
 #endif

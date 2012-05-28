@@ -775,6 +775,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 						+ lnb_param.SatCRvco
 						- 1400000
 						+ lnb_param.guard_offset;
+				AM_DEBUG(1, "[prepare] UnicableTuningWord %#04x",lnb_param.UnicableTuningWord);
 				int tmp2 = ((((tmp1 * 2) / 4000) + 1) / 2) * 4000;
 				*freq = lnb_param.SatCRvco - (tmp1-tmp2) + lnb_param.guard_offset;
 				lnb_param.UnicableTuningWord = ((tmp2 / 4000) 
@@ -897,52 +898,19 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 					RotorCmd=sw_param.m_rotorPosNum;
 				else  // we must calc gotoxx cmd
 				{
+					AM_DEBUG(1, "useGotoXX\n");
 					useGotoXX = AM_TRUE;
-
+					
+					/*as flag, judge rotor cmd status*/
 					double	SatLon = abs(rotor_param.m_gotoxx_parameters.m_sat_longitude)/10.00,
 							SiteLat = rotor_param.m_gotoxx_parameters.m_latitude,
 							SiteLon = rotor_param.m_gotoxx_parameters.m_longitude;
 
-					if ( rotor_param.m_gotoxx_parameters.m_la_direction == SOUTH )
-						SiteLat = -SiteLat;
+					if(rotor_param.m_gotoxx_parameters.m_sat_longitude < 0)
+						SatLon = -SatLon;	
 
-					if ( rotor_param.m_gotoxx_parameters.m_lo_direction == WEST )
-						SiteLon = 360 - SiteLon;
 
-					AM_DEBUG(1, "siteLatitude = %lf, siteLongitude = %lf, %lf degrees", SiteLat, SiteLon, SatLon );
-					double satHourAngle =
-						calcSatHourangle( SatLon, SiteLat, SiteLon );
-					AM_DEBUG(1, "PolarmountHourAngle=%lf", satHourAngle );
-
-					static int gotoXTable[10] =
-						{ 0x00, 0x02, 0x03, 0x05, 0x06, 0x08, 0x0A, 0x0B, 0x0D, 0x0E };
-
-					if (SiteLat >= 0) // Northern Hemisphere
-					{
-						int tmp=(int)round( fabs( 180 - satHourAngle ) * 10.0 );
-						RotorCmd = (tmp/10)*0x10 + gotoXTable[ tmp % 10 ];
-
-						if (satHourAngle < 180) // the east
-							RotorCmd |= 0xE000;
-						else					// west
-							RotorCmd |= 0xD000;
-					}
-					else // Southern Hemisphere
-					{
-						if (satHourAngle < 180) // the east
-						{
-							int tmp=(int)round( fabs( satHourAngle ) * 10.0 );
-							RotorCmd = (tmp/10)*0x10 + gotoXTable[ tmp % 10 ];
-							RotorCmd |= 0xD000;
-						}
-						else // west
-						{
-							int tmp=(int)round( fabs( 360 - satHourAngle ) * 10.0 );
-							RotorCmd = (tmp/10)*0x10 + gotoXTable[ tmp % 10 ];
-							RotorCmd |= 0xE000;
-						}
-					}
-					AM_DEBUG(1, "RotorCmd = %04x", RotorCmd);				
+					RotorCmd = AM_ProduceAngularPositioner(dev_no, SiteLon, SiteLat, SatLon);
 				}
 			}
 
@@ -1193,8 +1161,6 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 			else
 				usleep(sec_control.m_params[DELAY_BETWEEN_SWITCH_AND_MOTOR_CMD] * 1000);  // wait 700ms when diseqc changed
 
-			eDVBDiseqcCommand_t diseqc;
-			memset(diseqc.data, 0, MAX_DISEQC_LENGTH);
 
 			AM_SEC_SetSecCommandByVal( &sec_cmd, IF_ROTORPOS_VALID_GOTO, +5 );
 			if(AM_SEC_If_Rotorpos_Valid_Goto(&sec_cmd))
@@ -1204,16 +1170,6 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 				AM_FEND_Diseqccmd_SetPositionerHalt(dev_no);
 				// wait 150msec after send rotor stop cmd
 				usleep(sec_control.m_params[DELAY_AFTER_MOTOR_STOP_CMD] * 1000);
-			}
-
-			diseqc.data[0] = 0xE0;
-			diseqc.data[1] = 0x31;		// positioner
-			if ( useGotoXX )
-			{
-				diseqc.len = 5;
-				diseqc.data[2] = 0x6E;	// drive to angular position
-				diseqc.data[3] = ((RotorCmd & 0xFF00) / 0x100);
-				diseqc.data[4] = RotorCmd & 0xFF;
 			}
 
 		// use measure rotor input power to detect motor state
@@ -1263,8 +1219,18 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 				AM_SEC_Set_RotorStoped(&sec_cmd);
 				if ( useGotoXX )
 				{
-					AM_SEC_SetSecCommandByDiseqc(&sec_cmd, SEND_DISEQC, diseqc);
-					AM_SEC_Set_Diseqc(dev_no, &sec_cmd);				
+
+					double	SatLon = abs(rotor_param.m_gotoxx_parameters.m_sat_longitude)/10.00,
+							SiteLat = rotor_param.m_gotoxx_parameters.m_latitude,
+							SiteLon = rotor_param.m_gotoxx_parameters.m_longitude;
+
+					if(rotor_param.m_gotoxx_parameters.m_sat_longitude < 0)
+						SatLon = -SatLon;						
+
+					AM_DEBUG(1, "degrees = %d \n", rotor_param.m_gotoxx_parameters.m_sat_longitude );
+					AM_DEBUG(1, "siteLatitude = %f, siteLongitude = %f, degrees = %f \n", SiteLat, SiteLon, SatLon );
+
+					AM_FEND_Diseqccmd_GotoAngularPositioner(dev_no, SiteLon, SiteLat, SatLon);			
 				}
 				else
 				{
@@ -1400,8 +1366,7 @@ static AM_ErrorCode_t AM_SEC_DumpSetting(void)
 	AM_DEBUG(1, "Rotor Specific Parameters m_rotor_parameters:\n");
 	AM_DEBUG(1, "m_longitude %f\n", sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude);
 	AM_DEBUG(1, "m_latitude %f\n", sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude);
-	AM_DEBUG(1, "m_lo_direction %d\n", sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction);
-	AM_DEBUG(1, "m_la_direction %d\n", sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction);
+	AM_DEBUG(1, "m_sat_longitude %f\n", sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_sat_longitude);
 
 	AM_DEBUG(1, "Rotor Specific Parameters m_inputpower_parameters:\n");
 	AM_DEBUG(1, "m_use %d\n", sec_control.m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_use);
@@ -1469,10 +1434,8 @@ AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEquipmentC
 		para->m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude;	
 	sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude =
 		para->m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude;
-	sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction =
-		para->m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction;	
-	sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction =
-		para->m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction;
+	sec_control.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_sat_longitude =
+		para->m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_sat_longitude;	
 
 	sec_control.m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_use = 
 		para->m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_use;
@@ -1559,12 +1522,12 @@ AM_ErrorCode_t AM_SEC_PrepareBlindScan(int dev_no)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend_ctrl.h)
  */
-AM_ErrorCode_t AM_SEC_FreqConvert(unsigned int centre_freq, unsigned int *tp_freq)
+AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned int *tp_freq)
 {
 	assert(tp_freq);
 
 	AM_ErrorCode_t ret = AM_FENDCTRL_ERROR_BASE;
-	AM_FEND_Localoscollatorfreq_t cur_ocaloscollatorfreq;
+	AM_FEND_Localoscollatorfreq_t cur_ocaloscollatorfreq = AM_FEND_LOCALOSCILLATORFREQ_H;
 
 	if(sec_blind_flag == AM_FALSE)
 	{
@@ -1671,14 +1634,16 @@ AM_Bool_t AM_SEC_Get_Set_Frontend(void)
 	return am_sec_fend_set;
 }
 
-void AM_SEC_SetCommandString(eDVBDiseqcCommand_t *diseqc_cmd, const char *str)
+void AM_SEC_SetCommandString(int dev_no, const char *str)
 {
-	assert(diseqc_cmd);
 	assert(str);
+
+	eSecCommand_t sec_cmd;
+	eDVBDiseqcCommand_t diseqc_cmd;
 	
 	if (!str)
 		return;
-	diseqc_cmd->len=0;
+	diseqc_cmd.len=0;
 	int slen = strlen(str);
 	if (slen % 2)
 	{
@@ -1707,12 +1672,15 @@ void AM_SEC_SetCommandString(eDVBDiseqcCommand_t *diseqc_cmd, const char *str)
 		if ( i % 2 )
 		{
 			val |= c;
-			diseqc_cmd->data[i/2] = val;
+			diseqc_cmd.data[i/2] = val;
 		}
 		else
 			val = c << 4;
 	}
-	diseqc_cmd->len = slen/2;
+	diseqc_cmd.len = slen/2;
+
+	AM_SEC_SetSecCommandByDiseqc(&sec_cmd, SEND_DISEQC, diseqc_cmd);
+	AM_SEC_Set_Diseqc(dev_no, &sec_cmd);
 
 	return;
 }

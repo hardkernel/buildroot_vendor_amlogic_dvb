@@ -149,7 +149,7 @@ static void sec(int dev_no)
 					scanf("%d", &(diseqc));	
 					para.m_lnbs.m_diseqc_parameters.m_diseqc_mode = diseqc;
 
-					if(diseqc > 0)
+					if(para.m_lnbs.m_diseqc_parameters.m_diseqc_mode > 0)
 					{
 						printf("m_toneburst_param NO=0, A=1, B=2\n");
 						scanf("%d", &(diseqc));		
@@ -159,7 +159,7 @@ static void sec(int dev_no)
 						scanf("%d", &(diseqc));	
 						para.m_lnbs.m_diseqc_parameters.m_committed_cmd = diseqc;
 
-						if(diseqc > 1)
+						if(para.m_lnbs.m_diseqc_parameters.m_diseqc_mode > 1)
 						{
 							printf("m_committed_cmd SENDNO=4, 0xF0 .. 0xFF\n");
 							scanf("%x", &(diseqc));		
@@ -199,15 +199,6 @@ static void sec(int dev_no)
 				{
 					if((para.m_lnbs.m_diseqc_parameters.m_diseqc_mode == 3) && (para.m_lnbs.m_cursat_parameters.m_rotorPosNum == 0))
 					{
-						int direction;
-						printf("m_lo_direction EAST-2 WEST-3 \n");
-						scanf("%d", &(direction));	
-						para.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction = direction;
-
-						printf("m_la_direction NORT-0 SOUTH-1\n");
-						scanf("%d", &(direction));		
-						para.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction = direction;
-
 						float degree;
 						printf("m_longitude degree\n");
 						scanf("%f", &(degree));		
@@ -235,7 +226,7 @@ static void sec(int dev_no)
 						scanf("%d", &(para.m_lnbs.SatCR_positions));			
 						#endif
 						
-						printf("SatCRvco (MHz)\n");
+						printf("SatCRvco (KHz)\n");
 						scanf("%d", &(para.m_lnbs.SatCRvco));
 
 						printf("LNBNum 0-1\n");
