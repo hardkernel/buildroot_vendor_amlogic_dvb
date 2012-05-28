@@ -663,8 +663,8 @@ static int get_sat_para_record(sqlite3_stmt **stmts, AM_SCAN_SatellitePara_t *sa
 		/* by longitude + latitude */
 		stmt = stmts[QUERY_SAT_PARA_BY_LO_LA];
 		sqlite3_bind_int(stmt, 1, sat_para->lnb_num);
-		sqlite3_bind_int(stmt, 2, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction);
-		sqlite3_bind_int(stmt, 3, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction);
+		sqlite3_bind_int(stmt, 2, 0);/* unused */
+		sqlite3_bind_int(stmt, 3, 0);/* unused */
 		sqlite3_bind_double(stmt, 4, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude);
 		sqlite3_bind_double(stmt, 5, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude);
 	}
@@ -696,8 +696,8 @@ static int insert_sat_para(sqlite3_stmt **stmts, AM_SCAN_SatellitePara_t *sat_pa
 		sat_para->sat_name,sat_para->lnb_num,sat_para->sec.m_lnbs.m_lof_hi,sat_para->sec.m_lnbs.m_lof_lo,sat_para->sec.m_lnbs.m_lof_threshold,
 		sat_para->sec.m_lnbs.m_cursat_parameters.m_22khz_signal,sat_para->sec.m_lnbs.m_cursat_parameters.m_voltage_mode,
 		sat_para->motor_num,sat_para->sec.m_lnbs.m_cursat_parameters.m_rotorPosNum,
-		sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction,
-		sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction,
+		0,
+		0,
 		sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude,
 		sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude,
 		sat_para->sec.m_lnbs.m_diseqc_parameters.m_diseqc_mode,
@@ -718,8 +718,8 @@ static int insert_sat_para(sqlite3_stmt **stmts, AM_SCAN_SatellitePara_t *sat_pa
 		sqlite3_bind_int(stmt, 7, sat_para->sec.m_lnbs.m_cursat_parameters.m_voltage_mode);
 		sqlite3_bind_int(stmt, 8, sat_para->motor_num);
 		sqlite3_bind_int(stmt, 9, sat_para->sec.m_lnbs.m_cursat_parameters.m_rotorPosNum);
-		sqlite3_bind_int(stmt, 10, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_lo_direction);
-		sqlite3_bind_int(stmt, 11, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_la_direction);
+		sqlite3_bind_int(stmt, 10, 0);
+		sqlite3_bind_int(stmt, 11, 0);
 		sqlite3_bind_double(stmt, 12, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude);
 		sqlite3_bind_double(stmt, 13, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude);
 		sqlite3_bind_int(stmt, 14, sat_para->sec.m_lnbs.m_diseqc_parameters.m_diseqc_mode);
