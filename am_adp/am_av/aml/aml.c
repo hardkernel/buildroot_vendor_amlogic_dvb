@@ -4400,7 +4400,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 				blank    = AM_FALSE;
 			}
 
-			property_get("ro.build.version.sdk",version,"10");
+			property_get("ro.build.version.sdk",verstr,"10");
 			if(sscanf(verstr, "%d", &version)==1){
 				if(version < 15){
 					blank = AM_FALSE;
