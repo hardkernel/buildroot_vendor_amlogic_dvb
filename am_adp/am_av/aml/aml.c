@@ -4363,7 +4363,9 @@ aml_set_vpath(AM_AV_Device_t *dev)
 		AM_Bool_t blank = AM_TRUE;
 		char m1080scale[8];
 		char mode[16];
+		char verstr[32];
 		char *reqcmd, *osd1axis, *osd1cmd;
+		int version;
 		AM_Bool_t scale=AM_TRUE;
 
 #ifdef ANDROID
@@ -4396,6 +4398,13 @@ aml_set_vpath(AM_AV_Device_t *dev)
 				osd1axis = NULL;
 				osd1cmd  = "0";
 				blank    = AM_FALSE;
+			}
+
+			property_get("ro.build.version.sdk",version,"10");
+			if(sscanf(verstr, "%d", &version)==1){
+				if(version < 15){
+					blank = AM_FALSE;
+				}
 			}
 		}
 #endif
