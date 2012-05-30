@@ -12,8 +12,9 @@
 "pos_num integer",							/**< 保存的motor position number*/
 "lo_direction integer",						/**< 经度方向，0-EAST, 1-WEST*/
 "la_direction integer",						/**< 纬度方向，0-NORTH, 1-SOUTH*/
-"longitude real",							/**< 经度值*/
-"latitude real",							/**< 纬度值*/
+"longitude real",							/**< 本地经度值*/
+"latitude real",							/**< 本地纬度值*/
+"sat_longitude real",						/**< 卫星经度值*/
 
 "diseqc_mode integer",						/**< DiSEqC mode, 0-None, 1-V1.0, 2-V1.1, 3-V1.2*/
 "tone_burst integer",						/**< Tone Burst, 0-None, 1-Burst A, 2-Burst B*/
