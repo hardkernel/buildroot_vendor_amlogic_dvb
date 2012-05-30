@@ -56,16 +56,8 @@ AM_ErrorCode_t AM_FENDCTRL_SetPara(int dev_no, const AM_FENDCTRL_DVBFrontendPara
 	{
 		case AM_FEND_DEMOD_DVBS:
 			{
-				struct dvb_frontend_parameters convert_para;
-
-				memcpy(&convert_para, &(para->sat.para), sizeof(struct dvb_frontend_parameters));
 				/* process sec */
-				ret = AM_SEC_PrepareTune(dev_no, &(para->sat), &(convert_para.frequency), 5000);
-				
-				if((ret == AM_SUCCESS) && (AM_SEC_Get_Set_Frontend()))
-				{
-					ret = AM_FEND_SetPara(dev_no, &(convert_para));
-				}
+				ret = AM_SEC_PrepareTune(dev_no, &(para->sat), NULL, 0);
 				break;
 			}
 		case AM_FEND_DEMOD_DVBC:
@@ -102,18 +94,9 @@ AM_ErrorCode_t AM_FENDCTRL_Lock(int dev_no, const AM_FENDCTRL_DVBFrontendParamet
 	switch(para->m_type)
 	{
 		case AM_FEND_DEMOD_DVBS:
-			/* process sec */
 			{
-				struct dvb_frontend_parameters convert_para;
-				AM_DEBUG(1, "lock tp freq %d\n", para->sat.para.frequency);
-				memcpy(&convert_para, &(para->sat.para), sizeof(struct dvb_frontend_parameters));
 				/* process sec */
-				ret = AM_SEC_PrepareTune(dev_no, &(para->sat), &(convert_para.frequency), 5000);
-				AM_DEBUG(1, "lock centre freq %d\n", convert_para.frequency);
-				if((ret == AM_SUCCESS) && (AM_SEC_Get_Set_Frontend()))
-				{			
-					AM_FEND_Lock(dev_no, &(convert_para), status);
-				}
+				ret = AM_SEC_PrepareTune(dev_no, &(para->sat), status, 5000);
 			}
 			break;
 		case AM_FEND_DEMOD_DVBC:
