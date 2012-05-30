@@ -847,7 +847,7 @@ static int teletext_header_update(unsigned int dwPageCode)
 		    }
 		}
 		TELETEXT_DRAW(&context_tele, ({
-        	DrawPage(&context_tele.sCurrPage, VTDF_HEADERONLY, VTDoubleProfile);
+        	DrawPage(&context_tele.sCurrPage, 0/*VTDF_HEADERONLY*/, VTDoubleProfile);
 		}));
     	}
     	else
@@ -901,7 +901,7 @@ static int teletext_page_update(INT32U dwPageCode)
                 		}
             		}
 			TELETEXT_DRAW(&context_tele, ({
-            		DrawPage(&context_tele.sCurrPage, VTDF_UPDATEDONLY, VTDoubleProfile);
+            		DrawPage(&context_tele.sCurrPage, 0/*VTDF_UPDATEDONLY*/, VTDoubleProfile);
 			}));
        		}
        		return AM_SUCCESS;
