@@ -11,8 +11,6 @@
 #ifndef _AM_FEND_CTRL_INTERNAL_H
 #define _AM_FEND_CTRL_INTERNAL_H
 
-#include <pthread.h>
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -26,8 +24,7 @@ extern "C"
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
-
-
+ 
 
 /****************************************************************************
  * Function prototypes  

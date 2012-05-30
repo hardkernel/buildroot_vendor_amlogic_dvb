@@ -118,6 +118,7 @@ struct AM_FEND_Device
 	int                flags;         /**< 状态监控线程标志*/
 	AM_FEND_Callback_t cb;            /**< 状态监控回调函数*/
 	void              *user_data;     /**< 回调函数参数*/
+	AM_Bool_t         enable_cb;      /**< 允许或者禁止状态监控回调函数*/
 	struct dvb_frontend_info info;    /**< 前端设备信息*/ 
 	
 	AM_Bool_t          enable_blindscan_thread; /**< 状扫处理线程是否运行*/

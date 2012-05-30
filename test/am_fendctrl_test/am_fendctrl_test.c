@@ -75,7 +75,8 @@ static void sec(int dev_no)
 		printf("Set Diseqc-7\n");
 		printf("Set Rotor-8\n");
 		printf("Set unicable-9\n");
-		printf("Exit sec-10\n");
+		printf("Dump sec-10\n");
+		printf("Exit sec-11\n");
 		printf("-----------------------------\n");
 		printf("select\n");
 		scanf("%d", &sec);
@@ -217,7 +218,8 @@ static void sec(int dev_no)
 			case 9:
 				{
 					printf("SatCR_idx  0-(max_satcr-1)\n");
-					scanf("%d", &(para.m_lnbs.SatCR_idx));	
+					scanf("%d", &(para.m_lnbs.SatCR_idx));
+					printf("para.m_lnbs.SatCR_idx:%d\n", para.m_lnbs.SatCR_idx);
 
 					if(para.m_lnbs.SatCR_idx >= 0 && para.m_lnbs.SatCR_idx <= 7)
 					{
@@ -236,8 +238,14 @@ static void sec(int dev_no)
 				}                  
 
 			case 10:
+				AM_SEC_DumpSetting();
+				break;
+
+			case 11:
 				sec_exit = AM_TRUE;
 				break;
+
+
 				
 			default:
 				break;
@@ -391,17 +399,30 @@ int main(int argc, char **argv)
 				printf("symbol rate: ");
 				scanf("%d", &(fenctrl_para.sat.para.u.qpsk.symbol_rate));
 			}
-#if 0
-			AM_TRY(AM_FENDCTRL_SetPara(/*FEND_DEV_NO*/fe_id, &fenctrl_para));
-#else
-			AM_TRY(AM_FENDCTRL_Lock(/*FEND_DEV_NO*/fe_id, &fenctrl_para, &status));
-			printf("lock status: 0x%x\n", status);
-#endif
+
+			int sync = 0;
+			printf("async-0, sync-1: ");			
+			scanf("%d", &(sync));
+
+			if(sync == 0)
+			{
+				AM_TRY(AM_FENDCTRL_SetPara(/*FEND_DEV_NO*/fe_id, &fenctrl_para));
+			}
+			else
+			{
+				AM_TRY(AM_FENDCTRL_Lock(/*FEND_DEV_NO*/fe_id, &fenctrl_para, &status));
+				printf("lock status: 0x%x\n", status);
+			}
+
 		}
 		else
 		{
 			loop = AM_FALSE;
 		}
+
+		printf("fend close: ");
+		scanf("%d", &(fe_id));
+		
 		AM_TRY(AM_FEND_Close(/*FEND_DEV_NO*/fe_id));
 	}
 	

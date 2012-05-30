@@ -17,6 +17,8 @@
 
 #include "am_fend_ctrl.h"
 
+#include "am_fend.h"
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -68,6 +70,7 @@ typedef struct rotor
 	int okcount;  // counter
 	int steps;    // goto steps
 	int direction;
+	int dev_no;
 }rotor_t;
 
 typedef struct pair
@@ -126,13 +129,12 @@ typedef enum {
 	NUM_DATA_ENTRIES
 }AM_SEC_FEND_DATA;
 
+
 /****************************************************************************
  * Function prototypes  
  ***************************************************************************/
 
-AM_ErrorCode_t AM_SEC_PrepareTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, unsigned int *freq, unsigned int tunetimeout);
-
-AM_Bool_t AM_SEC_Get_Set_Frontend(void);
+AM_ErrorCode_t AM_SEC_PrepareTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, fe_status_t *status, unsigned int tunetimeout);
 
 void AM_SEC_SetCommandString(int dev_no, const char *str);
 
