@@ -109,13 +109,19 @@ void *adec_handle;
 #define PCR_RECOVER_FILE	"/sys/class/tsync/pcr_recover"
 #endif
 
-#define PCR_NOT_RECOVER
+//#define ENABLE_AUDIO_RESAMPLE
+//#define ENABLE_PCR_RECOVER
 #define AUDIO_CACHE_TIME        200
+
+#ifdef ENABLE_AUDIO_RESAMPLE
+#define ENABLE_RESAMPLE_FILE    "/sys/class/amaudio/enable_resample"
+#define RESAMPLE_TYPE_FILE      "/sys/class/amaudio/resample_type"
+#endif
 
 #define AUDIO_DMX_PTS_FILE	"/sys/class/stb/audio_pts"
 #define VIDEO_DMX_PTS_FILE	"/sys/class/stb/video_pts"
-#define AUDIO_PTS_FILE	"/sys/class/stb/pts_audio"
-#define VIDEO_PTS_FILE	"/sys/class/stb/pts_video"
+#define AUDIO_PTS_FILE	"/sys/class/tsync/pts_audio"
+#define VIDEO_PTS_FILE	"/sys/class/tsync/pts_video"
 
 #define CANVAS_ALIGN(x)    (((x)+7)&~7)
 #define JPEG_WRTIE_UNIT    (32*1024)
@@ -3018,6 +3024,7 @@ static void* aml_av_monitor_thread(void *arg)
 	struct am_io_param astatus;
 	struct am_io_param vstatus;
 	struct timespec rt;
+	int curr_resample = 2;
 	AM_Bool_t avStatus[2];
 	
 	last_apts = last_vpts = 0;
@@ -3049,13 +3056,19 @@ static void* aml_av_monitor_thread(void *arg)
 			/*当AUDIO 和 VIDEO数据达到某个长度时才开始播放, 只有音频时不进行检查直接播放*/
 			if (dev->ts_player.play_para.apid < 0x1fff && 
 				(dev->ts_player.play_para.vpid >= 0x1fff || 
-#ifndef PCR_NOT_RECOVER
+#if defined(ENABLE_PCR_RECOVER) || defined(ENABLE_AUDIO_RESAMPLE)
 				(dev->ts_player.play_para.vpid < 0x1fff && astatus.status.data_len >= AUDIO_START_LEN)
 #else
 				(time-dev->ts_player.av_start_time >= AUDIO_CACHE_TIME)
 #endif
 				))
 			{ 
+#ifdef ENABLE_AUDIO_RESAMPLE
+				AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
+				AM_FileEcho(RESAMPLE_TYPE_FILE, "2");
+				curr_resample = 2;
+#endif
+
 #if !defined(ADEC_API_NEW)
 				adec_cmd("start");
 #else
@@ -3092,6 +3105,76 @@ static void* aml_av_monitor_thread(void *arg)
 		
 		if (av_playing)
 		{
+#ifdef ENABLE_AUDIO_RESAMPLE
+			if(ioctl(fd, AMSTREAM_IOC_AB_STATUS, (unsigned long)&astatus) != -1 && 
+					ioctl(fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1) {
+				int ab_size = astatus.status.size;
+				int a_size  = astatus.status.data_len;
+				int vb_size = vstatus.status.size;
+				int v_size  = vstatus.status.data_len;
+				int af, vf;
+				int resample;
+				int apts = 0, vpts = 0, dmx_apts = 0, dmx_vpts = 0;
+
+				if(a_size * 6 < ab_size){
+					af = -1;
+				}else if(a_size * 6 > ab_size * 5){
+					af = 1;
+				}else{
+					af = 0;
+				}
+
+				if(v_size * 6 < vb_size){
+					vf = -1;
+				}else if(v_size * 6 > vb_size * 5){
+					vf = 1;
+				}else{
+					vf = 0;
+				}
+
+				if(af > 1 || vf > 1){
+					resample = 1;
+				}else if(af < 0 && vf < 0){
+					resample = 2;
+				}else{
+					resample = 0;
+				}
+
+				if(resample == 2){
+					char buf[32], dmx_buf[32];
+
+					if(AM_FileRead(AUDIO_PTS_FILE, buf, sizeof(buf))>=0 &&
+							AM_FileRead(AUDIO_DMX_PTS_FILE, dmx_buf, sizeof(dmx_buf))>=0){
+						apts = strtol(buf, NULL, 0);
+						dmx_apts = strtol(dmx_buf, NULL, 0);
+					}
+
+					if(AM_FileRead(VIDEO_PTS_FILE, buf, sizeof(buf))>=0 &&
+							AM_FileRead(VIDEO_DMX_PTS_FILE, dmx_buf, sizeof(dmx_buf))>=0){
+						vpts = strtol(buf, NULL, 0);
+						dmx_vpts = strtol(dmx_buf, NULL, 0);
+					}
+
+					if(((dmx_apts - apts) > 90000 * 2) || ((dmx_vpts - vpts) > 90000 * 2)){
+						resample = 1;
+					}
+				}
+
+				AM_DEBUG(1, "asize %d adata %d vsize %d vdata %d apts_diff %d vpts_diff %d resample %d",
+					ab_size, a_size, vb_size, v_size, dmx_apts-apts, dmx_vpts-vpts, resample);
+
+				if(resample != curr_resample){
+					const char *cmd;
+					curr_resample = resample;
+					switch(resample){
+						case 1: cmd = "1"; break;
+						case 2: cmd = "2"; break;
+						default: cmd = "0"; break;
+					}
+					AM_FileEcho(RESAMPLE_TYPE_FILE, cmd);
+				}
+			}
+#endif /*ENABLE_AUDIO_RESAMPLE*/
 			AM_TIME_GetClock(&pts_time);
 			if ((pts_time - last_pts_time) >= 1000)
 			{
@@ -3189,6 +3272,10 @@ static void* aml_av_monitor_thread(void *arg)
 		AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_DATA_RESUME, NULL);
 	}
 	pthread_mutex_unlock(&gAVMonLock);
+
+#ifdef ENABLE_AUDIO_RESAMPLE
+	AM_FileEcho(ENABLE_RESAMPLE_FILE, "0");
+#endif
 
 	AM_DEBUG(1, "AV  monitor thread exit now");
 	return NULL;
@@ -3341,7 +3428,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 		case AV_PLAY_TS:
 			tp = (AV_TSPlayPara_t *)para;
 #if defined(ANDROID) || defined(CHIP_8626X)
-#ifndef PCR_NOT_RECOVER
+#ifdef ENABLE_PCR_RECOVER
 			AM_FileEcho(PCR_RECOVER_FILE, "1");
 #endif
 #endif
@@ -3457,7 +3544,7 @@ static AM_ErrorCode_t aml_close_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 		break;
 		case AV_PLAY_TS:
 #if defined(ANDROID) || defined(CHIP_8626X)
-#ifndef PCR_NOT_RECOVER
+#ifdef ENABLE_PCR_RECOVER
 			AM_FileEcho(PCR_RECOVER_FILE, "0");
 #endif
 #endif
@@ -4400,7 +4487,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 				blank    = AM_FALSE;
 			}
 
-			property_get("ro.build.version.sdk",version,"10");
+			property_get("ro.build.version.sdk",verstr,"10");
 			if(sscanf(verstr, "%d", &version)==1){
 				if(version < 15){
 					blank = AM_FALSE;
