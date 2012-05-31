@@ -511,6 +511,7 @@ static void AM_SEC_Set_Timeout(eSecCommand_t *sec_cmd)
 	if(sec_cmd->cmd == SET_TIMEOUT)
 	{
 		am_sec_timeoutcount = sec_cmd->val;
+		AM_DEBUG(1, "AM_SEC_Set_Timeout: %d\n", am_sec_timeoutcount);
 	}
 
 	return;
@@ -742,11 +743,14 @@ static int AM_SEC_CanBlindScanOrTune(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 
 #define M_AM_SEC_ASYNCCHECK()\
 	AM_MACRO_BEGIN\
-		AM_DEBUG(1, "M_AM_SEC_ASYNCCHECK \n");\
-		if(AM_Sec_AsyncCheck() == AM_SUCCESS)\
+		if(status == NULL)\
 		{\
-			return ret;\
-		};\
+			AM_DEBUG(1, "M_AM_SEC_ASYNCCHECK \n");\
+			if(AM_Sec_AsyncCheck() == AM_SUCCESS)\
+			{\
+				return ret;\
+			};\
+		}\
 	AM_MACRO_END
 
 
@@ -757,8 +761,12 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 	eSecCommand_t sec_cmd;
 
 	struct dvb_frontend_parameters convert_para;
-	AM_DEBUG(1, "lock tp freq %d\n", para->para.frequency);
-	memcpy(&convert_para, &(para->para), sizeof(struct dvb_frontend_parameters));
+
+	if(para != NULL)
+	{
+		AM_DEBUG(1, "lock tp freq %d\n", para->para.frequency);
+		memcpy(&convert_para, &(para->para), sizeof(struct dvb_frontend_parameters));
+	}
 
 	//AM_SEC_DumpSetting();
 	
@@ -1381,6 +1389,8 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_TIMEOUT, mrt*4 ); // mrt is in seconds... our SLEEP time is 250ms.. so * 4
 				AM_SEC_Set_Timeout(&sec_cmd);
 
+				AM_DEBUG(1, "set rotor timeout to %d seconds start", mrt);
+
 				while(1)
 				{
 					usleep( 250 * 1000 );  // 250msec delay
@@ -1398,7 +1408,8 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 						{
 							ret = AM_FEND_SetPara(dev_no, &(convert_para));
 						}						
-						
+
+						AM_DEBUG(1, "set rotor lock out");
 						break;
 					}
 
@@ -1418,6 +1429,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 							ret = AM_FEND_SetPara(dev_no, &(convert_para));
 						}	
 
+						AM_DEBUG(1, "set rotor unlock out");
 						break;
 					}					
 				}
@@ -1427,7 +1439,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 				AM_SEC_SetSecCommand( &sec_cmd, SET_ROTOR_STOPPED); 
 				AM_SEC_Set_RotorStoped(&sec_cmd);
 
-				AM_DEBUG(1, "set rotor timeout to %d seconds", mrt);
+				AM_DEBUG(1, "set rotor timeout to %d seconds end", mrt);
 			}
 
 			M_AM_SEC_ASYNCCHECK();
@@ -1902,3 +1914,4 @@ AM_ErrorCode_t AM_SEC_DumpSetting(void)
 	
 	return ret;
 }
+
