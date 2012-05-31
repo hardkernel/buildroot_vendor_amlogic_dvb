@@ -16,6 +16,8 @@
 #include <am_fend.h>
 #include <am_fend_diseqc_cmd.h>
 
+#include <semaphore.h>
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -39,6 +41,7 @@ extern "C"
 enum AM_FENDCTRL_ErrorCode
 {
 	AM_FENDCTRL_ERROR_BASE=AM_ERROR_BASE(AM_MOD_FENDCTRL),
+	AM_FENDCTRL_ERR_CANNOT_CREATE_THREAD,
 	AM_FENDCTRL_ERR_END
 };  
    
@@ -168,12 +171,28 @@ typedef enum{
 	SEC_CMD_MAX_PARAMS
 }AM_SEC_Cmd_Param_t;
 
+/**\brief 异步卫星设备控制信息*/
+typedef struct AM_SEC_AsyncInfo
+{
+	int                dev_no;        /**< 设备号*/
+	AM_Bool_t          enable_thread; /**< 异步卫星设备控制线程是否运行*/
+	pthread_t          thread;        /**< 异步卫星设备控制线程*/
+	pthread_mutex_t    lock;          /**< 异步卫星设备控制数据保护互斥体*/
+	pthread_cond_t     cond;          /**< 异步卫星设备控制控制条件变量*/
+	AM_Bool_t          preparerunning;/**< 异步卫星设备控制运行状态*/
+	AM_Bool_t          prepareexitnotify;
+	sem_t sem_running;
+	void *sat_para;
+}AM_SEC_AsyncInfo_t;
+
 /**\brief 卫星设备控制参数*/ 
 typedef struct AM_SEC_DVBSatelliteEquipmentControl
 {
 	AM_SEC_DVBSatelliteLNBParameters_t m_lnbs; // i think its enough
 	AM_Bool_t m_rotorMoving;
 	AM_Bool_t m_canMeasureInputPower;
+
+	AM_SEC_AsyncInfo_t m_sec_asyncinfo;
 
 	AM_SEC_Cmd_Param_t m_params[SEC_CMD_MAX_PARAMS];
 }AM_SEC_DVBSatelliteEquipmentControl_t;
@@ -254,6 +273,8 @@ extern AM_ErrorCode_t AM_SEC_PrepareBlindScan(int dev_no);
  *   - 其他值 错误代码(见am_fend_ctrl.h)
  */
 extern AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned int *tp_freq);
+
+extern AM_ErrorCode_t AM_SEC_DumpSetting(void);
 
 /* frontend control interface */ 
 

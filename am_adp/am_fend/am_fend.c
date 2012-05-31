@@ -155,7 +155,7 @@ static void* fend_thread(void *arg)
 		
 			if(ret==AM_SUCCESS)
 			{
-				if(dev->cb)
+				if(dev->cb && dev->enable_cb)
 				{
 					dev->cb(dev->dev_no, &evt, dev->user_data);
 				}
@@ -697,6 +697,7 @@ AM_ErrorCode_t AM_FEND_Open(int dev_no, const AM_FEND_OpenPara_t *para)
 	dev->openned = AM_TRUE;
 	dev->enable_thread = AM_TRUE;
 	dev->flags = 0;
+	dev->enable_cb = AM_TRUE;
 	
 	rc = pthread_create(&dev->thread, NULL, fend_thread, dev);
 	if(rc)
@@ -733,6 +734,8 @@ AM_ErrorCode_t AM_FEND_Close(int dev_no)
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
 
 	pthread_mutex_lock(&am_gAdpLock);
+
+	dev->enable_cb = AM_FALSE;
 	
 	/*Stop the thread*/
 	dev->enable_thread = AM_FALSE;
@@ -1061,7 +1064,7 @@ AM_ErrorCode_t AM_FEND_SetCallback(int dev_no, AM_FEND_Callback_t cb, void *user
 	
 	pthread_mutex_lock(&dev->lock);
 	
-	if(cb!=dev->cb)
+	if(cb!=dev->cb || user_data!=dev->user_data)
 	{
 		if(dev->enable_thread && (dev->thread!=pthread_self()))
 		{
@@ -1074,6 +1077,41 @@ AM_ErrorCode_t AM_FEND_SetCallback(int dev_no, AM_FEND_Callback_t cb, void *user
 		
 		dev->cb = cb;
 		dev->user_data = user_data;
+	}
+	
+	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
+
+/**\brief 设置前端设备状态监控回调函数活动状态
+ * \param dev_no 前端设备号
+ * \param[in] enable_cb 允许或者禁止状态回调函数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+AM_ErrorCode_t AM_FEND_SetActionCallback(int dev_no, AM_Bool_t enable_cb)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	if(enable_cb != dev->enable_cb)
+	{
+		if(dev->enable_thread && (dev->thread!=pthread_self()))
+		{
+			/*等待回调函数执行完*/
+			while(dev->flags&FEND_FL_RUN_CB)
+			{
+				pthread_cond_wait(&dev->cond, &dev->lock);
+			}
+		}
+		
+		dev->enable_cb = enable_cb;
 	}
 	
 	pthread_mutex_unlock(&dev->lock);
@@ -1624,7 +1662,7 @@ AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_BlindCallback_t cb, void *u
 	
 	pthread_mutex_lock(&am_gAdpLock);
 
-	if(cb!=dev->blindscan_cb)
+	if(cb!=dev->blindscan_cb || user_data!=dev->blindscan_cb_user_data)
 	{
 		dev->blindscan_cb = cb;
 		dev->blindscan_cb_user_data = user_data;

@@ -211,6 +211,15 @@ extern AM_ErrorCode_t AM_FEND_GetCallback(int dev_no, AM_FEND_Callback_t *cb, vo
  */
 extern AM_ErrorCode_t AM_FEND_SetCallback(int dev_no, AM_FEND_Callback_t cb, void *user_data);
 
+/**\brief 设置前端设备状态监控回调函数活动状态
+ * \param dev_no 前端设备号
+ * \param[in] enable_cb 允许或者禁止状态回调函数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_SetActionCallback(int dev_no, AM_Bool_t enable_cb);
+
 /**\brief 设定前端设备参数，并等待参数设定完成
  * \param dev_no 前端设备号
  * \param[in] para 前端设置参数
