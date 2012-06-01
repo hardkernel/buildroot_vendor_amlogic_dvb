@@ -11,6 +11,8 @@
 #ifndef _AM_FEND_CTRL_H
 #define _AM_FEND_CTRL_H
 
+#include <linux/dvb/frontend.h>
+
 #include <am_types.h>
 #include <am_mem.h>
 #include <am_fend.h>
@@ -36,6 +38,45 @@ extern "C"
 /****************************************************************************
  * Type definitions
  ***************************************************************************/ 
+
+/**\brief DVB-S前端控制模块设置参数*/ 
+typedef struct AM_FENDCTRL_DVBFrontendParametersSatellite
+{
+	struct dvb_frontend_parameters para;
+
+	AM_Bool_t no_rotor_command_on_tune;
+	AM_FEND_Polarisation_t polarisation;
+}AM_FENDCTRL_DVBFrontendParametersSatellite_t;
+
+/**\brief DVB-C前端控制模块设置参数*/ 
+typedef struct AM_FENDCTRL_DVBFrontendParametersCable
+{
+	struct dvb_frontend_parameters para;
+}AM_FENDCTRL_DVBFrontendParametersCable_t;
+
+/**\brief DVB-T前端控制模块设置参数*/
+typedef struct AM_FENDCTRL_DVBFrontendParametersTerrestrial
+{
+	struct dvb_frontend_parameters para;
+}AM_FENDCTRL_DVBFrontendParametersTerrestrial_t;
+
+/**\brief ATSC前端控制模块设置参数*/
+typedef struct AM_FENDCTRL_DVBFrontendParametersATSC
+{
+	struct dvb_frontend_parameters para;
+}AM_FENDCTRL_DVBFrontendParametersATSC_t;
+
+/**\brief 前端控制模块设置参数*/
+typedef struct AM_FENDCTRL_DVBFrontendParameters{
+	union
+	{
+		AM_FENDCTRL_DVBFrontendParametersSatellite_t sat;
+		AM_FENDCTRL_DVBFrontendParametersCable_t cable;
+		AM_FENDCTRL_DVBFrontendParametersTerrestrial_t terrestrial;
+		AM_FENDCTRL_DVBFrontendParametersATSC_t atsc;
+	};	
+	AM_FEND_DemodMode_t m_type;
+}AM_FENDCTRL_DVBFrontendParameters_t;
  
 /**\brief 前端控制模块错误代码*/
 enum AM_FENDCTRL_ErrorCode
@@ -182,9 +223,9 @@ typedef struct AM_SEC_AsyncInfo
 	AM_Bool_t          preparerunning;/**< 异步卫星设备控制运行状态*/
 	AM_Bool_t          prepareexitnotify;
 	sem_t sem_running;
-	void *sat_b_para;
-	void *sat_para;
-	void *sat_status;
+	AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t sat_b_para;
+	AM_FENDCTRL_DVBFrontendParametersSatellite_t sat_para;
+	fe_status_t *sat_status;
 	unsigned int sat_tunetimeout;
 }AM_SEC_AsyncInfo_t;
 
@@ -200,44 +241,6 @@ typedef struct AM_SEC_DVBSatelliteEquipmentControl
 	AM_SEC_Cmd_Param_t m_params[SEC_CMD_MAX_PARAMS];
 }AM_SEC_DVBSatelliteEquipmentControl_t;
 
-/**\brief DVB-S前端控制模块设置参数*/ 
-typedef struct AM_FENDCTRL_DVBFrontendParametersSatellite
-{
-	struct dvb_frontend_parameters para;
-
-	AM_Bool_t no_rotor_command_on_tune;
-	AM_FEND_Polarisation_t polarisation;
-}AM_FENDCTRL_DVBFrontendParametersSatellite_t;
-
-/**\brief DVB-C前端控制模块设置参数*/ 
-typedef struct AM_FENDCTRL_DVBFrontendParametersCable
-{
-	struct dvb_frontend_parameters para;
-}AM_FENDCTRL_DVBFrontendParametersCable_t;
-
-/**\brief DVB-T前端控制模块设置参数*/
-typedef struct AM_FENDCTRL_DVBFrontendParametersTerrestrial
-{
-	struct dvb_frontend_parameters para;
-}AM_FENDCTRL_DVBFrontendParametersTerrestrial_t;
-
-/**\brief ATSC前端控制模块设置参数*/
-typedef struct AM_FENDCTRL_DVBFrontendParametersATSC
-{
-	struct dvb_frontend_parameters para;
-}AM_FENDCTRL_DVBFrontendParametersATSC_t;
-
-/**\brief 前端控制模块设置参数*/
-typedef struct AM_FENDCTRL_DVBFrontendParameters{
-	union
-	{
-		AM_FENDCTRL_DVBFrontendParametersSatellite_t sat;
-		AM_FENDCTRL_DVBFrontendParametersCable_t cable;
-		AM_FENDCTRL_DVBFrontendParametersTerrestrial_t terrestrial;
-		AM_FENDCTRL_DVBFrontendParametersATSC_t atsc;
-	};	
-	AM_FEND_DemodMode_t m_type;
-}AM_FENDCTRL_DVBFrontendParameters_t;
 
 /* sec control interface */ 
 

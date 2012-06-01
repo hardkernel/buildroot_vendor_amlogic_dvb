@@ -555,9 +555,9 @@ static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, const AM_FENDCTRL_DVBFront
 	}
 
 	p_sec_asyncinfo->dev_no = dev_no;
-	p_sec_asyncinfo->sat_b_para = (void *)b_para;
-	p_sec_asyncinfo->sat_para = (void *)para;
-	p_sec_asyncinfo->sat_status = (void *)status;
+	p_sec_asyncinfo->sat_b_para = *b_para;
+	p_sec_asyncinfo->sat_para = *para;
+	p_sec_asyncinfo->sat_status = status;
 	p_sec_asyncinfo->sat_tunetimeout = tunetimeout;
 	
 	pthread_mutex_unlock(&p_sec_asyncinfo->lock);
@@ -630,8 +630,8 @@ static void* AM_Sec_AsyncThread(void *arg)
 			p_sec_asyncinfo->preparerunning = AM_TRUE;
 			pthread_mutex_unlock(&p_sec_asyncinfo->lock);
 
-			ret = AM_SEC_Prepare(p_sec_asyncinfo->dev_no, p_sec_asyncinfo->sat_b_para,
-									p_sec_asyncinfo->sat_para, p_sec_asyncinfo->sat_status, p_sec_asyncinfo->sat_tunetimeout);
+			ret = AM_SEC_Prepare(p_sec_asyncinfo->dev_no, &p_sec_asyncinfo->sat_b_para,
+									&p_sec_asyncinfo->sat_para, p_sec_asyncinfo->sat_status, p_sec_asyncinfo->sat_tunetimeout);
 		
 			pthread_mutex_lock(&p_sec_asyncinfo->lock);
 			p_sec_asyncinfo->prepareexitnotify = AM_FALSE;			
