@@ -991,10 +991,10 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 					&& voltage_mode == HV )  )
 				voltage = SEC_VOLTAGE_18;
 			if ( (sw_param.m_22khz_signal == ON)
-				|| ( sw_param.m_22khz_signal == HILO && (band&1) ) )
+				|| ( sw_param.m_22khz_signal == HILO && (b_para->ocaloscollatorfreq & AM_FEND_POLARISATION_H) ) )
 				tone = SEC_TONE_ON;
 			else if ( (sw_param.m_22khz_signal == OFF)
-				|| ( sw_param.m_22khz_signal == HILO && !(band&1) ) )
+				|| ( sw_param.m_22khz_signal == HILO && !(b_para->ocaloscollatorfreq & AM_FEND_POLARISATION_H) ) )
 				tone = SEC_TONE_OFF;			
 		}
 
