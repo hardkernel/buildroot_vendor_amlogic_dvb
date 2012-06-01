@@ -568,7 +568,7 @@ static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, const AM_FENDCTRL_DVBFront
 	pthread_mutex_lock(&p_sec_asyncinfo->lock);
 
 	if(p_sec_asyncinfo->preparerunning)
-	{
+	{		
 		if((b_para == NULL) && (status == NULL) && (tunetimeout == 0))/*setpara mode*/
 		{
 			p_sec_asyncinfo->prepareexitnotify = AM_TRUE;
@@ -584,8 +584,17 @@ static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, const AM_FENDCTRL_DVBFront
 		}
 
 		p_sec_asyncinfo->dev_no = dev_no;
-		p_sec_asyncinfo->sat_b_para = *b_para;
-		p_sec_asyncinfo->sat_para = *para;
+		p_sec_asyncinfo->sat_b_para = b_para;
+		if(para != NULL)
+		{
+			p_sec_asyncinfo->sat_para = *para;
+			p_sec_asyncinfo->sat_para_valid = AM_TRUE;
+		}
+		else
+		{
+			p_sec_asyncinfo->sat_para_valid = AM_FALSE;
+		}
+		
 		p_sec_asyncinfo->sat_status = status;
 		p_sec_asyncinfo->sat_tunetimeout = tunetimeout;		
 
@@ -593,8 +602,17 @@ static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, const AM_FENDCTRL_DVBFront
 	}
 	else{
 		p_sec_asyncinfo->dev_no = dev_no;
-		p_sec_asyncinfo->sat_b_para = *b_para;
-		p_sec_asyncinfo->sat_para = *para;
+		p_sec_asyncinfo->sat_b_para = b_para;
+		if(para != NULL)
+		{
+			p_sec_asyncinfo->sat_para = *para;
+			p_sec_asyncinfo->sat_para_valid = AM_TRUE;
+		}
+		else
+		{
+			p_sec_asyncinfo->sat_para_valid = AM_FALSE;
+		}		
+		
 		p_sec_asyncinfo->sat_status = status;
 		p_sec_asyncinfo->sat_tunetimeout = tunetimeout;
 
@@ -653,8 +671,20 @@ static void* AM_Sec_AsyncThread(void *arg)
 			p_sec_asyncinfo->preparerunning = AM_TRUE;
 			pthread_mutex_unlock(&p_sec_asyncinfo->lock);
 
-			ret = AM_SEC_Prepare(p_sec_asyncinfo->dev_no, &p_sec_asyncinfo->sat_b_para,
-									&p_sec_asyncinfo->sat_para, p_sec_asyncinfo->sat_status, p_sec_asyncinfo->sat_tunetimeout);
+			AM_FEND_SetActionCallback(p_sec_asyncinfo->dev_no, AM_FALSE);
+
+			if(p_sec_asyncinfo->sat_para_valid)
+			{
+				ret = AM_SEC_Prepare(p_sec_asyncinfo->dev_no, p_sec_asyncinfo->sat_b_para,
+										&p_sec_asyncinfo->sat_para, p_sec_asyncinfo->sat_status, p_sec_asyncinfo->sat_tunetimeout);
+			}
+			else
+			{
+				ret = AM_SEC_Prepare(p_sec_asyncinfo->dev_no, p_sec_asyncinfo->sat_b_para,
+										NULL, p_sec_asyncinfo->sat_status, p_sec_asyncinfo->sat_tunetimeout);			
+			}
+
+			AM_FEND_SetActionCallback(p_sec_asyncinfo->dev_no, AM_TRUE);
 		
 			pthread_mutex_lock(&p_sec_asyncinfo->lock);
 			p_sec_asyncinfo->prepareexitnotify = AM_FALSE;			
@@ -1549,6 +1579,8 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 
 			if((b_para == NULL) && (para != NULL))
 			{
+				AM_FEND_SetActionCallback(dev_no, AM_TRUE);
+				
 				if(status != NULL)
 				{
 					ret = AM_FEND_Lock(dev_no, &(convert_para), status);

@@ -223,8 +223,9 @@ typedef struct AM_SEC_AsyncInfo
 	AM_Bool_t          preparerunning;/**< 异步卫星设备控制运行状态*/
 	AM_Bool_t          prepareexitnotify;
 	sem_t sem_running;
-	AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t sat_b_para;
+	AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t *sat_b_para;
 	AM_FENDCTRL_DVBFrontendParametersSatellite_t sat_para;
+	AM_Bool_t sat_para_valid;
 	fe_status_t *sat_status;
 	unsigned int sat_tunetimeout;
 }AM_SEC_AsyncInfo_t;
