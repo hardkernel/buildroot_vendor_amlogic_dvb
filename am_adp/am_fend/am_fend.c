@@ -301,9 +301,9 @@ static AM_ErrorCode_t  AM_FEND_IBlindScanAPI_Start(int dev_no, unsigned int *fre
 
 	if(dev->bs_setting.BS_Mode)
 	{
-		pbsPara->m_uifrequency_100khz = 10 * dev->bs_setting.m_uiScan_Start_Freq_MHz + dev->bs_setting.m_uiTuner_MaxLPF_100kHz + (dev->bs_setting.m_uiScan_Bind_No) * dev->bs_setting.m_uiScan_Center_Freq_Step_100KHz;
-		pbsPara->m_uistartfreq_100khz = pbsPara->m_uifrequency_100khz - dev->bs_setting.m_uiTuner_MaxLPF_100kHz;
-		pbsPara->m_uistopfreq_100khz =  pbsPara->m_uifrequency_100khz + dev->bs_setting.m_uiTuner_MaxLPF_100kHz;
+		pbsPara->m_uifrequency_100khz = 10 * dev->bs_setting.m_uiScan_Start_Freq_MHz + 320 + (dev->bs_setting.m_uiScan_Bind_No) * dev->bs_setting.m_uiScan_Center_Freq_Step_100KHz;
+		pbsPara->m_uistartfreq_100khz = pbsPara->m_uifrequency_100khz - 320;
+		pbsPara->m_uistopfreq_100khz =  pbsPara->m_uifrequency_100khz + 320;
 	}
 	else
 	{
