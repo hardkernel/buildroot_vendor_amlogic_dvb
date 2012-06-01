@@ -155,12 +155,17 @@ static void* fend_thread(void *arg)
 		
 			if(ret==AM_SUCCESS)
 			{
+				AM_DEBUG(1, "fend_thread wait evt: %x\n", evt.status);
+				
 				if(dev->cb && dev->enable_cb)
 				{
 					dev->cb(dev->dev_no, &evt, dev->user_data);
 				}
-				
-				AM_EVT_Signal(dev->dev_no, AM_FEND_EVT_STATUS_CHANGED, &evt);
+
+				if(dev->enable_cb)
+				{
+					AM_EVT_Signal(dev->dev_no, AM_FEND_EVT_STATUS_CHANGED, &evt);
+				}
 			}
 		
 			pthread_mutex_lock(&dev->lock);
@@ -793,6 +798,8 @@ AM_ErrorCode_t AM_FEND_SetPara(int dev_no, const struct dvb_frontend_parameters 
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
 	assert(para);
+
+	AM_DEBUG(1, "AM_FEND_SetPara\n");
 	
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
 	
@@ -1170,6 +1177,8 @@ AM_ErrorCode_t AM_FEND_Lock(int dev_no, const struct dvb_frontend_parameters *pa
 	fend_lock_para_t lockp;
 	
 	assert(para && status);
+
+	AM_DEBUG(1, "AM_FEND_Lock\n");
 	
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
 	

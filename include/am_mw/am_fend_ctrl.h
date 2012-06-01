@@ -182,7 +182,10 @@ typedef struct AM_SEC_AsyncInfo
 	AM_Bool_t          preparerunning;/**< 异步卫星设备控制运行状态*/
 	AM_Bool_t          prepareexitnotify;
 	sem_t sem_running;
+	void *sat_b_para;
 	void *sat_para;
+	void *sat_status;
+	unsigned int sat_tunetimeout;
 }AM_SEC_AsyncInfo_t;
 
 /**\brief 卫星设备控制参数*/ 

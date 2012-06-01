@@ -117,7 +117,7 @@ static void sec(int dev_no)
 			case 4:
 				{
 					int voltage_mode; 
-					printf("Voltage Mode HV=0, _14V=1, _18V=2, _0V=3, HV_13=4\n");
+					printf("Voltage Mode _14V=0, _18V=1, _0V=2, HV=3, HV_13=4\n");
 					scanf("%d", &(voltage_mode));	
 					para.m_lnbs.m_cursat_parameters.m_voltage_mode = voltage_mode;
 					break;
@@ -126,7 +126,7 @@ static void sec(int dev_no)
 			case 5:
 				{
 					int _22khz_signal;
-					printf("22khz Signal HILO=0, ON=1, OFF=2\n");
+					printf("22khz Signal ON=0, OFF=1, HILO=2\n");
 					scanf("%d", &(_22khz_signal));	
 					para.m_lnbs.m_cursat_parameters.m_22khz_signal = _22khz_signal;
 					break;
