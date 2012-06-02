@@ -90,7 +90,7 @@
 		tmp = (_l);\
 		while (tmp){\
 			next = tmp->p_next;\
-			AM_SI_ReleaseSection(scanner->hsi, (void*)tmp);\
+			AM_SI_ReleaseSection(scanner->hsi, tmp->i_table_id, (void*)tmp);\
 			tmp = next;\
 		}\
 		(_l) = NULL;\
@@ -231,9 +231,9 @@ const char *sql_stmts[MAX_STMT] =
 	"select db_id from net_table where src=? and network_id=?",
 	"insert into net_table(network_id, src) values(?,?)",
 	"update net_table set name=? where db_id=?",
-	"select db_id from ts_table where src=? and freq=? and db_sat_para_id=?",
-	"insert into ts_table(src,freq,db_sat_para_id) values(?,?,?)",
-	"update ts_table set db_net_id=?,ts_id=?,symb=?,mod=?,bw=?,snr=?,ber=?,strength=?,polar=? where db_id=?",
+	"select db_id from ts_table where src=? and freq=? and db_sat_para_id=? and polar=?",
+	"insert into ts_table(src,freq,db_sat_para_id,polar) values(?,?,?,?)",
+	"update ts_table set db_net_id=?,ts_id=?,symb=?,mod=?,bw=?,snr=?,ber=?,strength=? where db_id=?",
 	"delete  from srv_table where db_ts_id=?",
 	"select db_id from srv_table where db_net_id=? and db_ts_id=? and service_id=?",
 	"insert into srv_table(db_net_id, db_ts_id,service_id) values(?,?,?)",
@@ -255,10 +255,10 @@ const char *sql_stmts[MAX_STMT] =
 	"update srv_table set major_chan_num=?, chan_num=? where db_id=(select db_id from srv_table where db_ts_id=?)",
 	"select db_id from srv_table where src=? and chan_num=?",
 	"select db_id from sat_para_table where lnb_num=? and motor_num=? and pos_num=?",
-	"select db_id from sat_para_table where lnb_num=? and lo_direction=? and la_direction=? and longitude=? and latitude=?",
+	"select db_id from sat_para_table where lnb_num=? and sat_longitude=?",
 	"insert into sat_para_table(sat_name,lnb_num,lof_hi,lof_lo,lof_threshold,signal_22khz,voltage,motor_num,pos_num,lo_direction,la_direction,\
-	longitude,latitude,diseqc_mode,tone_burst,committed_cmd,uncommitted_cmd,repeat_count,sequence_repeat,fast_diseqc,cmd_order) \
-	values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+	longitude,latitude,diseqc_mode,tone_burst,committed_cmd,uncommitted_cmd,repeat_count,sequence_repeat,fast_diseqc,cmd_order,sat_longitude) \
+	values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
 };
 
 /****************************************************************************
@@ -465,7 +465,7 @@ static int insert_net(sqlite3_stmt **stmts, int src, int orig_net_id)
 }
 
 /**\brief 插入一个TS记录，返回其索引*/
-static int insert_ts(sqlite3_stmt **stmts, int src, int freq, int db_satpara_id)
+static int insert_ts(sqlite3_stmt **stmts, int src, int freq, int db_satpara_id, int polar)
 {
 	int db_id = -1;
 
@@ -473,6 +473,7 @@ static int insert_ts(sqlite3_stmt **stmts, int src, int freq, int db_satpara_id)
 	sqlite3_bind_int(stmts[QUERY_TS], 1, src);
 	sqlite3_bind_int(stmts[QUERY_TS], 2, freq);
 	sqlite3_bind_int(stmts[QUERY_TS], 3, db_satpara_id);
+	sqlite3_bind_int(stmts[QUERY_TS], 4, polar);
 	if (sqlite3_step(stmts[QUERY_TS]) == SQLITE_ROW)
 	{
 		db_id = sqlite3_column_int(stmts[QUERY_TS], 0);
@@ -485,11 +486,13 @@ static int insert_ts(sqlite3_stmt **stmts, int src, int freq, int db_satpara_id)
 		sqlite3_bind_int(stmts[INSERT_TS], 1, src);
 		sqlite3_bind_int(stmts[INSERT_TS], 2, freq);
 		sqlite3_bind_int(stmts[INSERT_TS], 3, db_satpara_id);
+		sqlite3_bind_int(stmts[INSERT_TS], 4, polar);
 		if (sqlite3_step(stmts[INSERT_TS]) == SQLITE_DONE)
 		{
 			sqlite3_bind_int(stmts[QUERY_TS], 1, src);
 			sqlite3_bind_int(stmts[QUERY_TS], 2, freq);
 			sqlite3_bind_int(stmts[QUERY_TS], 3, db_satpara_id);
+			sqlite3_bind_int(stmts[QUERY_TS], 4, polar);
 			if (sqlite3_step(stmts[QUERY_TS]) == SQLITE_ROW)
 			{
 				db_id = sqlite3_column_int(stmts[QUERY_TS], 0);
@@ -660,13 +663,10 @@ static int get_sat_para_record(sqlite3_stmt **stmts, AM_SCAN_SatellitePara_t *sa
 	}
 	else
 	{
-		/* by longitude + latitude */
+		/* by satellite longitude*/
 		stmt = stmts[QUERY_SAT_PARA_BY_LO_LA];
 		sqlite3_bind_int(stmt, 1, sat_para->lnb_num);
-		sqlite3_bind_int(stmt, 2, 0);/* unused */
-		sqlite3_bind_int(stmt, 3, 0);/* unused */
-		sqlite3_bind_double(stmt, 4, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_longitude);
-		sqlite3_bind_double(stmt, 5, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_latitude);
+		sqlite3_bind_double(stmt, 2, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_sat_longitude);
 	}
 	
 	if (sqlite3_step(stmt) == SQLITE_ROW)
@@ -692,7 +692,7 @@ static int insert_sat_para(sqlite3_stmt **stmts, AM_SCAN_SatellitePara_t *sat_pa
 	{
 		AM_DEBUG(1, "@@ Insert a new satellite parameter record !!! @@");
 		AM_DEBUG(1, "name(%s),lnb_num(%d),lof_hi(%d),lof_lo(%d),lof_threshold(%d),22k(%d),vol(%d),motor(%d),pos_num(%d),lodir(%d),ladir(%d),\
-		lo(%f),la(%f),diseqc_mode(%d),toneburst(%d),cdc(%d),ucdc(%d),repeats(%d),seq_repeat(%d),fast_diseqc(%d),cmd_order(%d)",
+		lo(%f),la(%f),diseqc_mode(%d),toneburst(%d),cdc(%d),ucdc(%d),repeats(%d),seq_repeat(%d),fast_diseqc(%d),cmd_order(%d), sat_longitude(%d)",
 		sat_para->sat_name,sat_para->lnb_num,sat_para->sec.m_lnbs.m_lof_hi,sat_para->sec.m_lnbs.m_lof_lo,sat_para->sec.m_lnbs.m_lof_threshold,
 		sat_para->sec.m_lnbs.m_cursat_parameters.m_22khz_signal,sat_para->sec.m_lnbs.m_cursat_parameters.m_voltage_mode,
 		sat_para->motor_num,sat_para->sec.m_lnbs.m_cursat_parameters.m_rotorPosNum,
@@ -707,7 +707,8 @@ static int insert_sat_para(sqlite3_stmt **stmts, AM_SCAN_SatellitePara_t *sat_pa
 		sat_para->sec.m_lnbs.m_diseqc_parameters.m_repeats,
 		sat_para->sec.m_lnbs.m_diseqc_parameters.m_seq_repeat,
 		sat_para->sec.m_lnbs.m_diseqc_parameters.m_use_fast,
-		sat_para->sec.m_lnbs.m_diseqc_parameters.m_command_order);
+		sat_para->sec.m_lnbs.m_diseqc_parameters.m_command_order,
+		sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_sat_longitude);
 		stmt = stmts[INSERT_SAT_PARA];
 		sqlite3_bind_text(stmt, 1, sat_para->sat_name, strlen(sat_para->sat_name), SQLITE_STATIC);
 		sqlite3_bind_int(stmt, 2, sat_para->lnb_num);
@@ -730,6 +731,7 @@ static int insert_sat_para(sqlite3_stmt **stmts, AM_SCAN_SatellitePara_t *sat_pa
 		sqlite3_bind_int(stmt, 19, sat_para->sec.m_lnbs.m_diseqc_parameters.m_seq_repeat ? 1 : 0);
 		sqlite3_bind_int(stmt, 20, sat_para->sec.m_lnbs.m_diseqc_parameters.m_use_fast ? 1 : 0);
 		sqlite3_bind_int(stmt, 21, sat_para->sec.m_lnbs.m_diseqc_parameters.m_command_order);
+		sqlite3_bind_int(stmt, 22, sat_para->sec.m_lnbs.m_rotor_parameters.m_gotoxx_parameters.m_sat_longitude);
 		
 		if (sqlite3_step(stmt) == SQLITE_DONE)
 			db_id = get_sat_para_record(stmts, sat_para);
@@ -799,7 +801,8 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	}
 	
 	/*检查该TS是否已经添加*/
-	dbid = insert_ts(stmts, src, (int)dvb_fend_para(ts->fend_para)->frequency, satpara_dbid);
+	dbid = insert_ts(stmts, src, (int)dvb_fend_para(ts->fend_para)->frequency, satpara_dbid, 
+		(src==AM_FEND_DEMOD_DVBS)?(int)ts->fend_para.sat.polarisation:-1);
 	if (dbid == -1)
 	{
 		AM_DEBUG(1, "insert new ts error");
@@ -815,8 +818,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	sqlite3_bind_int(stmts[UPDATE_TS], 6, ts->snr);
 	sqlite3_bind_int(stmts[UPDATE_TS], 7, ts->ber);
 	sqlite3_bind_int(stmts[UPDATE_TS], 8, ts->strength);
-	sqlite3_bind_int(stmts[UPDATE_TS], 9, (src==AM_FEND_DEMOD_DVBS)?(int)ts->fend_para.sat.polarisation:-1);
-	sqlite3_bind_int(stmts[UPDATE_TS], 10, dbid);
+	sqlite3_bind_int(stmts[UPDATE_TS], 9, dbid);
 	sqlite3_step(stmts[UPDATE_TS]);
 	sqlite3_reset(stmts[UPDATE_TS]);
 
@@ -1447,7 +1449,8 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	}
 	
 	/*检查该TS是否已经添加*/
-	dbid = insert_ts(stmts, src, (int)dvb_fend_para(ts->fend_para)->frequency, satpara_dbid);
+	dbid = insert_ts(stmts, src, (int)dvb_fend_para(ts->fend_para)->frequency, satpara_dbid,
+		(src==AM_FEND_DEMOD_DVBS)?(int)ts->fend_para.sat.polarisation:-1);
 	if (dbid == -1)
 	{
 		AM_DEBUG(1, "insert new ts error");
@@ -1462,8 +1465,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	sqlite3_bind_int(stmts[UPDATE_TS], 6, ts->snr);
 	sqlite3_bind_int(stmts[UPDATE_TS], 7, ts->ber);
 	sqlite3_bind_int(stmts[UPDATE_TS], 8, ts->strength);
-	sqlite3_bind_int(stmts[UPDATE_TS], 9, (src==AM_FEND_DEMOD_DVBS)?(int)ts->fend_para.sat.polarisation:-1);
-	sqlite3_bind_int(stmts[UPDATE_TS], 10, dbid);
+	sqlite3_bind_int(stmts[UPDATE_TS], 9, dbid);
 	sqlite3_step(stmts[UPDATE_TS]);
 	sqlite3_reset(stmts[UPDATE_TS]);
 
@@ -1761,6 +1763,9 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 			snprintf(sqlstr, sizeof(sqlstr), "delete from ts_table where db_sat_para_id=%d",db_sat_id);
 			sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
 			snprintf(sqlstr, sizeof(sqlstr), "delete from srv_table where db_sat_para_id=%d",db_sat_id);
+			sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+			AM_DEBUG(1, "Remove this sat para record...");
+			snprintf(sqlstr, sizeof(sqlstr), "delete from sat_para_table where db_id=%d",db_sat_id);
 			sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
 		}
 	}
@@ -2382,8 +2387,11 @@ static void am_scan_pmt_done(AM_SCAN_Scanner_t *scanner)
 	
 	for (i=0; i<(int)AM_ARRAY_SIZE(scanner->pmtctl); i++)
 	{
-		if (scanner->pmtctl[i].fid >= 0 && am_scan_tablectl_test_complete(&scanner->pmtctl[i]))
+		if (scanner->pmtctl[i].fid >= 0 && 
+			am_scan_tablectl_test_complete(&scanner->pmtctl[i]) &&
+			scanner->pmtctl[i].data_arrive_time > 0)
 		{
+			AM_DEBUG(1, "Stop filter for PMT, program %d", scanner->pmtctl[i].ext);
 			am_scan_free_filter(scanner, &scanner->pmtctl[i].fid);
 		}
 	}
@@ -2768,7 +2776,8 @@ static AM_ErrorCode_t am_scan_request_section(AM_SCAN_Scanner_t *scanner, AM_SCA
 	}
 
 	/*分配过滤器*/
-	AM_TRY(AM_DMX_AllocateFilter(scanner->dmx_dev, &scl->fid));
+	if (AM_DMX_AllocateFilter(scanner->dmx_dev, &scl->fid) != AM_SUCCESS)
+		return AM_DMX_ERR_NO_FREE_FILTER;
 	/*设置处理函数*/
 	AM_TRY(AM_DMX_SetCallback(scanner->dmx_dev, scl->fid, am_scan_section_handler, (void*)scanner));
 
@@ -2821,7 +2830,7 @@ static int am_scan_get_recving_pmt_count(AM_SCAN_Scanner_t *scanner)
 
 static AM_ErrorCode_t am_scan_request_pmts(AM_SCAN_Scanner_t *scanner)
 {
-	int i;
+	int i, recv_count;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	dvbpsi_pat_program_t *cur_prog = scanner->cur_prog;
 	
@@ -2849,17 +2858,28 @@ static AM_ErrorCode_t am_scan_request_pmts(AM_SCAN_Scanner_t *scanner)
 			else
 				cur_prog = cur_prog->p_next;
 
+			AM_DEBUG(1, "current program %p", cur_prog);
 			while (cur_prog && cur_prog->i_number == 0)
+			{
+				AM_DEBUG(1, "Skip for program number = 0");
 				cur_prog = cur_prog->p_next;
-
+			}
+			
+			recv_count = am_scan_get_recving_pmt_count(scanner);
+			
 			if (! cur_prog)
 			{
-				AM_DEBUG(1,"All PMTs Done!");
-				/*清除搜索标识*/
-				scanner->recv_status &= ~scanner->pmtctl[0].recv_flag;
-				SET_PROGRESS_EVT(AM_SCAN_PROGRESS_PMT_DONE, (void*)scanner->curr_ts->pmts);
+				if (recv_count == 0)
+				{
+					AM_DEBUG(1,"All PMTs Done!");
+					scanner->cur_prog = NULL;
+					/*清除搜索标识*/
+					scanner->recv_status &= ~scanner->pmtctl[0].recv_flag;
+					SET_PROGRESS_EVT(AM_SCAN_PROGRESS_PMT_DONE, (void*)scanner->curr_ts->pmts);
+				}
 				return AM_SUCCESS;
 			}
+			
 			AM_DEBUG(1, "Start PMT for program %d, pmt_pid 0x%x", cur_prog->i_number, cur_prog->i_pid);
 			am_scan_tablectl_clear(&scanner->pmtctl[i]);
 			scanner->pmtctl[i].pid = cur_prog->i_pid;
@@ -2868,7 +2888,7 @@ static AM_ErrorCode_t am_scan_request_pmts(AM_SCAN_Scanner_t *scanner)
 			ret = am_scan_request_section(scanner, &scanner->pmtctl[i]);
 			if (ret == AM_DMX_ERR_NO_FREE_FILTER)
 			{
-				if (am_scan_get_recving_pmt_count(scanner) <= 0)
+				if (recv_count <= 0)
 				{
 					/* Can this case be true ? */
 					AM_DEBUG(1, "No more filter for recving PMT, skip program %d", cur_prog->i_number);
@@ -3170,8 +3190,9 @@ static void am_scan_blind_scan_callback(int dev_no, AM_FEND_BlindEvent_t *evt, v
 	if (!scanner)
 		return;
 	
+	AM_DEBUG(1, "bs callback wait lock, scanner %p", scanner);
 	pthread_mutex_lock(&scanner->lock);
-	
+	AM_DEBUG(1, "bs callback get lock");
 	if (evt->status == AM_FEND_BLIND_UPDATE)
 	{
 		int cnt = AM_SCAN_MAX_BS_TP_CNT;
@@ -3215,7 +3236,12 @@ static void am_scan_blind_scan_callback(int dev_no, AM_FEND_BlindEvent_t *evt, v
 	else if (evt->status == AM_FEND_BLIND_START)
 	{
 		scanner->bs_ctl.progress.freq = evt->freq;
+		AM_SEC_FreqConvert(scanner->fend_dev, 
+					scanner->bs_ctl.progress.freq, 
+					(unsigned int*)&scanner->bs_ctl.progress.freq);
+		AM_DEBUG(1, "bs callback evt: BLIND_START");
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_BLIND_SCAN, (void*)&scanner->bs_ctl.progress);
+		AM_DEBUG(1, "bs callback evt: BLIND_START end");
 	}
 	
 	
@@ -3260,7 +3286,7 @@ static AM_ErrorCode_t am_scan_start_blind_scan(AM_SCAN_Scanner_t *scanner)
 		scanner->bs_ctl.progress.lo = l;
 		scanner->bs_ctl.searched_tp_cnt = 0;
 
-#if 0
+#if 1
 		if (scanner->result.sat_para.sec.m_lnbs.m_lof_hi == scanner->result.sat_para.sec.m_lnbs.m_lof_lo && 
 			l == AM_FEND_LOCALOSCILLATORFREQ_H)
 #else
@@ -3277,6 +3303,7 @@ static AM_ErrorCode_t am_scan_start_blind_scan(AM_SCAN_Scanner_t *scanner)
 			AM_SEC_SetSetting(scanner->fend_dev, &setting);
 			AM_SEC_PrepareBlindScan(scanner->fend_dev);
 			
+			AM_DEBUG(1, "start blind scan, scanner %p", scanner);
 			/* start blind scan */
 			ret = AM_FEND_BlindScan(scanner->fend_dev, am_scan_blind_scan_callback, 
 				(void*)scanner, scanner->bs_ctl.start_freq, scanner->bs_ctl.stop_freq);	
@@ -3298,7 +3325,7 @@ static AM_ErrorCode_t am_scan_start_blind_scan(AM_SCAN_Scanner_t *scanner)
 		return am_scan_start_next_ts(scanner);
 	}
 	
-	AM_DEBUG(1,"return ret %d", ret);
+	AM_DEBUG(1,"start blind scan return ret %d", ret);
 	return ret;
 }
 
@@ -3444,16 +3471,24 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 {
 	AM_SCAN_SignalInfo_t si;
 	int i;
+	unsigned int freq;
 	
-	/*if ((scanner->curr_freq >= 0) && 
+	if (scanner->result.src == AM_FEND_DEMOD_DVBS)
+		AM_SEC_FreqConvert(scanner->fend_dev, scanner->fe_evt.parameters.frequency, &freq);
+	else
+		freq = scanner->fe_evt.parameters.frequency;
+		
+	AM_DEBUG(1, "%d %d, unicable %d", freq, 
+		dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency,
+		(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE)?1:0);
+	if ((scanner->curr_freq >= 0) && 
 		(scanner->curr_freq < scanner->start_freqs_cnt) &&
-		(dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency != \
-		scanner->fe_evt.parameters.frequency) && 
+		(dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency != freq) && 
 		!(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE))
 	{
 		AM_DEBUG(1, "Unexpected fend_evt arrived");
 		return;
-	}*/
+	}
 
 	if ( ! (scanner->recv_status & AM_SCAN_RECVING_WAIT_FEND))
 	{
@@ -3610,6 +3645,7 @@ static void am_scan_get_wait_timespec(AM_SCAN_Scanner_t *scanner, struct timespe
 			rel = am_scan_compare_timespec(&scanner->table.end_time, &now);\
 			if (rel <= 0){\
 				AM_DEBUG(1, "%s timeout", scanner->table.tname);\
+				scanner->table.data_arrive_time = 1;/*just mark it*/\
 				scanner->table.done(scanner);\
 			}\
 			if (rel > 0 || memcmp(&end, &scanner->table.end_time, sizeof(struct timespec))){\
@@ -3730,8 +3766,11 @@ handle_events:
 			{
 				if (GET_MODE(scanner->result.mode) == AM_SCAN_MODE_SAT_BLIND)
 				{
+					/* we must unlock, as BlindExit will wait the callback done */
+					pthread_mutex_unlock(&scanner->lock);
 					/* Stop blind scan */
 					AM_FEND_BlindExit(scanner->fend_dev);
+					pthread_mutex_lock(&scanner->lock);
 				}
 				
 				if (scanner->result.tses/* && scanner->stage == AM_SCAN_STAGE_DONE*/)

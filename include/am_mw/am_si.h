@@ -235,12 +235,13 @@ extern AM_ErrorCode_t AM_SI_DecodeSection(int handle, uint16_t pid, uint8_t *buf
 
 /**\brief 释放一个从 AM_SI_DecodeSection()返回的section
  * \param handle SI解析句柄
+ * \param table_id 表ID
  * \param [in] sec 需要释放的section
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-extern AM_ErrorCode_t AM_SI_ReleaseSection(int handle, void *sec);
+extern AM_ErrorCode_t AM_SI_ReleaseSection(int handle, uint8_t table_id, void *sec);
 
 /**\brief 获得一个section头信息
  * \param handle SI解析句柄

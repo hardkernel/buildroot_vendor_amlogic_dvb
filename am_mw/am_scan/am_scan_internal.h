@@ -195,7 +195,7 @@ typedef struct
 struct AM_SCAN_Scanner_s
 {
 	AM_SCAN_TableCtl_t				patctl;			/**< PAT接收控制*/
-	AM_SCAN_TableCtl_t				pmtctl[32];			/**< PMT接收控制*/
+	AM_SCAN_TableCtl_t				pmtctl[20];			/**< PMT接收控制*/
 	AM_SCAN_TableCtl_t				catctl;			/**< CAT接收控制*/
 	AM_SCAN_TableCtl_t				sdtctl;			/**< SDT接收控制*/
 	AM_SCAN_TableCtl_t				nitctl;			/**< NIT接收控制*/
