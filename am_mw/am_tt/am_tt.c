@@ -386,6 +386,7 @@ static pes_buffer_t* get_subtitle_pes_packet(PesWorkBuffer_t *pwb)
 		if(!start_code_found_12&&!start_code_found_first)
 		{
 			pwb->rd_ptr=pwb->start_ptr;
+
 			return 0;
 
 		}
@@ -469,6 +470,7 @@ case1:
 		}
 
 	}
+
 	return 0;
 
 
@@ -602,7 +604,6 @@ static int teletext_parse_data(unsigned char *pData,int nDatalength)
 		 return -1;
 	}
 
-	
 	while (processLength < nDatalength)
 	{
 		data_unit_id = *pData++;
@@ -1277,6 +1278,7 @@ static void pes_filter_callback(int dev_no,int fhandle,const unsigned char *data
 	fwrite(data,1,len,fp2);
 #endif
 	pthread_mutex_lock(&context_tele.rd_wr_Mutex);
+
 	while(data_remain>0&&context_tele.flags&TELTE_RUNNING_FLAG)
 	{
 		data_copy+=copy_data_to_pes_buffer((char*)data+data_copy,data_remain);
@@ -1337,6 +1339,7 @@ static int open_demux_pes_filter(int dev_no,int pid,int type)
 		ret=AM_TT_ERR_OPEN_PES;
 		goto error;
 	}
+
 	context_tele.fhandle=fhandle;
 	goto exit;
 error:
@@ -1366,7 +1369,7 @@ static int close_demux_pes_filter()
 #endif
 
 
-AM_ErrorCode_t AM_TT_Start(int dmx_id, int pid, int mag, int page)
+AM_ErrorCode_t AM_TT_Start(int dmx_id, int pid, int mag, int page, int sub_page)
 {
 	int ret=AM_SUCCESS;
 	int pageIndex;
@@ -1405,7 +1408,7 @@ AM_ErrorCode_t AM_TT_Start(int dmx_id, int pid, int mag, int page)
     	TeletextRegisterfunc(teletext_page_process_callback);
 
 	context_tele.wPageIndex = pageIndex;
-	context_tele.wPageSubCode = 0xffff;
+	context_tele.wPageSubCode = sub_page;
 	context_tele.status=TELETEXT_STARTED;
 	teletext_history_reset();
 	//teletext_draw_display_message(VT_PAGENOTFIND);
@@ -1549,7 +1552,7 @@ AM_ErrorCode_t AM_TT_RegisterDrawOps(AM_TT_DrawOps_t *ops)
 	return 0;
 }
 
-AM_ErrorCode_t AM_TT_NextSubPage()
+AM_ErrorCode_t AM_TT_NextSubPage(AM_Bool_t circle)
 {
     INT32U dwPageCode;
     INT32S nRetCode = 0;
@@ -1561,7 +1564,7 @@ AM_ErrorCode_t AM_TT_NextSubPage()
 
     dwPageCode = MAKELONG(context_tele.wPageIndex, context_tele.wPageSubCode);
 
-    nRetCode = GetNextDisplaySubPage(dwPageCode, &context_tele.sCurrPage, FALSE);
+    nRetCode = GetNextDisplaySubPage(dwPageCode, &context_tele.sCurrPage, FALSE, circle);
     if (nRetCode == 0)
     {
         return AM_TT_ERR_PAGE_NOT_EXSIT;
@@ -1576,7 +1579,7 @@ AM_ErrorCode_t AM_TT_NextSubPage()
     return AM_SUCCESS;
 }
 
-AM_ErrorCode_t AM_TT_PreviousSubPage()
+AM_ErrorCode_t AM_TT_PreviousSubPage(AM_Bool_t circle)
 {
     INT32U dwPageCode;
     INT32S nRetCode = 0;
@@ -1588,7 +1591,7 @@ AM_ErrorCode_t AM_TT_PreviousSubPage()
 
     dwPageCode = MAKELONG(context_tele.wPageIndex, context_tele.wPageSubCode);
 
-    nRetCode = GetNextDisplaySubPage(dwPageCode, &context_tele.sCurrPage, TRUE);
+    nRetCode = GetNextDisplaySubPage(dwPageCode, &context_tele.sCurrPage, TRUE, circle);
     if (nRetCode == 0)
     {
         return AM_TT_ERR_PAGE_NOT_EXSIT;
