@@ -475,6 +475,7 @@ static void AM_SEC_Set_RotorMoving(eSecCommand_t *sec_cmd)
 	if(sec_cmd->cmd == SET_ROTOR_MOVING)
 	{
 		sec_control.m_rotorMoving = AM_TRUE;
+		AM_EVT_Signal(sec_cmd->val, AM_FENDCTRL_EVT_ROTOR_MOVING, NULL);
 	}
 
 	return;
@@ -487,6 +488,7 @@ static void AM_SEC_Set_RotorStoped(eSecCommand_t *sec_cmd)
 	if(sec_cmd->cmd == SET_ROTOR_STOPPED)
 	{
 		sec_control.m_rotorMoving = AM_FALSE;
+		AM_EVT_Signal(sec_cmd->val, AM_FENDCTRL_EVT_ROTOR_STOP, NULL);
 	}
 
 	return;
@@ -540,6 +542,8 @@ static AM_ErrorCode_t AM_Sec_AsyncSet(void)
 	{
 		sem_post(&p_sec_asyncinfo->sem_running);
 	}
+
+	AM_DEBUG(1, "AM_Sec_AsyncSet %d\n", sem_value);
 	
 	return ret;
 }
@@ -550,11 +554,15 @@ static AM_ErrorCode_t AM_Sec_AsyncWait(void)
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	int rc;
 
+	AM_DEBUG(1, "AM_Sec_AsyncWait\n");
+
 	rc = sem_wait(&p_sec_asyncinfo->sem_running);
 	if(rc)
 	{
 		ret = AM_FENDCTRL_ERROR_BASE;
 	}
+
+	AM_DEBUG(1, "AM_Sec_AsyncWait %d\n", ret);
 	
 	return ret;
 }
@@ -564,6 +572,8 @@ static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, const AM_FENDCTRL_DVBFront
 {
 	AM_SEC_AsyncInfo_t *p_sec_asyncinfo = &(sec_control.m_sec_asyncinfo);
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_DEBUG(1, "AM_Sec_SetAsyncInfo enter %d %p %p %p %d\n", dev_no, b_para, para, status, tunetimeout);	
 		
 	pthread_mutex_lock(&p_sec_asyncinfo->lock);
 
@@ -618,6 +628,9 @@ static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, const AM_FENDCTRL_DVBFront
 
 		AM_Sec_AsyncSet();
 
+		if(p_sec_asyncinfo->enable_thread)
+			p_sec_asyncinfo->preparerunning = AM_TRUE;
+
 		if(!((b_para == NULL) && (status == NULL) && (tunetimeout == 0)))
 		{
 			if(p_sec_asyncinfo->enable_thread && (p_sec_asyncinfo->thread!=pthread_self()))
@@ -668,7 +681,7 @@ static void* AM_Sec_AsyncThread(void *arg)
 		{
 			pthread_mutex_lock(&p_sec_asyncinfo->lock);
 			p_sec_asyncinfo->prepareexitnotify = AM_FALSE;
-			p_sec_asyncinfo->preparerunning = AM_TRUE;
+			p_sec_asyncinfo->preparerunning = AM_TRUE;		
 			pthread_mutex_unlock(&p_sec_asyncinfo->lock);
 
 			AM_FEND_SetActionCallback(p_sec_asyncinfo->dev_no, AM_FALSE);
@@ -826,6 +839,8 @@ static int AM_SEC_CanBlindScanOrTune(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 				AM_FEND_SetActionCallback(dev_no, AM_TRUE);\
 				AM_DEBUG(1, "AM_FEND_SetActionCallback enable \n");\
 				AM_FEND_Diseqccmd_SetPositionerHalt(dev_no);\
+				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_ROTOR_STOPPED, dev_no);\
+				AM_SEC_Set_RotorStoped(&sec_cmd);\				
 				usleep(15 * 1000);\
 				return ret;\
 			};\
@@ -1416,8 +1431,8 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 
 				AM_SEC_SetSecCommand( &sec_cmd, INVALIDATE_CURRENT_ROTORPARMS );
 				AM_SEC_Set_Invalid_Cur_RotorPara(&sec_cmd);
-				AM_SEC_SetSecCommand( &sec_cmd, SET_ROTOR_MOVING); 
-				AM_SEC_Set_RotorStoped(&sec_cmd);
+				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_ROTOR_MOVING, dev_no); 
+				AM_SEC_Set_RotorMoving(&sec_cmd);
 
 				M_AM_SEC_ASYNCCHECK();
 				
@@ -1532,7 +1547,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 
 				AM_SEC_SetSecCommand( &sec_cmd, UPDATE_CURRENT_ROTORPARAMS); 
 				AM_SEC_Set_Update_Cur_RotorPara(&sec_cmd);
-				AM_SEC_SetSecCommand( &sec_cmd, SET_ROTOR_STOPPED); 
+				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_ROTOR_STOPPED, dev_no); 
 				AM_SEC_Set_RotorStoped(&sec_cmd);
 
 				AM_DEBUG(1, "set rotor timeout to %d seconds end\n", mrt);
@@ -1859,10 +1874,18 @@ AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned
 	return ret;
 }
 
+/**\brief 准备锁频卫星设备控制
+ * \param dev_no 前端设备号
+ * \param para 前端设备参数
+ * \param status 前端设备状态
+ * \param tunetimeout 超时时间
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
 AM_ErrorCode_t AM_SEC_PrepareTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, fe_status_t *status, unsigned int tunetimeout)
 {
 	assert(para);
-	assert(status);
 	
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
@@ -1924,11 +1947,6 @@ AM_ErrorCode_t AM_SEC_PrepareTurnOffSatCR(int dev_no, int satcr)
 	return ret;
 }
 
-AM_Bool_t AM_SEC_IsRotorMoving(void)
-{
-	return sec_control.m_rotorMoving;
-}
-
 void AM_SEC_SetCommandString(int dev_no, const char *str)
 {
 	assert(str);
@@ -1980,6 +1998,12 @@ void AM_SEC_SetCommandString(int dev_no, const char *str)
 	return;
 }
 
+/**\brief 卫星设备控制命令执行,测试使用
+ * \param dev_no 前端设备号
+ * \param str 卫星设备控制命令字符串
+ * \return
+ *   - 无
+ */
 AM_ErrorCode_t AM_SEC_DumpSetting(void)
 {	
 	AM_ErrorCode_t ret = AM_SUCCESS;
