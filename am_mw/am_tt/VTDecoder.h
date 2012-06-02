@@ -100,7 +100,7 @@ INT16U GetNonVisiblePageNumbers(INT16U* lpNumberList, INT16U nListSize);
 void GetDisplayHeader(struct TVTPage* pBuffer, BOOLEAN bClockOnly);
 INT32U GetDisplayPage(INT32U dwPageCode, struct TVTPage* pBuffer);
 INT32U GetNextDisplayPage(INT32U dwPageCode, struct TVTPage* pBuffer, BOOLEAN bReverse);
-INT32U GetNextDisplaySubPage(INT32U dwPageCode, struct TVTPage* pBuffer, BOOLEAN bReverse, BOOLEAN bCircle);
+INT32U GetNextDisplaySubPage(INT32U dwPageCode, struct TVTPage* pBuffer, BOOLEAN bReverse);
 BOOLEAN GetDisplayComment(INT32U dwPageCode, struct TVTPage* pBuffer);
 void CreateTestDisplayPage(struct TVTPage* pBuffer);
 void GetStatusDisplay(INT8S* lpBuffer, INT32U nLength);

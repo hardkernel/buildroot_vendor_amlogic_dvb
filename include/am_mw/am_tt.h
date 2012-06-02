@@ -169,20 +169,18 @@ unsigned int AM_TT_GetCurrentPageCode();
 AM_ErrorCode_t AM_TT_SetCurrentPageCode(unsigned short wPageCode, unsigned short wSubPageCode);
 
 /**\brief 子页下翻
- * \param circle 是否循环查找
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tt.h)
  */
-AM_ErrorCode_t AM_TT_NextSubPage(AM_Bool_t circle);
+AM_ErrorCode_t AM_TT_NextSubPage();
 
 /**\brief 子页上翻
- * \param circle 是否循环查找
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tt.h)
  */
-AM_ErrorCode_t AM_TT_PreviousSubPage(AM_Bool_t circle);
+AM_ErrorCode_t AM_TT_PreviousSubPage();
 
 /**\brief 页下翻
  * \return

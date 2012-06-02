@@ -1552,10 +1552,11 @@ AM_ErrorCode_t AM_TT_RegisterDrawOps(AM_TT_DrawOps_t *ops)
 	return 0;
 }
 
-AM_ErrorCode_t AM_TT_NextSubPage(AM_Bool_t circle)
+AM_ErrorCode_t AM_TT_NextSubPage()
 {
     INT32U dwPageCode;
     INT32S nRetCode = 0;
+    INT16U wOldPageIndex = context_tele.wPageIndex;
 
     if (context_tele.status != TELETEXT_STARTED)
     {
@@ -1564,7 +1565,7 @@ AM_ErrorCode_t AM_TT_NextSubPage(AM_Bool_t circle)
 
     dwPageCode = MAKELONG(context_tele.wPageIndex, context_tele.wPageSubCode);
 
-    nRetCode = GetNextDisplaySubPage(dwPageCode, &context_tele.sCurrPage, FALSE, circle);
+    nRetCode = GetNextDisplaySubPage(dwPageCode, &context_tele.sCurrPage, FALSE);
     if (nRetCode == 0)
     {
         return AM_TT_ERR_PAGE_NOT_EXSIT;
@@ -1573,16 +1574,24 @@ AM_ErrorCode_t AM_TT_NextSubPage(AM_Bool_t circle)
     GetDisplayHeader(&context_tele.sCurrPage, TRUE);
     DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
     context_tele.update_display();
-
+    
+    context_tele.wPageIndex =  LOWWORD(nRetCode);
     context_tele.wPageSubCode = HIGHWORD(nRetCode);
+
+    if(wOldPageIndex != context_tele.wPageIndex)
+    {
+        SetTeletextCurrPageIndex(context_tele.wPageIndex);
+        teletext_history_push_page(context_tele.wPageIndex);
+    }
 
     return AM_SUCCESS;
 }
 
-AM_ErrorCode_t AM_TT_PreviousSubPage(AM_Bool_t circle)
+AM_ErrorCode_t AM_TT_PreviousSubPage()
 {
     INT32U dwPageCode;
     INT32S nRetCode = 0;
+    INT16U wOldPageIndex = context_tele.wPageIndex;
 
     if (context_tele.status != TELETEXT_STARTED)
     {
@@ -1591,7 +1600,7 @@ AM_ErrorCode_t AM_TT_PreviousSubPage(AM_Bool_t circle)
 
     dwPageCode = MAKELONG(context_tele.wPageIndex, context_tele.wPageSubCode);
 
-    nRetCode = GetNextDisplaySubPage(dwPageCode, &context_tele.sCurrPage, TRUE, circle);
+    nRetCode = GetNextDisplaySubPage(dwPageCode, &context_tele.sCurrPage, TRUE);
     if (nRetCode == 0)
     {
         return AM_TT_ERR_PAGE_NOT_EXSIT;
@@ -1601,7 +1610,14 @@ AM_ErrorCode_t AM_TT_PreviousSubPage(AM_Bool_t circle)
     DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
     context_tele.update_display();
 
+    context_tele.wPageIndex =  LOWWORD(nRetCode);
     context_tele.wPageSubCode = HIGHWORD(nRetCode);
+
+    if(wOldPageIndex != context_tele.wPageIndex)
+    {
+        SetTeletextCurrPageIndex(context_tele.wPageIndex);
+        teletext_history_push_page(context_tele.wPageIndex);
+    }
 
     return AM_SUCCESS;
 

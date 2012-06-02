@@ -1320,7 +1320,7 @@ INT32U GetNextDisplayPage(INT32U dwPageCode, struct TVTPage* pBuffer, BOOLEAN bR
 }
 
 
-INT32U GetNextDisplaySubPage(INT32U dwPageCode, struct TVTPage* pBuffer, BOOLEAN bReverse, BOOLEAN bCircle)
+INT32U GetNextDisplaySubPage(INT32U dwPageCode, struct TVTPage* pBuffer, BOOLEAN bReverse)
 {
     INT16U 		wPageHex = LOWWORD(dwPageCode);
     INT16U 		wPageIndex = PageHex2ArrayIndex(wPageHex);
@@ -1348,8 +1348,43 @@ INT32U GetNextDisplaySubPage(INT32U dwPageCode, struct TVTPage* pBuffer, BOOLEAN
     {
         pPage = FindNextSubPage(pSubPageList, dwPageCode, bReverse);
 
-        if ((pPage == NULL) && bCircle)
+        if (pPage == NULL)
         {
+            int delta = (bReverse==TRUE) ? -1 : 1;
+            int i;
+            
+            // Loop around the available pages to find the next or previous page
+            for (i = 800 + wPageIndex + delta; (i % 800) != wPageIndex; i += delta)
+            {
+	        pPage = FindReceivedPage(m_VisiblePageList[i % 800]);
+                if (pPage != NULL)
+                {
+                    wPageHex = LOWWORD(pPage->dwPageCode);
+                    wPageIndex = PageHex2ArrayIndex(wPageHex);
+                    pSubPageList = m_VisiblePageList[i % 800];
+                    break;
+                }
+            }
+
+            if (pPage != NULL)
+            {
+                struct TVTPage* pSub = NULL;
+
+            	pSub = FindNextSubPage(pSubPageList, MAKELONG(wPageHex, bReverse == FALSE ? 0 : 0xFFFF), bReverse);
+            	if(pSub != NULL) {
+            	    pPage = pSub;
+            	}
+            }
+            
+            if (pPage != NULL)
+            {
+                if (pPage->dwPageCode == dwPageCode)
+                {
+                    pPage = NULL;
+                }
+            }
+
+#if 0
             if (bReverse == FALSE)
             {
                 pPage = FindSubPage(pSubPageList, MAKELONG(wPageHex, 0));
@@ -1367,6 +1402,7 @@ INT32U GetNextDisplaySubPage(INT32U dwPageCode, struct TVTPage* pBuffer, BOOLEAN
                     pPage = NULL;
                 }
             }
+#endif
         }
     }
 
