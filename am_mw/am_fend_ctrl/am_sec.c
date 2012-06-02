@@ -1556,7 +1556,10 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 			M_AM_SEC_ASYNCCHECK();
 			
 			AM_SEC_SetFendData(NEW_ROTOR_CMD, RotorCmd);
-			AM_SEC_SetFendData(NEW_ROTOR_POS, rotor_param.m_gotoxx_parameters.m_sat_longitude);			
+			AM_SEC_SetFendData(NEW_ROTOR_POS, rotor_param.m_gotoxx_parameters.m_sat_longitude);		
+
+			AM_SEC_SetSecCommand( &sec_cmd, UPDATE_CURRENT_ROTORPARAMS); 
+			AM_SEC_Set_Update_Cur_RotorPara(&sec_cmd);
 		}
 
 		M_AM_SEC_ASYNCCHECK();
