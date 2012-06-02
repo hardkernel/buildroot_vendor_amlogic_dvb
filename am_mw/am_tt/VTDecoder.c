@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <am_tt.h>
+#include <android/log.h>
 
 #ifndef AM_SUCCESS
 #define AM_SUCCESS			(0)
@@ -260,7 +261,7 @@ void VTDecodeLine(INT8U *data)
             return;
         }
     }
-
+    
     switch (uPacketNumber)
     {
         case 0: // page header
@@ -270,7 +271,7 @@ void VTDecodeLine(INT8U *data)
             // Work out the page number
             uPageHex = UnhamTwo84_LSBF(data + 2, &bError);
             uPageHex |= (uMagazine == 0 ? 0x800 : uMagazine * 0x100);
-            
+
             // Caution: Remember that these offsets are zero based while indexes
             // in the ETS Teletext specification (ETS 300 706) are one based.
             uS1 = Unham84(data[4], &bError);
@@ -389,7 +390,7 @@ void VTDecodeLine(INT8U *data)
                 //if (m_MagazineState[uMagazine].bReceiving != FALSE)
                 {
                     uLine = uPacketNumber - 1;
-
+                    
                     // do not override an existing line
                     if (m_MagazineState[uMagazine].bLineReceived[uLine] != FALSE)
                     {
@@ -1319,7 +1320,7 @@ INT32U GetNextDisplayPage(INT32U dwPageCode, struct TVTPage* pBuffer, BOOLEAN bR
 }
 
 
-INT32U GetNextDisplaySubPage(INT32U dwPageCode, struct TVTPage* pBuffer, BOOLEAN bReverse)
+INT32U GetNextDisplaySubPage(INT32U dwPageCode, struct TVTPage* pBuffer, BOOLEAN bReverse, BOOLEAN bCircle)
 {
     INT16U 		wPageHex = LOWWORD(dwPageCode);
     INT16U 		wPageIndex = PageHex2ArrayIndex(wPageHex);
@@ -1347,7 +1348,7 @@ INT32U GetNextDisplaySubPage(INT32U dwPageCode, struct TVTPage* pBuffer, BOOLEAN
     {
         pPage = FindNextSubPage(pSubPageList, dwPageCode, bReverse);
 
-        if (pPage == NULL)
+        if ((pPage == NULL) && bCircle)
         {
             if (bReverse == FALSE)
             {
