@@ -1572,8 +1572,10 @@ AM_ErrorCode_t AM_TT_NextSubPage()
     }
 
     GetDisplayHeader(&context_tele.sCurrPage, TRUE);
+    
+    TELETEXT_DRAW(&context_tele, ({
     DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
-    context_tele.update_display();
+    }));
     
     context_tele.wPageIndex =  LOWWORD(nRetCode);
     context_tele.wPageSubCode = HIGHWORD(nRetCode);
@@ -1607,8 +1609,10 @@ AM_ErrorCode_t AM_TT_PreviousSubPage()
     }
 
     GetDisplayHeader(&context_tele.sCurrPage, TRUE);
+
+    TELETEXT_DRAW(&context_tele, ({
     DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
-    context_tele.update_display();
+    }));
 
     context_tele.wPageIndex =  LOWWORD(nRetCode);
     context_tele.wPageSubCode = HIGHWORD(nRetCode);
@@ -1655,8 +1659,10 @@ AM_ErrorCode_t AM_TT_NextPage()
 
 
     GetDisplayHeader(&context_tele.sCurrPage, TRUE);
+
+    TELETEXT_DRAW(&context_tele, ({
     DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
-    context_tele.update_display();
+    }));
 
     context_tele.wPageIndex =  LOWWORD(nRetCode);
     context_tele.wPageSubCode = HIGHWORD(nRetCode);
@@ -1701,8 +1707,10 @@ AM_ErrorCode_t AM_TT_PreviousPage()
     }
 
     GetDisplayHeader(&context_tele.sCurrPage, TRUE);
+
+    TELETEXT_DRAW(&context_tele, ({
     DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
-    context_tele.update_display();
+    }));
 
     context_tele.wPageIndex =  LOWWORD(nRetCode);
     context_tele.wPageSubCode = HIGHWORD(nRetCode);
@@ -1766,8 +1774,10 @@ AM_ErrorCode_t AM_TT_PerformColorLink(unsigned char color)
 
 
         GetDisplayHeader(&context_tele.sCurrPage, TRUE);
+
+        TELETEXT_DRAW(&context_tele, ({
         DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
-        context_tele.update_display();
+        }));
 
         context_tele.wPageIndex =  LOWWORD(uLoadedPageCode);
         context_tele.wPageSubCode = HIGHWORD(uLoadedPageCode);
