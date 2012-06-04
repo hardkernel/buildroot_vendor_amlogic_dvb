@@ -475,6 +475,7 @@ static void AM_SEC_Set_RotorMoving(eSecCommand_t *sec_cmd)
 	if(sec_cmd->cmd == SET_ROTOR_MOVING)
 	{
 		sec_control.m_rotorMoving = AM_TRUE;
+		AM_EVT_Signal(sec_cmd->val, AM_FENDCTRL_EVT_ROTOR_MOVING, NULL);
 	}
 
 	return;
@@ -487,6 +488,7 @@ static void AM_SEC_Set_RotorStoped(eSecCommand_t *sec_cmd)
 	if(sec_cmd->cmd == SET_ROTOR_STOPPED)
 	{
 		sec_control.m_rotorMoving = AM_FALSE;
+		AM_EVT_Signal(sec_cmd->val, AM_FENDCTRL_EVT_ROTOR_STOP, NULL);
 	}
 
 	return;
@@ -511,6 +513,7 @@ static void AM_SEC_Set_Timeout(eSecCommand_t *sec_cmd)
 	if(sec_cmd->cmd == SET_TIMEOUT)
 	{
 		am_sec_timeoutcount = sec_cmd->val;
+		AM_DEBUG(1, "AM_SEC_Set_Timeout: %d\n", am_sec_timeoutcount);
 	}
 
 	return;
@@ -528,27 +531,118 @@ static AM_Bool_t AM_SEC_If_Timeout_Goto(eSecCommand_t *sec_cmd)
 	return AM_FALSE;
 }
 
-static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para)
+static AM_ErrorCode_t AM_Sec_AsyncSet(void)
 {
 	AM_SEC_AsyncInfo_t *p_sec_asyncinfo = &(sec_control.m_sec_asyncinfo);
 	AM_ErrorCode_t ret = AM_SUCCESS;
+	int sem_value = 0;
+
+	sem_getvalue(&p_sec_asyncinfo->sem_running, &sem_value);
+	if(sem_value == 0)
+	{
+		sem_post(&p_sec_asyncinfo->sem_running);
+	}
+
+	AM_DEBUG(1, "AM_Sec_AsyncSet %d\n", sem_value);
+	
+	return ret;
+}
+
+static AM_ErrorCode_t AM_Sec_AsyncWait(void)
+{
+	AM_SEC_AsyncInfo_t *p_sec_asyncinfo = &(sec_control.m_sec_asyncinfo);
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	int rc;
+
+	AM_DEBUG(1, "AM_Sec_AsyncWait\n");
+
+	rc = sem_wait(&p_sec_asyncinfo->sem_running);
+	if(rc)
+	{
+		ret = AM_FENDCTRL_ERROR_BASE;
+	}
+
+	AM_DEBUG(1, "AM_Sec_AsyncWait %d\n", ret);
+	
+	return ret;
+}
+
+static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, const AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t *b_para,
+												const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, fe_status_t *status, unsigned int tunetimeout)
+{
+	AM_SEC_AsyncInfo_t *p_sec_asyncinfo = &(sec_control.m_sec_asyncinfo);
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_DEBUG(1, "AM_Sec_SetAsyncInfo enter %d %p %p %p %d\n", dev_no, b_para, para, status, tunetimeout);	
 		
 	pthread_mutex_lock(&p_sec_asyncinfo->lock);
 
 	if(p_sec_asyncinfo->preparerunning)
-		p_sec_asyncinfo->prepareexitnotify = AM_TRUE;
-	
-	if(p_sec_asyncinfo->enable_thread && (p_sec_asyncinfo->thread!=pthread_self()))
-	{
-		/*等待prepare函数执行完*/
-		while(p_sec_asyncinfo->preparerunning)
+	{		
+		if((b_para == NULL) && (status == NULL) && (tunetimeout == 0))/*setpara mode*/
 		{
-			pthread_cond_wait(&p_sec_asyncinfo->cond, &p_sec_asyncinfo->lock);
+			p_sec_asyncinfo->prepareexitnotify = AM_TRUE;
+		}
+	
+		if(p_sec_asyncinfo->enable_thread && (p_sec_asyncinfo->thread!=pthread_self()))
+		{
+			/*等待prepare函数执行完*/
+			while(p_sec_asyncinfo->preparerunning)
+			{
+				pthread_cond_wait(&p_sec_asyncinfo->cond, &p_sec_asyncinfo->lock);
+			}
+		}
+
+		p_sec_asyncinfo->dev_no = dev_no;
+		p_sec_asyncinfo->sat_b_para = b_para;
+		if(para != NULL)
+		{
+			p_sec_asyncinfo->sat_para = *para;
+			p_sec_asyncinfo->sat_para_valid = AM_TRUE;
+		}
+		else
+		{
+			p_sec_asyncinfo->sat_para_valid = AM_FALSE;
+		}
+		
+		p_sec_asyncinfo->sat_status = status;
+		p_sec_asyncinfo->sat_tunetimeout = tunetimeout;		
+
+		AM_Sec_AsyncSet();
+	}
+	else{
+		p_sec_asyncinfo->dev_no = dev_no;
+		p_sec_asyncinfo->sat_b_para = b_para;
+		if(para != NULL)
+		{
+			p_sec_asyncinfo->sat_para = *para;
+			p_sec_asyncinfo->sat_para_valid = AM_TRUE;
+		}
+		else
+		{
+			p_sec_asyncinfo->sat_para_valid = AM_FALSE;
+		}		
+		
+		p_sec_asyncinfo->sat_status = status;
+		p_sec_asyncinfo->sat_tunetimeout = tunetimeout;
+
+		AM_Sec_AsyncSet();
+
+		if(p_sec_asyncinfo->enable_thread)
+			p_sec_asyncinfo->preparerunning = AM_TRUE;
+
+		if(!((b_para == NULL) && (status == NULL) && (tunetimeout == 0)))
+		{
+			if(p_sec_asyncinfo->enable_thread && (p_sec_asyncinfo->thread!=pthread_self()))
+			{
+				/*等待prepare函数执行完*/
+				while(p_sec_asyncinfo->preparerunning)
+				{
+					pthread_cond_wait(&p_sec_asyncinfo->cond, &p_sec_asyncinfo->lock);
+				}
+			}
 		}
 	}
-
-	p_sec_asyncinfo->dev_no = dev_no;
-	p_sec_asyncinfo->sat_para = (void *)para;
 	
 	pthread_mutex_unlock(&p_sec_asyncinfo->lock);
 	
@@ -571,36 +665,6 @@ static AM_ErrorCode_t AM_Sec_AsyncCheck(void)
 	return ret;
 }
 
-static AM_ErrorCode_t AM_Sec_AsyncSet(void)
-{
-	AM_SEC_AsyncInfo_t *p_sec_asyncinfo = &(sec_control.m_sec_asyncinfo);
-	AM_ErrorCode_t ret = AM_SUCCESS;
-	int sem_value = 0;
-
-	sem_getvalue(&p_sec_asyncinfo->sem_running, &sem_value);
-	if(sem_value == 0)
-	{
-		sem_post(&p_sec_asyncinfo->sem_running);
-	}
-	
-	return ret;
-}
-
-static AM_ErrorCode_t AM_Sec_AsyncWait(void)
-{
-	AM_SEC_AsyncInfo_t *p_sec_asyncinfo = &(sec_control.m_sec_asyncinfo);
-	AM_ErrorCode_t ret = AM_SUCCESS;
-	int rc;
-
-	rc = sem_wait(&p_sec_asyncinfo->sem_running);
-	if(rc)
-	{
-		ret = AM_FENDCTRL_ERROR_BASE;
-	}
-	
-	return ret;
-}
-
 static void* AM_Sec_AsyncThread(void *arg)
 {
 	AM_SEC_AsyncInfo_t *p_sec_asyncinfo = (AM_SEC_AsyncInfo_t *)arg;
@@ -617,10 +681,23 @@ static void* AM_Sec_AsyncThread(void *arg)
 		{
 			pthread_mutex_lock(&p_sec_asyncinfo->lock);
 			p_sec_asyncinfo->prepareexitnotify = AM_FALSE;
-			p_sec_asyncinfo->preparerunning = AM_TRUE;
+			p_sec_asyncinfo->preparerunning = AM_TRUE;		
 			pthread_mutex_unlock(&p_sec_asyncinfo->lock);
-		
-			ret = AM_SEC_Prepare(p_sec_asyncinfo->dev_no, NULL, p_sec_asyncinfo->sat_para, NULL, 0);
+
+			AM_FEND_SetActionCallback(p_sec_asyncinfo->dev_no, AM_FALSE);
+
+			if(p_sec_asyncinfo->sat_para_valid)
+			{
+				ret = AM_SEC_Prepare(p_sec_asyncinfo->dev_no, p_sec_asyncinfo->sat_b_para,
+										&p_sec_asyncinfo->sat_para, p_sec_asyncinfo->sat_status, p_sec_asyncinfo->sat_tunetimeout);
+			}
+			else
+			{
+				ret = AM_SEC_Prepare(p_sec_asyncinfo->dev_no, p_sec_asyncinfo->sat_b_para,
+										NULL, p_sec_asyncinfo->sat_status, p_sec_asyncinfo->sat_tunetimeout);			
+			}
+
+			AM_FEND_SetActionCallback(p_sec_asyncinfo->dev_no, AM_TRUE);
 		
 			pthread_mutex_lock(&p_sec_asyncinfo->lock);
 			p_sec_asyncinfo->prepareexitnotify = AM_FALSE;			
@@ -705,7 +782,7 @@ static int AM_SEC_CanBlindScanOrTune(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 		ret = 15000;
 	}
 
-	AM_DEBUG(1, "ret1 %d", ret);
+	AM_DEBUG(1, "ret1 %d\n", ret);
 
 	if (!is_unicable)
 	{
@@ -717,7 +794,7 @@ static int AM_SEC_CanBlindScanOrTune(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 		}
 		else
 			ret += 15;
-		AM_DEBUG(1, "ret2 %d", ret);
+		AM_DEBUG(1, "ret2 %d\n", ret);
 	}
 
 	if ((para != NULL) && ret && !is_unicable)
@@ -731,23 +808,44 @@ static int AM_SEC_CanBlindScanOrTune(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 
 	/* rotor */
 	
-	AM_DEBUG(1, "ret %d, score old %d", ret, score);
+	AM_DEBUG(1, "ret %d, score old %d\n", ret, score);
 
 	score = ret;
 
-	AM_DEBUG(1, "final score %d", score);
+	AM_DEBUG(1, "final score %d\n", score);
 	
 	return score;
 }
 
 #define M_AM_SEC_ASYNCCHECK()\
 	AM_MACRO_BEGIN\
-		AM_DEBUG(1, "M_AM_SEC_ASYNCCHECK \n");\
-		if(AM_Sec_AsyncCheck() == AM_SUCCESS)\
+		if((b_para == NULL) && (status == NULL) && (tunetimeout == 0))\
 		{\
-			return ret;\
-		};\
+			AM_DEBUG(1, "M_AM_SEC_ASYNCCHECK \n");\
+			if(AM_Sec_AsyncCheck() == AM_SUCCESS)\
+			{\
+				return ret;\
+			};\
+		}\
 	AM_MACRO_END
+
+#define M_AM_SEC_ASYNCCHECK_ROTORSTOP()\
+	AM_MACRO_BEGIN\
+		if((b_para == NULL) && (status == NULL) && (tunetimeout == 0))\
+		{\
+			AM_DEBUG(1, "M_AM_SEC_ASYNCCHECK_ROTORSTOP \n");\
+			if(AM_Sec_AsyncCheck() == AM_SUCCESS)\
+			{\
+				AM_FEND_SetActionCallback(dev_no, AM_TRUE);\
+				AM_DEBUG(1, "AM_FEND_SetActionCallback enable \n");\
+				AM_FEND_Diseqccmd_SetPositionerHalt(dev_no);\
+				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_ROTOR_STOPPED, dev_no);\
+				AM_SEC_Set_RotorStoped(&sec_cmd);\				
+				usleep(15 * 1000);\
+				return ret;\
+			};\
+		}\
+	AM_MACRO_END			
 
 
 static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t *b_para,
@@ -757,8 +855,14 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 	eSecCommand_t sec_cmd;
 
 	struct dvb_frontend_parameters convert_para;
-	AM_DEBUG(1, "lock tp freq %d\n", para->para.frequency);
-	memcpy(&convert_para, &(para->para), sizeof(struct dvb_frontend_parameters));
+
+	AM_DEBUG(1, "AM_SEC_Prepare enter %d %p %p %p %d\n", dev_no, b_para, para, status, tunetimeout);
+
+	if(para != NULL)
+	{
+		AM_DEBUG(1, "lock tp freq %d\n", para->para.frequency);
+		memcpy(&convert_para, &(para->para), sizeof(struct dvb_frontend_parameters));
+	}
 
 	//AM_SEC_DumpSetting();
 	
@@ -872,7 +976,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 						+ lnb_param.SatCRvco
 						- 1400000
 						+ lnb_param.guard_offset;
-				AM_DEBUG(1, "[prepare] UnicableTuningWord %#04x",lnb_param.UnicableTuningWord);
+				AM_DEBUG(1, "[prepare] UnicableTuningWord %#04x\n",lnb_param.UnicableTuningWord);
 				int tmp2 = ((((tmp1 * 2) / 4000) + 1) / 2) * 4000;
 				convert_para.frequency = lnb_param.SatCRvco - (tmp1-tmp2) + lnb_param.guard_offset;
 				lnb_param.UnicableTuningWord = ((tmp2 / 4000) 
@@ -880,8 +984,8 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 						| ((band & 2) ? 0x800 : 0)			//VertHor
 						| ((lnb_param.LNBNum & 1) ? 0 : 0x1000)			//Umschaltung LNB1 LNB2
 						| (lnb_param.SatCR_idx << 13));		//Adresse des SatCR
-				AM_DEBUG(1, "[prepare] UnicableTuningWord %#04x",lnb_param.UnicableTuningWord);
-				AM_DEBUG(1, "[prepare] guard_offset %d",lnb_param.guard_offset);
+				AM_DEBUG(1, "[prepare] UnicableTuningWord %#04x\n",lnb_param.UnicableTuningWord);
+				AM_DEBUG(1, "[prepare] guard_offset %d\n",lnb_param.guard_offset);
 				AM_SEC_SetFendData(FREQ_OFFSET, (lnb_param.UnicableTuningWord & 0x3FF) *4000 + 1400000 + lof - (2 * (lnb_param.SatCRvco - (tmp1-tmp2))) );
 				voltage = SEC_VOLTAGE_13;
 			}
@@ -902,10 +1006,10 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 					&& voltage_mode == HV )  )
 				voltage = SEC_VOLTAGE_18;
 			if ( (sw_param.m_22khz_signal == ON)
-				|| ( sw_param.m_22khz_signal == HILO && (band&1) ) )
+				|| ( sw_param.m_22khz_signal == HILO && (b_para->ocaloscollatorfreq & AM_FEND_POLARISATION_H) ) )
 				tone = SEC_TONE_ON;
 			else if ( (sw_param.m_22khz_signal == OFF)
-				|| ( sw_param.m_22khz_signal == HILO && !(band&1) ) )
+				|| ( sw_param.m_22khz_signal == HILO && !(b_para->ocaloscollatorfreq & AM_FEND_POLARISATION_H) ) )
 				tone = SEC_TONE_OFF;			
 		}
 
@@ -969,7 +1073,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 					&& di_param.m_committed_cmd < SENDNO
 					&& (lastcsw & 0xF0)
 					&& ((csw / 4) == (lastcsw / 4)) )
-					AM_DEBUG(1, "dont send committed cmd (fast diseqc)");
+					AM_DEBUG(1, "dont send committed cmd (fast diseqc)\n");
 				else
 				{
 					send_mask |= 1;
@@ -981,7 +1085,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 			}
 
 #if 1
-			AM_DEBUG(1, "sendmask: ");
+			AM_DEBUG(1, "sendmask: \n");
 			int i = 3;
 			for (i = 3; i >= 0; --i)
 				if ( send_mask & (1<<i) )
@@ -1098,7 +1202,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 					if ( send_mask & 2 )
 						++loops;
 
-					AM_DEBUG(1, "loops:%d", loops);
+					AM_DEBUG(1, "loops:%d\n", loops);
 
 					loops <<= diseqc_repeats;
 
@@ -1225,7 +1329,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 		}
 
 
-		AM_DEBUG(1, "RotorCmd %02x, lastRotorCmd %02lx", RotorCmd, lastRotorCmd);
+		AM_DEBUG(1, "RotorCmd %02x, lastRotorCmd %02lx\n", RotorCmd, lastRotorCmd);
 		if ( RotorCmd != -1 && RotorCmd != lastRotorCmd )
 		{
 			AM_Bool_t no_need_sendrotorstop_and_recheck_vol = AM_FALSE;
@@ -1300,6 +1404,8 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 			{
 				if (curRotorPos != -1)
 				{
+					AM_DEBUG(1, "calc cur = %ld m_sat_longitude sub timout = %d \n", curRotorPos, rotor_param.m_gotoxx_parameters.m_sat_longitude );
+					
 					mrt = abs(curRotorPos - rotor_param.m_gotoxx_parameters.m_sat_longitude);
 					if (mrt > 1800)
 						mrt = 3600 - mrt;
@@ -1325,8 +1431,8 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 
 				AM_SEC_SetSecCommand( &sec_cmd, INVALIDATE_CURRENT_ROTORPARMS );
 				AM_SEC_Set_Invalid_Cur_RotorPara(&sec_cmd);
-				AM_SEC_SetSecCommand( &sec_cmd, SET_ROTOR_MOVING); 
-				AM_SEC_Set_RotorStoped(&sec_cmd);
+				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_ROTOR_MOVING, dev_no); 
+				AM_SEC_Set_RotorMoving(&sec_cmd);
 
 				M_AM_SEC_ASYNCCHECK();
 				
@@ -1369,8 +1475,13 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 					AM_SEC_Set_Tone(dev_no, &sec_cmd);				
 					usleep(sec_control.m_params[DELAY_AFTER_FINAL_CONT_TONE_CHANGE] * 1000);
 				}
-				AM_FEND_SetActionCallback(dev_no, AM_FALSE);
-				AM_FEND_SetPara(dev_no, &(convert_para));
+				if((b_para == NULL) && (para != NULL))
+				{
+					AM_FEND_SetActionCallback(dev_no, AM_FALSE);
+					AM_DEBUG(1, "AM_FEND_SetActionCallback disable\n");
+
+					AM_FEND_SetPara(dev_no, &(convert_para));
+				}
 
 				cmd.direction=1;  // check for running rotor
 				cmd.deltaA=0;
@@ -1381,59 +1492,74 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_TIMEOUT, mrt*4 ); // mrt is in seconds... our SLEEP time is 250ms.. so * 4
 				AM_SEC_Set_Timeout(&sec_cmd);
 
+				AM_DEBUG(1, "set rotor timeout to %d seconds start\n", mrt);
+
 				while(1)
 				{
 					usleep( 250 * 1000 );  // 250msec delay
 
+					M_AM_SEC_ASYNCCHECK_ROTORSTOP();
+
 					AM_SEC_SetSecCommandByMeasure( &sec_cmd, IF_TUNER_LOCKED_GOTO, cmd); 
 					if(AM_SEC_If_Tuner_Locked_Goto(&sec_cmd))
 					{
-						AM_FEND_SetActionCallback(dev_no, AM_TRUE);
-
-						if(status != NULL)
+						if((b_para == NULL) && (para != NULL))
 						{
-							ret = AM_FEND_Lock(dev_no, &(convert_para), status);
-						}	
-						else
-						{
-							ret = AM_FEND_SetPara(dev_no, &(convert_para));
-						}						
+							AM_FEND_SetActionCallback(dev_no, AM_TRUE);
+							AM_DEBUG(1, "AM_FEND_SetActionCallback enable\n");
 						
+							if(status != NULL)
+							{
+								ret = AM_FEND_Lock(dev_no, &(convert_para), status);
+							}	
+							else
+							{
+								ret = AM_FEND_SetPara(dev_no, &(convert_para));
+							}						
+						}
+						AM_DEBUG(1, "set rotor lock out\n");
 						break;
 					}
 
 					AM_SEC_SetSecCommand( &sec_cmd, IF_TIMEOUT_GOTO); 
 					if(AM_SEC_If_Timeout_Goto(&sec_cmd))
 					{
-
-						AM_FEND_SetActionCallback(dev_no, AM_TRUE);
-
-						/*tune timeout?*/
-						if(status != NULL)
+						if((b_para == NULL) && (para != NULL))
 						{
-							ret = AM_FEND_Lock(dev_no, &(convert_para), status);
-						}	
-						else
-						{
-							ret = AM_FEND_SetPara(dev_no, &(convert_para));
-						}	
+							AM_FEND_SetActionCallback(dev_no, AM_TRUE);
+							AM_DEBUG(1, "AM_FEND_SetActionCallback enable\n");
+						
+							/*tune timeout?*/
+							if(status != NULL)
+							{
+								ret = AM_FEND_Lock(dev_no, &(convert_para), status);
+							}	
+							else
+							{
+								ret = AM_FEND_SetPara(dev_no, &(convert_para));
+							}	
+						}
 
+						AM_DEBUG(1, "set rotor unlock out\n");
 						break;
 					}					
 				}
 
 				AM_SEC_SetSecCommand( &sec_cmd, UPDATE_CURRENT_ROTORPARAMS); 
 				AM_SEC_Set_Update_Cur_RotorPara(&sec_cmd);
-				AM_SEC_SetSecCommand( &sec_cmd, SET_ROTOR_STOPPED); 
+				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_ROTOR_STOPPED, dev_no); 
 				AM_SEC_Set_RotorStoped(&sec_cmd);
 
-				AM_DEBUG(1, "set rotor timeout to %d seconds", mrt);
+				AM_DEBUG(1, "set rotor timeout to %d seconds end\n", mrt);
 			}
 
 			M_AM_SEC_ASYNCCHECK();
 			
 			AM_SEC_SetFendData(NEW_ROTOR_CMD, RotorCmd);
-			AM_SEC_SetFendData(NEW_ROTOR_POS, rotor_param.m_gotoxx_parameters.m_sat_longitude);			
+			AM_SEC_SetFendData(NEW_ROTOR_POS, rotor_param.m_gotoxx_parameters.m_sat_longitude);		
+
+			AM_SEC_SetSecCommand( &sec_cmd, UPDATE_CURRENT_ROTORPARAMS); 
+			AM_SEC_Set_Update_Cur_RotorPara(&sec_cmd);
 		}
 
 		M_AM_SEC_ASYNCCHECK();
@@ -1469,13 +1595,18 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 			/*tune timeout?*/			
 			AM_DEBUG(1, "lock centre freq %d\n", convert_para.frequency);
 
-			if(status != NULL)
+			if((b_para == NULL) && (para != NULL))
 			{
-				ret = AM_FEND_Lock(dev_no, &(convert_para), status);
-			}
-			else
-			{
-				ret = AM_FEND_SetPara(dev_no, &(convert_para));
+				AM_FEND_SetActionCallback(dev_no, AM_TRUE);
+				
+				if(status != NULL)
+				{
+					ret = AM_FEND_Lock(dev_no, &(convert_para), status);
+				}
+				else
+				{
+					ret = AM_FEND_SetPara(dev_no, &(convert_para));
+				}
 			}
 		}
 
@@ -1507,6 +1638,9 @@ static AM_ErrorCode_t AM_SEC_Init(void)
 	p_sec_asyncinfo->dev_no = -1;
 	p_sec_asyncinfo->enable_thread = AM_TRUE;
 	sem_init(&p_sec_asyncinfo->sem_running, 1, 0);
+
+	p_sec_asyncinfo->prepareexitnotify = AM_FALSE;
+	p_sec_asyncinfo->preparerunning = AM_FALSE;	
 	
 	rc = pthread_create(&p_sec_asyncinfo->thread, NULL, AM_Sec_AsyncThread, p_sec_asyncinfo);
 	if(rc)
@@ -1664,7 +1798,14 @@ AM_ErrorCode_t AM_SEC_PrepareBlindScan(int dev_no)
 
 	sec_blind_flag = AM_TRUE;
 
+	AM_DEBUG(1, "%s", "AM_SEC_PrepareBlindScan async\n");
+	ret = AM_Sec_SetAsyncInfo(dev_no, &(sec_control.m_lnbs.b_para), NULL, NULL, 0);
+	//AM_Sec_AsyncSet();
+	AM_DEBUG(1, "%s", "AM_SEC_PrepareBlindScan async ok\n");
+
+#if 0
 	ret = AM_SEC_Prepare(dev_no, &(sec_control.m_lnbs.b_para), NULL, NULL, 0);
+#endif
 
 	return ret;
 }
@@ -1713,7 +1854,7 @@ AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned
 		else if((sec_control.m_lnbs.m_lof_hi >= (M_C_TP_START_FREQ + M_CENTRE_START_FREQ)) 
 			&& (sec_control.m_lnbs.m_lof_hi <= (M_C_TP_END_FREQ + M_CENTRE_END_FREQ)))
 		{
-			*tp_freq = centre_freq - sec_control.m_lnbs.m_lof_hi;
+			*tp_freq = sec_control.m_lnbs.m_lof_hi - centre_freq;
 			ret = AM_SUCCESS;
 		}
 	}
@@ -1728,7 +1869,7 @@ AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned
 		else if((sec_control.m_lnbs.m_lof_lo >= (M_C_TP_START_FREQ + M_CENTRE_START_FREQ)) 
 			&& (sec_control.m_lnbs.m_lof_lo <= (M_C_TP_END_FREQ + M_CENTRE_END_FREQ)))
 		{
-			*tp_freq = centre_freq - sec_control.m_lnbs.m_lof_lo ;
+			*tp_freq = sec_control.m_lnbs.m_lof_lo - centre_freq;
 			ret = AM_SUCCESS;
 		}	
 	}
@@ -1736,24 +1877,42 @@ AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned
 	return ret;
 }
 
+/**\brief 准备锁频卫星设备控制
+ * \param dev_no 前端设备号
+ * \param para 前端设备参数
+ * \param status 前端设备状态
+ * \param tunetimeout 超时时间
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
 AM_ErrorCode_t AM_SEC_PrepareTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, fe_status_t *status, unsigned int tunetimeout)
 {
 	assert(para);
-	assert(status);
 	
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
 	sec_blind_flag = AM_FALSE;
 
+	AM_DEBUG(1, "%s", "AM_SEC_PrepareTune async\n");
+	ret = AM_Sec_SetAsyncInfo(dev_no, NULL, para, status, tunetimeout);
+	//AM_Sec_AsyncSet();
+	AM_DEBUG(1, "%s", "AM_SEC_PrepareTune async ok\n");
+
+#if 0
 	if(status == NULL)
 	{
+		AM_DEBUG(1, "%s", "AM_SEC_PrepareTune async\n");
 		ret = AM_Sec_SetAsyncInfo(dev_no, para);
 		AM_Sec_AsyncSet();
+		AM_DEBUG(1, "%s", "AM_SEC_PrepareTune async ok\n");
 	}
 	else
 	{
+		AM_DEBUG(1, "%s", "AM_SEC_PrepareTune sync\n");
 		ret = AM_SEC_Prepare(dev_no, NULL, para, status, tunetimeout);
 	}
+#endif
 
 	return ret;
 }
@@ -1789,11 +1948,6 @@ AM_ErrorCode_t AM_SEC_PrepareTurnOffSatCR(int dev_no, int satcr)
 	}
 
 	return ret;
-}
-
-AM_Bool_t AM_SEC_IsRotorMoving(void)
-{
-	return sec_control.m_rotorMoving;
 }
 
 void AM_SEC_SetCommandString(int dev_no, const char *str)
@@ -1847,6 +2001,12 @@ void AM_SEC_SetCommandString(int dev_no, const char *str)
 	return;
 }
 
+/**\brief 卫星设备控制命令执行,测试使用
+ * \param dev_no 前端设备号
+ * \param str 卫星设备控制命令字符串
+ * \return
+ *   - 无
+ */
 AM_ErrorCode_t AM_SEC_DumpSetting(void)
 {	
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -1902,3 +2062,6 @@ AM_ErrorCode_t AM_SEC_DumpSetting(void)
 	
 	return ret;
 }
+
+
+

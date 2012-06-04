@@ -100,7 +100,7 @@
 		tmp = (_l);\
 		while (tmp){\
 			next = tmp->p_next;\
-			AM_SI_ReleaseSection(mon->hsi, (void*)tmp);\
+			AM_SI_ReleaseSection(mon->hsi, tmp->i_table_id, (void*)tmp);\
 			tmp = next;\
 		}\
 		(_l) = NULL;\
@@ -581,7 +581,7 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 					AM_EVT_Signal((int)mon, AM_EPG_EVT_NEW_TDT, (void*)p_tot);
 					
 					/*释放改TDT/TOT*/
-					AM_SI_ReleaseSection(mon->hsi, (void*)p_tot);
+					AM_SI_ReleaseSection(mon->hsi, p_tot->i_table_id, (void*)p_tot);
 
 					TABLE_DONE();
 				}
@@ -608,7 +608,7 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 					/*触发通知事件*/
 					SIGNAL_EVENT(AM_EPG_EVT_NEW_EIT, (void*)p_eit);
 					/*释放该section*/
-					AM_SI_ReleaseSection(mon->hsi, (void*)p_eit);
+					AM_SI_ReleaseSection(mon->hsi, p_eit->i_table_id, (void*)p_eit);
 
 					if (! mon->eit_has_data)
 						mon->eit_has_data = AM_TRUE;
@@ -635,7 +635,7 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 					/*触发通知事件*/
 					SIGNAL_EVENT(AM_EPG_EVT_NEW_PSIP_EIT, (void*)p_eit);
 					/*释放该section*/
-					AM_SI_ReleaseSection(mon->hsi, (void*)p_eit);
+					AM_SI_ReleaseSection(mon->hsi, p_eit->i_table_id, (void*)p_eit);
 
 					if (! mon->eit_has_data)
 						mon->eit_has_data = AM_TRUE;
@@ -671,7 +671,7 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 					AM_EVT_Signal((int)mon, AM_EPG_EVT_NEW_STT, (void*)p_stt);
 					
 					/*释放改STT*/
-					AM_SI_ReleaseSection(mon->hsi, (void*)p_stt);
+					AM_SI_ReleaseSection(mon->hsi, p_stt->i_table_id, (void*)p_stt);
 					
 					/*设置为已接收*/
 					am_epg_tablectl_mark_section(sec_ctrl, &header); 

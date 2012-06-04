@@ -122,6 +122,12 @@ static const char *dimension_fields[] =
 #include "dimension.fld"
 };
 
+/**\brief satellite parameter table 字段定义*/
+static const char *sat_para_fields[] = 
+{
+#include "satellite_para.fld"
+};
+
 /*各表自动获取字段数目函数定义*/
 DEFINE_GET_FIELD_COUNT_FUNC(net_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(ts_fields)
@@ -133,6 +139,7 @@ DEFINE_GET_FIELD_COUNT_FUNC(grp_map_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(subtitle_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(teletext_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(dimension_fields)
+DEFINE_GET_FIELD_COUNT_FUNC(sat_para_fields)
 
 /**\brief 所有的表定义*/
 static AM_DB_Table_t db_tables[] = 
@@ -147,6 +154,7 @@ static AM_DB_Table_t db_tables[] =
 	{"subtitle_table", subtitle_fields, db_get_subtitle_fields_cnt},
 	{"teletext_table", teletext_fields, db_get_teletext_fields_cnt},
 	{"dimension_table", dimension_fields, db_get_dimension_fields_cnt},
+	{"sat_para_table", sat_para_fields, db_get_sat_para_fields_cnt},
 };
 
 /**\brief 分析数据类型列表，并生成相应结构*/

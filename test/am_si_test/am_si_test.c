@@ -185,7 +185,7 @@ static void si_section_callback(int dev_no, int fid, const uint8_t *data, int le
 		/*Print detail*/
 		if (si_sections[t].print)
 			si_sections[t].print(p_table);
-		AM_SI_ReleaseSection(hsi, (void*)p_table);
+		AM_SI_ReleaseSection(hsi, p_table->i_table_id, (void*)p_table);
 	}
 	else
 	{
