@@ -24,6 +24,9 @@ extern "C"
 /*最大支持的音频个数*/
 #define AM_SCAN_MAX_AUD_CNT 32
 
+/*卫星盲扫最大缓冲TP个数*/
+#define AM_SCAN_MAX_BS_TP_CNT 128
+
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
@@ -60,7 +63,8 @@ enum
 	AM_SCAN_EVT_VCT_DONE 	= 0x100, /**< VCT表已经接收完毕*/
 	AM_SCAN_EVT_QUIT		= 0x200, /**< 退出搜索事件*/
 	AM_SCAN_EVT_START		= 0x400,/**< 开始搜索事件*/
-	AM_SCAN_EVT_ATV_SEARCH_DONE	= 0X800,	/**< 当前设置的ATV 频率搜索完毕*/
+	AM_SCAN_EVT_ATV_SEARCH_DONE	= 0x800,	/**< 当前设置的ATV 频率搜索完毕*/
+	AM_SCAN_EVT_BLIND_SCAN_DONE = 0x2000,	/**< 当前卫星盲扫完毕*/
 };
 
 /*SCAN 所在阶段*/
@@ -70,6 +74,15 @@ enum
 	AM_SCAN_STAGE_NIT,
 	AM_SCAN_STAGE_TS,
 	AM_SCAN_STAGE_DONE
+};
+
+/*卫星盲扫阶段*/
+enum
+{
+	AM_SCAN_BS_STAGE_HL,
+	AM_SCAN_BS_STAGE_VL,
+	AM_SCAN_BS_STAGE_HH,
+	AM_SCAN_BS_STAGE_VH
 };
 
 /*sqlite3 stmts for DVB*/
@@ -101,6 +114,9 @@ enum
 	QUERY_MAX_MAJOR_CHAN_NUM,
 	UPDATE_MAJOR_CHAN_NUM,
 	QUERY_SRV_BY_CHAN_NUM,
+	QUERY_SAT_PARA_BY_POS_NUM,
+	QUERY_SAT_PARA_BY_LO_LA,
+	INSERT_SAT_PARA,
 	MAX_STMT
 };
 
@@ -157,18 +173,29 @@ typedef struct
 /**\brief 搜索频点数据*/
 typedef struct
 {
-	int status;		/**< 搜索状态, AM_SCAN_FE_ATV等*/
-	AM_Bool_t dtv_locked;	/**< 数字是否以锁住频点，用于ATSC，避免重复设置数字和模拟频率*/
-	int atv_freq;	/**< 模拟频率*/
-	struct dvb_frontend_parameters dtv_para /**< 数字参数*/;
+	int					status;		/**< 搜索状态, AM_SCAN_FE_ATV等*/
+	AM_Bool_t			dtv_locked;	/**< 数字是否以锁住频点，用于ATSC，避免重复设置数字和模拟频率*/
+	int					atv_freq;	/**< 模拟频率*/
+	AM_FENDCTRL_DVBFrontendParameters_t	dtv_para 	/**< 数字参数*/;
 }AM_SCAN_FrontEndPara_t;
+
+/**\brief 卫星盲扫控制数据*/
+typedef struct
+{
+	int								start_freq;	/**< 起始频率*/
+	int								stop_freq;	/**< 结束频率*/
+	int								stage;		/**< HL,HH,VL,VH*/
+	AM_SCAN_BlindScanProgress_t		progress;	/**< Blind Scan 进度*/
+	int								searched_tp_cnt;	/**< 已搜索到的 TP 个数*/
+	struct dvb_frontend_parameters	searched_tps[AM_SCAN_MAX_BS_TP_CNT];	/**< 已搜索到的TP*/
+}AM_SCAN_BlindScanCtrl_t;
 
 
 /**\brief 搜索中间数据*/
 struct AM_SCAN_Scanner_s
 {
 	AM_SCAN_TableCtl_t				patctl;			/**< PAT接收控制*/
-	AM_SCAN_TableCtl_t				pmtctl;			/**< PMT接收控制*/
+	AM_SCAN_TableCtl_t				pmtctl[20];			/**< PMT接收控制*/
 	AM_SCAN_TableCtl_t				catctl;			/**< CAT接收控制*/
 	AM_SCAN_TableCtl_t				sdtctl;			/**< SDT接收控制*/
 	AM_SCAN_TableCtl_t				nitctl;			/**< NIT接收控制*/
@@ -198,6 +225,7 @@ struct AM_SCAN_Scanner_s
 	int								end_code;		/**< 搜索结束码*/
 	void							*user_data;		/**< 用户数据*/
 	AM_Bool_t						store;			/**< 是否存储*/
+	AM_SCAN_BlindScanCtrl_t			bs_ctl;			/**< 盲扫控制*/
 };
 
 

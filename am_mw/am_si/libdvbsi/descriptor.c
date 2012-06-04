@@ -49,6 +49,8 @@ extern void si_decode_descriptor(dvbpsi_descriptor_t *des);
 dvbpsi_descriptor_t* dvbpsi_NewDescriptor(uint8_t i_tag, uint8_t i_length,
                                           uint8_t* p_data)
 {
+  if (i_length == 0)
+  	return NULL;
   dvbpsi_descriptor_t* p_descriptor
                 = (dvbpsi_descriptor_t*)malloc(sizeof(dvbpsi_descriptor_t));
 

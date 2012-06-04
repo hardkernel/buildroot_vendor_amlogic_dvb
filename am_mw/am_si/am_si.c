@@ -633,19 +633,20 @@ AM_ErrorCode_t AM_SI_DecodeSection(int handle, uint16_t pid, uint8_t *buf, uint1
 
 /**\brief 释放一个从 AM_SI_DecodeSection()返回的section
  * \param handle SI解析句柄
+ * \param table_id 用于标示section类型
  * \param [in] sec 需要释放的section
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-AM_ErrorCode_t AM_SI_ReleaseSection(int handle, void *sec)
+AM_ErrorCode_t AM_SI_ReleaseSection(int handle, uint8_t table_id, void *sec)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
 	assert(sec);
 	AM_TRY(si_check_handle(handle));
 
-	switch (((dvbpsi_pat_t*)sec)->i_table_id)
+	switch (table_id)
 	{
 		case AM_SI_TID_PAT:
 			dvbpsi_DeletePAT((dvbpsi_pat_t*)sec);
