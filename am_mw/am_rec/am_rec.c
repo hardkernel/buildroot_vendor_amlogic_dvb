@@ -479,6 +479,9 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 	if (mkdir(rec->rec_file_name, 0666) && errno != EEXIST)
 	{
 		AM_DEBUG(0, "Cannot create record store directory '%s', error: %s.", rec->rec_file_name, strerror(errno));	
+		if (errno == EACCES)
+			return AM_REC_ERR_CANNOT_ACCESS_FILE;
+			
 		return AM_REC_ERR_CANNOT_OPEN_FILE;
 	}
 		
@@ -506,8 +509,17 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 			now = rand();
 			snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), "%s/DVBRecordFiles/REC_%04d%02d%02d_%d.ts", 
 				rec->store_dir, stim.tm_year + 1900, stim.tm_mon+1, stim.tm_mday, now);
-			if (stat(rec->rec_file_name, &st) && errno == ENOENT)
-				break;
+			if (!stat(rec->rec_file_name, &st))
+			{
+				continue;
+			}
+			else
+			{
+				AM_DEBUG(1, "Try search file in %s/DVBRecordFiles Failed, error: %s", rec->store_dir, strerror(errno));
+				if (errno == EACCES)
+					return AM_REC_ERR_CANNOT_ACCESS_FILE;
+				return AM_REC_ERR_CANNOT_OPEN_FILE;
+			}	
 		}while(1);
 
 		if (rec->rec_db_id != -1)
@@ -581,6 +593,7 @@ static int am_rec_start_record(AM_REC_Recorder_t *rec)
 	}
 
 start_end:
+	AM_DEBUG(0, "start record return %d", ret);
 	if (ret != 0)
 	{
 		/*通知录像错误*/
