@@ -20,7 +20,7 @@
 struct mosaic_ctx_s
 {
     INT32S (*fill_rectangle)(INT32S left, INT32S top, INT32U width, INT32U height, INT32U color);
-    INT32U (*convert_color)(INT8U alpah, INT8U red, INT8U green, INT8U blue);
+    INT32U (*convert_color)(INT32U index);
 };
 
 struct mosaic_ctx_s* mosaic_ctx = NULL;
@@ -94,7 +94,7 @@ INT32S Mosaic_deinit(void)
 
 
 INT32S Mosaic_RegisterCallback(INT32S (*fill_rectangle)(INT32S left, INT32S top, INT32U width, INT32U height, INT32U color),
-                               INT32U (*convert_color)(INT8U alpah, INT8U red, INT8U green, INT8U blue))
+                               INT32U (*convert_color)(INT32U index))
 {
     INT32S error_code = AM_SUCCESS;
 
@@ -109,7 +109,7 @@ INT32S Mosaic_RegisterCallback(INT32S (*fill_rectangle)(INT32S left, INT32S top,
     }
 
     mosaic_ctx->fill_rectangle = fill_rectangle;
-    mosaic_ctx->convert_color   = convert_color;
+    mosaic_ctx->convert_color  = convert_color;
 
     return error_code;
 }
@@ -148,7 +148,7 @@ void DrawG1Mosaic(LPRECT lpRect, INT8U uChar, INT8U uColor, BOOLEAN bSeparated)
 
                 rect.width = w;
                 rect.height = h;
-                mosaic_ctx->fill_rectangle(rect.left, rect.top, rect.width, rect.height, mosaic_ctx->convert_color(0xff, 6, 58, 208));
+                mosaic_ctx->fill_rectangle(rect.left, rect.top, rect.width, rect.height, mosaic_ctx->convert_color(uColor));
             }
         }
     }

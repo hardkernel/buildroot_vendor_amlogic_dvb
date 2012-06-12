@@ -350,44 +350,7 @@ INT32S Draw_RegisterCallback(INT32S (*fill_rectangle)(INT32S left, INT32S top, I
 
 static INT8U GetColorValue(INT8U TxtColor)
 {
-    INT8U uRetValue = 0;
-
-    switch (TxtColor)
-    {
-        case VTCOLOR_BLACK:
-            uRetValue = 0;
-            break;
-        case VTCOLOR_BLUE:
-            uRetValue = 1;
-            break;
-        case VTCOLOR_GREEN:
-            uRetValue = 2;
-            break;
-        case VTCOLOR_CYAN:
-            uRetValue = 3;
-            break;
-        case VTCOLOR_RED:
-            uRetValue = 4;
-            break;
-        case VTCOLOR_MAGENTA:
-            uRetValue = 5;
-            break;
-        case VTCOLOR_YELLOW:
-            uRetValue = 6;
-            break;
-        case VTCOLOR_WHITE:
-            uRetValue = 15;
-            break;
-        case VTCOLOR_NONE:
-            uRetValue = 0xff;
-            break;
-
-        default:
-            uRetValue = 0;
-            break;
-    }
-
-    return uRetValue;
+    return TxtColor;
 }
 
 void SetBounds(INT16U uWidth, INT16U uHeight)
