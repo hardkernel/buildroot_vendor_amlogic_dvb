@@ -513,6 +513,10 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 			{
 				continue;
 			}
+			else if (errno == ENOENT)
+			{
+				break;
+			}
 			else
 			{
 				AM_DEBUG(1, "Try search file in %s/DVBRecordFiles Failed, error: %s", rec->store_dir, strerror(errno));
