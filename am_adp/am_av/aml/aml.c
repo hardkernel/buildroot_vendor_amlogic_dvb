@@ -3140,26 +3140,25 @@ static void* aml_av_monitor_thread(void *arg)
 					resample = 0;
 				}
 
-				if(resample == 2){
+				if(resample != 1){
 					char buf[32], dmx_buf[32];
 
 					if(AM_FileRead(AUDIO_PTS_FILE, buf, sizeof(buf))>=0 &&
 							AM_FileRead(AUDIO_DMX_PTS_FILE, dmx_buf, sizeof(dmx_buf))>=0){
-						apts = strtol(buf, NULL, 0);
-						dmx_apts = strtol(dmx_buf, NULL, 0);
+						sscanf(buf+2, "%x", &apts);
+						sscanf(dmx_buf, "%d", &dmx_apts);
 					}
 
 					if(AM_FileRead(VIDEO_PTS_FILE, buf, sizeof(buf))>=0 &&
 							AM_FileRead(VIDEO_DMX_PTS_FILE, dmx_buf, sizeof(dmx_buf))>=0){
-						vpts = strtol(buf, NULL, 0);
-						dmx_vpts = strtol(dmx_buf, NULL, 0);
+						sscanf(buf+2, "%x", &vpts);
+						sscanf(dmx_buf, "%d", &dmx_vpts);
 					}
 
 					if(((dmx_apts - apts) > 90000 * 2) || ((dmx_vpts - vpts) > 90000 * 2)){
 						resample = 1;
 					}
 				}
-
 				AM_DEBUG(1, "asize %d adata %d vsize %d vdata %d apts_diff %d vpts_diff %d resample %d",
 					ab_size, a_size, vb_size, v_size, dmx_apts-apts, dmx_vpts-vpts, resample);
 
@@ -3171,6 +3170,7 @@ static void* aml_av_monitor_thread(void *arg)
 						case 2: cmd = "2"; break;
 						default: cmd = "0"; break;
 					}
+					AM_FileEcho(ENABLE_RESAMPLE_FILE, resample?"1":"0");
 					AM_FileEcho(RESAMPLE_TYPE_FILE, cmd);
 				}
 			}
