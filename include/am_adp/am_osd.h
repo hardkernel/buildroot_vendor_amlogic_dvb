@@ -65,6 +65,8 @@ typedef enum
 	AM_OSD_FMT_COLOR_BGR_888,    /**< 真彩b:8 g:8 r:8*/
 	AM_OSD_FMT_COLOR_ARGB_8888,  /**< 真彩a:8 r:8 g:8 b:8*/
 	AM_OSD_FMT_COLOR_BGRA_8888,  /**< 真彩a:8 r:8 g:8 b:8*/
+	AM_OSD_FMT_COLOR_RGBA_8888,  /**< 真彩a:8 r:8 g:8 b:8*/
+	AM_OSD_FMT_COLOR_ABGR_8888,  /**< 真彩a:8 r:8 g:8 b:8*/
 	AM_OSD_FMT_YUV_420,          /**< YUV4:2:0模式*/
 	AM_OSD_FMT_YUV_422,          /**< YUV4:2:2模式*/
 	AM_OSD_FMT_YUV_444,          /**< YUV4:4:4模式*/
