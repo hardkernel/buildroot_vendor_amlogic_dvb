@@ -442,6 +442,7 @@ static AM_Bool_t AM_SEC_If_Rotorpos_Valid_Goto(eSecCommand_t *sec_cmd)
 	return AM_FALSE;
 }
 
+/**\brief 判断马达参数是否有效*/
 static void AM_SEC_Set_Invalid_Cur_RotorPara(eSecCommand_t *sec_cmd)
 {
 	assert(sec_cmd);
@@ -455,6 +456,7 @@ static void AM_SEC_Set_Invalid_Cur_RotorPara(eSecCommand_t *sec_cmd)
 	return;
 }
 
+/**\brief 更新马达参数*/
 static void AM_SEC_Set_Update_Cur_RotorPara(eSecCommand_t *sec_cmd)
 {
 	assert(sec_cmd);
@@ -473,6 +475,7 @@ static void AM_SEC_Set_Update_Cur_RotorPara(eSecCommand_t *sec_cmd)
 	return;
 }
 
+/**\brief 马达转动中是否锁定*/
 static AM_Bool_t AM_SEC_If_Tuner_Locked_Goto(eSecCommand_t *sec_cmd)
 {
 	assert(sec_cmd);
@@ -492,6 +495,7 @@ static AM_Bool_t AM_SEC_If_Tuner_Locked_Goto(eSecCommand_t *sec_cmd)
 	return AM_FALSE;
 }
 
+/**\brief 马达转动中*/
 static void AM_SEC_Set_RotorMoving(eSecCommand_t *sec_cmd)
 {
 	assert(sec_cmd);
@@ -505,6 +509,7 @@ static void AM_SEC_Set_RotorMoving(eSecCommand_t *sec_cmd)
 	return;
 }
 
+/**\brief 马达转动停止*/
 static void AM_SEC_Set_RotorStoped(eSecCommand_t *sec_cmd)
 {
 	assert(sec_cmd);
@@ -518,6 +523,7 @@ static void AM_SEC_Set_RotorStoped(eSecCommand_t *sec_cmd)
 	return;
 }
 
+/**\brief 是否需要快速锁定*/
 static AM_Bool_t AM_SEC_Need_Turn_Fast(int turn_speed)
 {
 	if (turn_speed == FAST)
@@ -530,6 +536,7 @@ static AM_Bool_t AM_SEC_Need_Turn_Fast(int turn_speed)
 	return AM_FALSE;
 }
 
+/**\brief 马达转动锁频超时时间*/
 static void AM_SEC_Set_Timeout(eSecCommand_t *sec_cmd)
 {
 	assert(sec_cmd);
@@ -543,6 +550,7 @@ static void AM_SEC_Set_Timeout(eSecCommand_t *sec_cmd)
 	return;
 }
 
+/**\brief 马达转动锁频超时时间是否到达*/
 static AM_Bool_t AM_SEC_If_Timeout_Goto(eSecCommand_t *sec_cmd)
 {
 	assert(sec_cmd);
@@ -555,6 +563,7 @@ static AM_Bool_t AM_SEC_If_Timeout_Goto(eSecCommand_t *sec_cmd)
 	return AM_FALSE;
 }
 
+/**\brief 卫星设备控制事件设置*/
 static AM_ErrorCode_t AM_Sec_AsyncSet(void)
 {
 	AM_SEC_AsyncInfo_t *p_sec_asyncinfo = &(sec_control.m_sec_asyncinfo);
@@ -572,6 +581,7 @@ static AM_ErrorCode_t AM_Sec_AsyncSet(void)
 	return ret;
 }
 
+/**\brief 等待卫星设备控制事件*/
 static AM_ErrorCode_t AM_Sec_AsyncWait(void)
 {
 	AM_SEC_AsyncInfo_t *p_sec_asyncinfo = &(sec_control.m_sec_asyncinfo);
@@ -591,6 +601,7 @@ static AM_ErrorCode_t AM_Sec_AsyncWait(void)
 	return ret;
 }
 
+/**\brief 设置卫星设备控制事件信息*/
 static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, const AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t *b_para,
 												const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, fe_status_t *status, unsigned int tunetimeout)
 {
@@ -673,7 +684,7 @@ static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, const AM_FENDCTRL_DVBFront
 	return ret;
 }
 
-
+/**\brief 卫星设备控制状态检查*/
 static AM_ErrorCode_t AM_Sec_AsyncCheck(void)
 {
 	AM_SEC_AsyncInfo_t *p_sec_asyncinfo = &(sec_control.m_sec_asyncinfo);
@@ -689,6 +700,7 @@ static AM_ErrorCode_t AM_Sec_AsyncCheck(void)
 	return ret;
 }
 
+/**\brief 卫星设备控制线程*/
 static void* AM_Sec_AsyncThread(void *arg)
 {
 	AM_SEC_AsyncInfo_t *p_sec_asyncinfo = (AM_SEC_AsyncInfo_t *)arg;
@@ -734,6 +746,7 @@ static void* AM_Sec_AsyncThread(void *arg)
 	return NULL;
 }
 
+/**\brief 是否可进行卫星设备控制在锁频或者盲扫前*/
 static int AM_SEC_CanBlindScanOrTune(int dev_no, const AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t *b_para,
 											const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para)
 {	
@@ -871,7 +884,7 @@ static int AM_SEC_CanBlindScanOrTune(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 		}\
 	AM_MACRO_END			
 
-
+/**\brief 卫星设备控制流程*/
 static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t *b_para,
 										const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, fe_status_t *status, unsigned int tunetimeout)
 {
@@ -1030,10 +1043,10 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 					&& voltage_mode == HV )  )
 				voltage = SEC_VOLTAGE_18;
 			if ( (sw_param.m_22khz_signal == ON)
-				|| ( sw_param.m_22khz_signal == HILO && (b_para->ocaloscollatorfreq & AM_FEND_POLARISATION_H) ) )
+				|| ( sw_param.m_22khz_signal == HILO && (band&1) ) )
 				tone = SEC_TONE_ON;
 			else if ( (sw_param.m_22khz_signal == OFF)
-				|| ( sw_param.m_22khz_signal == HILO && !(b_para->ocaloscollatorfreq & AM_FEND_POLARISATION_H) ) )
+				|| ( sw_param.m_22khz_signal == HILO && !(band&1) ) )
 				tone = SEC_TONE_OFF;			
 		}
 
@@ -1641,6 +1654,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 	return AM_FENDCTRL_ERR_END;
 }
 
+/**\brief 卫星设备控制初始化*/
 static AM_ErrorCode_t AM_SEC_Init(void)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -1680,6 +1694,7 @@ static AM_ErrorCode_t AM_SEC_Init(void)
 	return ret;
 }
 
+/**\brief 卫星设备控制去初始化*/
 static AM_ErrorCode_t AM_SEC_DeInit(void)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
