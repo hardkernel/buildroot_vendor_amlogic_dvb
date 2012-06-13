@@ -100,11 +100,6 @@ typedef void (*AM_TT_DisplayUpdateCb_t)(void);
 typedef void (*AM_TT_ClearDisplayCb_t)(void);
 
 
-/**\brief 马赛克ARGB颜色转换
- * alpha,red,green,blue颜色属性
- */
-typedef unsigned int (*AM_TT_MosaicConvertColorCb_t)(unsigned char alpha, unsigned char red,  unsigned char green,  unsigned char blue);
-
 /**\brief 绘图回调函数集*/
 typedef struct {
 	AM_TT_FillRectCb_t        fill_rect;     /**< 填充矩形*/
@@ -115,7 +110,6 @@ typedef struct {
 	AM_TT_DrawBeginCb_t       draw_begin;    /**< 开始绘图*/
 	AM_TT_DisplayUpdateCb_t   disp_update;   /**< 更新显示*/
 	AM_TT_ClearDisplayCb_t    clear_disp;    /**< 清空屏幕*/
-	AM_TT_MosaicConvertColorCb_t mosaic_conv;/**< 马赛克颜色转换*/
 }AM_TT_DrawOps_t;
 
 /**\brief 初始化teletext 模块

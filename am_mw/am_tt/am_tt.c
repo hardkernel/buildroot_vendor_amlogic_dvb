@@ -25,6 +25,8 @@
 
 #define MAX_DMX_COUNT 3
 
+#define logp(...) __android_log_print(ANDROID_LOG_INFO, "XXXX", __VA_ARGS__)
+
 enum
 {
     TELTTEXT_UNLIZED,
@@ -102,7 +104,6 @@ typedef struct am_mw_teletext_context_s
 	AM_TT_GetFontMaxWidthCb_t gfw;
 	AM_TT_DrawBeginCb_t       draw_begin;
 	AM_TT_DisplayUpdateCb_t   update_display;
-	AM_TT_MosaicConvertColorCb_t mcc;
 	AM_TT_ClearDisplayCb_t       co;
 	int fhandle;
 	pthread_mutex_t rd_wr_Mutex;
@@ -705,7 +706,7 @@ static void teletext_draw_display_message(INT8U uType)
 
     char VTDisplayMessage[46];
 
-    context_tele.fr(DrawRect.left, DrawRect.top, DrawRect.width, DrawRect.height, context_tele.mcc(0xff, 6, 58, 208));
+    context_tele.fr(DrawRect.left, DrawRect.top, DrawRect.width, DrawRect.height, context_tele.cc(1));
 
     memset(VTDisplayMessage, 0x20, 45);
 
@@ -729,7 +730,7 @@ static void teletext_draw_display_message(INT8U uType)
             VTDisplayMessage[26]=0x0;VTDisplayMessage[27]='.';
  
 	    TELETEXT_DRAW(&context_tele, ({
-            	context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (unsigned short*)VTDisplayMessage, 28, context_tele.mcc(0xff, 255, 255, 255), 1, 1);
+            	context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (unsigned short*)VTDisplayMessage, 28, context_tele.cc(3), 1, 1);
 	    }));
             break;
 
@@ -759,7 +760,7 @@ static void teletext_draw_display_message(INT8U uType)
             VTDisplayMessage[42]=0x0;VTDisplayMessage[43]='9';
             VTDisplayMessage[44]=0x0;VTDisplayMessage[45]='9';
 	    TELETEXT_DRAW(&context_tele, ({
-            context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (INT16U *)VTDisplayMessage, 46, context_tele.mcc(0xff, 255, 255, 255), 1, 1);
+            context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (INT16U *)VTDisplayMessage, 46, context_tele.cc(3), 1, 1);
 	    }));
             break;
         default:
@@ -1102,7 +1103,7 @@ AM_ErrorCode_t AM_TT_Init(int buffer_size)
 	Mosaic_init();
 	
 	Draw_RegisterCallback(teletext_fill_rectangle,teletext_draw_text,teletext_convert_color,teletext_get_font_height,teletext_get_font_max_width,teletext_clean_osd);
-	Mosaic_RegisterCallback(teletext_fill_rectangle,teletext_mosaic_convert_color);
+	Mosaic_RegisterCallback(teletext_fill_rectangle,teletext_convert_color);
 
 	pthread_mutex_init(&context_tele.rd_wr_Mutex,0);
 	context_tele.flags=0;
@@ -1112,7 +1113,6 @@ AM_ErrorCode_t AM_TT_Init(int buffer_size)
 	context_tele.cc=NULL;
 	context_tele.gfh=NULL;
 	context_tele.gfw=NULL;
-	context_tele.mcc=NULL;
 	context_tele.co=NULL;
 	context_tele.draw_begin=NULL;
 	context_tele.update_display=NULL;
@@ -1520,13 +1520,6 @@ static INT32U teletext_get_font_max_width(void)
 
 }
 
-static unsigned int teletext_mosaic_convert_color(unsigned char alpha, unsigned char red,  unsigned char green,  unsigned char blue)
-{
-	if(context_tele.mcc)	
-		return context_tele.mcc(alpha,red,green,blue);
-	return 0;
-}
-
 static void teletext_clean_osd()
 {
 	if(context_tele.co)		
@@ -1546,7 +1539,6 @@ AM_ErrorCode_t AM_TT_RegisterDrawOps(AM_TT_DrawOps_t *ops)
 	context_tele.gfw=ops->font_width;
 	context_tele.draw_begin = ops->draw_begin;
 	context_tele.update_display=ops->disp_update;
-	context_tele.mcc=ops->mosaic_conv;
 	context_tele.co=ops->clear_disp;
 
 	return 0;
@@ -1572,8 +1564,10 @@ AM_ErrorCode_t AM_TT_NextSubPage()
     }
 
     GetDisplayHeader(&context_tele.sCurrPage, TRUE);
+    
+    TELETEXT_DRAW(&context_tele, ({
     DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
-    context_tele.update_display();
+    }));
     
     context_tele.wPageIndex =  LOWWORD(nRetCode);
     context_tele.wPageSubCode = HIGHWORD(nRetCode);
@@ -1607,8 +1601,10 @@ AM_ErrorCode_t AM_TT_PreviousSubPage()
     }
 
     GetDisplayHeader(&context_tele.sCurrPage, TRUE);
+
+    TELETEXT_DRAW(&context_tele, ({
     DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
-    context_tele.update_display();
+    }));
 
     context_tele.wPageIndex =  LOWWORD(nRetCode);
     context_tele.wPageSubCode = HIGHWORD(nRetCode);
@@ -1655,8 +1651,10 @@ AM_ErrorCode_t AM_TT_NextPage()
 
 
     GetDisplayHeader(&context_tele.sCurrPage, TRUE);
+
+    TELETEXT_DRAW(&context_tele, ({
     DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
-    context_tele.update_display();
+    }));
 
     context_tele.wPageIndex =  LOWWORD(nRetCode);
     context_tele.wPageSubCode = HIGHWORD(nRetCode);
@@ -1701,8 +1699,10 @@ AM_ErrorCode_t AM_TT_PreviousPage()
     }
 
     GetDisplayHeader(&context_tele.sCurrPage, TRUE);
+
+    TELETEXT_DRAW(&context_tele, ({
     DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
-    context_tele.update_display();
+    }));
 
     context_tele.wPageIndex =  LOWWORD(nRetCode);
     context_tele.wPageSubCode = HIGHWORD(nRetCode);
@@ -1766,8 +1766,10 @@ AM_ErrorCode_t AM_TT_PerformColorLink(unsigned char color)
 
 
         GetDisplayHeader(&context_tele.sCurrPage, TRUE);
+
+        TELETEXT_DRAW(&context_tele, ({
         DrawPage(&context_tele.sCurrPage, 0, VTDoubleProfile);
-        context_tele.update_display();
+        }));
 
         context_tele.wPageIndex =  LOWWORD(uLoadedPageCode);
         context_tele.wPageSubCode = HIGHWORD(uLoadedPageCode);

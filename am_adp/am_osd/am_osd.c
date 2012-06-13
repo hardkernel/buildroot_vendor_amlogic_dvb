@@ -262,7 +262,29 @@ static AM_ErrorCode_t osd_init(void)
 	fmt[type].bits_per_pixel      = 32;
 	fmt[type].bytes_per_pixel     = 4;
 	FMT_BIT_MASK(0x000000FF,0,0,0x0000FF00,8,0,0x00FF0000,16,0,0xFF000000,24,0);
-	
+
+#if __BYTE_ORDER == __BIG_ENDIAN
+	type = AM_OSD_FMT_COLOR_ABGR_8888;
+#else
+	type = AM_OSD_FMT_COLOR_RGBA_8888;
+#endif
+	fmt[type].type                = type;
+	fmt[type].planes              = 1;
+	fmt[type].bits_per_pixel      = 32;
+	fmt[type].bytes_per_pixel     = 4;
+	FMT_BIT_MASK(0xFF000000,24,0,0x000000FF,0,0,0x0000FF00,8,0,0x00FF0000,16,0);
+
+#if __BYTE_ORDER == __BIG_ENDIAN
+	type = AM_OSD_FMT_COLOR_RGBA_8888;
+#else
+	type = AM_OSD_FMT_COLOR_ABGR_8888;
+#endif
+	fmt[type].type                = type;
+	fmt[type].planes              = 1;
+	fmt[type].bits_per_pixel      = 32;
+	fmt[type].bytes_per_pixel     = 4;
+	FMT_BIT_MASK(0x000000FF,0,0,0xFF000000,24,0,0x00FF0000,16,0,0x0000FF00,8,0);
+
 	type = AM_OSD_FMT_YUV_420;
 	fmt[type].type                = type;
 	fmt[type].planes              = 3;

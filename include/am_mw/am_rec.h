@@ -43,6 +43,7 @@ enum AM_REC_ErrorCode
 	AM_REC_ERR_TIME_CONFLICT,			/**< 录像时间段冲突*/
 	AM_REC_ERR_CANNOT_OPEN_FILE,		/**< 无法打开录像文件*/
 	AM_REC_ERR_CANNOT_WRITE_FILE,		/**< 写录像文件出错*/
+	AM_REC_ERR_CANNOT_ACCESS_FILE,		/**< 无法访问文件，检查权限*/
 	AM_REC_ERR_DVR,						/**< 操作DVR设备出错*/
 	AM_REC_ERR_END
 };
