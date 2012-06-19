@@ -213,6 +213,10 @@ typedef struct AM_SEC_DVBSatelliteLNBParameters
 	int LNBNum;                         /**< LNB1 LNB2*/
 
 	AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t b_para; /**< 盲扫设置参数*/
+
+	AM_Bool_t sec_blind_flag; /**< 盲扫模式标识*/
+
+	pthread_mutex_t    lock; /**< 卫星设备控制LNB数据保护互斥体*/	
 }AM_SEC_DVBSatelliteLNBParameters_t;
 
 /**\brief 卫星设备控制命令延迟*/
@@ -260,12 +264,10 @@ typedef struct AM_SEC_AsyncInfo
 typedef struct AM_SEC_DVBSatelliteEquipmentControl
 {
 	AM_SEC_DVBSatelliteLNBParameters_t m_lnbs; /**< LNB参数*/
-	AM_Bool_t m_rotorMoving; /**< rotor状态*/
 	AM_Bool_t m_canMeasureInputPower; /**< 供电状态*/
+	AM_SEC_Cmd_Param_t m_params[SEC_CMD_MAX_PARAMS]; /**< 命令延迟参数*/
 
 	AM_SEC_AsyncInfo_t m_sec_asyncinfo; /**< 卫星设备控制异步运行信息*/
-
-	AM_SEC_Cmd_Param_t m_params[SEC_CMD_MAX_PARAMS]; /**< 命令延迟参数*/
 }AM_SEC_DVBSatelliteEquipmentControl_t;
 
 

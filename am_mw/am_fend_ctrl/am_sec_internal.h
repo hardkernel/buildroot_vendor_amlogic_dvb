@@ -134,6 +134,7 @@ typedef enum {
 	CUR_VOLTAGE_INC,      // current voltage increased
 	CUR_TONE,             // current continuous tone
 	SATCR,                // current SatCR
+	SEC_TIMEOUTCOUNT,	// needed for timeout
 	NUM_DATA_ENTRIES
 }AM_SEC_FEND_DATA;
 
