@@ -3478,9 +3478,13 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 	else
 		freq = scanner->fe_evt.parameters.frequency;
 		
-	AM_DEBUG(1, "%d %d, unicable %d", freq, 
-		dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency,
-		(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE)?1:0);
+	if ((scanner->curr_freq >= 0) && 
+		(scanner->curr_freq < scanner->start_freqs_cnt))
+	{
+		AM_DEBUG(1, "%d %d, unicable %d", freq, 
+			dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency,
+			(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE)?1:0);
+	}
 	if ((scanner->curr_freq >= 0) && 
 		(scanner->curr_freq < scanner->start_freqs_cnt) &&
 		(dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency != freq) && 
