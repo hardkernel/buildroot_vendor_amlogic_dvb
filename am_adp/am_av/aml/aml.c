@@ -4566,7 +4566,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			}
 
 			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "3");
-			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "14");
+			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "30");
 			AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","0");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");
