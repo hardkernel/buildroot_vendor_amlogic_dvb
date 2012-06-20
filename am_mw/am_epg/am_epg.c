@@ -1136,6 +1136,7 @@ static void am_epg_solve_fend_evt(AM_EPG_Monitor_t *mon)
 		return;
 
 	AM_DEBUG(1, "EPG change TS");
+	SIGNAL_EVENT(AM_EPG_EVT_CHANGE_TS, (void*)&mon->fe_evt.parameters);
 	mon->curr_param = mon->fe_evt.parameters;
 	am_epg_reset(mon);
 }
@@ -1298,7 +1299,8 @@ static void *am_epg_thread(void *para)
 
 	/*获得当前前端参数*/
 	AM_FEND_GetPara(mon->fend_dev, &mon->curr_param);
-
+	AM_EVT_Signal((int)mon, AM_EPG_EVT_CHANGE_TS, (void*)&mon->curr_param);
+	
 	/*注册前端事件*/
 	AM_EVT_Subscribe(mon->fend_dev, AM_FEND_EVT_STATUS_CHANGED, am_epg_fend_callback, (void*)mon);
 
