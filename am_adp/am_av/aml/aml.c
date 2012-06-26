@@ -1255,9 +1255,9 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 			memset(&cp, 0, sizeof(cp));
 			audio_decode_init(&adec_handle, &cp);
 		}
-#ifdef CHIP_8626X
+//#ifdef CHIP_8626X
 		audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
-#endif
+//#endif
 		
 		audio_decode_start(adec_handle);
 #endif
@@ -1870,9 +1870,9 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 
 			audio_decode_init(&adec_handle, &cp);
 		}
-#ifdef CHIP_8626X
+//#ifdef CHIP_8626X
 		audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
-#endif
+//#endif
 		
 		audio_decode_start(adec_handle);
 #endif
@@ -3089,9 +3089,9 @@ static void* aml_av_monitor_thread(void *arg)
 					memset(&cp, 0, sizeof(cp));
 					audio_decode_init(&adec_handle, &cp);
 				}
-#ifdef CHIP_8626X
+//#ifdef CHIP_8626X
 				audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
-#endif
+//#endif
 
 				audio_decode_start(adec_handle);
 				AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
@@ -3471,9 +3471,9 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 
 				audio_decode_init(&adec_handle, &cp);
 			}
-#ifdef CHIP_8626X
+//#ifdef CHIP_8626X
 			audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
-#endif
+//#endif
 
 			audio_decode_start(adec_handle);
 #endif
