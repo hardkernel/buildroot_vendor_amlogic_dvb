@@ -3472,6 +3472,7 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 	AM_SCAN_SignalInfo_t si;
 	int i;
 	unsigned int freq;
+	unsigned int cur_drift, max_drift;
 	
 	if (scanner->result.src == AM_FEND_DEMOD_DVBS)
 		AM_SEC_FreqConvert(scanner->fend_dev, scanner->fe_evt.parameters.frequency, &freq);
@@ -3485,13 +3486,31 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 			dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency,
 			(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE)?1:0);
 	}
-	if ((scanner->curr_freq >= 0) && 
-		(scanner->curr_freq < scanner->start_freqs_cnt) &&
-		(dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency != freq) && 
-		!(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE))
+
+	if (scanner->result.src == AM_FEND_DEMOD_DVBS)
 	{
-		AM_DEBUG(1, "Unexpected fend_evt arrived");
-		return;
+		cur_drift = AM_ABS(dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency - freq);
+		/*algorithm from kernel*/
+		max_drift = scanner->start_freqs[scanner->curr_freq].dtv_para.sat.para.u.qpsk.symbol_rate / 2000;
+		
+		if ((scanner->curr_freq >= 0) && 
+			(scanner->curr_freq < scanner->start_freqs_cnt) &&
+			(cur_drift > max_drift) && 
+			!(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE))
+		{
+			AM_DEBUG(1, "Unexpected fend_evt arrived dvbs");
+			return;
+		}	
+	}
+	else
+	{
+		if ((scanner->curr_freq >= 0) && 
+			(scanner->curr_freq < scanner->start_freqs_cnt) &&
+			(dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency != freq))
+		{
+			AM_DEBUG(1, "Unexpected fend_evt arrived");
+			return;
+		}
 	}
 
 	if ( ! (scanner->recv_status & AM_SCAN_RECVING_WAIT_FEND))
