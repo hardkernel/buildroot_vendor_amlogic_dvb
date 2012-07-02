@@ -3482,8 +3482,9 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 	if ((scanner->curr_freq >= 0) && 
 		(scanner->curr_freq < scanner->start_freqs_cnt))
 	{
-		AM_DEBUG(1, "%d %d, unicable %d", freq, 
+		AM_DEBUG(1, "%d %d, max_drift %d, unicable %d", freq, 
 			dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency,
+			scanner->start_freqs[scanner->curr_freq].dtv_para.sat.para.u.qpsk.symbol_rate / 2000,
 			(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE)?1:0);
 	}
 
@@ -3498,7 +3499,7 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 			(cur_drift > max_drift) && 
 			!(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE))
 		{
-			AM_DEBUG(1, "Unexpected fend_evt arrived dvbs");
+			AM_DEBUG(1, "Unexpected fend_evt arrived dvbs %d %d", cur_drift, max_drift);
 			return;
 		}	
 	}
