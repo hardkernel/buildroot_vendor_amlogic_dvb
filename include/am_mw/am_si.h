@@ -140,6 +140,7 @@ extern "C"
 #define AM_SI_DESCR_AAC						(0x7C)
 #define AM_SI_DESCR_LCN_83                      (0x83)
 #define AM_SI_DESCR_LCN_87                      (0x87)
+#define AM_SI_DESCR_LCN_88                      (0x88)
 
 /*ATSC Table types*/
 #define AM_SI_ATSC_TT_CURRENT_TVCT	0x0
