@@ -3674,7 +3674,8 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 
 	if (scanner->result.src == AM_FEND_DEMOD_DVBS)
 	{
-		cur_drift = AM_ABS(dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency - freq);
+		int tmp_drift = dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency - freq;
+		cur_drift = AM_ABS(tmp_drift);
 		/*algorithm from kernel*/
 		max_drift = scanner->start_freqs[scanner->curr_freq].dtv_para.sat.para.u.qpsk.symbol_rate / 2000;
 		
