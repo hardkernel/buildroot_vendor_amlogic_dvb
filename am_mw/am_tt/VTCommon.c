@@ -519,7 +519,7 @@ INT8U ParsePageElements(struct TVTPage* pPage, INT16U* lpFlags, TParserCallback 
         // Call the line elements parser
         if ((uResult = ParseLineElements(pPage, uRow, &uFlags, fnParseProc, draw_para)) == PARSE_STOPPAGE)
         {
-            break;
+            //break;
         }
 
         if (uResult == PARSE_NOTUPDATED)
@@ -539,7 +539,7 @@ INT8U ParsePageElements(struct TVTPage* pPage, INT16U* lpFlags, TParserCallback 
             // Call the line parser again for the repeat
             if ((uResult = ParseLineElements(pPage, uRow, &uFlags, fnParseProc, draw_para)) == PARSE_STOPPAGE)
             {
-                break;
+                //break;
             }
             uRow++;
         }

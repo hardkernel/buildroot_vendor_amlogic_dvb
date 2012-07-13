@@ -730,9 +730,7 @@ static void teletext_draw_display_message(INT8U uType)
             VTDisplayMessage[24]=0x0;VTDisplayMessage[25]='.';
             VTDisplayMessage[26]=0x0;VTDisplayMessage[27]='.';
  
-	    TELETEXT_DRAW(&context_tele, ({
-            	context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (unsigned short*)VTDisplayMessage, 28, context_tele.cc(3), 1, 1);
-	    }));
+            context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (unsigned short*)VTDisplayMessage, 28, context_tele.cc(3), 1, 1);
             break;
 
         case VT_INVALIDPAGENUM:
@@ -760,9 +758,7 @@ static void teletext_draw_display_message(INT8U uType)
             VTDisplayMessage[40]=0x0;VTDisplayMessage[41]='8';
             VTDisplayMessage[42]=0x0;VTDisplayMessage[43]='9';
             VTDisplayMessage[44]=0x0;VTDisplayMessage[45]='9';
-	    TELETEXT_DRAW(&context_tele, ({
             context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (INT16U *)VTDisplayMessage, 46, context_tele.cc(3), 1, 1);
-	    }));
             break;
         default:
             break;
@@ -997,7 +993,6 @@ AM_ErrorCode_t AM_TT_SetCurrentPageCode(unsigned short wPageCode, unsigned short
     	}
     	if (PageHex2ArrayIndex(wPageCode) == 0xFFFF)
     	{
-        	//teletext_draw_display_message(VT_INVALIDPAGENUM);
 		if(context_tele.ecb!=0)
 		{
 			context_tele.ecb(AM_TT_EVT_PAGE_ERROR);
@@ -1012,7 +1007,9 @@ AM_ErrorCode_t AM_TT_SetCurrentPageCode(unsigned short wPageCode, unsigned short
     	{
         	context_tele.wPageIndex =  wPageCode;
         	SetWaitingPage(wPageCode, TRUE);
+		TELETEXT_DRAW(&context_tele, ({
         	teletext_draw_display_message(VT_PAGENOTFIND);
+		}));
 
         	return AM_TT_ERR_PAGE_NOT_EXSIT;
     	}
@@ -1410,7 +1407,6 @@ AM_ErrorCode_t AM_TT_Start(int dmx_id, int pid, int mag, int page, int sub_page)
 	context_tele.wPageSubCode = sub_page;
 	context_tele.status=TELETEXT_STARTED;
 	teletext_history_reset();
-	//teletext_draw_display_message(VT_PAGENOTFIND);
 	goto exit;
 #ifndef LINUX_PES_FILTER
 error_set_buffer:
@@ -1781,7 +1777,10 @@ AM_ErrorCode_t AM_TT_PerformColorLink(unsigned char color)
     {
         context_tele.wPageIndex = wPageHex;
         SetWaitingPage(wPageHex, TRUE);
+
+	TELETEXT_DRAW(&context_tele, ({
         teletext_draw_display_message(VT_PAGENOTFIND);
+	}));
     }
 
     return AM_SUCCESS;
