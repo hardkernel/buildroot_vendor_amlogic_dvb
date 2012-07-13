@@ -49,13 +49,21 @@ extern void si_decode_descriptor(dvbpsi_descriptor_t *des);
 dvbpsi_descriptor_t* dvbpsi_NewDescriptor(uint8_t i_tag, uint8_t i_length,
                                           uint8_t* p_data)
 {
-  if (i_length == 0)
-  	return NULL;
   dvbpsi_descriptor_t* p_descriptor
                 = (dvbpsi_descriptor_t*)malloc(sizeof(dvbpsi_descriptor_t));
-
+  
   if(p_descriptor)
   {
+    if (i_length == 0)
+    {
+  	  /* In some descriptors, this case is legacy */
+  	  p_descriptor->p_data = NULL;
+  	  p_descriptor->i_tag = i_tag;
+      p_descriptor->i_length = i_length;
+      p_descriptor->p_decoded = NULL;
+      p_descriptor->p_next = NULL;
+  	  return p_descriptor;
+   }
     p_descriptor->p_data = (uint8_t*)malloc(i_length * sizeof(uint8_t));
 
     if(p_descriptor->p_data)

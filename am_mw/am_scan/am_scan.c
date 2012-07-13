@@ -595,7 +595,7 @@ static int insert_teletext(sqlite3_stmt **stmts, int db_srv_id, int pid, dvbpsi_
 	else
 	{
 		sqlite3_bind_int(stmts[INSERT_TELETEXT], 3, 0);
-		sqlite3_bind_int(stmts[INSERT_TELETEXT], 4, 0);
+		sqlite3_bind_int(stmts[INSERT_TELETEXT], 4, 1);
 		sqlite3_bind_int(stmts[INSERT_TELETEXT], 5, 0);
 		sqlite3_bind_text(stmts[INSERT_TELETEXT], 6, "", -1, SQLITE_STATIC);
 	}
@@ -1671,6 +1671,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 					int itel;
 					dvbpsi_teletext_dr_t *ptd = (dvbpsi_teletext_dr_t*)descr->p_decoded;
 
+					AM_DEBUG(1, "Find teletext descriptor, ptd %p", ptd);
 					if (ptd)
 					{
 						for (itel=0; itel<ptd->i_pages_number; itel++)
