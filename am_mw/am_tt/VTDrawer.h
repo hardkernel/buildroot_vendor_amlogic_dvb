@@ -33,7 +33,7 @@ void DrawPage(struct TVTPage* pPage, INT16U uFlags, INT8U pDoubleProfile[25]);
 
 INT32S Draw_RegisterCallback(INT32S (*fill_rectangle)(INT32S left, INT32S top, INT32U width, INT32U height, INT32U color),
                              INT32S (*draw_text)(INT32S x, INT32S y, INT32U width, INT32U height, INT16U *text, INT32S len, INT32U color, INT32U w_scale, INT32U h_scale),
-                             INT32U (*convert_color)(INT32U index),
+                             INT32U (*convert_color)(INT32U index, INT32U type),
                              INT32U (*get_font_height)(void),
                              INT32U (*get_font_max_width)(void),
 			     void (*clean_osd)(void));

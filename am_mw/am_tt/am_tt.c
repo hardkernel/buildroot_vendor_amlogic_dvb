@@ -125,7 +125,7 @@ static INT16U  VTPageHistory[TELETEXT_MAX_PAGEHISTORY];
 
 static INT32S teletext_fill_rectangle(INT32S left, INT32S top, INT32U width, INT32U height, INT32U color);
 static INT32S teletext_draw_text(INT32S x, INT32S y, INT32U width, INT32U height, INT16U *text, INT32S len, INT32U color, INT32U w_scale, INT32U h_scale);
-static INT32U teletext_convert_color(INT32U index);
+static INT32U teletext_convert_color(INT32U index, INT32U type);
 static INT32U teletext_get_font_height(void);
 static INT32U teletext_get_font_max_width(void);
 static unsigned int teletext_mosaic_convert_color(unsigned char alpha, unsigned char red,  unsigned char green,  unsigned char blue);
@@ -706,7 +706,7 @@ static void teletext_draw_display_message(INT8U uType)
 
     char VTDisplayMessage[46];
 
-    context_tele.fr(DrawRect.left, DrawRect.top, DrawRect.width, DrawRect.height, context_tele.cc(1));
+    context_tele.fr(DrawRect.left, DrawRect.top, DrawRect.width, DrawRect.height, context_tele.cc(1, AM_TT_COLOR_TEXT_BG));
 
     memset(VTDisplayMessage, 0x20, 45);
 
@@ -730,7 +730,7 @@ static void teletext_draw_display_message(INT8U uType)
             VTDisplayMessage[26]=0x0;VTDisplayMessage[27]='.';
  
 	    TELETEXT_DRAW(&context_tele, ({
-            	context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (unsigned short*)VTDisplayMessage, 28, context_tele.cc(3), 1, 1);
+            	context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (unsigned short*)VTDisplayMessage, 28, context_tele.cc(3, AM_TT_COLOR_TEXT_FG), 1, 1);
 	    }));
             break;
 
@@ -760,7 +760,7 @@ static void teletext_draw_display_message(INT8U uType)
             VTDisplayMessage[42]=0x0;VTDisplayMessage[43]='9';
             VTDisplayMessage[44]=0x0;VTDisplayMessage[45]='9';
 	    TELETEXT_DRAW(&context_tele, ({
-            context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (INT16U *)VTDisplayMessage, 46, context_tele.cc(3), 1, 1);
+            context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (INT16U *)VTDisplayMessage, 46, context_tele.cc(3, AM_TT_COLOR_TEXT_FG), 1, 1);
 	    }));
             break;
         default:
@@ -1487,11 +1487,11 @@ static INT32S teletext_draw_text(INT32S x, INT32S y, INT32U width, INT32U height
 
 }
 
-static INT32U teletext_convert_color(INT32U index)
+static INT32U teletext_convert_color(INT32U index, INT32U type)
 {
 	if(context_tele.cc)
 	{
-		return context_tele.cc(index);
+		return context_tele.cc(index, type);
 	}
 	return 0;
 

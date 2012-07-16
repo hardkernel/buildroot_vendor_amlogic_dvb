@@ -52,6 +52,15 @@ typedef enum AM_TT_EventCode
 	AM_TT_EVT_PAGE_ERROR,
 } AM_TT_EventCode_t;
 
+typedef enum
+{
+    AM_TT_COLOR_TEXT_FG,
+    AM_TT_COLOR_TEXT_BG,
+    AM_TT_COLOR_SPACE,
+    AM_TT_COLOR_MOSAIC
+} AM_TT_ColorType_t;
+
+
 /**\brief 填充矩形
  * left,top,width,height为矩形属性
  * color 为填充颜色
@@ -74,7 +83,7 @@ typedef void (*AM_TT_DrawTextCb_t)(int x, int y, unsigned int width, unsigned in
 /**\brief 颜色转换
  * index颜色索引值(0:黑色;1:蓝色;2:绿色;3:青色;4:红色;5:紫色;6:黄色;15:白色;)
  */
-typedef unsigned int (*AM_TT_ConvertColorCb_t)(unsigned int index);
+typedef unsigned int (*AM_TT_ConvertColorCb_t)(unsigned int index, unsigned int type);
 /**\brief 获取字体高度
  * (无参数)
  */
