@@ -172,7 +172,8 @@
 		sqlite3_bind_int(stmts[UPDATE_SRV], 22, 0);\
 		sqlite3_bind_int(stmts[UPDATE_SRV], 23, -1);\
 		sqlite3_bind_int(stmts[UPDATE_SRV], 24, satpara_dbid);\
-		sqlite3_bind_int(stmts[UPDATE_SRV], 25, srv_dbid);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 25, scrambled_flag);\
+		sqlite3_bind_int(stmts[UPDATE_SRV], 26, srv_dbid);\
 		sqlite3_step(stmts[UPDATE_SRV]);\
 		sqlite3_reset(stmts[UPDATE_SRV]);\
 		AM_DEBUG(1, "Updating Program: '%s',srv_type(%d), vpid(%d), vfmt(%d),apids(%s), afmts(%s), alangs(%s) ",\
@@ -187,6 +188,7 @@ typedef struct{
 	int    srv_cnt;
 	int    buf_size;
 	int   *srv_ids;
+	AM_SCAN_TS_t **tses;
 }ScanRecTab_t;
 
 /****************************************************************************
@@ -237,7 +239,11 @@ const char *sql_stmts[MAX_STMT] =
 	"delete  from srv_table where db_ts_id=?",
 	"select db_id from srv_table where db_net_id=? and db_ts_id=? and service_id=?",
 	"insert into srv_table(db_net_id, db_ts_id,service_id) values(?,?,?)",
-	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?, running_status=?, free_ca_mode=?, volume=?, aud_track=?, vid_pid=?, vid_fmt=?,aud_pids=?,aud_fmts=?,aud_langs=?,db_sub_id=-1,skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,hide_guide=?, source_id=?,favor=?,current_aud=?,db_sat_para_id=?  where db_id=?",
+	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?,\
+	 running_status=?,free_ca_mode=?,volume=?,aud_track=?,vid_pid=?,vid_fmt=?,aud_pids=?,aud_fmts=?,\
+	 aud_langs=?,db_sub_id=-1,skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,\
+	 hidden=?,hide_guide=?, source_id=?,favor=?,current_aud=?,db_sat_para_id=?,scrambled_flag=?,lcn=0,hd_lcn=0,\
+	 sd_lcn=0,default_chan_num=0 where db_id=?",
 	"select db_id,service_type from srv_table where db_ts_id=? order by service_id",
 	"update srv_table set chan_num=? where db_id=?",
 	"delete  from evt_table where db_ts_id=?",
@@ -259,6 +265,15 @@ const char *sql_stmts[MAX_STMT] =
 	"insert into sat_para_table(sat_name,lnb_num,lof_hi,lof_lo,lof_threshold,signal_22khz,voltage,motor_num,pos_num,lo_direction,la_direction,\
 	longitude,latitude,diseqc_mode,tone_burst,committed_cmd,uncommitted_cmd,repeat_count,sequence_repeat,fast_diseqc,cmd_order,sat_longitude) \
 	values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+	"select db_id from srv_table where src=? and lcn=?",
+	"select max(lcn) from srv_table where src=?",
+	"update srv_table set lcn=?,hd_lcn=?,sd_lcn=? where db_id=?",
+	"update srv_table set default_chan_num=? where db_id=?",
+	"select service_type from srv_table where db_id=?",
+	"select max(default_chan_num) from srv_table where service_type=? and src=?",
+	"select max(default_chan_num) from srv_table where src=?",
+	"select db_id,hd_lcn from srv_table where src=? and sd_lcn=?",
+	"select db_id,service_type from srv_table where src=? order by default_chan_num",
 };
 
 /****************************************************************************
@@ -395,24 +410,39 @@ static void scan_rec_tab_release(ScanRecTab_t *tab)
 {
 	if(tab->srv_ids){
 		free(tab->srv_ids);
+		free(tab->tses);
 	}
 }
 
-static int scan_rec_tab_add_srv(ScanRecTab_t *tab, int id)
+static int scan_rec_tab_add_srv(ScanRecTab_t *tab, int id, AM_SCAN_TS_t *ts)
 {
+	int i;
+
+	for(i=0; i<tab->srv_cnt; i++){
+		if(tab->srv_ids[i]==id)
+			return 0;
+	}
+	
 	if(tab->srv_cnt == tab->buf_size){
 		int size = AM_MAX(tab->buf_size*2, 32);
-		int *buf;
+		int *buf, *buf1;
 
 		buf = realloc(tab->srv_ids, sizeof(int)*size);
 		if(!buf)
 			return -1;
+		buf1 = realloc(tab->tses, sizeof(AM_SCAN_TS_t)*size);
+		if(!buf1) {
+			free(buf);
+			return -1;
+		}
 
 		tab->buf_size = size;
 		tab->srv_ids  = buf;
+		tab->tses = buf1;
 	}
 
-	tab->srv_ids[tab->srv_cnt++] = id;
+	tab->srv_ids[tab->srv_cnt] = id;
+	tab->tses[tab->srv_cnt++] = ts;
 
 	return 0;
 }
@@ -574,7 +604,7 @@ static int insert_teletext(sqlite3_stmt **stmts, int db_srv_id, int pid, dvbpsi_
 	else
 	{
 		sqlite3_bind_int(stmts[INSERT_TELETEXT], 3, 0);
-		sqlite3_bind_int(stmts[INSERT_TELETEXT], 4, 0);
+		sqlite3_bind_int(stmts[INSERT_TELETEXT], 4, 1);
 		sqlite3_bind_int(stmts[INSERT_TELETEXT], 5, 0);
 		sqlite3_bind_text(stmts[INSERT_TELETEXT], 6, "", -1, SQLITE_STATIC);
 	}
@@ -762,6 +792,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	uint8_t srv_type, eit_sche, eit_pf, rs, free_ca;
 	int vfmt, chan_num, afmt_tmp, vfmt_tmp;
 	int major_chan_num, minor_chan_num, source_id;
+	int scrambled_flag;
 	uint8_t access_controlled, hidden, hide_guide;
 	char name[AM_DB_MAX_SRV_NAME_LEN + 1];
 	char lang_tmp[3];
@@ -867,6 +898,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 		chan_num = 0;
 		source_id = 0;
 		aud_info.audio_count = 0;
+		scrambled_flag = 0;
 		
 		/*添加新业务到数据库*/
 		srv_dbid = insert_srv(stmts, net_dbid, dbid, 0xffff);
@@ -980,6 +1012,7 @@ analog_vct_done:
 				chan_num = 0;
 				source_id = 0;
 				aud_info.audio_count = 0;
+				scrambled_flag = 0;
 				
 				/*添加新业务到数据库*/
 				srv_dbid = insert_srv(stmts, net_dbid, dbid, ccinfo->program_number);
@@ -1084,6 +1117,7 @@ analog_vct_done:
 				chan_num = 0;
 				source_id = 0;
 				aud_info.audio_count = 0;
+				scrambled_flag = 0;
 				
 				/*添加新业务到数据库*/
 				srv_dbid = insert_srv(stmts, net_dbid, dbid, tcinfo->program_number);
@@ -1185,6 +1219,7 @@ analog_vct_done:
 		chan_num = 0;
 		source_id = 0;
 		aud_info.audio_count = 0;
+		scrambled_flag = 0;
 		
 		/*添加新业务到数据库*/
 		srv_dbid = insert_srv(stmts, net_dbid, dbid, pmt->i_program_number);
@@ -1360,6 +1395,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	uint8_t srv_type, eit_sche, eit_pf, rs, free_ca;
 	int vfmt, chan_num, afmt_tmp, vfmt_tmp;
 	int major_chan_num, minor_chan_num, source_id;
+	int scrambled_flag;
 	uint8_t access_controlled, hidden, hide_guide;
 	char name[AM_DB_MAX_SRV_NAME_LEN + 1];
 	char lang_tmp[3];
@@ -1513,6 +1549,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 		chan_num = 0;
 		source_id = 0;
 		aud_info.audio_count = 0;
+		scrambled_flag = 0;
 		
 		/*添加新业务到数据库*/
 		srv_dbid = insert_srv(stmts, net_dbid, dbid, srv_id);
@@ -1522,7 +1559,17 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 			continue;
 		}
 
-		scan_rec_tab_add_srv(tab, srv_dbid);
+		scan_rec_tab_add_srv(tab, srv_dbid, ts);
+		
+		/* looking for CA descr */
+		AM_SI_LIST_BEGIN(pmt-> p_first_descriptor, descr)
+			if (descr->i_tag == AM_SI_DESCR_CA && ! scrambled_flag)
+			{
+				AM_DEBUG(1, "Found CA descr, set scrambled flag to 1");
+				scrambled_flag = 1;
+				break;
+			}
+		AM_SI_LIST_END()
 
 		/*取ES流信息*/
 		AM_SI_LIST_BEGIN(pmt->p_first_es, es)
@@ -1633,6 +1680,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 					int itel;
 					dvbpsi_teletext_dr_t *ptd = (dvbpsi_teletext_dr_t*)descr->p_decoded;
 
+					AM_DEBUG(1, "Find teletext descriptor, ptd %p", ptd);
 					if (ptd)
 					{
 						for (itel=0; itel<ptd->i_pages_number; itel++)
@@ -1644,6 +1692,11 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 					{
 						insert_teletext(stmts, srv_dbid, es->i_pid, NULL);
 					}
+				}
+				else if (descr->i_tag == AM_SI_DESCR_CA && ! scrambled_flag)
+				{
+					AM_DEBUG(1, "Found CA descr, set scrambled flag to 1");
+					scrambled_flag = 1;
 				}
 			AM_SI_LIST_END()
 		AM_SI_LIST_END()
@@ -1725,6 +1778,429 @@ static void am_scan_clear_source(sqlite3 *hdb, int src)
 	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
 }
 
+/**\brief 从一个NIT中查找某个service的LCN*/
+static AM_Bool_t am_scan_get_lcn_from_nit(int org_net_id, int ts_id, int srv_id, dvbpsi_nit_t *nits, 
+int *sd_lcn, int *sd_visible, int *hd_lcn, int *hd_visible)
+{
+	dvbpsi_nit_ts_t *ts;
+	dvbpsi_descriptor_t *dr;
+	dvbpsi_nit_t *nit;
+	
+	*sd_lcn = -1;
+	*hd_lcn = -1;
+	AM_SI_LIST_BEGIN(nits, nit)
+		AM_SI_LIST_BEGIN(nit->p_first_ts, ts)
+			if(ts->i_ts_id==ts_id && ts->i_orig_network_id==org_net_id){
+				AM_SI_LIST_BEGIN(ts->p_first_descriptor, dr)
+					if(dr->p_decoded && ((dr->i_tag == AM_SI_DESCR_LCN_83))){
+						if(dr->i_tag==AM_SI_DESCR_LCN_83)
+						{
+							dvbpsi_logical_channel_number_83_dr_t *lcn_dr = (dvbpsi_logical_channel_number_83_dr_t*)dr->p_decoded;
+							dvbpsi_logical_channel_number_83_t *lcn = lcn_dr->p_logical_channel_number;
+							int j;
+
+							for(j=0; j<lcn_dr->i_logical_channel_numbers_number; j++){
+								if(lcn->i_service_id == srv_id){
+									*sd_lcn = lcn->i_logical_channel_number;
+									*sd_visible = lcn->i_visible_service_flag;
+									AM_DEBUG(1, "sd lcn for service %d ---> %d", srv_id, *sd_lcn);
+									if (*hd_lcn == -1) {
+										/* break to wait for lcn88 */
+										break;
+									} else {
+										goto lcn_found;
+									}
+								}
+								lcn++;
+							}
+						}
+					}
+					else if (dr->i_tag==AM_SI_DESCR_LCN_88)
+					{
+						dvbpsi_logical_channel_number_88_dr_t *lcn_dr = (dvbpsi_logical_channel_number_88_dr_t*)dr->p_decoded;
+						dvbpsi_logical_channel_number_88_t *lcn = lcn_dr->p_logical_channel_number;
+						int j;
+
+						for(j=0; j<lcn_dr->i_logical_channel_numbers_number; j++){
+							if(lcn->i_service_id == srv_id){
+								*hd_lcn = lcn->i_logical_channel_number;
+								*hd_visible = lcn->i_visible_service_flag;
+								if (*sd_lcn == -1) {
+									/* break to wait for lcn83 */
+									break;
+								} else {
+									goto lcn_found;
+								}
+							}
+							lcn++;
+						}
+					}
+				AM_SI_LIST_END()
+			}
+		AM_SI_LIST_END()
+	AM_SI_LIST_END()
+	
+lcn_found:
+	if (*sd_lcn != -1 || *hd_lcn != -1)
+		return AM_TRUE;
+	
+	return AM_FALSE;
+}
+
+/**\brief LCN排序处理*/
+static void am_scan_lcn_proc(AM_SCAN_Result_t *result, sqlite3_stmt **stmts, ScanRecTab_t *srv_tab)
+{
+#define LCN_CONFLICT_START 900
+#define UPDATE_SRV_LCN(_l, _hl, _sl, _d) \
+AM_MACRO_BEGIN\
+	sqlite3_bind_int(stmts[UPDATE_LCN], 1, _l);\
+	sqlite3_bind_int(stmts[UPDATE_LCN], 2, _hl);\
+	sqlite3_bind_int(stmts[UPDATE_LCN], 3, _sl);\
+	sqlite3_bind_int(stmts[UPDATE_LCN], 4, _d);\
+	sqlite3_step(stmts[UPDATE_LCN]);\
+	sqlite3_reset(stmts[UPDATE_LCN]);\
+AM_MACRO_END
+	if (result->tses && result->standard != AM_SCAN_STANDARD_ATSC)
+	{
+		dvbpsi_nit_t *nit;
+		AM_SCAN_TS_t *ts;
+		dvbpsi_descriptor_t *dr;
+		int i, conflict_lcn_start = LCN_CONFLICT_START;
+		
+		/*找到当前无LCN频道或LCN冲突频道的频道号起始位置*/
+		sqlite3_bind_int(stmts[QUERY_MAX_LCN], 1, result->src);
+		if(sqlite3_step(stmts[QUERY_MAX_LCN])==SQLITE_ROW)
+		{
+			conflict_lcn_start = sqlite3_column_int(stmts[QUERY_MAX_LCN], 0)+1;
+			if (conflict_lcn_start < LCN_CONFLICT_START)
+				conflict_lcn_start = LCN_CONFLICT_START;
+			AM_DEBUG(1, "Have LCN, will set conflict LCN from %d", conflict_lcn_start);
+		}
+		sqlite3_reset(stmts[QUERY_MAX_LCN]);
+		
+		for(i=0; i<srv_tab->srv_cnt; i++)
+		{
+			int r;
+
+			sqlite3_bind_int(stmts[QUERY_SRV_TS_NET_ID], 1, srv_tab->srv_ids[i]);
+			r = sqlite3_step(stmts[QUERY_SRV_TS_NET_ID]);
+			if(r==SQLITE_ROW)
+			{
+				int srv_id, ts_id, org_net_id;
+				int num = -1, visible = 1, hd_num = -1;
+				int sd_lcn = -1, hd_lcn = -1;
+				int sd_visible = 1, hd_visible = 1;
+				AM_Bool_t swapped = AM_FALSE;
+				AM_Bool_t got_lcn = AM_FALSE;
+
+				srv_id = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 0);
+				ts_id  = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 1);
+				org_net_id = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 2);
+
+				AM_DEBUG(1, "Looking for lcn of net %x, ts %x, srv %x", org_net_id, ts_id, srv_id);
+				if (srv_tab->tses[i] != NULL && 
+					am_scan_get_lcn_from_nit(org_net_id, ts_id, srv_id, srv_tab->tses[i]->nits, 
+					&sd_lcn, &sd_visible, &hd_lcn, &hd_visible))
+				{
+					/* find in its own ts */
+					AM_DEBUG(1, "Found lcn in its own TS");
+					got_lcn = AM_TRUE;
+				}
+				if (! got_lcn)
+				{
+					/* find in other tses */
+					AM_SI_LIST_BEGIN(result->tses, ts)
+						if (ts != srv_tab->tses[i])
+						{
+							if (am_scan_get_lcn_from_nit(org_net_id, ts_id, srv_id, ts->nits, 
+								&sd_lcn, &sd_visible, &hd_lcn, &hd_visible)) 
+							{
+								AM_DEBUG(1, "Found lcn in other TS");
+								break;
+							}
+						}
+					AM_SI_LIST_END()
+				}
+
+				/* Skip Non-TV&Radio services */
+				sqlite3_bind_int(stmts[QUERY_SRV_TYPE], 1, srv_tab->srv_ids[r]);
+				r = sqlite3_step(stmts[QUERY_SRV_TYPE]);
+				if (r == SQLITE_ROW)
+				{
+					int srv_type = sqlite3_column_int(stmts[QUERY_SRV_TYPE], 0);
+					if (srv_type != 1 && srv_type != 2)
+						continue;
+				}
+				sqlite3_reset(stmts[QUERY_SRV_TYPE]);
+				
+				AM_DEBUG(1, "save: sd_lcn is %d", sd_lcn);
+				/* default we use SD */
+				num = sd_lcn;
+				hd_num = hd_lcn;
+				visible = sd_visible;
+				
+				/* need to swap lcn ? */
+				if (sd_lcn != -1 && hd_lcn != -1)
+				{
+					/* 是否存在一个service的lcn == 本service的hd_lcn? */
+					sqlite3_bind_int(stmts[QUERY_SRV_BY_SD_LCN], 1, result->src);
+					sqlite3_bind_int(stmts[QUERY_SRV_BY_SD_LCN], 2, hd_lcn);
+					if(sqlite3_step(stmts[QUERY_SRV_BY_SD_LCN])==SQLITE_ROW)
+					{
+						int cft_db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_SD_LCN], 0);
+						int tmp_hd_lcn = sqlite3_column_int(stmts[QUERY_SRV_BY_SD_LCN], 1);
+						
+						AM_DEBUG(1, "SWAP LCN: from %d -> %d", tmp_hd_lcn, hd_lcn);
+						UPDATE_SRV_LCN(tmp_hd_lcn, tmp_hd_lcn, hd_lcn, cft_db_id);
+						AM_DEBUG(1, "SWAP LCN: from %d -> %d", hd_lcn, sd_lcn);
+						num = hd_lcn; /* Use sd_lcn instead of hd_lcn */
+						visible = hd_visible;
+						swapped = AM_TRUE;
+					}
+					sqlite3_reset(stmts[QUERY_SRV_BY_SD_LCN]);
+				}
+				else if (sd_lcn == -1)
+				{
+					/* only hd lcn */
+					num = hd_lcn;
+					visible = hd_visible;
+				}
+				
+				if(!visible){
+					sqlite3_bind_int(stmts[UPDATE_CHAN_SKIP], 1, 1);
+					sqlite3_bind_int(stmts[UPDATE_CHAN_SKIP], 2, srv_tab->srv_ids[i]);
+					sqlite3_step(stmts[UPDATE_CHAN_SKIP]);
+					sqlite3_reset(stmts[UPDATE_CHAN_SKIP]);
+				}
+				
+				if (! swapped)
+				{
+					if (num >= 0)
+					{
+						/*该频道号是否已存在*/
+						sqlite3_bind_int(stmts[QUERY_SRV_BY_LCN], 1, result->src);
+						sqlite3_bind_int(stmts[QUERY_SRV_BY_LCN], 2, num);
+						if(sqlite3_step(stmts[QUERY_SRV_BY_LCN])==SQLITE_ROW)
+						{
+							AM_DEBUG(1, "Find a conflict LCN, set from %d -> %d", num, conflict_lcn_start);
+							/*已经存在，将当前service放到900后*/
+							num = conflict_lcn_start++;
+						}
+						sqlite3_reset(stmts[QUERY_SRV_BY_LCN]);
+					}
+					else
+					{
+						/*未找到LCN， 将当前service放到900后*/
+						num = conflict_lcn_start++;
+						AM_DEBUG(1, "No LCN found for this program, automatically set to %d", num);
+					}
+				}
+
+				UPDATE_SRV_LCN(num, hd_lcn, sd_lcn, srv_tab->srv_ids[i]);
+			}
+			sqlite3_reset(stmts[QUERY_SRV_TS_NET_ID]);
+		}
+	}
+}
+
+/**\brief 按搜索顺序进行默认排序 */
+static void am_scan_default_sort_by_scan_order(AM_SCAN_Result_t *result, sqlite3_stmt **stmts, ScanRecTab_t *srv_tab)
+{
+	if (result->tses && result->standard != AM_SCAN_STANDARD_ATSC)
+	{
+		int row = AM_DB_MAX_SRV_CNT_PER_SRC, i, j;
+		int r, db_id, rr, srv_type;
+
+		i=1;
+		j=1;
+		
+		/* 重新按default_chan_num 对已有channel排序 */
+		sqlite3_bind_int(stmts[QUERY_SRV_BY_DEF_CHAN_NUM_ORDER], 1, result->src);
+		r = sqlite3_step(stmts[QUERY_SRV_BY_DEF_CHAN_NUM_ORDER]);
+		while (r == SQLITE_ROW)
+		{
+			db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_DEF_CHAN_NUM_ORDER], 0);
+			if (! scan_rec_tab_have_src(srv_tab, db_id))
+			{
+				srv_type = sqlite3_column_int(stmts[QUERY_SRV_BY_DEF_CHAN_NUM_ORDER], 1);
+				if (srv_type == 0x1)
+				{
+					/*电视节目*/
+					sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, i++);
+					sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
+					sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+					sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+				}
+				else if (srv_type == 0x2)
+				{
+					/*广播节目*/
+					sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, j++);
+					sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
+					sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+					sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+				}
+			}
+			r = sqlite3_step(stmts[QUERY_SRV_BY_DEF_CHAN_NUM_ORDER]);
+		}
+		sqlite3_reset(stmts[QUERY_SRV_BY_DEF_CHAN_NUM_ORDER]);
+		
+		AM_DEBUG(1, "Insert channel default channel num from TV:%d, Radio:%d", i, j);
+		/* 将本次搜索到的节目排到最后 */
+		for (r=0; r<srv_tab->srv_cnt; r++)
+		{
+			sqlite3_bind_int(stmts[QUERY_SRV_TYPE], 1, srv_tab->srv_ids[r]);
+			rr = sqlite3_step(stmts[QUERY_SRV_TYPE]);
+			if (rr == SQLITE_ROW)
+			{
+				srv_type = sqlite3_column_int(stmts[QUERY_SRV_TYPE], 0);
+				if (srv_type == 1)
+				{
+					/*电视节目*/
+					sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, i++);
+					sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, srv_tab->srv_ids[r]);
+					sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+					sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+				}
+				else if (srv_type == 2)
+				{
+					/*广播节目*/
+					sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, j++);
+					sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, srv_tab->srv_ids[r]);
+					sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+					sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+				}
+			}
+			sqlite3_reset(stmts[QUERY_SRV_TYPE]);
+		}
+	}
+}
+
+/**\brief 按频点大小和service_id大小排序*/
+static void am_scan_default_sort_by_service_id(AM_SCAN_Result_t *result, sqlite3_stmt **stmts, ScanRecTab_t *srv_tab)
+{
+	if (result->tses && result->standard != AM_SCAN_STANDARD_ATSC)
+	{
+		int row = AM_DB_MAX_SRV_CNT_PER_SRC, i, j, max_num;
+		int r, db_ts_id, db_id, rr, srv_type;
+
+		i=1;
+		j=1;
+
+		if(!result->resort_all)
+		{
+#ifndef SORT_TOGETHER
+			sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 1, 1);
+			sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 2, result->src);
+			r = sqlite3_step(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE]);
+			if(r==SQLITE_ROW)
+			{
+				i = sqlite3_column_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 0)+1;
+			}
+			sqlite3_reset(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE]);
+
+			sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 1, 2);
+			sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 2, result->src);
+			r = sqlite3_step(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE]);
+			if(r==SQLITE_ROW)
+			{
+				j = sqlite3_column_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 0)+1;
+			}
+			sqlite3_reset(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE]);
+#else
+			sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM], 1, result->src);
+			r = sqlite3_step(stmts[QUERY_MAX_DEFAULT_CHAN_NUM]);
+			if(r==SQLITE_ROW)
+			{
+				i = j = sqlite3_column_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM], 0)+1;
+			}
+			sqlite3_reset(stmts[QUERY_MAX_DEFAULT_CHAN_NUM]);
+
+#endif
+		}
+
+		/*重新对srv_table排序以生成新的频道号*/
+		/*首先按频点排序*/
+		sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, result->src);
+		r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+
+		while (r == SQLITE_ROW)
+		{
+			/*同频点下按service_id排序*/
+			db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
+			sqlite3_bind_int(stmts[QUERY_SRV_BY_TYPE], 1, db_ts_id);
+			rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
+			while (rr == SQLITE_ROW)
+			{
+				db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 0);
+
+				if(result->resort_all || scan_rec_tab_have_src(srv_tab, db_id))
+				{
+					srv_type = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 1);
+					if (srv_type == 1)
+					{
+						/*电视节目*/
+						sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, i);
+						sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
+						sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+						sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+						i++;
+					}
+#ifndef SORT_TOGETHER 
+					else if (srv_type == 2)
+					{
+						/*广播节目*/
+						sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, j);
+						sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
+						sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+						sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+						j++;
+					}
+				}
+
+				rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
+			}
+			sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
+#else
+				}
+				rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
+			}
+			sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
+			r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+		}
+		sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
+		sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, result->src);
+		r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+		while (r == SQLITE_ROW)
+		{
+			/*广播节目放到最后*/
+			db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
+			sqlite3_bind_int(stmts[QUERY_SRV_BY_TYPE], 1, db_ts_id);
+			rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
+			while (rr == SQLITE_ROW)
+			{
+				db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 0);
+				if(result->resort_all || scan_rec_tab_have_src(srv_tab, db_id))
+				{
+					srv_type = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 1);
+					if (srv_type == 2)
+					{
+						sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, i);
+						sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
+						sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+						sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+						i++;
+					}
+				}
+				rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
+			}
+			sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
+#endif
+			r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+		}
+		sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
+	}
+}
+
 /**\brief 默认搜索完毕存储函数*/
 static void am_scan_default_store(AM_SCAN_Result_t *result)
 {
@@ -1732,7 +2208,7 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 	char sqlstr[128];
 	sqlite3 *hdb = result->hdb;
 	sqlite3_stmt	*stmts[MAX_STMT];
-	int i, ret, conflict_lcn_start = 850;
+	int i, ret;
 	ScanRecTab_t srv_tab;
 	AM_Bool_t sorted = 0;
 	
@@ -1784,262 +2260,24 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 			store_atsc_ts(stmts, result, ts);
 	AM_SI_LIST_END()
 
-	/*根据LCN排序*/
-	if (!sorted && result->tses && result->standard != AM_SCAN_STANDARD_ATSC && result->enable_lcn)
+	/* 生成lcn排序结果 */
+	am_scan_lcn_proc(result, stmts, &srv_tab);
+	
+	/* 生成按service_id大小顺序排序结果 */
+	am_scan_default_sort_by_service_id(result, stmts, &srv_tab);
+	
+	/* 生成最终 chan_num */
+	if (result->enable_lcn)
 	{
-		dvbpsi_nit_t *nit;
-		dvbpsi_nit_ts_t *ts;
-		dvbpsi_descriptor_t *dr;
-		AM_Bool_t have_lcn = AM_FALSE;
-		
-		AM_SI_LIST_BEGIN(result->nits, nit)
-			AM_SI_LIST_BEGIN(nit->p_first_ts, ts)
-				AM_SI_LIST_BEGIN(ts->p_first_descriptor, dr)
-					if(dr->p_decoded && ((dr->i_tag == AM_SI_DESCR_LCN_83) || (dr->i_tag == AM_SI_DESCR_LCN_87)))
-					{
-						have_lcn = AM_TRUE;
-					}
-				AM_SI_LIST_END()
-			AM_SI_LIST_END()
-		AM_SI_LIST_END()
-
-		if(have_lcn)
-		{
-			/*找到当前无LCN频道或LCN冲突频道的频道号起始位置*/
-			sqlite3_bind_int(stmts[QUERY_MAX_CHAN_NUM], 1, result->src);
-			if(sqlite3_step(stmts[QUERY_MAX_CHAN_NUM])==SQLITE_ROW)
-			{
-				conflict_lcn_start = sqlite3_column_int(stmts[QUERY_MAX_CHAN_NUM], 0);
-				if (conflict_lcn_start < 850)
-					conflict_lcn_start = 850;
-				AM_DEBUG(1, "Have LCN, will set conflict LCN from %d", conflict_lcn_start);
-			}
-			sqlite3_reset(stmts[QUERY_MAX_CHAN_NUM]);
-			
-			for(i=0; i<srv_tab.srv_cnt; i++)
-			{
-				int r;
-
-				sqlite3_bind_int(stmts[QUERY_SRV_TS_NET_ID], 1, srv_tab.srv_ids[i]);
-				r = sqlite3_step(stmts[QUERY_SRV_TS_NET_ID]);
-				if(r==SQLITE_ROW)
-				{
-					int srv_id, ts_id, org_net_id;
-					int num = -1, visible = 1;
-
-					srv_id = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 0);
-					ts_id  = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 1);
-					org_net_id = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 2);
-
-					AM_SI_LIST_BEGIN(result->nits, nit)
-						AM_SI_LIST_BEGIN(nit->p_first_ts, ts)
-							if(ts->i_ts_id==ts_id && ts->i_orig_network_id==org_net_id){
-								AM_SI_LIST_BEGIN(ts->p_first_descriptor, dr)
-									if(dr->p_decoded && ((dr->i_tag == AM_SI_DESCR_LCN_83) || (dr->i_tag == AM_SI_DESCR_LCN_87))){
-										if(dr->i_tag==AM_SI_DESCR_LCN_83)
-										{
-											dvbpsi_logical_channel_number_83_dr_t *lcn_dr = (dvbpsi_logical_channel_number_83_dr_t*)dr->p_decoded;
-											dvbpsi_logical_channel_number_83_t *lcn = lcn_dr->p_logical_channel_number;
-											int j;
-
-											for(j=0; j<lcn_dr->i_logical_channel_numbers_number; j++){
-												if(lcn->i_service_id == srv_id){
-													num = lcn->i_logical_channel_number;
-													visible = lcn->i_visible_service_flag;
-													goto lcn_found;
-												}
-												lcn++;
-											}
-										}
-										else if(dr->i_tag==AM_SI_DESCR_LCN_87)
-										{
-											dvbpsi_logical_channel_number_87_dr_t *lcn_dr = (dvbpsi_logical_channel_number_87_dr_t*)dr->p_decoded;
-											dvbpsi_logical_channel_list_87_t *lcl = lcn_dr->p_logical_channel_list;
-											int j, k;
-
-											for(j=0; j<lcn_dr->i_logical_channel_lists_number; j++){
-												dvbpsi_logical_channel_number_87_t *lcn = lcl->p_logical_channel_number;
-												for(k=0; k<lcl->i_logical_channel_numbers_number; k++){
-													if(lcn->i_service_id == srv_id){
-														num = lcn->i_logical_channel_number;
-														visible = lcn->i_visible_service_flag;
-														goto lcn_found;
-													}
-													lcn++;
-												}
-												lcl++;
-											}
-										}
-									}
-								AM_SI_LIST_END()
-							}
-						AM_SI_LIST_END()
-					AM_SI_LIST_END()
-lcn_found:
-					if(!visible){
-						sqlite3_bind_int(stmts[UPDATE_CHAN_SKIP], 1, 1);
-						sqlite3_bind_int(stmts[UPDATE_CHAN_SKIP], 2, srv_tab.srv_ids[i]);
-						sqlite3_step(stmts[UPDATE_CHAN_SKIP]);
-						sqlite3_reset(stmts[UPDATE_CHAN_SKIP]);
-					}
-					
-					if (num >= 0)
-					{
-						/*该频道号是否已存在*/
-						sqlite3_bind_int(stmts[QUERY_SRV_BY_CHAN_NUM], 1, result->src);
-						sqlite3_bind_int(stmts[QUERY_SRV_BY_CHAN_NUM], 2, num);
-						if(sqlite3_step(stmts[QUERY_SRV_BY_CHAN_NUM])==SQLITE_ROW)
-						{
-							AM_DEBUG(1, "Find a conflict LCN, set from %d -> %d", num, conflict_lcn_start);
-							/*已经存在，将当前service放到850后*/
-							num = conflict_lcn_start++;
-							
-						}
-						sqlite3_reset(stmts[QUERY_SRV_BY_CHAN_NUM]);
-					}
-					else
-					{
-						/*未找到LCN， 将当前service放到850后*/
-						num = conflict_lcn_start++;
-						AM_DEBUG(1, "No LCN found for this program, automatically set to %d", num);
-					}
-
-					sqlite3_bind_int(stmts[UPDATE_CHAN_NUM], 1, num);
-					sqlite3_bind_int(stmts[UPDATE_CHAN_NUM], 2, srv_tab.srv_ids[i]);
-					sqlite3_step(stmts[UPDATE_CHAN_NUM]);
-					sqlite3_reset(stmts[UPDATE_CHAN_NUM]);
-				}
-				sqlite3_reset(stmts[QUERY_SRV_TS_NET_ID]);
-			}
-			sorted = AM_TRUE;
-		}
+		AM_DEBUG(1, "Updating chan_num from lcn ...");
+		sqlite3_exec(hdb, "update srv_table set chan_num=lcn where lcn>0", NULL, NULL, NULL);
 	}
-
-	/*重新排列数据库中全部service*/
-	if (!sorted && result->tses && result->standard != AM_SCAN_STANDARD_ATSC)
+	else
 	{
-		int *srv_dbids;
-		int row = AM_DB_MAX_SRV_CNT_PER_SRC, i, j, max_num;
-		int r, db_ts_id, db_id, rr, srv_type;
-
-		i=1;
-		j=1;
-
-		if(!result->resort_all)
-		{
-#ifndef SORT_TOGETHER
-			sqlite3_bind_int(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE], 1, 1);
-			sqlite3_bind_int(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE], 2, result->src);
-			r = sqlite3_step(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE]);
-			if(r==SQLITE_ROW)
-			{
-				i = sqlite3_column_int(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE], 0)+1;
-			}
-			sqlite3_reset(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE]);
-
-			sqlite3_bind_int(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE], 1, 2);
-			sqlite3_bind_int(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE], 2, result->src);
-			r = sqlite3_step(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE]);
-			if(r==SQLITE_ROW)
-			{
-				j = sqlite3_column_int(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE], 0)+1;
-			}
-			sqlite3_reset(stmts[QUERY_MAX_CHAN_NUM_BY_TYPE]);
-#else
-			sqlite3_bind_int(stmts[QUERY_MAX_CHAN_NUM], 1, result->src);
-			r = sqlite3_step(stmts[QUERY_MAX_CHAN_NUM]);
-			if(r==SQLITE_ROW)
-			{
-				i = j = sqlite3_column_int(stmts[QUERY_MAX_CHAN_NUM], 0)+1;
-			}
-			sqlite3_reset(stmts[QUERY_MAX_CHAN_NUM]);
-
-#endif
-		}
-
-		/*重新对srv_table排序以生成新的频道号*/
-		/*首先按频点排序*/
-		sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, result->src);
-		r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
-
-		while (r == SQLITE_ROW)
-		{
-			/*同频点下按service_id排序*/
-			db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
-			sqlite3_bind_int(stmts[QUERY_SRV_BY_TYPE], 1, db_ts_id);
-			rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
-			while (rr == SQLITE_ROW)
-			{
-				db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 0);
-
-				if(result->resort_all || scan_rec_tab_have_src(&srv_tab, db_id))
-				{
-					srv_type = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 1);
-					if (srv_type == 1)
-					{
-						/*电视节目*/
-						sqlite3_bind_int(stmts[UPDATE_CHAN_NUM], 1, i);
-						sqlite3_bind_int(stmts[UPDATE_CHAN_NUM], 2, db_id);
-						sqlite3_step(stmts[UPDATE_CHAN_NUM]);
-						sqlite3_reset(stmts[UPDATE_CHAN_NUM]);
-						i++;
-					}
-#ifndef SORT_TOGETHER 
-					else if (srv_type == 2)
-					{
-						/*广播节目*/
-						sqlite3_bind_int(stmts[UPDATE_CHAN_NUM], 1, j);
-						sqlite3_bind_int(stmts[UPDATE_CHAN_NUM], 2, db_id);
-						sqlite3_step(stmts[UPDATE_CHAN_NUM]);
-						sqlite3_reset(stmts[UPDATE_CHAN_NUM]);
-						j++;
-					}
-				}
-
-				rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
-			}
-			sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
-#else
-				}
-				rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
-			}
-			sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
-			r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
-		}
-		sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
-		sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, result->src);
-		r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
-		while (r == SQLITE_ROW)
-		{
-			/*广播节目放到最后*/
-			db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
-			sqlite3_bind_int(stmts[QUERY_SRV_BY_TYPE], 1, db_ts_id);
-			rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
-			while (rr == SQLITE_ROW)
-			{
-				db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 0);
-				if(result->resort_all || scan_rec_tab_have_src(&srv_tab, db_id))
-				{
-					srv_type = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 1);
-					if (srv_type == 2)
-					{
-						sqlite3_bind_int(stmts[UPDATE_CHAN_NUM], 1, i);
-						sqlite3_bind_int(stmts[UPDATE_CHAN_NUM], 2, db_id);
-						sqlite3_step(stmts[UPDATE_CHAN_NUM]);
-						sqlite3_reset(stmts[UPDATE_CHAN_NUM]);
-						i++;
-					}
-				}
-				rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
-			}
-			sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
-#endif
-			r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
-		}
-		sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
-
-		sorted = AM_TRUE;
+		AM_DEBUG(1, "Updating chan_num from default_chan_num ...");
+		sqlite3_exec(hdb, "update srv_table set chan_num=default_chan_num where default_chan_num>0", NULL, NULL, NULL);
 	}
+	
 
 store_end:
 	for (i=0; i<MAX_STMT; i++)
@@ -2233,6 +2471,14 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 	am_scan_free_filter(scanner, &scanner->nitctl.fid);
 	/*清除事件标志*/
 	//scanner->evt_flag &= ~scanner->nitctl.evt_flag;
+	
+	if (scanner->stage == AM_SCAN_STAGE_TS)
+	{
+		/*清除搜索标识*/
+		scanner->recv_status &= ~scanner->nitctl.recv_flag;
+		AM_DEBUG(1, "NIT Done in TS stage!");
+		return;
+	}
 	
 	if (! scanner->result.nits)
 	{
@@ -2714,7 +2960,14 @@ static void am_scan_section_handler(int dev_no, int fid, const uint8_t *data, in
 					COLLECT_SECTION(dvbpsi_cat_t, scanner->curr_ts->cats);
 				break;
 			case AM_SI_TID_NIT_ACT:
-				COLLECT_SECTION(dvbpsi_nit_t, scanner->result.nits);
+				if (scanner->stage != AM_SCAN_STAGE_TS)
+				{
+					COLLECT_SECTION(dvbpsi_nit_t, scanner->result.nits);
+				}
+				else
+				{
+					COLLECT_SECTION(dvbpsi_nit_t, scanner->curr_ts->nits);
+				}
 				break;
 			case AM_SI_TID_BAT:
 				AM_DEBUG(1, "BAT ext 0x%x, sec %d, last %d", header.extension, header.sec_num, header.last_sec_num);
@@ -3371,22 +3624,8 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 	{
 		am_scan_tablectl_init(&scanner->sdtctl, AM_SCAN_RECVING_SDT, AM_SCAN_EVT_SDT_DONE, SDT_TIMEOUT, 
 							AM_SI_PID_SDT, AM_SI_TID_SDT_ACT, "SDT", 1, am_scan_sdt_done, 0);
-
-		/*In order to support lcn, add nit info support in manual and allband scan mode*/
-		if ((scanner->result.enable_lcn)
-			&& (GET_MODE(scanner->result.mode) == AM_SCAN_MODE_MANUAL 
-			|| GET_MODE(scanner->result.mode) == AM_SCAN_MODE_ALLBAND))
-		{
-			am_scan_tablectl_init(&scanner->nitctl, AM_SCAN_RECVING_NIT, AM_SCAN_EVT_NIT_DONE, NIT_TIMEOUT, 
-								AM_SI_PID_NIT, AM_SI_TID_NIT_ACT, "NIT", 1, am_scan_nit_done_nousefreqinfo, 0);		
-		}
-		else
-		{
-			am_scan_tablectl_init(&scanner->nitctl, AM_SCAN_RECVING_NIT, AM_SCAN_EVT_NIT_DONE, NIT_TIMEOUT, 
-								AM_SI_PID_NIT, AM_SI_TID_NIT_ACT, "NIT", 1, am_scan_nit_done, 0);
-		}
-
-		
+		am_scan_tablectl_init(&scanner->nitctl, AM_SCAN_RECVING_NIT, AM_SCAN_EVT_NIT_DONE, NIT_TIMEOUT, 
+							AM_SI_PID_NIT, AM_SI_TID_NIT_ACT, "NIT", 1, am_scan_nit_done, 0);
 		am_scan_tablectl_init(&scanner->batctl, AM_SCAN_RECVING_BAT, AM_SCAN_EVT_BAT_DONE, BAT_TIMEOUT, 
 							AM_SI_PID_BAT, AM_SI_TID_BAT, "BAT", MAX_BAT_SUBTABLE_CNT, 
 							am_scan_bat_done, BAT_REPEAT_DISTANCE);
@@ -3472,22 +3711,47 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 	AM_SCAN_SignalInfo_t si;
 	int i;
 	unsigned int freq;
+	unsigned int cur_drift, max_drift;
 	
 	if (scanner->result.src == AM_FEND_DEMOD_DVBS)
 		AM_SEC_FreqConvert(scanner->fend_dev, scanner->fe_evt.parameters.frequency, &freq);
 	else
 		freq = scanner->fe_evt.parameters.frequency;
 		
-	AM_DEBUG(1, "%d %d, unicable %d", freq, 
-		dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency,
-		(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE)?1:0);
 	if ((scanner->curr_freq >= 0) && 
-		(scanner->curr_freq < scanner->start_freqs_cnt) &&
-		(dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency != freq) && 
-		!(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE))
+		(scanner->curr_freq < scanner->start_freqs_cnt))
 	{
-		AM_DEBUG(1, "Unexpected fend_evt arrived");
-		return;
+		AM_DEBUG(1, "%d %d, max_drift %d, unicable %d", freq, 
+			dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency,
+			scanner->start_freqs[scanner->curr_freq].dtv_para.sat.para.u.qpsk.symbol_rate / 2000,
+			(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE)?1:0);
+	}
+
+	if (scanner->result.src == AM_FEND_DEMOD_DVBS)
+	{
+		int tmp_drift = dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency - freq;
+		cur_drift = AM_ABS(tmp_drift);
+		/*algorithm from kernel*/
+		max_drift = scanner->start_freqs[scanner->curr_freq].dtv_para.sat.para.u.qpsk.symbol_rate / 2000;
+		
+		if ((scanner->curr_freq >= 0) && 
+			(scanner->curr_freq < scanner->start_freqs_cnt) &&
+			(cur_drift > max_drift) && 
+			!(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE))
+		{
+			AM_DEBUG(1, "Unexpected fend_evt arrived dvbs %d %d", cur_drift, max_drift);
+			return;
+		}	
+	}
+	else
+	{
+		if ((scanner->curr_freq >= 0) && 
+			(scanner->curr_freq < scanner->start_freqs_cnt) &&
+			(dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency != freq))
+		{
+			AM_DEBUG(1, "Unexpected fend_evt arrived");
+			return;
+		}
 	}
 
 	if ( ! (scanner->recv_status & AM_SCAN_RECVING_WAIT_FEND))
@@ -3577,10 +3841,8 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 				am_scan_request_section(scanner, &scanner->catctl);
 				am_scan_request_section(scanner, &scanner->sdtctl);
 
-				/*In order to support lcn, add nit info support in manual and allband scan mode*/
-				if ((!scanner->result.nits) && (scanner->result.enable_lcn)
-					&& (GET_MODE(scanner->result.mode) == AM_SCAN_MODE_MANUAL 
-					|| GET_MODE(scanner->result.mode) == AM_SCAN_MODE_ALLBAND))
+				/*In order to support lcn, we need scan NIT for each TS */
+				if (scanner->result.enable_lcn)
 				{
 					am_scan_tablectl_clear(&scanner->nitctl);
 					am_scan_request_section(scanner, &scanner->nitctl);
@@ -4023,6 +4285,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	scanner->result.src = para->source;
 	scanner->result.hdb = para->hdb;
 	scanner->result.standard = para->standard;
+	para->enable_lcn = AM_TRUE;
 	scanner->result.enable_lcn = para->enable_lcn;
 	scanner->result.resort_all = para->resort_all;
 	scanner->fend_dev = para->fend_dev_id;

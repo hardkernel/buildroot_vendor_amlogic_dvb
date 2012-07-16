@@ -107,6 +107,7 @@ typedef struct am_mw_teletext_context_s
 	AM_TT_ClearDisplayCb_t       co;
 	int fhandle;
 	pthread_mutex_t rd_wr_Mutex;
+	pthread_cond_t  rd_wr_Cond;
 	char auto_page_status ;
 	char TtxCodepage;
 	AM_TT_EventCb_t ecb;
@@ -657,9 +658,13 @@ static void* teletext_thread(void *para)
 
 	while(context_tele.flags&TELTE_RUNNING_FLAG)
 	{
-		pthread_mutex_lock(&context_tele.rd_wr_Mutex);	
+		pthread_mutex_lock(&context_tele.rd_wr_Mutex);
+		while((context_tele.flags&TELTE_RUNNING_FLAG) && (context_tele.pwb.rd_ptr==context_tele.pwb.wr_ptr)){
+			pthread_cond_wait(&context_tele.rd_wr_Cond, &context_tele.rd_wr_Mutex);
+		}
 		pbt=get_subtitle_pes_packet(&context_tele.pwb);
 		pthread_mutex_unlock(&context_tele.rd_wr_Mutex);
+
 		if(context_tele.pwb.rd_ptr>context_tele.pwb.wr_ptr)
 			context_tele.pwb.last_rd_wr=1;
 		else
@@ -682,10 +687,6 @@ static void* teletext_thread(void *para)
 			free(pbt);
 
 			continue;
-		}
-		else
-		{
-			usleep(100);
 		}
 	}
 	if(buffer)
@@ -729,9 +730,7 @@ static void teletext_draw_display_message(INT8U uType)
             VTDisplayMessage[24]=0x0;VTDisplayMessage[25]='.';
             VTDisplayMessage[26]=0x0;VTDisplayMessage[27]='.';
  
-	    TELETEXT_DRAW(&context_tele, ({
-            	context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (unsigned short*)VTDisplayMessage, 28, context_tele.cc(3, AM_TT_COLOR_TEXT_FG), 1, 1);
-	    }));
+            context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (unsigned short*)VTDisplayMessage, 28, context_tele.cc(3, AM_TT_COLOR_TEXT_FG), 1, 1);
             break;
 
         case VT_INVALIDPAGENUM:
@@ -759,9 +758,8 @@ static void teletext_draw_display_message(INT8U uType)
             VTDisplayMessage[40]=0x0;VTDisplayMessage[41]='8';
             VTDisplayMessage[42]=0x0;VTDisplayMessage[43]='9';
             VTDisplayMessage[44]=0x0;VTDisplayMessage[45]='9';
-	    TELETEXT_DRAW(&context_tele, ({
+
             context_tele.dt( DrawRect.left, DrawRect.top-5, DrawRect.width, DrawRect.height, (INT16U *)VTDisplayMessage, 46, context_tele.cc(3, AM_TT_COLOR_TEXT_FG), 1, 1);
-	    }));
             break;
         default:
             break;
@@ -996,7 +994,6 @@ AM_ErrorCode_t AM_TT_SetCurrentPageCode(unsigned short wPageCode, unsigned short
     	}
     	if (PageHex2ArrayIndex(wPageCode) == 0xFFFF)
     	{
-        	//teletext_draw_display_message(VT_INVALIDPAGENUM);
 		if(context_tele.ecb!=0)
 		{
 			context_tele.ecb(AM_TT_EVT_PAGE_ERROR);
@@ -1011,7 +1008,9 @@ AM_ErrorCode_t AM_TT_SetCurrentPageCode(unsigned short wPageCode, unsigned short
     	{
         	context_tele.wPageIndex =  wPageCode;
         	SetWaitingPage(wPageCode, TRUE);
+		TELETEXT_DRAW(&context_tele, ({
         	teletext_draw_display_message(VT_PAGENOTFIND);
+		}));
 
         	return AM_TT_ERR_PAGE_NOT_EXSIT;
     	}
@@ -1106,6 +1105,8 @@ AM_ErrorCode_t AM_TT_Init(int buffer_size)
 	Mosaic_RegisterCallback(teletext_fill_rectangle,teletext_convert_color);
 
 	pthread_mutex_init(&context_tele.rd_wr_Mutex,0);
+	pthread_cond_init(&context_tele.rd_wr_Cond,0);
+
 	context_tele.flags=0;
 	context_tele.status=TELETEXT_INILIZED;
 	context_tele.fr=NULL;
@@ -1283,13 +1284,9 @@ static void pes_filter_callback(int dev_no,int fhandle,const unsigned char *data
 	{
 		data_copy+=copy_data_to_pes_buffer((char*)data+data_copy,data_remain);
 		data_remain-=data_copy;
-		if(data_remain>0)
-		{
-			usleep(100);
-		}
-
 	}
 	pthread_mutex_unlock(&context_tele.rd_wr_Mutex);
+	pthread_cond_signal(&context_tele.rd_wr_Cond);
 }
 
 static int open_demux_pes_filter(int dev_no,int pid,int type)
@@ -1411,7 +1408,6 @@ AM_ErrorCode_t AM_TT_Start(int dmx_id, int pid, int mag, int page, int sub_page)
 	context_tele.wPageSubCode = sub_page;
 	context_tele.status=TELETEXT_STARTED;
 	teletext_history_reset();
-	//teletext_draw_display_message(VT_PAGENOTFIND);
 	goto exit;
 #ifndef LINUX_PES_FILTER
 error_set_buffer:
@@ -1441,6 +1437,7 @@ AM_ErrorCode_t AM_TT_Quit()
 	Vtdrawer_deinit();
 	Mosaic_deinit();
 	pthread_mutex_destroy(&context_tele.rd_wr_Mutex);
+	pthread_cond_destroy(&context_tele.rd_wr_Cond);
 	
 	return 0;
 }
@@ -1458,6 +1455,7 @@ AM_ErrorCode_t AM_TT_Stop()
 	if (context_tele.flags&TELTE_RUNNING_FLAG)
 	{
 		context_tele.flags&=~TELTE_RUNNING_FLAG;
+		pthread_cond_signal(&context_tele.rd_wr_Cond);
 		pthread_join(context_tele.teletext_thread,NULL);
 	}
 	AM_DEBUG(1,"@@ teletext thread exit ok");
@@ -1780,7 +1778,10 @@ AM_ErrorCode_t AM_TT_PerformColorLink(unsigned char color)
     {
         context_tele.wPageIndex = wPageHex;
         SetWaitingPage(wPageHex, TRUE);
+
+	TELETEXT_DRAW(&context_tele, ({
         teletext_draw_display_message(VT_PAGENOTFIND);
+	}));
     }
 
     return AM_SUCCESS;

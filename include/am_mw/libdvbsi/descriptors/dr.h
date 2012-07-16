@@ -67,6 +67,7 @@
 #include "dr_54.h"
 #include "dr_83.h"
 #include "dr_87.h"
+#include "dr_88.h"
 
 #else
 #error "Multiple inclusions of dr.h"

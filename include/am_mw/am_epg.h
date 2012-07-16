@@ -100,6 +100,7 @@ enum AM_EPG_EventType
 	AM_EPG_EVT_EIT_UPDATE,	/**< 通知接收到新的EIT数据，用于上层实现更新*/
 	AM_EPG_EVT_NEW_SUB_PLAY,	/**< 提前通知有将开始的预约节目要播放,参数为db_evt_id*/
 	AM_EPG_EVT_SUB_PLAY_START,	/**< 预约节目即将切换播放,参数为db_evt_id*/
+	AM_EPG_EVT_CHANGE_TS,	/**< 频点切换*/
 	AM_EPG_EVT_END
 };
 

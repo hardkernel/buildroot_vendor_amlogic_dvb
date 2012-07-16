@@ -1255,9 +1255,9 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 			memset(&cp, 0, sizeof(cp));
 			audio_decode_init(&adec_handle, &cp);
 		}
-#ifdef CHIP_8626X
+//#ifdef CHIP_8626X
 		audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
-#endif
+//#endif
 		
 		audio_decode_start(adec_handle);
 #endif
@@ -1870,9 +1870,9 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 
 			audio_decode_init(&adec_handle, &cp);
 		}
-#ifdef CHIP_8626X
+//#ifdef CHIP_8626X
 		audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
-#endif
+//#endif
 		
 		audio_decode_start(adec_handle);
 #endif
@@ -3013,14 +3013,14 @@ static void* aml_av_monitor_thread(void *arg)
 	//AM_Bool_t reset_avail = AM_FALSE;
 	AM_Bool_t av_playing = AM_FALSE;
 	uint32_t last_apts, last_vpts, apts, vpts;
-	uint32_t last_dec_vpts, dec_vpts, dec_apts;
-	int fd, pts_repeat_count, vpts_repeat_count;
+	uint32_t last_dec_vpts, dec_vpts, dec_apts, last_dec_apts;
+	int fd, pts_repeat_count, vpts_repeat_count, apts_repeat_count;
 	int pts_time, last_pts_time;
 	int alen, vlen;
 	const int AUDIO_DATA_CHECK_PERIOD = 100;
 	const int PTS_CHECK_PERIOD = 1000;
 	AM_Bool_t notified = AM_FALSE;
-	AM_Bool_t adec_start;
+	AM_Bool_t adec_start, vdec_start;
 	struct am_io_param astatus;
 	struct am_io_param vstatus;
 	struct timespec rt;
@@ -3029,10 +3029,11 @@ static void* aml_av_monitor_thread(void *arg)
 	
 	last_apts = last_vpts = 0;
 	last_dec_vpts = dec_vpts = 0;
-	pts_repeat_count = vpts_repeat_count = 0;
+	pts_repeat_count = 0;
+	vpts_repeat_count = apts_repeat_count = 0;
 	pts_time = last_pts_time = 0;
 	alen = vlen = 0;
-	adec_start = AM_FALSE;
+	adec_start = vdec_start = AM_FALSE;
 	pthread_mutex_lock(&gAVMonLock);
 	while (1)
 	{
@@ -3088,18 +3089,21 @@ static void* aml_av_monitor_thread(void *arg)
 					memset(&cp, 0, sizeof(cp));
 					audio_decode_init(&adec_handle, &cp);
 				}
-#ifdef CHIP_8626X
+//#ifdef CHIP_8626X
 				audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
-#endif
+//#endif
 
 				audio_decode_start(adec_handle);
 				AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
 #endif
 				av_playing = AM_TRUE;
 				adec_start = AM_FALSE;
+				vdec_start = AM_FALSE;
 				last_pts_time = 0;
 				vpts_repeat_count = 0;
+				apts_repeat_count = 0;
 				last_dec_vpts = 0;
+				last_dec_apts = 0;
 			}
 		}
 		
@@ -3140,26 +3144,25 @@ static void* aml_av_monitor_thread(void *arg)
 					resample = 0;
 				}
 
-				if(resample == 2){
+				if(resample != 1){
 					char buf[32], dmx_buf[32];
 
 					if(AM_FileRead(AUDIO_PTS_FILE, buf, sizeof(buf))>=0 &&
 							AM_FileRead(AUDIO_DMX_PTS_FILE, dmx_buf, sizeof(dmx_buf))>=0){
-						apts = strtol(buf, NULL, 0);
-						dmx_apts = strtol(dmx_buf, NULL, 0);
+						sscanf(buf+2, "%x", &apts);
+						sscanf(dmx_buf, "%d", &dmx_apts);
 					}
 
 					if(AM_FileRead(VIDEO_PTS_FILE, buf, sizeof(buf))>=0 &&
 							AM_FileRead(VIDEO_DMX_PTS_FILE, dmx_buf, sizeof(dmx_buf))>=0){
-						vpts = strtol(buf, NULL, 0);
-						dmx_vpts = strtol(dmx_buf, NULL, 0);
+						sscanf(buf+2, "%x", &vpts);
+						sscanf(dmx_buf, "%d", &dmx_vpts);
 					}
 
 					if(((dmx_apts - apts) > 90000 * 2) || ((dmx_vpts - vpts) > 90000 * 2)){
 						resample = 1;
 					}
 				}
-
 				AM_DEBUG(1, "asize %d adata %d vsize %d vdata %d apts_diff %d vpts_diff %d resample %d",
 					ab_size, a_size, vb_size, v_size, dmx_apts-apts, dmx_vpts-vpts, resample);
 
@@ -3171,6 +3174,7 @@ static void* aml_av_monitor_thread(void *arg)
 						case 2: cmd = "2"; break;
 						default: cmd = "0"; break;
 					}
+					AM_FileEcho(ENABLE_RESAMPLE_FILE, resample?"1":"0");
 					AM_FileEcho(RESAMPLE_TYPE_FILE, cmd);
 				}
 			}
@@ -3179,35 +3183,85 @@ static void* aml_av_monitor_thread(void *arg)
 			if ((pts_time - last_pts_time) >= 1000)
 			{
 				last_pts_time = pts_time;
-				dec_vpts = aml_get_pts_video();
-				dec_apts = aml_get_pts_audio();
-				/*Audio PID有效并且audio已开始解码，检查是否需要reset av播放*/
-				if (dev->ts_player.play_para.apid < 0x1fff && 
-					!adec_start && dec_apts != (uint32_t)-1 && dec_vpts != 0)
+				
+				/* Audio 或者 Video PID 有效，需要检查是否reset av */
+				if (dev->ts_player.play_para.vpid < 0x1fff || dev->ts_player.play_para.apid < 0x1fff)
 				{
-					AM_DEBUG(1, "@@ audio pts is 0x%x, start av reset monitor @@", dec_apts);
-					adec_start = AM_TRUE;
-				}
-				if (adec_start && dec_vpts == last_dec_vpts)
-				{
-					vpts_repeat_count++;
-					AM_DEBUG(1, "@@ Videop PTS has not changed for %d times @@", vpts_repeat_count);
-					if (vpts_repeat_count >= 3)
+					dec_vpts = aml_get_pts_video();
+					dec_apts = aml_get_pts_audio();
+					AM_DEBUG(1, "adec_start %d, last_dec_apts %x, dec_apts %x", adec_start, last_dec_apts, dec_apts);
+					/* Audio PID有效并且Audio pts有变化，认为audio 开始解码*/
+					if (dev->ts_player.play_para.apid < 0x1fff && 
+						!adec_start && last_dec_apts && 
+						dec_apts != last_dec_apts)
 					{
-						AM_DEBUG(1, "@@ Need to restart Audio & Video @@");
-						aml_close_ts_mode(dev, AM_FALSE);
-						aml_open_mode(dev, AV_PLAY_TS);
-						aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
-						av_playing = AM_FALSE;			
-						
-						continue;
+						AM_DEBUG(1, "@@ audio pts changed from 0x%x->0x%x @@", last_dec_apts, dec_apts);
+						adec_start = AM_TRUE;
 					}
+					/* Video PID有效并且 Video pts有变化，认为video 开始解码*/
+					if (dev->ts_player.play_para.vpid < 0x1fff && 
+						!vdec_start && last_dec_vpts && 
+						dec_vpts != last_dec_vpts)
+					{
+						AM_DEBUG(1, "@@ video pts changed from 0x%x->0x%x @@", last_dec_vpts, dec_vpts);
+						vdec_start = AM_TRUE;
+					}
+				
+					/* Audio和Video都已开始解码，或者只有单路流有效时且已开始解码, 检查是否需要reset av播放 */
+					if ((dev->ts_player.play_para.vpid >= 0x1fff || vdec_start) &&
+						(dev->ts_player.play_para.apid >= 0x1fff || adec_start))
+					{
+						if (vdec_start)
+						{
+							if (dec_vpts == last_dec_vpts)
+							{
+								vpts_repeat_count++;
+								AM_DEBUG(1, "@@ Video PTS has not changed for %d times @@", vpts_repeat_count);
+								if (vpts_repeat_count >= 3)
+								{
+									AM_DEBUG(1, "@@ Need to restart Audio & Video @@");
+									aml_close_ts_mode(dev, AM_FALSE);
+									aml_open_mode(dev, AV_PLAY_TS);
+									aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
+									av_playing = AM_FALSE;			
+						
+									continue;
+								}
+							}
+							else if (vpts_repeat_count != 0)
+							{
+								vpts_repeat_count = 0;
+							}
+						}
+						
+						if (adec_start)
+						{
+							if (dec_apts == last_dec_apts)
+							{
+								apts_repeat_count++;
+								AM_DEBUG(1, "@@ Audio PTS has not changed for %d times @@", apts_repeat_count);
+								if (apts_repeat_count >= 3)
+								{
+									AM_DEBUG(1, "@@ Need to restart Audio & Video @@");
+									aml_close_ts_mode(dev, AM_FALSE);
+									aml_open_mode(dev, AV_PLAY_TS);
+									aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
+									av_playing = AM_FALSE;			
+						
+									continue;
+								}
+							}
+							else if (apts_repeat_count != 0)
+							{
+								apts_repeat_count = 0;
+							}
+						}
+						
+					}
+					
+					last_dec_vpts = dec_vpts;
+					last_dec_apts = dec_apts;
 				}
-				else if (dec_vpts != last_dec_vpts && vpts_repeat_count != 0)
-				{
-					vpts_repeat_count = 0;
-				}
-				last_dec_vpts = dec_vpts;
 			
 				if (av_playing && aml_get_pts(AUDIO_DMX_PTS_FILE, &apts) == AM_SUCCESS && 
 					aml_get_pts(VIDEO_DMX_PTS_FILE, &vpts) == AM_SUCCESS)
@@ -3417,9 +3471,9 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 
 				audio_decode_init(&adec_handle, &cp);
 			}
-#ifdef CHIP_8626X
+//#ifdef CHIP_8626X
 			audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
-#endif
+//#endif
 
 			audio_decode_start(adec_handle);
 #endif
@@ -4512,7 +4566,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			}
 
 			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "3");
-			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "14");
+			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "30");
 			AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","0");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");

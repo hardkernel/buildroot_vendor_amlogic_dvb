@@ -440,6 +440,7 @@ void si_decode_descriptor(dvbpsi_descriptor_t *des)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_PDC, 			dvbpsi_DecodePDCDr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_LCN_83, 			dvbpsi_DecodeLogicalChannelNumber83Dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_LCN_87, 			dvbpsi_DecodeLogicalChannelNumber87Dr)
+		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_LCN_88, 			dvbpsi_DecodeLogicalChannelNumber88Dr)
 		default:
 			break;
 	}

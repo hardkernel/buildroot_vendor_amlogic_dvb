@@ -73,7 +73,7 @@ void SetCodepage(INT8S Codepage)
 
 void DrawPage(struct TVTPage* pPage, INT16U uFlags, INT8U pDoubleProfile[25])
 {
-    INT16U wParsePageFlags = PARSE_REPEATDOUBLE;
+    INT16U wParsePageFlags = PARSE_REPEATDOUBLE|PARSE_ALSOKEYWORDS;
     TVTDrawPara draw_para;
 
     if (uFlags & VTDF_UPDATEDONLY)

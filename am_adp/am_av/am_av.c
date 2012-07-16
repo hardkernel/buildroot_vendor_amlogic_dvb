@@ -1960,7 +1960,7 @@ AM_ErrorCode_t AM_AV_GetVideoBrightness(int dev_no, int *val)
 	pthread_mutex_lock(&dev->lock);
 	
 	if(val)
-		*val = dev->video_saturation;
+		*val = dev->video_brightness;
 	
 	pthread_mutex_unlock(&dev->lock);
 	
