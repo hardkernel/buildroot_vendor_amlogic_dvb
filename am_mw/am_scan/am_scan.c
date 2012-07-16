@@ -188,6 +188,7 @@ typedef struct{
 	int    srv_cnt;
 	int    buf_size;
 	int   *srv_ids;
+	AM_SCAN_TS_t **tses;
 }ScanRecTab_t;
 
 /****************************************************************************
@@ -409,10 +410,11 @@ static void scan_rec_tab_release(ScanRecTab_t *tab)
 {
 	if(tab->srv_ids){
 		free(tab->srv_ids);
+		free(tab->tses);
 	}
 }
 
-static int scan_rec_tab_add_srv(ScanRecTab_t *tab, int id)
+static int scan_rec_tab_add_srv(ScanRecTab_t *tab, int id, AM_SCAN_TS_t *ts)
 {
 	int i;
 
@@ -423,17 +425,24 @@ static int scan_rec_tab_add_srv(ScanRecTab_t *tab, int id)
 	
 	if(tab->srv_cnt == tab->buf_size){
 		int size = AM_MAX(tab->buf_size*2, 32);
-		int *buf;
+		int *buf, *buf1;
 
 		buf = realloc(tab->srv_ids, sizeof(int)*size);
 		if(!buf)
 			return -1;
+		buf1 = realloc(tab->tses, sizeof(AM_SCAN_TS_t)*size);
+		if(!buf1) {
+			free(buf);
+			return -1;
+		}
 
 		tab->buf_size = size;
 		tab->srv_ids  = buf;
+		tab->tses = buf1;
 	}
 
-	tab->srv_ids[tab->srv_cnt++] = id;
+	tab->srv_ids[tab->srv_cnt] = id;
+	tab->tses[tab->srv_cnt++] = ts;
 
 	return 0;
 }
@@ -1550,7 +1559,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 			continue;
 		}
 
-		scan_rec_tab_add_srv(tab, srv_dbid);
+		scan_rec_tab_add_srv(tab, srv_dbid, ts);
 		
 		/* looking for CA descr */
 		AM_SI_LIST_BEGIN(pmt-> p_first_descriptor, descr)
@@ -1769,14 +1778,92 @@ static void am_scan_clear_source(sqlite3 *hdb, int src)
 	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
 }
 
+/**\brief 从一个NIT中查找某个service的LCN*/
+static AM_Bool_t am_scan_get_lcn_from_nit(int org_net_id, int ts_id, int srv_id, dvbpsi_nit_t *nits, 
+int *sd_lcn, int *sd_visible, int *hd_lcn, int *hd_visible)
+{
+	dvbpsi_nit_ts_t *ts;
+	dvbpsi_descriptor_t *dr;
+	dvbpsi_nit_t *nit;
+	
+	*sd_lcn = -1;
+	*hd_lcn = -1;
+	AM_SI_LIST_BEGIN(nits, nit)
+		AM_SI_LIST_BEGIN(nit->p_first_ts, ts)
+			if(ts->i_ts_id==ts_id && ts->i_orig_network_id==org_net_id){
+				AM_SI_LIST_BEGIN(ts->p_first_descriptor, dr)
+					if(dr->p_decoded && ((dr->i_tag == AM_SI_DESCR_LCN_83))){
+						if(dr->i_tag==AM_SI_DESCR_LCN_83)
+						{
+							dvbpsi_logical_channel_number_83_dr_t *lcn_dr = (dvbpsi_logical_channel_number_83_dr_t*)dr->p_decoded;
+							dvbpsi_logical_channel_number_83_t *lcn = lcn_dr->p_logical_channel_number;
+							int j;
+
+							for(j=0; j<lcn_dr->i_logical_channel_numbers_number; j++){
+								if(lcn->i_service_id == srv_id){
+									*sd_lcn = lcn->i_logical_channel_number;
+									*sd_visible = lcn->i_visible_service_flag;
+									AM_DEBUG(1, "sd lcn for service %d ---> %d", srv_id, *sd_lcn);
+									if (*hd_lcn == -1) {
+										/* break to wait for lcn88 */
+										break;
+									} else {
+										goto lcn_found;
+									}
+								}
+								lcn++;
+							}
+						}
+					}
+					else if (dr->i_tag==AM_SI_DESCR_LCN_88)
+					{
+						dvbpsi_logical_channel_number_88_dr_t *lcn_dr = (dvbpsi_logical_channel_number_88_dr_t*)dr->p_decoded;
+						dvbpsi_logical_channel_number_88_t *lcn = lcn_dr->p_logical_channel_number;
+						int j;
+
+						for(j=0; j<lcn_dr->i_logical_channel_numbers_number; j++){
+							if(lcn->i_service_id == srv_id){
+								*hd_lcn = lcn->i_logical_channel_number;
+								*hd_visible = lcn->i_visible_service_flag;
+								if (*sd_lcn == -1) {
+									/* break to wait for lcn83 */
+									break;
+								} else {
+									goto lcn_found;
+								}
+							}
+							lcn++;
+						}
+					}
+				AM_SI_LIST_END()
+			}
+		AM_SI_LIST_END()
+	AM_SI_LIST_END()
+	
+lcn_found:
+	if (*sd_lcn != -1 || *hd_lcn != -1)
+		return AM_TRUE;
+	
+	return AM_FALSE;
+}
+
 /**\brief LCN排序处理*/
 static void am_scan_lcn_proc(AM_SCAN_Result_t *result, sqlite3_stmt **stmts, ScanRecTab_t *srv_tab)
 {
 #define LCN_CONFLICT_START 900
+#define UPDATE_SRV_LCN(_l, _hl, _sl, _d) \
+AM_MACRO_BEGIN\
+	sqlite3_bind_int(stmts[UPDATE_LCN], 1, _l);\
+	sqlite3_bind_int(stmts[UPDATE_LCN], 2, _hl);\
+	sqlite3_bind_int(stmts[UPDATE_LCN], 3, _sl);\
+	sqlite3_bind_int(stmts[UPDATE_LCN], 4, _d);\
+	sqlite3_step(stmts[UPDATE_LCN]);\
+	sqlite3_reset(stmts[UPDATE_LCN]);\
+AM_MACRO_END
 	if (result->tses && result->standard != AM_SCAN_STANDARD_ATSC)
 	{
 		dvbpsi_nit_t *nit;
-		dvbpsi_nit_ts_t *ts;
+		AM_SCAN_TS_t *ts;
 		dvbpsi_descriptor_t *dr;
 		int i, conflict_lcn_start = LCN_CONFLICT_START;
 		
@@ -1804,72 +1891,37 @@ static void am_scan_lcn_proc(AM_SCAN_Result_t *result, sqlite3_stmt **stmts, Sca
 				int sd_lcn = -1, hd_lcn = -1;
 				int sd_visible = 1, hd_visible = 1;
 				AM_Bool_t swapped = AM_FALSE;
+				AM_Bool_t got_lcn = AM_FALSE;
 
 				srv_id = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 0);
 				ts_id  = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 1);
 				org_net_id = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 2);
 
-				AM_SI_LIST_BEGIN(result->nits, nit)
-					AM_SI_LIST_BEGIN(nit->p_first_ts, ts)
-						if(ts->i_ts_id==ts_id && ts->i_orig_network_id==org_net_id){
-							AM_SI_LIST_BEGIN(ts->p_first_descriptor, dr)
-								if(dr->p_decoded && ((dr->i_tag == AM_SI_DESCR_LCN_83))){
-									if(dr->i_tag==AM_SI_DESCR_LCN_83)
-									{
-										dvbpsi_logical_channel_number_83_dr_t *lcn_dr = (dvbpsi_logical_channel_number_83_dr_t*)dr->p_decoded;
-										dvbpsi_logical_channel_number_83_t *lcn = lcn_dr->p_logical_channel_number;
-										int j;
-
-										for(j=0; j<lcn_dr->i_logical_channel_numbers_number; j++){
-											if(lcn->i_service_id == srv_id){
-												sd_lcn = lcn->i_logical_channel_number;
-												sd_visible = lcn->i_visible_service_flag;
-												if (hd_lcn == -1) {
-													/* break to wait for lcn88 */
-													break;
-												} else {
-													goto lcn_found;
-												}
-											}
-											lcn++;
-										}
-									}
-								}
-								else if (dr->i_tag==AM_SI_DESCR_LCN_88)
-								{
-									dvbpsi_logical_channel_number_88_dr_t *lcn_dr = (dvbpsi_logical_channel_number_88_dr_t*)dr->p_decoded;
-									dvbpsi_logical_channel_number_88_t *lcn = lcn_dr->p_logical_channel_number;
-									int j;
-
-									for(j=0; j<lcn_dr->i_logical_channel_numbers_number; j++){
-										if(lcn->i_service_id == srv_id){
-											hd_lcn = lcn->i_logical_channel_number;
-											hd_visible = lcn->i_visible_service_flag;
-											if (sd_lcn == -1) {
-												/* break to wait for lcn83 */
-												break;
-											} else {
-												goto lcn_found;
-											}
-										}
-										lcn++;
-									}
-								}
-							AM_SI_LIST_END()
+				AM_DEBUG(1, "Looking for lcn of net %x, ts %x, srv %x", org_net_id, ts_id, srv_id);
+				if (srv_tab->tses[i] != NULL && 
+					am_scan_get_lcn_from_nit(org_net_id, ts_id, srv_id, srv_tab->tses[i]->nits, 
+					&sd_lcn, &sd_visible, &hd_lcn, &hd_visible))
+				{
+					/* find in its own ts */
+					AM_DEBUG(1, "Found lcn in its own TS");
+					got_lcn = AM_TRUE;
+				}
+				if (! got_lcn)
+				{
+					/* find in other tses */
+					AM_SI_LIST_BEGIN(result->tses, ts)
+						if (ts != srv_tab->tses[i])
+						{
+							if (am_scan_get_lcn_from_nit(org_net_id, ts_id, srv_id, ts->nits, 
+								&sd_lcn, &sd_visible, &hd_lcn, &hd_visible)) 
+							{
+								AM_DEBUG(1, "Found lcn in other TS");
+								break;
+							}
 						}
 					AM_SI_LIST_END()
-				AM_SI_LIST_END()
-lcn_found:
+				}
 
-#define UPDATE_SRV_LCN(_l, _hl, _sl, _d) \
-AM_MACRO_BEGIN\
-	sqlite3_bind_int(stmts[UPDATE_LCN], 1, _l);\
-	sqlite3_bind_int(stmts[UPDATE_LCN], 2, _hl);\
-	sqlite3_bind_int(stmts[UPDATE_LCN], 3, _sl);\
-	sqlite3_bind_int(stmts[UPDATE_LCN], 4, _d);\
-	sqlite3_step(stmts[UPDATE_LCN]);\
-	sqlite3_reset(stmts[UPDATE_LCN]);\
-AM_MACRO_END
 				/* Skip Non-TV&Radio services */
 				sqlite3_bind_int(stmts[QUERY_SRV_TYPE], 1, srv_tab->srv_ids[r]);
 				r = sqlite3_step(stmts[QUERY_SRV_TYPE]);
@@ -1881,6 +1933,7 @@ AM_MACRO_END
 				}
 				sqlite3_reset(stmts[QUERY_SRV_TYPE]);
 				
+				AM_DEBUG(1, "save: sd_lcn is %d", sd_lcn);
 				/* default we use SD */
 				num = sd_lcn;
 				hd_num = hd_lcn;
@@ -2419,6 +2472,14 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 	/*清除事件标志*/
 	//scanner->evt_flag &= ~scanner->nitctl.evt_flag;
 	
+	if (scanner->stage == AM_SCAN_STAGE_TS)
+	{
+		/*清除搜索标识*/
+		scanner->recv_status &= ~scanner->nitctl.recv_flag;
+		AM_DEBUG(1, "NIT Done in TS stage!");
+		return;
+	}
+	
 	if (! scanner->result.nits)
 	{
 		AM_DEBUG(1, "No NIT found ,try next frequency");
@@ -2899,7 +2960,14 @@ static void am_scan_section_handler(int dev_no, int fid, const uint8_t *data, in
 					COLLECT_SECTION(dvbpsi_cat_t, scanner->curr_ts->cats);
 				break;
 			case AM_SI_TID_NIT_ACT:
-				COLLECT_SECTION(dvbpsi_nit_t, scanner->result.nits);
+				if (scanner->stage != AM_SCAN_STAGE_TS)
+				{
+					COLLECT_SECTION(dvbpsi_nit_t, scanner->result.nits);
+				}
+				else
+				{
+					COLLECT_SECTION(dvbpsi_nit_t, scanner->curr_ts->nits);
+				}
 				break;
 			case AM_SI_TID_BAT:
 				AM_DEBUG(1, "BAT ext 0x%x, sec %d, last %d", header.extension, header.sec_num, header.last_sec_num);
@@ -3556,22 +3624,8 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 	{
 		am_scan_tablectl_init(&scanner->sdtctl, AM_SCAN_RECVING_SDT, AM_SCAN_EVT_SDT_DONE, SDT_TIMEOUT, 
 							AM_SI_PID_SDT, AM_SI_TID_SDT_ACT, "SDT", 1, am_scan_sdt_done, 0);
-
-		/*In order to support lcn, add nit info support in manual and allband scan mode*/
-		if ((scanner->result.enable_lcn)
-			&& (GET_MODE(scanner->result.mode) == AM_SCAN_MODE_MANUAL 
-			|| GET_MODE(scanner->result.mode) == AM_SCAN_MODE_ALLBAND))
-		{
-			am_scan_tablectl_init(&scanner->nitctl, AM_SCAN_RECVING_NIT, AM_SCAN_EVT_NIT_DONE, NIT_TIMEOUT, 
-								AM_SI_PID_NIT, AM_SI_TID_NIT_ACT, "NIT", 1, am_scan_nit_done_nousefreqinfo, 0);		
-		}
-		else
-		{
-			am_scan_tablectl_init(&scanner->nitctl, AM_SCAN_RECVING_NIT, AM_SCAN_EVT_NIT_DONE, NIT_TIMEOUT, 
-								AM_SI_PID_NIT, AM_SI_TID_NIT_ACT, "NIT", 1, am_scan_nit_done, 0);
-		}
-
-		
+		am_scan_tablectl_init(&scanner->nitctl, AM_SCAN_RECVING_NIT, AM_SCAN_EVT_NIT_DONE, NIT_TIMEOUT, 
+							AM_SI_PID_NIT, AM_SI_TID_NIT_ACT, "NIT", 1, am_scan_nit_done, 0);
 		am_scan_tablectl_init(&scanner->batctl, AM_SCAN_RECVING_BAT, AM_SCAN_EVT_BAT_DONE, BAT_TIMEOUT, 
 							AM_SI_PID_BAT, AM_SI_TID_BAT, "BAT", MAX_BAT_SUBTABLE_CNT, 
 							am_scan_bat_done, BAT_REPEAT_DISTANCE);
@@ -3787,10 +3841,8 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 				am_scan_request_section(scanner, &scanner->catctl);
 				am_scan_request_section(scanner, &scanner->sdtctl);
 
-				/*In order to support lcn, add nit info support in manual and allband scan mode*/
-				if ((!scanner->result.nits) && (scanner->result.enable_lcn)
-					&& (GET_MODE(scanner->result.mode) == AM_SCAN_MODE_MANUAL 
-					|| GET_MODE(scanner->result.mode) == AM_SCAN_MODE_ALLBAND))
+				/*In order to support lcn, we need scan NIT for each TS */
+				if (scanner->result.enable_lcn)
 				{
 					am_scan_tablectl_clear(&scanner->nitctl);
 					am_scan_request_section(scanner, &scanner->nitctl);
@@ -4233,6 +4285,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	scanner->result.src = para->source;
 	scanner->result.hdb = para->hdb;
 	scanner->result.standard = para->standard;
+	para->enable_lcn = AM_TRUE;
 	scanner->result.enable_lcn = para->enable_lcn;
 	scanner->result.resort_all = para->resort_all;
 	scanner->fend_dev = para->fend_dev_id;

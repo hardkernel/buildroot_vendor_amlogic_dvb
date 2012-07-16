@@ -179,6 +179,7 @@ typedef struct AM_SCAN_TS_s
 	int								ber;		/**< BER*/
 	int								strength;	/**< Strength*/
 	AM_FENDCTRL_DVBFrontendParameters_t fend_para;	/**< 频点信息*/
+	dvbpsi_nit_t					*nits;		/**< 搜索到的NIT表，为每个频点单独保存各自的NIT表，用于LCN等应用*/
 	dvbpsi_pat_t 					*pats;		/**< 搜索到的PAT表*/
 	dvbpsi_cat_t 					*cats;		/**< 搜索到的CAT表*/
 	dvbpsi_pmt_t 					*pmts;		/**< 搜索到的PMT表*/
