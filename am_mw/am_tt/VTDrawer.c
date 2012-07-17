@@ -4,7 +4,7 @@
 #include "VTCharacterSet.h"
 #include "VTMosaicGraphics.h"
 #include "VTCommon.h"
-
+#include <am_tt.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -28,7 +28,7 @@ struct vtdraw_ctx_s
 {
     INT32S (*fill_rectangle)(INT32S left, INT32S top, INT32U width, INT32U height, INT32U color);
     INT32S (*draw_text)(INT32S x, INT32S y, INT32U width, INT32U height, INT16U *text, INT32S len, INT32U color, INT32U w_scale, INT32U h_scale);
-    INT32U (*convert_color)(INT32U index);
+    INT32U (*convert_color)(INT32U index, INT32U type);
     INT32U (*get_font_height)(void);
     INT32U (*get_font_max_width)(void);
     void (*clean_osd)(void) ;
@@ -226,7 +226,7 @@ INT8U DrawPageProc(struct TVTPage* tvp , INT16U wPoint, INT16U* lpFlags, INT16U 
     {
         if (TxtBgColor < 16)
         {
-            vtdraw_ctx->fill_rectangle(DrawRect.left, DrawRect.top, DrawRect.width, DrawRect.height, vtdraw_ctx->convert_color(TxtBgColor));
+            vtdraw_ctx->fill_rectangle(DrawRect.left, DrawRect.top, DrawRect.width, DrawRect.height, vtdraw_ctx->convert_color(TxtBgColor, AM_TT_COLOR_MOSAIC));
         }
 
         DrawG1Mosaic(&DrawRect, uChar, TxtFgColor, (uMode & VTMODE_SEPARATED) != 0);
@@ -235,7 +235,7 @@ INT8U DrawPageProc(struct TVTPage* tvp , INT16U wPoint, INT16U* lpFlags, INT16U 
     else
     {
         //if(uChar < 0x20 || uChar > 0x7E)
-        if (uChar < 0x20)
+        if (uChar <= 0x20)
         {
             uChar = 0x20;
         }
@@ -244,7 +244,8 @@ INT8U DrawPageProc(struct TVTPage* tvp , INT16U wPoint, INT16U* lpFlags, INT16U 
 
         if (TxtBgColor < 16)
         {
-            vtdraw_ctx->fill_rectangle(DrawRect.left, DrawRect.top, DrawRect.width, DrawRect.height, vtdraw_ctx->convert_color(TxtBgColor));
+            vtdraw_ctx->fill_rectangle(DrawRect.left, DrawRect.top, DrawRect.width, DrawRect.height,
+            		vtdraw_ctx->convert_color(TxtBgColor, (uChar==0x20)?AM_TT_COLOR_SPACE:AM_TT_COLOR_TEXT_BG));
         }
 
         if (TxtFgColor < 16)
@@ -261,7 +262,7 @@ INT8U DrawPageProc(struct TVTPage* tvp , INT16U wPoint, INT16U* lpFlags, INT16U 
                                     DrawRect.height,
                                     (INT16U*)&UnicodeChar,
                                     str_length*2,
-                                    vtdraw_ctx->convert_color(TxtFgColor),
+                                    vtdraw_ctx->convert_color(TxtFgColor, AM_TT_COLOR_TEXT_FG),
                                     vtdraw_ctx->width_scale,
                                     vtdraw_ctx->height_scale);
         }
@@ -320,7 +321,7 @@ INT32S Vtdrawer_deinit(void)
 
 INT32S Draw_RegisterCallback(INT32S (*fill_rectangle)(INT32S left, INT32S top, INT32U width, INT32U height, INT32U color),
                              INT32S (*draw_text)(INT32S x, INT32S y, INT32U width, INT32U height, INT16U *text, INT32S len, INT32U color, INT32U w_scale, INT32U h_scale),
-                             INT32U (*convert_color)(INT32U index),
+                             INT32U (*convert_color)(INT32U index, INT32U type),
                              INT32U (*get_font_height)(void),
                              INT32U (*get_font_max_width)(void),
 			     void (*clean_osd)(void))

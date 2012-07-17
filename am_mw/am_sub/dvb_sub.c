@@ -1694,7 +1694,7 @@ static void sub_update_display(dvbsub_decoder_t* decoder)
         {
             dvbsub_dbg("[sub_update_display] clut %d not found use default !\r\n", p_region->clut);
             p_clut = &p_sys->default_clut;
-            //continue;
+            continue;
         }
 
         if (p_region->p_pixbuf)

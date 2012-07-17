@@ -94,7 +94,7 @@ INT32S Mosaic_deinit(void)
 
 
 INT32S Mosaic_RegisterCallback(INT32S (*fill_rectangle)(INT32S left, INT32S top, INT32U width, INT32U height, INT32U color),
-                               INT32U (*convert_color)(INT32U index))
+                               INT32U (*convert_color)(INT32U index, INT32U type))
 {
     INT32S error_code = AM_SUCCESS;
 
