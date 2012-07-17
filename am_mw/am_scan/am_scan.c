@@ -1881,18 +1881,17 @@ AM_MACRO_END
 		for(i=0; i<srv_tab->srv_cnt; i++)
 		{
 			int r;
+			int srv_id, ts_id, org_net_id;
+			int num = -1, visible = 1, hd_num = -1;
+			int sd_lcn = -1, hd_lcn = -1;
+			int sd_visible = 1, hd_visible = 1;
+			AM_Bool_t swapped = AM_FALSE;
+			AM_Bool_t got_lcn = AM_FALSE;
 
 			sqlite3_bind_int(stmts[QUERY_SRV_TS_NET_ID], 1, srv_tab->srv_ids[i]);
 			r = sqlite3_step(stmts[QUERY_SRV_TS_NET_ID]);
 			if(r==SQLITE_ROW)
 			{
-				int srv_id, ts_id, org_net_id;
-				int num = -1, visible = 1, hd_num = -1;
-				int sd_lcn = -1, hd_lcn = -1;
-				int sd_visible = 1, hd_visible = 1;
-				AM_Bool_t swapped = AM_FALSE;
-				AM_Bool_t got_lcn = AM_FALSE;
-
 				srv_id = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 0);
 				ts_id  = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 1);
 				org_net_id = sqlite3_column_int(stmts[QUERY_SRV_TS_NET_ID], 2);
@@ -1921,84 +1920,84 @@ AM_MACRO_END
 						}
 					AM_SI_LIST_END()
 				}
-
-				/* Skip Non-TV&Radio services */
-				sqlite3_bind_int(stmts[QUERY_SRV_TYPE], 1, srv_tab->srv_ids[r]);
-				r = sqlite3_step(stmts[QUERY_SRV_TYPE]);
-				if (r == SQLITE_ROW)
-				{
-					int srv_type = sqlite3_column_int(stmts[QUERY_SRV_TYPE], 0);
-					if (srv_type != 1 && srv_type != 2)
-						continue;
-				}
-				sqlite3_reset(stmts[QUERY_SRV_TYPE]);
-				
-				AM_DEBUG(1, "save: sd_lcn is %d", sd_lcn);
-				/* default we use SD */
-				num = sd_lcn;
-				hd_num = hd_lcn;
-				visible = sd_visible;
-				
-				/* need to swap lcn ? */
-				if (sd_lcn != -1 && hd_lcn != -1)
-				{
-					/* 是否存在一个service的lcn == 本service的hd_lcn? */
-					sqlite3_bind_int(stmts[QUERY_SRV_BY_SD_LCN], 1, result->src);
-					sqlite3_bind_int(stmts[QUERY_SRV_BY_SD_LCN], 2, hd_lcn);
-					if(sqlite3_step(stmts[QUERY_SRV_BY_SD_LCN])==SQLITE_ROW)
-					{
-						int cft_db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_SD_LCN], 0);
-						int tmp_hd_lcn = sqlite3_column_int(stmts[QUERY_SRV_BY_SD_LCN], 1);
-						
-						AM_DEBUG(1, "SWAP LCN: from %d -> %d", tmp_hd_lcn, hd_lcn);
-						UPDATE_SRV_LCN(tmp_hd_lcn, tmp_hd_lcn, hd_lcn, cft_db_id);
-						AM_DEBUG(1, "SWAP LCN: from %d -> %d", hd_lcn, sd_lcn);
-						num = hd_lcn; /* Use sd_lcn instead of hd_lcn */
-						visible = hd_visible;
-						swapped = AM_TRUE;
-					}
-					sqlite3_reset(stmts[QUERY_SRV_BY_SD_LCN]);
-				}
-				else if (sd_lcn == -1)
-				{
-					/* only hd lcn */
-					num = hd_lcn;
-					visible = hd_visible;
-				}
-				
-				if(!visible){
-					sqlite3_bind_int(stmts[UPDATE_CHAN_SKIP], 1, 1);
-					sqlite3_bind_int(stmts[UPDATE_CHAN_SKIP], 2, srv_tab->srv_ids[i]);
-					sqlite3_step(stmts[UPDATE_CHAN_SKIP]);
-					sqlite3_reset(stmts[UPDATE_CHAN_SKIP]);
-				}
-				
-				if (! swapped)
-				{
-					if (num >= 0)
-					{
-						/*该频道号是否已存在*/
-						sqlite3_bind_int(stmts[QUERY_SRV_BY_LCN], 1, result->src);
-						sqlite3_bind_int(stmts[QUERY_SRV_BY_LCN], 2, num);
-						if(sqlite3_step(stmts[QUERY_SRV_BY_LCN])==SQLITE_ROW)
-						{
-							AM_DEBUG(1, "Find a conflict LCN, set from %d -> %d", num, conflict_lcn_start);
-							/*已经存在，将当前service放到900后*/
-							num = conflict_lcn_start++;
-						}
-						sqlite3_reset(stmts[QUERY_SRV_BY_LCN]);
-					}
-					else
-					{
-						/*未找到LCN， 将当前service放到900后*/
-						num = conflict_lcn_start++;
-						AM_DEBUG(1, "No LCN found for this program, automatically set to %d", num);
-					}
-				}
-
-				UPDATE_SRV_LCN(num, hd_lcn, sd_lcn, srv_tab->srv_ids[i]);
 			}
 			sqlite3_reset(stmts[QUERY_SRV_TS_NET_ID]);
+
+			/* Skip Non-TV&Radio services */
+			sqlite3_bind_int(stmts[QUERY_SRV_TYPE], 1, srv_tab->srv_ids[r]);
+			r = sqlite3_step(stmts[QUERY_SRV_TYPE]);
+			if (r == SQLITE_ROW)
+			{
+				int srv_type = sqlite3_column_int(stmts[QUERY_SRV_TYPE], 0);
+				if (srv_type != 1 && srv_type != 2)
+					continue;
+			}
+			sqlite3_reset(stmts[QUERY_SRV_TYPE]);
+			
+			AM_DEBUG(1, "save: sd_lcn is %d", sd_lcn);
+			/* default we use SD */
+			num = sd_lcn;
+			hd_num = hd_lcn;
+			visible = sd_visible;
+			
+			/* need to swap lcn ? */
+			if (sd_lcn != -1 && hd_lcn != -1)
+			{
+				/* 是否存在一个service的lcn == 本service的hd_lcn? */
+				sqlite3_bind_int(stmts[QUERY_SRV_BY_SD_LCN], 1, result->src);
+				sqlite3_bind_int(stmts[QUERY_SRV_BY_SD_LCN], 2, hd_lcn);
+				if(sqlite3_step(stmts[QUERY_SRV_BY_SD_LCN])==SQLITE_ROW)
+				{
+					int cft_db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_SD_LCN], 0);
+					int tmp_hd_lcn = sqlite3_column_int(stmts[QUERY_SRV_BY_SD_LCN], 1);
+					
+					AM_DEBUG(1, "SWAP LCN: from %d -> %d", tmp_hd_lcn, hd_lcn);
+					UPDATE_SRV_LCN(tmp_hd_lcn, tmp_hd_lcn, hd_lcn, cft_db_id);
+					AM_DEBUG(1, "SWAP LCN: from %d -> %d", hd_lcn, sd_lcn);
+					num = hd_lcn; /* Use sd_lcn instead of hd_lcn */
+					visible = hd_visible;
+					swapped = AM_TRUE;
+				}
+				sqlite3_reset(stmts[QUERY_SRV_BY_SD_LCN]);
+			}
+			else if (sd_lcn == -1)
+			{
+				/* only hd lcn */
+				num = hd_lcn;
+				visible = hd_visible;
+			}
+			
+			if(!visible){
+				sqlite3_bind_int(stmts[UPDATE_CHAN_SKIP], 1, 1);
+				sqlite3_bind_int(stmts[UPDATE_CHAN_SKIP], 2, srv_tab->srv_ids[i]);
+				sqlite3_step(stmts[UPDATE_CHAN_SKIP]);
+				sqlite3_reset(stmts[UPDATE_CHAN_SKIP]);
+			}
+			
+			if (! swapped)
+			{
+				if (num >= 0)
+				{
+					/*该频道号是否已存在*/
+					sqlite3_bind_int(stmts[QUERY_SRV_BY_LCN], 1, result->src);
+					sqlite3_bind_int(stmts[QUERY_SRV_BY_LCN], 2, num);
+					if(sqlite3_step(stmts[QUERY_SRV_BY_LCN])==SQLITE_ROW)
+					{
+						AM_DEBUG(1, "Find a conflict LCN, set from %d -> %d", num, conflict_lcn_start);
+						/*已经存在，将当前service放到900后*/
+						num = conflict_lcn_start++;
+					}
+					sqlite3_reset(stmts[QUERY_SRV_BY_LCN]);
+				}
+				else
+				{
+					/*未找到LCN， 将当前service放到900后*/
+					num = conflict_lcn_start++;
+					AM_DEBUG(1, "No LCN found for this program, automatically set to %d", num);
+				}
+			}
+
+			UPDATE_SRV_LCN(num, hd_lcn, sd_lcn, srv_tab->srv_ids[i]);
 		}
 	}
 }
