@@ -82,6 +82,21 @@
 		(_t)->p_next = (_l);\
 		_l = _t;\
 	AM_MACRO_END
+
+/*添加数据到列表尾部*/
+#define APPEND_TO_LIST(_type,_t,_l)\
+	AM_MACRO_BEGIN\
+		_type *tmp = _l;\
+		_type *last = NULL;\
+		while (tmp != NULL) {\
+			last = tmp;\
+			tmp = tmp->p_next;\
+		}\
+		if (last == NULL)\
+			_l = _t;\
+		else\
+			last->p_next = _t;\
+	AM_MACRO_END
 	
 /*释放一个表的所有SI数据*/
 #define RELEASE_TABLE_FROM_LIST(_t, _l)\
@@ -3291,7 +3306,7 @@ static AM_ErrorCode_t am_scan_try_atv_search(AM_SCAN_Scanner_t *scanner)
 		scanner->curr_ts->type = AM_SCAN_TS_ANALOG;
 
 		/*添加到搜索结果列表*/
-		ADD_TO_LIST(scanner->curr_ts, scanner->result.tses);
+		APPEND_TO_LIST(AM_SCAN_TS_t, scanner->curr_ts, scanner->result.tses);
 	}
 	
 	
@@ -3852,7 +3867,7 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 			scanner->curr_ts->fend_para = scanner->start_freqs[scanner->curr_freq].dtv_para;
 			scanner->start_freqs[scanner->curr_freq].dtv_locked = AM_TRUE;
 			/*添加到搜索结果列表*/
-			ADD_TO_LIST(scanner->curr_ts, scanner->result.tses);
+			APPEND_TO_LIST(AM_SCAN_TS_t, scanner->curr_ts, scanner->result.tses);
 
 			return;
 		}
@@ -4284,7 +4299,6 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	scanner->result.src = para->source;
 	scanner->result.hdb = para->hdb;
 	scanner->result.standard = para->standard;
-	para->enable_lcn = AM_TRUE;
 	scanner->result.enable_lcn = para->enable_lcn;
 	scanner->result.resort_all = para->resort_all;
 	scanner->fend_dev = para->fend_dev_id;
