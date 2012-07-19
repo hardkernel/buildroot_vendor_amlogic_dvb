@@ -28,8 +28,8 @@
 #define USE_TDT_TIME
 
 /*子表最大个数*/
-#define MAX_EIT4E_SUBTABLE_CNT 64
-#define MAX_EIT_SUBTABLE_CNT 300
+#define MAX_EIT4E_SUBTABLE_CNT 500
+#define MAX_EIT_SUBTABLE_CNT 1000
 
 /*多子表时接收重复最小间隔*/
 #define EIT4E_REPEAT_DISTANCE 3000

@@ -120,6 +120,9 @@
 			p_table->p_next = NULL;\
 			ADD_TO_LIST(p_table, list); /*添加到搜索结果列表中*/\
 			am_scan_tablectl_mark_section(sec_ctrl, &header); /*设置为已接收*/\
+		}else\
+		{\
+			AM_DEBUG(1, "Decode Section failed");\
 		}\
 	AM_MACRO_END
 
@@ -2636,6 +2639,9 @@ static void am_scan_pat_done(AM_SCAN_Scanner_t *scanner)
 
 	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_PAT_DONE, (void*)scanner->curr_ts->pats);
 	
+	/* Set the current PAT section */
+	scanner->cur_pat = scanner->curr_ts->pats;
+	
 	/*开始搜索PMT表*/
 	am_scan_request_pmts(scanner);
 }
@@ -2955,6 +2961,7 @@ static void am_scan_section_handler(int dev_no, int fid, const uint8_t *data, in
 		switch (header.table_id)
 		{
 			case AM_SI_TID_PAT:
+				AM_DEBUG(1, "PAT section %d/%d arrived", header.sec_num, header.last_sec_num);
 				if (scanner->curr_ts)
 					COLLECT_SECTION(dvbpsi_pat_t, scanner->curr_ts->pats);
 				break;
@@ -2966,6 +2973,7 @@ static void am_scan_section_handler(int dev_no, int fid, const uint8_t *data, in
 				}
 				break;
 			case AM_SI_TID_SDT_ACT:
+				AM_DEBUG(1, "SDT actual section %d/%d arrived", header.sec_num, header.last_sec_num);
 				if (scanner->curr_ts)
 					COLLECT_SECTION(dvbpsi_sdt_t, scanner->curr_ts->sdts);
 				break;
@@ -3110,21 +3118,32 @@ static AM_ErrorCode_t am_scan_request_pmts(AM_SCAN_Scanner_t *scanner)
 	if (! scanner->curr_ts->pats)
 		return AM_SCAN_ERROR_BASE;
 		
-	if (! scanner->curr_ts->pats->p_first_program)
-	{
-		AM_DEBUG(1,"Scan: no PMT found in PAT");
-		return AM_SUCCESS;
-	}
-	
 	for (i=0; i<(int)AM_ARRAY_SIZE(scanner->pmtctl); i++)
 	{
 		if (scanner->pmtctl[i].fid < 0)
 		{
-			if (! cur_prog)
-				cur_prog = scanner->curr_ts->pats->p_first_program;
-			else
+			if (cur_prog)
+			{
+				/* Start next */
 				cur_prog = cur_prog->p_next;
-
+			}
+			if (! cur_prog)
+			{
+				/* find a valid PAT section */
+				while (scanner->cur_pat && ! scanner->cur_pat->p_first_program)
+				{
+					AM_DEBUG(1,"Scan: no PMT found in this PAT section, try next PAT section.");
+					scanner->cur_pat = scanner->cur_pat->p_next;
+				}
+				/* Start from its first program */
+				if (scanner->cur_pat) 
+				{
+					AM_DEBUG(1, "Start PMT from a new PAT section %p...", scanner->cur_pat);
+					cur_prog = scanner->cur_pat->p_first_program;
+					scanner->cur_pat = scanner->cur_pat->p_next;
+				}
+			}
+			
 			AM_DEBUG(1, "current program %p", cur_prog);
 			while (cur_prog && cur_prog->i_number == 0)
 			{
@@ -3139,11 +3158,12 @@ static AM_ErrorCode_t am_scan_request_pmts(AM_SCAN_Scanner_t *scanner)
 				if (recv_count == 0)
 				{
 					AM_DEBUG(1,"All PMTs Done!");
-					scanner->cur_prog = NULL;
+					
 					/*清除搜索标识*/
 					scanner->recv_status &= ~scanner->pmtctl[0].recv_flag;
 					SET_PROGRESS_EVT(AM_SCAN_PROGRESS_PMT_DONE, (void*)scanner->curr_ts->pmts);
 				}
+				scanner->cur_prog = NULL;
 				return AM_SUCCESS;
 			}
 			
@@ -3179,51 +3199,6 @@ static AM_ErrorCode_t am_scan_request_pmts(AM_SCAN_Scanner_t *scanner)
 	
 	return ret;
 }
-
-#if 0
-/**\brief 请求下一个program的PMT表*/
-static AM_ErrorCode_t am_scan_request_next_pmt(AM_SCAN_Scanner_t *scanner)
-{
-	if (! scanner->curr_ts)
-	{
-		/*A serious error*/
-		AM_DEBUG(1, "Error, no current ts selected");
-		return AM_SCAN_ERROR_BASE;
-	}
-	if (! scanner->curr_ts->pats)
-		return AM_SCAN_ERROR_BASE;
-		
-	if (! scanner->curr_ts->pats->p_first_program)
-	{
-		AM_DEBUG(1,"Scan: no PMT found in PAT");
-		return AM_SUCCESS;
-	}
-	if (! scanner->cur_prog)
-		scanner->cur_prog = scanner->curr_ts->pats->p_first_program;
-	else
-		scanner->cur_prog = scanner->cur_prog->p_next;
-
-	while (scanner->cur_prog && scanner->cur_prog->i_number == 0)
-		scanner->cur_prog = scanner->cur_prog->p_next;
-
-	if (! scanner->cur_prog)
-	{
-		AM_DEBUG(1,"All PMTs Done!");
-		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_PMT_DONE, (void*)scanner->curr_ts->pmts);
-		return AM_SUCCESS;
-	}
-
-	AM_DEBUG(1, "Start PMT for program %d, pmt_pid 0x%x", scanner->cur_prog->i_number, scanner->cur_prog->i_pid);
-	/*初始化接收控制数据*/
-	am_scan_tablectl_clear(&scanner->pmtctl);
-	scanner->pmtctl.pid = scanner->cur_prog->i_pid;
-	scanner->pmtctl.ext = scanner->cur_prog->i_number;
-
-	AM_TRY(am_scan_request_section(scanner, &scanner->pmtctl));
-
-	return AM_SUCCESS;
-}
-#endif
 
 /**\brief 从下一个主频点中搜索NIT表*/
 static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner)
@@ -3955,7 +3930,6 @@ static void am_scan_get_wait_timespec(AM_SCAN_Scanner_t *scanner, struct timespe
 		TIMEOUT_CHECK(nitctl);
 		TIMEOUT_CHECK(batctl);
 	}
-	
 	
 	if (scanner->stage == AM_SCAN_STAGE_TS && \
 		scanner->recv_status == AM_SCAN_RECVING_COMPLETE)

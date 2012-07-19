@@ -3189,7 +3189,7 @@ static void* aml_av_monitor_thread(void *arg)
 				{
 					dec_vpts = aml_get_pts_video();
 					dec_apts = aml_get_pts_audio();
-					AM_DEBUG(1, "adec_start %d, last_dec_apts %x, dec_apts %x", adec_start, last_dec_apts, dec_apts);
+					AM_DEBUG(7, "adec_start %d, last_dec_apts %x, dec_apts %x", adec_start, last_dec_apts, dec_apts);
 					/* Audio PID有效并且Audio pts有变化，认为audio 开始解码*/
 					if (dev->ts_player.play_para.apid < 0x1fff && 
 						!adec_start && last_dec_apts && 

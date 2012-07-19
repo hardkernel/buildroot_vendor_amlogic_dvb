@@ -228,6 +228,7 @@ struct AM_SCAN_Scanner_s
 	struct dvb_frontend_event		fe_evt;			/**< 前段事件*/
 	AM_SCAN_FrontEndPara_t		 	*start_freqs;	/**< 需要搜索的频点列表*/ 
 	AM_SCAN_TS_t					*curr_ts;		/**< 当前正在搜索的TS数据*/
+	dvbpsi_pat_t					*cur_pat;		/**< 当前搜索PMT时搜使用的PAT section */
 	dvbpsi_pat_program_t			*cur_prog;		/**< 当前正在接收PMT的Program*/
 	AM_SCAN_StoreCb 				store_cb;		/**< 存储回调*/
 	AM_SCAN_Result_t				result;			/**< 搜索结果*/
