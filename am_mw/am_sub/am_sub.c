@@ -1163,7 +1163,6 @@ start:
 							sub_display->state = SUBTITLE_REMOVE;
 						}
 					}
-				
 				}
 				else if (sub_display->state == SUBTITLE_DISPLAY)
 				{
@@ -1180,15 +1179,24 @@ start:
 							sub_display->display = 0;
 							clear_screen = &sub_display->sub_screen;
 						}
-
-
 					}
 					else if (context_sub.flags & SUBTITLE_SHOW_FLAG)
 					{
-						sub_display->display = 1;
-						if (sub_display->display)
+						if(cur_pts < disp_pts)
 						{
-							show_screen = &sub_display->sub_screen;
+							if(sub_display->display)
+							{
+								sub_display->display = 0;
+								clear_screen = &sub_display->sub_screen;
+							}
+						}
+						else
+						{
+							sub_display->display = 1;
+							if (sub_display->display)
+							{
+								show_screen = &sub_display->sub_screen;
+							}
 						}
 					}
 				}
