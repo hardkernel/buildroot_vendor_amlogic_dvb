@@ -260,8 +260,8 @@ const char *sql_stmts[MAX_STMT] =
 	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?,\
 	 running_status=?,free_ca_mode=?,volume=?,aud_track=?,vid_pid=?,vid_fmt=?,aud_pids=?,aud_fmts=?,\
 	 aud_langs=?,db_sub_id=-1,skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,\
-	 hidden=?,hide_guide=?, source_id=?,favor=?,current_aud=?,db_sat_para_id=?,scrambled_flag=?,lcn=0,hd_lcn=0,\
-	 sd_lcn=0,default_chan_num=0 where db_id=?",
+	 hidden=?,hide_guide=?, source_id=?,favor=?,current_aud=?,db_sat_para_id=?,scrambled_flag=?,lcn=-1,hd_lcn=-1,\
+	 sd_lcn=-1,default_chan_num=-1,chan_order=0 where db_id=?",
 	"select db_id,service_type from srv_table where db_ts_id=? order by service_id",
 	"update srv_table set chan_num=? where db_id=?",
 	"delete  from evt_table where db_ts_id=?",
@@ -2133,6 +2133,8 @@ static void am_scan_default_sort_by_service_id(AM_SCAN_Result_t *result, sqlite3
 			sqlite3_reset(stmts[QUERY_MAX_DEFAULT_CHAN_NUM]);
 
 #endif
+			i = (i<=0) ? 1 : i;
+			j = (j<=0) ? 1 : j;
 		}
 
 		/*重新对srv_table排序以生成新的频道号*/
@@ -2286,13 +2288,14 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 	/* 生成最终 chan_num */
 	if (result->enable_lcn)
 	{
-		AM_DEBUG(1, "Updating chan_num from lcn ...");
-		sqlite3_exec(hdb, "update srv_table set chan_num=lcn where lcn>0", NULL, NULL, NULL);
+		AM_DEBUG(1, "Updating chan_num & chan_order from lcn ...");
+		sqlite3_exec(hdb, "update srv_table set chan_num=lcn, chan_order=lcn where lcn>0", NULL, NULL, NULL);
 	}
 	else
 	{
-		AM_DEBUG(1, "Updating chan_num from default_chan_num ...");
-		sqlite3_exec(hdb, "update srv_table set chan_num=default_chan_num where default_chan_num>0", NULL, NULL, NULL);
+		AM_DEBUG(1, "Updating chan_num & chan_order from default_chan_num ...");
+		sqlite3_exec(hdb, "update srv_table set chan_num=default_chan_num, \
+			chan_order=default_chan_num where default_chan_num>0", NULL, NULL, NULL);
 	}
 	
 
