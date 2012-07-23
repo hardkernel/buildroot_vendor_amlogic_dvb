@@ -2282,23 +2282,22 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 	/* 生成lcn排序结果 */
 	am_scan_lcn_proc(result, stmts, &srv_tab);
 	
-	/* 生成按service_id大小顺序排序结果 */
-	am_scan_default_sort_by_service_id(result, stmts, &srv_tab);
-	
-	/* 生成最终 chan_num */
-	if (result->enable_lcn)
+	if (result->sort_method == AM_SCAN_SORT_BY_FREQ_SRV_ID)
 	{
-		AM_DEBUG(1, "Updating chan_num & chan_order from lcn ...");
-		sqlite3_exec(hdb, "update srv_table set chan_num=lcn, chan_order=lcn where lcn>0", NULL, NULL, NULL);
+		/* 生成按service_id大小顺序排序结果 */
+		am_scan_default_sort_by_service_id(result, stmts, &srv_tab);
 	}
 	else
 	{
-		AM_DEBUG(1, "Updating chan_num & chan_order from default_chan_num ...");
-		sqlite3_exec(hdb, "update srv_table set chan_num=default_chan_num, \
-			chan_order=default_chan_num where default_chan_num>0", NULL, NULL, NULL);
+		/* 生成按搜索先后顺序排序结果 */
+		am_scan_default_sort_by_scan_order(result, stmts, &srv_tab);
 	}
 	
-
+	/* 生成最终 chan_num */
+	AM_DEBUG(1, "Updating chan_num & chan_order from default_chan_num ...");
+	sqlite3_exec(hdb, "update srv_table set chan_num=default_chan_num, \
+		chan_order=default_chan_num where default_chan_num>0", NULL, NULL, NULL);
+	
 store_end:
 	for (i=0; i<MAX_STMT; i++)
 	{
@@ -3834,11 +3833,8 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 				am_scan_request_section(scanner, &scanner->sdtctl);
 
 				/*In order to support lcn, we need scan NIT for each TS */
-				if (scanner->result.enable_lcn)
-				{
-					am_scan_tablectl_clear(&scanner->nitctl);
-					am_scan_request_section(scanner, &scanner->nitctl);
-				}
+				am_scan_tablectl_clear(&scanner->nitctl);
+				am_scan_request_section(scanner, &scanner->nitctl);
 			}
 			
 
@@ -4276,7 +4272,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	scanner->result.src = para->source;
 	scanner->result.hdb = para->hdb;
 	scanner->result.standard = para->standard;
-	scanner->result.enable_lcn = para->enable_lcn;
+	scanner->result.sort_method = para->sort_method;
 	scanner->result.resort_all = para->resort_all;
 	scanner->fend_dev = para->fend_dev_id;
 	scanner->dmx_dev = para->dmx_dev_id;

@@ -114,6 +114,13 @@ enum AM_SCAN_TSType
 	AM_SCAN_TS_ANALOG
 };
 
+/**\brief 频道排序方法*/
+typedef enum
+{
+	AM_SCAN_SORT_BY_FREQ_SRV_ID,	/**< 按照频率大小排序,同频率下按service_id排序*/
+	AM_SCAN_SORT_BY_SCAN_ORDER,		/**< 按照搜索先后顺序排序*/
+}AM_SCAN_SortMethod_t;
+
 /**\brief 频点进度数据*/
 typedef struct
 {
@@ -217,7 +224,7 @@ typedef struct
 	cvct_channel_info_t	*cvcs;		/**<ATSC C virtual channels*/
 	tvct_channel_info_t	*tvcs;		/**<ATSC T virtual channels*/
 
-	AM_Bool_t			enable_lcn; /**< 使用LCN排序*/
+	AM_SCAN_SortMethod_t	sort_method;		/**< 频道排序方法*/
 	AM_Bool_t			resort_all; /**< 重新排列数据库中的所有service*/
 	
 	AM_SCAN_SatellitePara_t	sat_para;/**< 卫星参数配置,只有当source位Satellite时有效*/
@@ -248,7 +255,7 @@ typedef struct
 
 	AM_SCAN_StoreCb					store_cb;			/**< 搜索完成时存储回调函数*/
 	sqlite3							*hdb;				/**< 数据库句柄*/
-	AM_Bool_t						enable_lcn;			/**< 根据逻辑频道号进行排序*/
+	AM_SCAN_SortMethod_t			sort_method;		/**< 频道排序方法*/
 	AM_Bool_t						resort_all;			/**< 重新排列数据库中的所有service*/
 }AM_SCAN_CreatePara_t;
 

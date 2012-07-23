@@ -72,11 +72,17 @@ extern "C"
 
 /**\brief 开始解析一个被指定字符隔开的字符串*/
 #define AM_TOKEN_PARSE_BEGIN(_str, _delim, _token) \
-	_token = strtok(_str, _delim);\
-	while (_token != NULL) {
+	{\
+	char *_strb =  strdup(_str);\
+	if (_strb) {\
+		_token = strtok(_strb, _delim);\
+		while (_token != NULL) {
 	
 #define AM_TOKEN_PARSE_END(_str, _delim, _token) \
-	_token = strtok(NULL, _delim);\
+		_token = strtok(NULL, _delim);\
+		}\
+		free(_strb);\
+	}\
 	}
 	
 

@@ -1028,6 +1028,16 @@ extern AM_ErrorCode_t AM_AV_FastForwardTimeshift(int dev_no, int speed);
  */
 extern AM_ErrorCode_t AM_AV_FastBackwardTimeshift(int dev_no, int speed);
 
+/**\brief 切换当前Timeshift播放音频
+ * \param dev_no 音视频设备号
+ * \param apid the audio pid switched to
+ * \param afmt the audio fmt switched to
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+extern AM_ErrorCode_t AM_AV_SwitchTimeshiftAudio(int dev_no, int apid, int afmt);
+
 /**\brief 设置视频通道参数
  * \param dev_no 音视频设备号
  * \param fs free scale参数

@@ -70,9 +70,10 @@ typedef struct
 	int				timeshift_duration;
 	int				timeshift_dmx_dev;
 	int				rec_duration;
+	int				apid;
+	int				vpid;
 	AM_AV_VFormat_t	vfmt;
-	AM_AV_AFormat_t	afmt1;
-	AM_AV_AFormat_t	afmt2;
+	AM_AV_AFormat_t	afmt;
 	AM_Bool_t		seek_start;
 	pthread_t		thread;
 	pthread_t		rec_thread;

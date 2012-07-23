@@ -2708,6 +2708,45 @@ AM_ErrorCode_t AM_AV_FastBackwardTimeshift(int dev_no, int speed)
 	return ret;
 }
 
+/**\brief 切换当前Timeshift播放音频
+ * \param dev_no 音视频设备号
+ * \param apid the audio pid switched to
+ * \param afmt the audio fmt switched to
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+AM_ErrorCode_t AM_AV_SwitchTimeshiftAudio(int dev_no, int apid, int afmt)
+{
+	AM_AV_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	AV_TSPlayPara_t para;
+	
+	AM_TRY(av_get_openned_dev(dev_no, &dev));
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	if(!(dev->mode&AV_TIMESHIFT))
+	{
+		AM_DEBUG(1, "do not in the Timeshift play mode");
+		ret = AM_AV_ERR_ILLEGAL_OP;
+	}
+	
+	if(ret==AM_SUCCESS)
+	{
+		if(dev->drv->timeshift_cmd)
+		{
+			para.apid   = apid;
+			para.afmt 	= afmt;
+			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_SWITCH_AUDIO, &para);
+		}
+	}
+	
+	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
+
 /**\brief 设置视频通道参数
  * \param dev_no 音视频设备号
  * \param fs free scale参数

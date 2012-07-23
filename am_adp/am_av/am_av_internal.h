@@ -129,7 +129,8 @@ typedef enum
 	AV_PLAY_FF,                      /**< 快速前进*/
 	AV_PLAY_FB,                      /**< 快速后退*/
 	AV_PLAY_SEEK,                    /**< 设定播放位置*/
-	AV_PLAY_RESET_VPATH              /**< 重新设定Video path*/
+	AV_PLAY_RESET_VPATH,             /**< 重新设定Video path*/
+	AV_PLAY_SWITCH_AUDIO			 /**< 切换音频*/
 } AV_PlayCmd_t;
 
 /**\brief 文件播放参数*/

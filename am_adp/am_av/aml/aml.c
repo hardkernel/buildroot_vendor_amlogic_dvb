@@ -2071,7 +2071,7 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 			if (tshift->state != AV_TIMESHIFT_STAT_PAUSE)
 			{
 				tshift->inject_size = 0;
-				tshift->timeout = -1;
+				tshift->timeout = 1000;
 				tshift->state = AV_TIMESHIFT_STAT_PAUSE;
 				aml_timeshift_pause_av(tshift);
 				AM_DEBUG(1, "@@@Timeshift Paused");
@@ -2125,6 +2125,16 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 			/*restart play now*/
 			aml_start_timeshift(tshift, &tshift->para, AM_FALSE, AM_TRUE);
 
+			/*Set the left to 0, we will read from the new point*/
+			tshift->left = 0;
+			tshift->inject_size = 0;
+			tshift->timeout = 0;
+			/* will turn to play state from current_time */
+			tshift->state = AV_TIMESHIFT_STAT_SEARCHOK;
+			break;
+		case AV_PLAY_SWITCH_AUDIO:
+			/* just restart play using the new audio para */
+			AM_DEBUG(1, "Switch audio to pid=%d, fmt=%d",tshift->para.aud_id, tshift->para.aud_fmt);
 			/*Set the left to 0, we will read from the new point*/
 			tshift->left = 0;
 			tshift->inject_size = 0;
@@ -2420,6 +2430,15 @@ static AM_ErrorCode_t aml_timeshift_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, v
 	else if (cmd == AV_PLAY_SEEK)
 	{
 		data->seek_pos = ((AV_FileSeekPara_t*)para)->pos;;
+	}
+	else if (cmd == AV_PLAY_SWITCH_AUDIO)
+	{
+		AV_TSPlayPara_t *audio_para = (AV_TSPlayPara_t*)para;
+		if (audio_para)
+		{
+			data->para.aud_id = audio_para->apid;
+			data->para.aud_fmt = audio_para->afmt;
+		}
 	}
 	pthread_cond_signal(&data->cond);
 	pthread_mutex_unlock(&data->lock);
