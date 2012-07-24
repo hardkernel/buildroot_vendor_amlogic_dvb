@@ -119,6 +119,7 @@ typedef enum
 {
 	AM_SCAN_SORT_BY_FREQ_SRV_ID,	/**< 按照频率大小排序,同频率下按service_id排序*/
 	AM_SCAN_SORT_BY_SCAN_ORDER,		/**< 按照搜索先后顺序排序*/
+	AM_SCAN_SORT_BY_LCN,			/**< 按照LCN排序*/
 }AM_SCAN_SortMethod_t;
 
 /**\brief 频点进度数据*/

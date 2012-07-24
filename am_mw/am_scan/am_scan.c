@@ -292,6 +292,7 @@ const char *sql_stmts[MAX_STMT] =
 	"select max(default_chan_num) from srv_table where src=?",
 	"select db_id,hd_lcn from srv_table where src=? and sd_lcn=?",
 	"select db_id,service_type from srv_table where src=? order by default_chan_num",
+	"select db_id,service_type from srv_table where src=? order by lcn",
 };
 
 /****************************************************************************
@@ -1942,7 +1943,7 @@ AM_MACRO_END
 			sqlite3_reset(stmts[QUERY_SRV_TS_NET_ID]);
 
 			/* Skip Non-TV&Radio services */
-			sqlite3_bind_int(stmts[QUERY_SRV_TYPE], 1, srv_tab->srv_ids[r]);
+			sqlite3_bind_int(stmts[QUERY_SRV_TYPE], 1, srv_tab->srv_ids[i]);
 			r = sqlite3_step(stmts[QUERY_SRV_TYPE]);
 			if (r == SQLITE_ROW)
 			{
@@ -2017,6 +2018,47 @@ AM_MACRO_END
 
 			UPDATE_SRV_LCN(num, hd_lcn, sd_lcn, srv_tab->srv_ids[i]);
 		}
+	}
+}
+
+/**\brief 按LCN顺序进行默认排序 */
+static void am_scan_default_sort_by_lcn(AM_SCAN_Result_t *result, sqlite3_stmt **stmts, ScanRecTab_t *srv_tab)
+{
+	if (result->tses && result->standard != AM_SCAN_STANDARD_ATSC)
+	{
+		int row = AM_DB_MAX_SRV_CNT_PER_SRC, i, j;
+		int r, db_id, rr, srv_type;
+
+		i=1;
+		j=1;
+		
+		/* 重新按default_chan_num 对已有channel排序 */
+		sqlite3_bind_int(stmts[QUERY_SRV_BY_LCN_ORDER], 1, result->src);
+		r = sqlite3_step(stmts[QUERY_SRV_BY_LCN_ORDER]);
+		while (r == SQLITE_ROW)
+		{
+			db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_LCN_ORDER], 0);
+			srv_type = sqlite3_column_int(stmts[QUERY_SRV_BY_LCN_ORDER], 1);
+			if (srv_type == 0x1)
+			{
+				/*电视节目*/
+				sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, i++);
+				sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
+				sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+				sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+			}
+			else if (srv_type == 0x2)
+			{
+				/*广播节目*/
+				sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, j++);
+				sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
+				sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+				sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+			}
+
+			r = sqlite3_step(stmts[QUERY_SRV_BY_LCN_ORDER]);
+		}
+		sqlite3_reset(stmts[QUERY_SRV_BY_LCN_ORDER]);
 	}
 }
 
@@ -2286,6 +2328,10 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 	{
 		/* 生成按service_id大小顺序排序结果 */
 		am_scan_default_sort_by_service_id(result, stmts, &srv_tab);
+	}
+	else if (result->sort_method == AM_SCAN_SORT_BY_LCN)
+	{
+		am_scan_default_sort_by_lcn(result, stmts, &srv_tab);
 	}
 	else
 	{
