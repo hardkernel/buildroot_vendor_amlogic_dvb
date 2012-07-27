@@ -185,10 +185,10 @@ INT8U DrawPageProc(struct TVTPage* tvp , INT16U wPoint, INT16U* lpFlags, INT16U 
         return PARSE_CONTINUE;
     }
 
-    if ((uMode & VTMODE_CONCEAL) && !(uVTDFlags & VTDF_HIDDEN))
+    /*if ((uMode & VTMODE_CONCEAL) && !(uVTDFlags & VTDF_HIDDEN))
     {
         return PARSE_CONTINUE;
-    }
+    }*/
 
     nCol = HIGHBYTE(wPoint);
     nRow = LOWBYTE(wPoint);

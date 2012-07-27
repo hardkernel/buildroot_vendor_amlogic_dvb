@@ -689,10 +689,10 @@ INT8U ParseLineElements(struct TVTPage* pPage, INT8U nRow, INT16U* lpFlags, TPar
             {
                 case 0x00:  // NUL (reserved) (2.5+: Alpha Black)
                     // Workaround to 1.x vs 2.5+ conflict
-                    if (Background == 0)
+                   /* if (Background == 0)
                     {
                         break;
-                    }
+                    }*/
                 case 0x01:  // Alpha Red
                 case 0x02:  // Alpha Green
                 case 0x03:  // Alpha Yellow
