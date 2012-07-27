@@ -1713,7 +1713,8 @@ AM_ErrorCode_t AM_EPG_ConvertCode(char *in_code,int in_len,char *out_code,int ou
 	}
 	else if (in_len <= 1)
 	{
-		return AM_SUCCESS;
+		pin = &in_code;
+		strcpy(cod, "ISO-8859-1");
 	}
 	else
 	{
