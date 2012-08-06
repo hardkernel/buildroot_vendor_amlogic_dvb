@@ -144,7 +144,9 @@ static void* dmx_data_thread(void *arg)
 	AM_DMX_FilterMask_t mask;
 	AM_ErrorCode_t ret;
 
-	sec_buf = (uint8_t*)malloc(4096);
+#define BUF_SIZE (4096)
+
+	sec_buf = (uint8_t*)malloc(BUF_SIZE);
 	
 	while(dev->enable_thread)
 	{
@@ -175,7 +177,7 @@ static void* dmx_data_thread(void *arg)
 				if(!filter->enable || !filter->used)
 					continue;
 				
-				sec_len = sizeof(sec_buf);
+				sec_len = BUF_SIZE;
 
 #ifndef DMX_WAIT_CB
 				pthread_mutex_lock(&dev->lock);
