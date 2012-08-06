@@ -138,11 +138,13 @@ static AM_INLINE AM_ErrorCode_t dmx_get_used_filter(AM_DMX_Device_t *dev, int fi
 static void* dmx_data_thread(void *arg)
 {
 	AM_DMX_Device_t *dev = (AM_DMX_Device_t*)arg;
-	static uint8_t sec_buf[4096];
+	uint8_t *sec_buf;
 	uint8_t *sec;
 	int sec_len;
 	AM_DMX_FilterMask_t mask;
 	AM_ErrorCode_t ret;
+
+	sec_buf = (uint8_t*)malloc(4096);
 	
 	while(dev->enable_thread)
 	{
@@ -228,6 +230,11 @@ static void* dmx_data_thread(void *arg)
 		{
 			usleep(10000);
 		}
+	}
+
+	if(sec_buf)
+	{
+		free(sec_buf);
 	}
 	
 	return NULL;

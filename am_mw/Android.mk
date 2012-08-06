@@ -9,7 +9,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_font/am_font.c am_font/freetype.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
-		   am_sub/am_sub.c am_sub/dvb_sub.c am_sub/sub_memory.c\
+		   am_sub2/am_sub.c am_sub2/dvb_sub.c am_sub2/sub_memory.c\
 		   am_tt/am_tt.c am_tt/VTCommon.c am_tt/VTDrawer.c am_tt/VTTeletext.c\
 		   am_tt/VTCharacterSet.c am_tt/VTDecoder.c am_tt/VTMosaicGraphics.c am_tt/VTTopText.c\
 		   am_si/am_si.c\
@@ -70,7 +70,8 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/atsc/atsc_descriptor.c\
 		   am_si/atsc/huffman_decode.c\
 		   am_fend_ctrl/am_sec.c\
-		   am_fend_ctrl/am_fend_ctrl.c
+		   am_fend_ctrl/am_fend_ctrl.c\
+		   am_pes/am_pes.c
 
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M
@@ -119,7 +120,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_font/am_font.c am_font/freetype.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
-		   am_sub/am_sub.c am_sub/dvb_sub.c am_sub/sub_memory.c\
+		   am_sub2/am_sub.c am_sub2/dvb_sub.c am_sub2/sub_memory.c\
 		   am_tt/am_tt.c am_tt/VTCommon.c am_tt/VTDrawer.c am_tt/VTTeletext.c\
 		   am_tt/VTCharacterSet.c am_tt/VTDecoder.c am_tt/VTMosaicGraphics.c am_tt/VTTopText.c\
 		   am_si/am_si.c\
