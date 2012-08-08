@@ -9,8 +9,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_font/am_font.c am_font/freetype.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
-		   am_sub2/am_sub.c am_sub2/dvb_sub.c am_sub2/sub_memory.c\
-		   am_sub/am_sub.c\
+		   am_sub2/am_sub.c am_sub2/dvb_sub.c \
 		   am_tt/am_tt.c am_tt/VTCommon.c am_tt/VTDrawer.c am_tt/VTTeletext.c\
 		   am_tt/VTCharacterSet.c am_tt/VTDecoder.c am_tt/VTMosaicGraphics.c am_tt/VTTopText.c\
 		   am_si/am_si.c\
@@ -121,7 +120,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_font/am_font.c am_font/freetype.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
-		   am_sub2/am_sub.c am_sub2/dvb_sub.c am_sub2/sub_memory.c\
+		   am_sub2/am_sub.c am_sub2/dvb_sub.c\
 		   am_tt/am_tt.c am_tt/VTCommon.c am_tt/VTDrawer.c am_tt/VTTeletext.c\
 		   am_tt/VTCharacterSet.c am_tt/VTDecoder.c am_tt/VTMosaicGraphics.c am_tt/VTTopText.c\
 		   am_si/am_si.c\

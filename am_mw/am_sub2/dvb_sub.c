@@ -6,15 +6,16 @@
 #include "clut_tables.h"
 #include "ycbcr_rgb.h"
 #include "sub_bits.h"
-#include "sub_memory.h"
+//#include "sub_memory.h"
 #include "stdio.h"
 
 #include "dvb_sub.h"
+#include <am_debug.h>
 
 #define DVBSUB_DEBUG                                (0)
 
 #if DVBSUB_DEBUG
-#define dvbsub_dbg                                  AM_TRACE
+#define dvbsub_dbg(args...)                         AM_DEBUG(1, args)
 #else
 #define dvbsub_dbg(args...)  {do{}while(0);}
 #endif
@@ -198,7 +199,7 @@ static void sub_default_display_init(dvbsub_decoder_t* decoder);
 static void sub_update_display(dvbsub_decoder_t* decoder);
 static void sub_remove_display(dvbsub_decoder_t* decoder, dvbsub_picture_t* pic);
 
-static dvbsub_decoder_t *sub_decoder = NULL;
+//static dvbsub_decoder_t *sub_decoder = NULL;
 
 static void sub_parse_segment(dvbsub_decoder_t* decoder, bs_t* s)
 {
@@ -232,7 +233,7 @@ static void sub_parse_segment(dvbsub_decoder_t* decoder, bs_t* s)
          (decoder->ancillary_id == page_id) && \
          (segment_type == DVBSUB_ST_PAGE_COMPOSITION))
     {
-        dvbsub_dbg("[sub_parse_segment] skipped invalid ancillary subtitle packet !\r\n", page_id);
+        dvbsub_dbg("[sub_parse_segment] skipped invalid ancillary subtitle packet !\r\n");
         bs_skip(s,  8 * (2 + segment_length));
         return;
     }
@@ -1882,15 +1883,16 @@ static void sub_remove_display(dvbsub_decoder_t* decoder, dvbsub_picture_t* pic)
 
 INT32S dvbsub_decoder_create(INT16U composition_id, INT16U ancillary_id, dvbsub_callback_t callback, INT32U* handle)
 {
+    dvbsub_decoder_t *sub_decoder = NULL;
     INT32S retcode = 0;
 
-    if ((composition_id == 0xffff) || (callback == NULL) || (handle == NULL))
+    if ((composition_id == 0xffff) || /*(callback == NULL) ||*/ (handle == NULL))
     {
         dvbsub_dbg("[dvbsub_decoder_create] bad parameter !\r\n");
         return -1;
     }
 
-    sub_mem_init();
+    //sub_mem_init();
 
     if (sub_decoder == NULL)
     {
@@ -1947,6 +1949,7 @@ INT32S dvbsub_decoder_destroy(INT32U handle)
     INT32S retcode = 0;
     dvbsub_picture_t *p_pic = NULL, *p_pic_next = NULL;
     sub_pic_region_t *p_reg = NULL, *p_reg_next = NULL;
+    dvbsub_decoder_t *sub_decoder = (dvbsub_decoder_t*)handle;
 
     if ((handle != (INT32U)sub_decoder) || (handle == 0))
     {
@@ -1989,7 +1992,7 @@ INT32S dvbsub_decoder_destroy(INT32U handle)
     free(sub_decoder);
     sub_decoder = NULL;
 
-    sub_mem_deinit();
+    //sub_mem_deinit();
 
     dvbsub_dbg("[dvbsub_decoder_destroy] decoder destroyed\r\n");
 
@@ -2008,6 +2011,7 @@ INT32S dvbsub_parse_pes_packet(INT32U handle, const INT8U* packet, INT32U length
     INT8U  pts_dts_flag = 0;
     INT8U  pes_header_length = 0;
     dvbsub_sys_t *p_sys = NULL;
+    dvbsub_decoder_t *sub_decoder = (dvbsub_decoder_t*)handle;
 
     if ((handle != (INT32U)sub_decoder) || (handle == 0))
     {
@@ -2145,6 +2149,8 @@ INT32S dvbsub_parse_pes_packet(INT32U handle, const INT8U* packet, INT32U length
 
 dvbsub_picture_t* dvbsub_get_display_set(INT32U handle)
 {
+    dvbsub_decoder_t *sub_decoder = (dvbsub_decoder_t*)handle;
+
     if ((handle != (INT32U)sub_decoder) || (handle == 0))
     {
         dvbsub_dbg("[dvbsub_get_display_set] invalid handle !\r\n");
@@ -2157,6 +2163,7 @@ dvbsub_picture_t* dvbsub_get_display_set(INT32U handle)
 INT32S dvbsub_remove_display_picture(INT32U handle, dvbsub_picture_t* pic)
 {
     INT32S retcode = 0;
+    dvbsub_decoder_t *sub_decoder = (dvbsub_decoder_t*)handle;
 
     if ((handle != (INT32U)sub_decoder) || (handle == 0))
     {

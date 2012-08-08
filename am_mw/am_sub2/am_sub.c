@@ -23,52 +23,56 @@ typedef struct
 	pthread_cond_t     cond;
 	pthread_t          thread;
 	AM_SUB2_Picture_t *pic;
-	AM_Bool_t          display;
 }AM_SUB2_Parser_t;
 
 static void sub2_check(AM_SUB2_Parser_t *parser)
 {
 	AM_SUB2_Picture_t *old = parser->pic;
-	AM_Bool_t old_disp = parser->display;
+	AM_SUB2_Picture_t *npic;
+	uint64_t pts;
+	int64_t diff;
 
-	if(!parser->pic)
+	do
 	{
-		parser->pic = dvbsub_get_display_set(parser->handle);
-	}
-
-	while(parser->pic)
-	{
-		uint64_t pts = parser->para.get_pts(parser, parser->pic->pts);
-		int64_t diff;
-
-		diff = pts - parser->pic->pts;
-		if(diff < 0)
+		if(parser->pic)
 		{
-			parser->display = AM_TRUE;
-			break;
-		}
-
-		if(diff < (parser->pic->timeout * 90000))
-		{
-			parser->display = AM_TRUE;
-			return;
-		}
-
-		dvbsub_remove_display_picture(parser->handle, parser->pic);
-
-		parser->pic = dvbsub_get_display_set(parser->handle);
-	}
-
-	if(parser->running && ((old != parser->pic) || (old_disp != parser->display)))
-	{
-		if(parser->display)
-		{
-			parser->para.show(parser, parser->pic);
+			npic = parser->pic->p_next;
 		}
 		else
 		{
-			parser->para.show(parser, NULL);
+			npic = dvbsub_get_display_set(parser->handle);
 		}
+
+		if(npic)
+		{
+			pts = parser->para.get_pts(parser, npic->pts);
+			diff = npic->pts - pts;
+
+			if(diff < 0)
+			{
+				dvbsub_remove_display_picture(parser->handle, parser->pic);
+				parser->pic = npic;
+			}
+		}
+
+		if(parser->pic)
+		{
+			pts = parser->para.get_pts(parser, parser->pic->pts);
+			diff = pts - parser->pic->pts;
+
+			if(diff > parser->pic->timeout * 90000ll)
+			{
+				dvbsub_remove_display_picture(parser->handle, parser->pic);
+				parser->pic = NULL;
+			}
+		}
+	}
+	while(npic && !parser->pic);
+	
+	if(parser->running && (old != parser->pic))
+	{
+		AM_DEBUG(1, "show %p", parser->pic);
+		parser->para.show(parser, parser->pic);
 	}
 }
 
@@ -76,21 +80,18 @@ static void* sub2_thread(void *arg)
 {
 	AM_SUB2_Parser_t *parser = (AM_SUB2_Parser_t*)arg;
 
+	pthread_mutex_lock(&parser->lock);
+
 	while(parser->running)
 	{
-		pthread_mutex_lock(&parser->lock);
 		sub2_check(parser);
 
-		if(parser->running)
-		{
-			struct timespec ts;
-
-			AM_TIME_GetTimeSpecTimeout(20, &ts);
-			pthread_cond_timedwait(&parser->cond, &parser->lock, &ts);
-		}
-
 		pthread_mutex_unlock(&parser->lock);
+		usleep(20000);
+		pthread_mutex_lock(&parser->lock);
 	}
+
+	pthread_mutex_unlock(&parser->lock);
 
 	return NULL;
 }
@@ -253,6 +254,8 @@ AM_ErrorCode_t AM_SUB2_Start(AM_SUB2_Handle_t handle)
 AM_ErrorCode_t AM_SUB2_Stop(AM_SUB2_Handle_t handle)
 {
 	AM_SUB2_Parser_t *parser;
+	pthread_t th;
+	AM_Bool_t wait = AM_FALSE;
 
 	if(!handle)
 	{
@@ -267,10 +270,15 @@ AM_ErrorCode_t AM_SUB2_Stop(AM_SUB2_Handle_t handle)
 	{
 		parser->running = AM_FALSE;
 		pthread_cond_signal(&parser->cond);
-		pthread_join(parser->thread, NULL);
+		th = parser->thread;
+		wait = AM_TRUE;
 	}
 
 	pthread_mutex_unlock(&parser->lock);
+
+	if(wait){
+		pthread_join(th, NULL);
+	}
 
 	return AM_SUCCESS;
 }

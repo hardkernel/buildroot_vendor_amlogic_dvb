@@ -99,6 +99,7 @@ AM_ErrorCode_t AM_PES_Decode(AM_PES_Handle_t handle, uint8_t *buf, int size)
 			return AM_PES_ERR_NO_MEM;
 		}
 
+		parser->buf  = buf;
 		parser->size = total;
 	}
 
@@ -134,7 +135,7 @@ AM_ErrorCode_t AM_PES_Decode(AM_PES_Handle_t handle, uint8_t *buf, int size)
 
 		if(parser->para.packet)
 		{
-			parser->para.packet(handle, parser->buf + pos + 6, plen);
+			parser->para.packet(handle, parser->buf + pos, plen + 6);
 		}
 
 		pos += plen + 6;
