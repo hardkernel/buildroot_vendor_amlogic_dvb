@@ -10,8 +10,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
 		   am_sub2/am_sub.c am_sub2/dvb_sub.c \
-		   am_tt/am_tt.c am_tt/VTCommon.c am_tt/VTDrawer.c am_tt/VTTeletext.c\
-		   am_tt/VTCharacterSet.c am_tt/VTDecoder.c am_tt/VTMosaicGraphics.c am_tt/VTTopText.c\
+		   am_tt2/am_tt.c \
 		   am_si/am_si.c\
 		   am_si/libdvbsi/tables/bat.c\
 		   am_si/libdvbsi/tables/sdt.c\
@@ -84,15 +83,15 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw/atsc\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    $(LOCAL_PATH)/../android/ex_include\
-		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amadec/include\
-		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amcodec/include\
-		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amffmpeg\
-		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amplayer
-
+		    packages/amlogic/LibPlayer/amadec/include\
+		    packages/amlogic/LibPlayer/amcodec/include\
+		    packages/amlogic/LibPlayer/amffmpeg\
+		    packages/amlogic/LibPlayer/amplayer\
+		    external/libzvbi/src
 		    
 
 LOCAL_STATIC_LIBRARIES += libfreetype libiconv
-LOCAL_SHARED_LIBRARIES += libam_adp libsqlite libamplayer liblog libc 
+LOCAL_SHARED_LIBRARIES += libzvbi libam_adp libsqlite libamplayer liblog libc 
 
 # support for atv_scan		   
 SUPPORT_ATV_SCAN := no
@@ -121,8 +120,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
 		   am_sub2/am_sub.c am_sub2/dvb_sub.c\
-		   am_tt/am_tt.c am_tt/VTCommon.c am_tt/VTDrawer.c am_tt/VTTeletext.c\
-		   am_tt/VTCharacterSet.c am_tt/VTDecoder.c am_tt/VTMosaicGraphics.c am_tt/VTTopText.c\
+		   am_tt2/am_tt.c \
 		   am_si/am_si.c\
 		   am_si/libdvbsi/tables/bat.c\
 		   am_si/libdvbsi/tables/sdt.c\
@@ -194,15 +192,15 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw/atsc\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    $(LOCAL_PATH)/../android/ex_include\
-		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amadec/include\
-		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amcodec/include\
-		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amffmpeg\
-		    $(LOCAL_PATH)/../../../packages/amlogic/LibPlayer/amplayer
-
+		    packages/amlogic/LibPlayer/amadec/include\
+		    packages/amlogic/LibPlayer/amcodec/include\
+		    packages/amlogic/LibPlayer/amffmpeg\
+		    packages/amlogic/LibPlayer/amplayer\
+		    external/libzvbi/src
 		    
 
 LOCAL_STATIC_LIBRARIES += libfreetype libiconv
-LOCAL_SHARED_LIBRARIES += libam_adp libsqlite libamplayer liblog libc 
+LOCAL_SHARED_LIBRARIES += libzvbi libam_adp libsqlite libamplayer liblog libc 
 
 # support for atv_scan		   
 SUPPORT_ATV_SCAN := no
