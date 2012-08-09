@@ -77,6 +77,21 @@ static void tt2_show(AM_TT2_Parser_t *parser)
 	if(parser->para.draw_begin)
 		parser->para.draw_begin(parser);
 	
+	/*{
+		char buf[256];
+		int i, j;
+
+		for(i=0; i<page.rows; i++){
+			char *ptr = buf;
+			for(j=0; j<page.columns; j++){
+				sprintf(ptr, "%02x", page.text[i*page.columns+j].unicode);
+				ptr += 2;
+			}
+
+			AM_DEBUG(1, "text %02d: %s", i, buf);
+		}
+	}*/
+	
 	vbi_draw_vt_page_region(&page, VBI_PIXFMT_RGBA32_LE, parser->para.bitmap, parser->para.pitch, 0, 0, page.columns, page.rows, 1, 1);
 
 	if(parser->para.draw_end)
@@ -190,7 +205,13 @@ static void tt2_event_handler(vbi_event *ev, void *user_data)
 
 	if(pi && (pi->sub_page_no == sub))
 	{
-		pi->pts = parser->pts;
+		int64_t diff = parser->pts - pi->pts;
+
+		if(diff > 0)
+		{
+			AM_DEBUG(1, "reset pts %llu", parser->pts);
+			pi->pts = parser->pts;
+		}
 	}
 	else
 	{
@@ -207,7 +228,7 @@ static void tt2_event_handler(vbi_event *ev, void *user_data)
 			info->next = pi;
 			pi->prev->next = info;
 			pi->prev = info;
-			if(parser->pages[id] == pi)
+			if((parser->pages[id] == pi) && (sub < pi->sub_page_no))
 				parser->pages[id] = info;
 		}
 		else
@@ -383,7 +404,6 @@ AM_ErrorCode_t AM_TT2_Decode(AM_TT2_Handle_t handle, uint8_t *buf, int size)
 		
 		data_unit_id = ptr[0];
 		data_unit_length = ptr[1];
-
 		if((data_unit_id != 0x02) && (data_unit_id != 0x03))
 			goto next_packet;
 		if(data_unit_length > left)
@@ -422,7 +442,9 @@ next_packet:
 	}
 
 	if(s_count)
+	{
 		vbi_decode(parser->dec, sliced, s_count, pts/90000.);
+	}
 
 	pthread_mutex_unlock(&parser->lock);
 
@@ -515,6 +537,16 @@ AM_ErrorCode_t AM_TT2_GotoPage(AM_TT2_Handle_t handle, int page_no, int sub_page
 		return AM_TT2_ERR_INVALID_HANDLE;
 	}
 
+	if(page_no<100 || page_no>899)
+	{
+		return AM_TT2_ERR_INVALID_PARAM;
+	}
+
+	if(sub_page_no>0xFF && sub_page_no!=AM_TT2_ANY_SUBNO)
+	{
+		return AM_TT2_ERR_INVALID_PARAM;
+	}
+
 	pthread_mutex_lock(&parser->lock);
 
 	parser->page_no = page_no;
@@ -550,7 +582,7 @@ AM_ErrorCode_t AM_TT2_GoHome(AM_TT2_Handle_t handle)
 	{
 		vbi_resolve_home(&page, &link);
 		if(link.type == VBI_LINK_PAGE)
-			parser->page_no = link.pgno;
+			parser->page_no = vbi_bcd2dec(link.pgno);
 		else if(link.type == VBI_LINK_SUBPAGE)
 			parser->sub_page_no = link.subno;
 
@@ -693,7 +725,7 @@ AM_ErrorCode_t AM_TT2_ColorLink(AM_TT2_Handle_t handle, AM_TT2_Color_t color)
 	cached = vbi_fetch_vt_page(parser->dec, &page, vbi_dec2bcd(parser->page_no), parser->sub_page_no, VBI_WST_LEVEL_3p5, 25, AM_TRUE);
 	if(cached)
 	{
-		parser->page_no = page.nav_link[color].pgno;
+		parser->page_no = vbi_bcd2dec(page.nav_link[color].pgno);
 		parser->sub_page_no = page.nav_link[color].subno;
 		vbi_unref_page(&page);
 	}
@@ -763,7 +795,7 @@ AM_ErrorCode_t AM_TT2_Search(AM_TT2_Handle_t handle, int dir)
 
 		status = vbi_search_next(parser->search, &page, dir);
 		if(status == VBI_SEARCH_SUCCESS){
-			parser->page_no = page->pgno;
+			parser->page_no = vbi_bcd2dec(page->pgno);
 			parser->sub_page_no = page->subno;
 		}
 	}
