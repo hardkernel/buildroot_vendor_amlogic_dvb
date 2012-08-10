@@ -71,7 +71,6 @@ static void sub2_check(AM_SUB2_Parser_t *parser)
 	
 	if(parser->running && (old != parser->pic))
 	{
-		AM_DEBUG(1, "show %p", parser->pic);
 		parser->para.show(parser, parser->pic);
 	}
 }
@@ -84,11 +83,15 @@ static void* sub2_thread(void *arg)
 
 	while(parser->running)
 	{
-		sub2_check(parser);
+		if(parser->running){
+			struct timespec ts;
+			int timeout = 20;
 
-		pthread_mutex_unlock(&parser->lock);
-		usleep(20000);
-		pthread_mutex_lock(&parser->lock);
+			AM_TIME_GetTimeSpecTimeout(timeout, &ts);
+			pthread_cond_timedwait(&parser->cond, &parser->lock, &ts);
+		}
+
+		sub2_check(parser);
 	}
 
 	pthread_mutex_unlock(&parser->lock);
@@ -151,6 +154,9 @@ AM_ErrorCode_t AM_SUB2_Destroy(AM_SUB2_Handle_t handle)
 	AM_SUB2_Stop(handle);
 
 	dvbsub_decoder_destroy(parser->handle);
+
+	pthread_mutex_destroy(&parser->lock);
+	pthread_cond_destroy(&parser->cond);
 
 	free(parser);
 
