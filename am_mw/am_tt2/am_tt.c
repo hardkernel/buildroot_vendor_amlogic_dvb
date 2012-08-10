@@ -515,6 +515,7 @@ AM_ErrorCode_t AM_TT2_GoHome(AM_TT2_Handle_t handle)
 AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir)
 {
 	AM_TT2_Parser_t *parser = (AM_TT2_Parser_t*)handle;
+	int pgno, subno;
 
 	if(!parser)
 	{
@@ -522,6 +523,15 @@ AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir)
 	}
 
 	pthread_mutex_lock(&parser->lock);
+
+	pgno  = vbi_dec2bcd(parser->page_no);
+	subno = parser->sub_page_no;
+
+	if(vbi_get_next_pgno(parser->dec, dir, &pgno, &subno))
+	{
+		parser->page_no = vbi_bcd2dec(pgno);
+		parser->sub_page_no = subno;
+	}
 
 	pthread_mutex_unlock(&parser->lock);
 
