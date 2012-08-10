@@ -15,12 +15,11 @@ typedef struct
 	AM_TT2_Para_t      para;
 	int                page_no;
 	int                sub_page_no;
-	int                disp_page_no;
-	int                disp_sub_page_no;
 	AM_Bool_t          disp_update;
 	AM_Bool_t          running;
 	uint64_t           pts;
 	pthread_mutex_t    lock;
+	pthread_cond_t     cond;
 	pthread_t          thread;
 }AM_TT2_Parser_t;
 
@@ -61,11 +60,8 @@ static void tt2_show(AM_TT2_Parser_t *parser)
 	if(!cached)
 		return;
 	
-	parser->disp_page_no     = vbi_bcd2dec(page.pgno);
-	parser->disp_sub_page_no = page.subno;
-	parser->disp_update      = AM_FALSE;
 	parser->sub_page_no      = page.subno;
-	
+
 	if(parser->para.draw_begin)
 		parser->para.draw_begin(parser);
 	
@@ -91,8 +87,6 @@ static void tt2_show(AM_TT2_Parser_t *parser)
 		parser->para.draw_end(parser);
 	
 	vbi_unref_page(&page);
-
-	AM_DEBUG(1, "draw page %d %d", parser->disp_page_no, parser->disp_sub_page_no);
 }
 
 static void* tt2_thread(void *arg)
@@ -103,13 +97,14 @@ static void* tt2_thread(void *arg)
 
 	while(parser->running)
 	{
-		if((parser->disp_page_no != parser->page_no) || (parser->disp_sub_page_no != parser->sub_page_no) || parser->disp_update){
-			tt2_show(parser);
+		while(parser->running && !parser->disp_update){
+			pthread_cond_wait(&parser->cond, &parser->lock);
 		}
 
-		pthread_mutex_unlock(&parser->lock);
-		usleep(20000);
-		pthread_mutex_lock(&parser->lock);
+		if(parser->disp_update){
+			tt2_show(parser);
+			parser->disp_update = AM_FALSE;
+		}
 	}
 
 	pthread_mutex_unlock(&parser->lock);
@@ -130,8 +125,8 @@ static void tt2_event_handler(vbi_event *ev, void *user_data)
 
 	if((pgno==parser->page_no) && (parser->sub_page_no==AM_TT2_ANY_SUBNO || parser->sub_page_no==subno))
 	{
-		AM_DEBUG(1, "update %d %d", pgno, subno);
 		parser->disp_update = AM_TRUE;
+		pthread_cond_signal(&parser->cond);
 	}
 }
 
@@ -169,6 +164,7 @@ AM_ErrorCode_t AM_TT2_Create(AM_TT2_Handle_t *handle, AM_TT2_Para_t *para)
 	vbi_event_handler_register(parser->dec, VBI_EVENT_TTX_PAGE, tt2_event_handler, parser);
 
 	pthread_mutex_init(&parser->lock, NULL);
+	pthread_cond_init(&parser->cond, NULL);
 
 	parser->page_no = 100;
 	parser->sub_page_no = AM_TT2_ANY_SUBNO;
@@ -196,6 +192,7 @@ AM_ErrorCode_t AM_TT2_Destroy(AM_TT2_Handle_t handle)
 
 	AM_TT2_Stop(handle);
 
+	pthread_cond_destroy(&parser->cond);
 	pthread_mutex_destroy(&parser->lock);
 
 	if(parser->search)
@@ -233,8 +230,12 @@ AM_TT2_SetSubtitleMode(AM_TT2_Handle_t handle, AM_Bool_t subtitle)
 	pthread_mutex_lock(&parser->lock);
 
 	parser->para.is_subtitle = subtitle;
+	parser->disp_update = AM_TRUE;
 
 	pthread_mutex_unlock(&parser->lock);
+
+	pthread_cond_signal(&parser->cond);
+
 
 	return AM_SUCCESS;
 }
@@ -372,6 +373,7 @@ end:
 AM_ErrorCode_t AM_TT2_Start(AM_TT2_Handle_t handle)
 {
 	AM_TT2_Parser_t *parser = (AM_TT2_Parser_t*)handle;
+	AM_ErrorCode_t ret = AM_SUCCESS;
 
 	if(!parser)
 	{
@@ -386,7 +388,7 @@ AM_ErrorCode_t AM_TT2_Start(AM_TT2_Handle_t handle)
 		if(pthread_create(&parser->thread, NULL, tt2_thread, parser))
 		{
 			parser->running = AM_FALSE;
-			return AM_TT2_ERR_CANNOT_CREATE_THREAD;
+			ret = AM_TT2_ERR_CANNOT_CREATE_THREAD;
 		}
 	}
 
@@ -422,6 +424,7 @@ AM_ErrorCode_t AM_TT2_Stop(AM_TT2_Handle_t handle)
 	}
 
 	pthread_mutex_unlock(&parser->lock);
+	pthread_cond_signal(&parser->cond);
 
 	if(wait)
 	{
@@ -462,8 +465,11 @@ AM_ErrorCode_t AM_TT2_GotoPage(AM_TT2_Handle_t handle, int page_no, int sub_page
 
 	parser->page_no = page_no;
 	parser->sub_page_no = sub_page_no;
+	parser->disp_update = AM_TRUE;
 
 	pthread_mutex_unlock(&parser->lock);
+
+	pthread_cond_signal(&parser->cond);
 
 	return AM_SUCCESS;
 }
@@ -498,6 +504,9 @@ AM_ErrorCode_t AM_TT2_GoHome(AM_TT2_Handle_t handle)
 			parser->sub_page_no = link.subno;
 
 		vbi_unref_page(&page);
+
+		parser->disp_update = AM_TRUE;
+		pthread_cond_signal(&parser->cond);
 	}
 
 	pthread_mutex_unlock(&parser->lock);
@@ -531,6 +540,9 @@ AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir)
 	{
 		parser->page_no = vbi_bcd2dec(pgno);
 		parser->sub_page_no = subno;
+
+		parser->disp_update = AM_TRUE;
+		pthread_cond_signal(&parser->cond);
 	}
 
 	pthread_mutex_unlock(&parser->lock);
@@ -569,6 +581,9 @@ AM_ErrorCode_t AM_TT2_ColorLink(AM_TT2_Handle_t handle, AM_TT2_Color_t color)
 		parser->page_no = vbi_bcd2dec(page.nav_link[color].pgno);
 		parser->sub_page_no = page.nav_link[color].subno;
 		vbi_unref_page(&page);
+
+		parser->disp_update = AM_TRUE;
+		pthread_cond_signal(&parser->cond);
 	}
 
 	pthread_mutex_unlock(&parser->lock);
@@ -638,6 +653,9 @@ AM_ErrorCode_t AM_TT2_Search(AM_TT2_Handle_t handle, int dir)
 		if(status == VBI_SEARCH_SUCCESS){
 			parser->page_no = vbi_bcd2dec(page->pgno);
 			parser->sub_page_no = page->subno;
+
+			parser->disp_update = AM_TRUE;
+			pthread_cond_signal(&parser->cond);
 		}
 	}
 
