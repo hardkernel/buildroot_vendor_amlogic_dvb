@@ -11,10 +11,10 @@
 #define AM_DEBUG_LEVEL 5
 
 #include <string.h>
-#include <iconv.h>
 #include <assert.h>
 #include <am_debug.h>
 #include "dtv.h"
+#include <am_iconv.h>
 #include <am_scan.h>
 #include <am_cfg.h>
 #include <am_av.h>

@@ -12,7 +12,7 @@
 
 #include <errno.h>
 #include <assert.h>
-#include <iconv.h>
+#include <am_iconv.h>
 #include <am_debug.h>
 #include <am_scan.h>
 #include "am_scan_internal.h"

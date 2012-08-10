@@ -6,7 +6,6 @@ LOCAL_MODULE    := libam_mw
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_epg/am_epg.c\
-		   am_font/am_font.c am_font/freetype.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
 		   am_sub2/am_sub.c am_sub2/dvb_sub.c \
@@ -82,16 +81,16 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/tables\
 		    $(LOCAL_PATH)/../include/am_mw/atsc\
 		    $(LOCAL_PATH)/../android/ndk/include\
-		    $(LOCAL_PATH)/../android/ex_include\
 		    packages/amlogic/LibPlayer/amadec/include\
 		    packages/amlogic/LibPlayer/amcodec/include\
 		    packages/amlogic/LibPlayer/amffmpeg\
 		    packages/amlogic/LibPlayer/amplayer\
-		    external/libzvbi/src
+		    external/libzvbi/src\
+		    external/sqlite/dist\
+		    external/icu4c/common
 		    
 
-LOCAL_STATIC_LIBRARIES += libfreetype libiconv
-LOCAL_SHARED_LIBRARIES += libzvbi libam_adp libsqlite libamplayer liblog libc 
+LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc 
 
 # support for atv_scan		   
 SUPPORT_ATV_SCAN := no
@@ -116,7 +115,6 @@ LOCAL_MODULE    := libam_mw
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_epg/am_epg.c\
-		   am_font/am_font.c am_font/freetype.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
 		   am_sub2/am_sub.c am_sub2/dvb_sub.c\
@@ -191,16 +189,16 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/tables\
 		    $(LOCAL_PATH)/../include/am_mw/atsc\
 		    $(LOCAL_PATH)/../android/ndk/include\
-		    $(LOCAL_PATH)/../android/ex_include\
 		    packages/amlogic/LibPlayer/amadec/include\
 		    packages/amlogic/LibPlayer/amcodec/include\
 		    packages/amlogic/LibPlayer/amffmpeg\
 		    packages/amlogic/LibPlayer/amplayer\
-		    external/libzvbi/src
-		    
+		    external/libzvbi/src\
+		    external/sqlite/dist\
+		    external/icu4c/common
 
-LOCAL_STATIC_LIBRARIES += libfreetype libiconv
-LOCAL_SHARED_LIBRARIES += libzvbi libam_adp libsqlite libamplayer liblog libc 
+
+LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc 
 
 # support for atv_scan		   
 SUPPORT_ATV_SCAN := no
@@ -218,6 +216,4 @@ endif
 LOCAL_PRELINK_MODULE := false
 
 include $(BUILD_STATIC_LIBRARY)
-
-include $(LOCAL_PATH)/../android/ex_lib/Android.mk
 

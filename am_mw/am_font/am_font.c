@@ -16,7 +16,7 @@
 #include "am_font_internal.h"
 #include "../../am_adp/am_osd/am_osd_internal.h"
 #include <assert.h>
-#include <iconv.h>
+#include <am_iconv.h>
 #include <errno.h>
 
 

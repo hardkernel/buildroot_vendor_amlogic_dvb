@@ -2,7 +2,7 @@
 #include "atsc_descriptor.h"
 #include "huffman_decode.h"
 #include <errno.h>
-#include <iconv.h>
+#include <am_iconv.h>
 
 #define SHORT_NAME_LEN (14)
 

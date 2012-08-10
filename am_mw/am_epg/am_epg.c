@@ -11,7 +11,6 @@
 #define AM_DEBUG_LEVEL 3
 
 #include <errno.h>
-#include <iconv.h>
 #include <time.h>
 #include <am_debug.h>
 #include <assert.h>
@@ -19,6 +18,7 @@
 #include "am_epg_internal.h"
 #include <am_time.h>
 #include <am_dmx.h>
+#include <am_iconv.h>
 
 /****************************************************************************
  * Macro definitions
