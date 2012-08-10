@@ -84,7 +84,8 @@ static void tt2_show(AM_TT2_Parser_t *parser)
 		}
 	}*/
 	
-	vbi_draw_vt_page_region(&page, VBI_PIXFMT_RGBA32_LE, parser->para.bitmap, parser->para.pitch, 0, 0, page.columns, page.rows, 1, 1);
+	vbi_draw_vt_page_region(&page, VBI_PIXFMT_RGBA32_LE, parser->para.bitmap, parser->para.pitch,
+			0, 0, page.columns, page.rows, 1, 1, parser->para.is_subtitle);
 
 	if(parser->para.draw_end)
 		parser->para.draw_end(parser);
@@ -211,6 +212,33 @@ AM_ErrorCode_t AM_TT2_Destroy(AM_TT2_Handle_t handle)
 
 	return AM_SUCCESS;
 }
+
+/**\brief 设定是否为字幕
+ * \param handle 要释放的句柄
+ * \param subtitle 是否为字幕
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_tt2.h)
+ */
+AM_ErrorCode_t
+AM_TT2_SetSubtitleMode(AM_TT2_Handle_t handle, AM_Bool_t subtitle)
+{
+	AM_TT2_Parser_t *parser = (AM_TT2_Parser_t*)handle;
+
+	if(!parser)
+	{
+		return AM_TT2_ERR_INVALID_HANDLE;
+	}
+
+	pthread_mutex_lock(&parser->lock);
+
+	parser->para.is_subtitle = subtitle;
+
+	pthread_mutex_unlock(&parser->lock);
+
+	return AM_SUCCESS;
+}
+
 
 /**\brief 取得用户定义数据
  * \param handle 句柄

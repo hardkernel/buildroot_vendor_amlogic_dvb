@@ -68,7 +68,7 @@ typedef struct
 {
 	AM_TT2_DrawBegin_t draw_begin;   /**< 开始绘制*/
 	AM_TT2_DrawEnd_t   draw_end;     /**< 结束绘制*/
-	AM_TT2_GetPTS_t  get_pts;        /**< 取得当前PTS*/
+	AM_Bool_t        is_subtitle;    /**< 是否为字幕*/
 	uint8_t         *bitmap;         /**< 绘图缓冲区*/
 	int              pitch;          /**< 绘图缓冲区每行字节数*/
 	void            *user_data;      /**< 用户定义数据*/
@@ -90,6 +90,15 @@ extern AM_ErrorCode_t AM_TT2_Create(AM_TT2_Handle_t *handle, AM_TT2_Para_t *para
  *   - 其他值 错误代码(见am_tt2.h)
  */
 extern AM_ErrorCode_t AM_TT2_Destroy(AM_TT2_Handle_t handle);
+
+/**\brief 设定是否为字幕
+ * \param handle 要释放的句柄
+ * \param subtitle 是否为字幕
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_tt2.h)
+ */
+extern AM_ErrorCode_t AM_TT2_SetSubtitleMode(AM_TT2_Handle_t handle, AM_Bool_t subtitle);
 
 /**\brief 取得用户定义数据
  * \param handle 句柄
