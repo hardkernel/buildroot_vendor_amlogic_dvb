@@ -76,7 +76,7 @@ AM_ErrorCode_t AM_PES_Destroy(AM_PES_Handle_t handle)
 AM_ErrorCode_t AM_PES_Decode(AM_PES_Handle_t handle, uint8_t *buf, int size)
 {
 	AM_PES_Parser_t *parser = (AM_PES_Parser_t*)handle;
-	int pos, total;
+	int pos, total, left;
 
 	if(!parser)
 	{
@@ -142,13 +142,14 @@ AM_ErrorCode_t AM_PES_Decode(AM_PES_Handle_t handle, uint8_t *buf, int size)
 	} while(pos < parser->len);
 
 end:
-	if(parser->len - pos)
-	{
-		int left = parser->len - pos;
+	left = parser->len - pos;
 
+	if(left)
+	{
 		memmove(parser->buf, parser->buf + pos, left);
-		parser->len = left;
 	}
+
+	parser->len = left;
 
 	return AM_SUCCESS;
 }

@@ -6,18 +6,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#define AM_TT2_MAX_PAGE (800)
-#define AM_TT2_PAGE_TO_INDEX(p)  ((p)-100)
 #define AM_TT2_MAX_SLICES (32)
-
-typedef struct AM_TT2_PageInfo AM_TT2_PageInfo_t;
-struct AM_TT2_PageInfo
-{
-	AM_TT2_PageInfo_t *prev;
-	AM_TT2_PageInfo_t *next;
-	uint64_t           pts;
-	int                sub_page_no;
-};
 
 typedef struct
 {
@@ -28,13 +17,11 @@ typedef struct
 	int                sub_page_no;
 	int                disp_page_no;
 	int                disp_sub_page_no;
-	uint64_t           disp_pts;
+	AM_Bool_t          disp_update;
 	AM_Bool_t          running;
-	AM_Bool_t          update;
 	uint64_t           pts;
 	pthread_mutex_t    lock;
 	pthread_t          thread;
-	AM_TT2_PageInfo_t *pages[AM_TT2_MAX_PAGE];
 }AM_TT2_Parser_t;
 
 enum systems {
@@ -74,6 +61,11 @@ static void tt2_show(AM_TT2_Parser_t *parser)
 	if(!cached)
 		return;
 	
+	parser->disp_page_no     = vbi_bcd2dec(page.pgno);
+	parser->disp_sub_page_no = page.subno;
+	parser->disp_update      = AM_FALSE;
+	parser->sub_page_no      = page.subno;
+	
 	if(parser->para.draw_begin)
 		parser->para.draw_begin(parser);
 	
@@ -98,6 +90,8 @@ static void tt2_show(AM_TT2_Parser_t *parser)
 		parser->para.draw_end(parser);
 	
 	vbi_unref_page(&page);
+
+	AM_DEBUG(1, "draw page %d %d", parser->disp_page_no, parser->disp_sub_page_no);
 }
 
 static void* tt2_thread(void *arg)
@@ -108,59 +102,8 @@ static void* tt2_thread(void *arg)
 
 	while(parser->running)
 	{
-		AM_TT2_PageInfo_t *info = NULL;
-		int id = AM_TT2_PAGE_TO_INDEX(parser->page_no);
-
-		if(parser->pages[id])
-		{
-			if(parser->sub_page_no == VBI_ANY_SUBNO)
-			{
-				info = parser->pages[id];
-				parser->sub_page_no = info->sub_page_no;
-			}
-			else
-			{
-				AM_TT2_PageInfo_t *p = parser->pages[id];
-				do
-				{
-					if(p->sub_page_no == parser->sub_page_no)
-					{
-						info = p;
-						break;
-					}
-					p = p->next;
-				}while(p != parser->pages[id]);
-			}
-		}
-
-		if(info)
-		{
-			AM_Bool_t update = AM_FALSE;
-
-			if((parser->disp_page_no != parser->page_no) || (parser->disp_sub_page_no != parser->sub_page_no))
-			{
-				update = AM_TRUE;
-			}
-			else
-			{
-				uint64_t pts = 0ll;
-				int64_t diff;
-
-				if(parser->para.get_pts)
-					pts = parser->para.get_pts(parser, info->pts);
-
-				diff = pts - info->pts;
-				if(diff >= 0)
-					update = AM_TRUE;
-			}
-
-			if(update)
-			{
-				parser->disp_page_no = parser->page_no;
-				parser->disp_sub_page_no = parser->sub_page_no;
-				parser->disp_pts = info->pts;
-				tt2_show(parser);
-			}
+		if((parser->disp_page_no != parser->page_no) || (parser->disp_sub_page_no != parser->sub_page_no) || parser->disp_update){
+			tt2_show(parser);
 		}
 
 		pthread_mutex_unlock(&parser->lock);
@@ -176,67 +119,18 @@ static void* tt2_thread(void *arg)
 static void tt2_event_handler(vbi_event *ev, void *user_data)
 {
 	AM_TT2_Parser_t *parser = (AM_TT2_Parser_t*)user_data;
-	AM_TT2_PageInfo_t *pi, *info;
-	int id, sub;
+	int pgno, subno;
 
 	if(ev->type != VBI_EVENT_TTX_PAGE)
 		return;
 	
-	id  = AM_TT2_PAGE_TO_INDEX(vbi_bcd2dec(ev->ev.ttx_page.pgno));
-	sub = (ev->ev.ttx_page.subno & 0xFF);
+	pgno  = vbi_bcd2dec(ev->ev.ttx_page.pgno);
+	subno = ev->ev.ttx_page.subno;
 
-	if(id<0 || id>=AM_TT2_MAX_PAGE)
-		return;
-	
-	if(parser->pages[id])
+	if((pgno==parser->page_no) && (parser->sub_page_no==AM_TT2_ANY_SUBNO || parser->sub_page_no==subno))
 	{
-		pi = parser->pages[id];
-		do
-		{
-			if(pi->sub_page_no >= sub)
-				break;
-			pi = pi->next;
-		}while(pi != parser->pages[id]);
-	}
-	else
-	{
-		pi = NULL;
-	}
-
-	if(pi && (pi->sub_page_no == sub))
-	{
-		int64_t diff = parser->pts - pi->pts;
-
-		if(diff > 0)
-		{
-			AM_DEBUG(1, "reset pts %llu", parser->pts);
-			pi->pts = parser->pts;
-		}
-	}
-	else
-	{
-		info = (AM_TT2_PageInfo_t*)malloc(sizeof(AM_TT2_PageInfo_t));
-		if(!info)
-			return;
-
-		info->pts = parser->pts;
-		info->sub_page_no = sub;
-		
-		if(pi)
-		{
-			info->prev = pi->prev;
-			info->next = pi;
-			pi->prev->next = info;
-			pi->prev = info;
-			if((parser->pages[id] == pi) && (sub < pi->sub_page_no))
-				parser->pages[id] = info;
-		}
-		else
-		{
-			info->prev = info;
-			info->next = info;
-			parser->pages[id] = info;
-		}
+		AM_DEBUG(1, "update %d %d", pgno, subno);
+		parser->disp_update = AM_TRUE;
 	}
 }
 
@@ -293,8 +187,6 @@ AM_ErrorCode_t AM_TT2_Create(AM_TT2_Handle_t *handle, AM_TT2_Para_t *para)
 AM_ErrorCode_t AM_TT2_Destroy(AM_TT2_Handle_t handle)
 {
 	AM_TT2_Parser_t *parser = (AM_TT2_Parser_t*)handle;
-	AM_TT2_PageInfo_t *p, *np;
-	int i;
 
 	if(!parser)
 	{
@@ -313,15 +205,6 @@ AM_ErrorCode_t AM_TT2_Destroy(AM_TT2_Handle_t handle)
 	if(parser->dec)
 	{
 		vbi_decoder_delete(parser->dec);
-	}
-
-	for(i=0; i<AM_TT2_MAX_PAGE; i++)
-	{
-		for(p=parser->pages[i]; p; p=np)
-		{
-			np = p->next;
-			free(p);
-		}
 	}
 
 	free(parser);
@@ -604,8 +487,6 @@ AM_ErrorCode_t AM_TT2_GoHome(AM_TT2_Handle_t handle)
 AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir)
 {
 	AM_TT2_Parser_t *parser = (AM_TT2_Parser_t*)handle;
-	AM_TT2_PageInfo_t *p, *rp = NULL;
-	int i, id, sub_no = parser->sub_page_no, page_no = parser->page_no;
 
 	if(!parser)
 	{
@@ -613,84 +494,6 @@ AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir)
 	}
 
 	pthread_mutex_lock(&parser->lock);
-
-	id = AM_TT2_PAGE_TO_INDEX(parser->page_no);
-	p = parser->pages[id];
-	if(p)
-	{
-		if(parser->sub_page_no != VBI_ANY_SUBNO)
-		{
-			do
-			{
-				if(p->sub_page_no == parser->sub_page_no)
-				{
-					rp = p;
-					break;
-				}
-				p = p->next;
-			}while(p!=parser->pages[id]);
-
-			if(rp)
-			{
-				if(dir>0 && rp->next->sub_page_no>rp->sub_page_no)
-				{
-					rp = rp->next;
-					sub_no = rp->sub_page_no;
-					goto end;
-				}
-				else if(dir<0 && rp->prev->sub_page_no<rp->sub_page_no)
-				{
-					rp = rp->prev;
-					sub_no = rp->sub_page_no;
-					goto end;
-				}
-
-			}
-		}
-		else
-		{
-			rp = p;
-		}
-	}
-
-	if(dir>0)
-	{
-		for(i=0; i<AM_TT2_MAX_PAGE; i++)
-		{
-			id++;
-			if(id == AM_TT2_MAX_PAGE)
-				id = 0;
-			if(parser->pages[id])
-			{
-				rp = parser->pages[id];
-				page_no = id + 100;
-				sub_no = rp->sub_page_no;
-				goto end;
-			}
-		}
-	}
-	else if(dir<0)
-	{
-		for(i=0; i<AM_TT2_MAX_PAGE; i++)
-		{
-			id--;
-			if(id == -1)
-				id = AM_TT2_MAX_PAGE - 1;
-			if(parser->pages[id])
-			{
-				rp = parser->pages[id]->prev;
-				page_no = id + 100;
-				sub_no = rp->sub_page_no;
-				goto end;
-			}
-		}
-	}
-end:
-	if(rp)
-	{
-		parser->page_no = page_no;
-		parser->sub_page_no = sub_no;
-	}
 
 	pthread_mutex_unlock(&parser->lock);
 
