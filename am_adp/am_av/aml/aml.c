@@ -4517,6 +4517,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "0");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","1");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect", ppr);
+			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", "0");
 		}
 #endif
 	}else{
@@ -4590,6 +4591,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","0");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");
 			AM_FileEcho("/sys/class/video/axis", "0 0 0 0");
+			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", "1");
 		}
 #endif
 	}
