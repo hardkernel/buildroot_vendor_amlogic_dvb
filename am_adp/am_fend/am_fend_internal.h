@@ -37,6 +37,8 @@ typedef struct AM_FEND_Device AM_FEND_Device_t;
 typedef struct
 {
 	AM_ErrorCode_t (*open) (AM_FEND_Device_t *dev, const AM_FEND_OpenPara_t *para);
+	AM_ErrorCode_t (*set_mode) (AM_FEND_Device_t *dev, int mode);
+	AM_ErrorCode_t (*get_info) (AM_FEND_Device_t *dev, struct dvb_frontend_info *info);
 	AM_ErrorCode_t (*set_para) (AM_FEND_Device_t *dev, const struct dvb_frontend_parameters *para);
 	AM_ErrorCode_t (*get_para) (AM_FEND_Device_t *dev, struct dvb_frontend_parameters *para);
 	AM_ErrorCode_t (*get_status) (AM_FEND_Device_t *dev, fe_status_t *status);
@@ -117,9 +119,10 @@ struct AM_FEND_Device
 	pthread_cond_t     cond;          /**< 状态监控线程控制条件变量*/
 	int                flags;         /**< 状态监控线程标志*/
 	AM_FEND_Callback_t cb;            /**< 状态监控回调函数*/
+	int                curr_mode;     /**< 当前解调模式*/
 	void              *user_data;     /**< 回调函数参数*/
 	AM_Bool_t         enable_cb;      /**< 允许或者禁止状态监控回调函数*/
-	struct dvb_frontend_info info;    /**< 前端设备信息*/ 
+	//struct dvb_frontend_info info;    /**< 前端设备信息*/ 
 	
 	AM_Bool_t          enable_blindscan_thread; /**< 状扫处理线程是否运行*/
 	pthread_t          blindscan_thread;        /**< 盲扫处理线程*/

@@ -27,12 +27,14 @@
 #define _DVBFRONTEND_H_
 
 #include <linux/types.h>
+#include <linux/videodev2.h>
 
 typedef enum fe_type {
 	FE_QPSK,
 	FE_QAM,
 	FE_OFDM,
-	FE_ATSC
+	FE_ATSC,
+	FE_ANALOG
 } fe_type_t;
 
 
@@ -228,6 +230,12 @@ struct dvb_ofdm_parameters {
 	fe_hierarchy_t      hierarchy_information;
 };
 
+struct dvb_analog_parameters {
+	unsigned int         mode;    /*V4L2_TUNER_RADIO,V4L2_TUNER_ANALOG_TV,V4L2_TUNER_DIGITAL_TV*/
+	unsigned int         audmode; /*V4L2_TUNER_MODE_MONO,V4L2_TUNER_MODE_STEREO,V4L2_TUNER_MODE_LANG2,V4L2_TUNER_MODE_SAP,V4L2_TUNER_MODE_LANG1,V4L2_TUNER_MODE_LANG1_LANG2*/
+	unsigned int         std_hi;
+	unsigned int         std_lo;
+};
 
 struct dvb_frontend_parameters {
 	__u32 frequency;     /* (absolute) frequency in Hz for QAM/OFDM/ATSC */
@@ -238,6 +246,7 @@ struct dvb_frontend_parameters {
 		struct dvb_qam_parameters  qam;
 		struct dvb_ofdm_parameters ofdm;
 		struct dvb_vsb_parameters vsb;
+		struct dvb_analog_parameters analog;
 	} u;
 };
 
@@ -336,6 +345,7 @@ typedef enum fe_delivery_system {
 	SYS_DMBTH,
 	SYS_CMMB,
 	SYS_DAB,
+	SYS_ANALOG
 } fe_delivery_system_t;
 
 struct dtv_cmds_h {
@@ -372,9 +382,6 @@ struct dtv_properties {
 	struct dtv_property *props;
 };
 
-#define FE_SET_PROPERTY		   _IOW('o', 82, struct dtv_properties)
-#define FE_GET_PROPERTY		   _IOR('o', 83, struct dtv_properties)
-
 /*Stores the blind scan parameters which are passed to the FE_SET_BLINDSCAN ioctl.*/
 struct dvbsx_blindscanpara
 {
@@ -395,10 +402,9 @@ struct dvbsx_blindscaninfo
 	__u16 m_uiResultCode;				/*The result of the blind scan operation.  Possible values are:  0 - blind scan operation normal; 1 -- more than 120 channels have been detected.*/ 
 };
 
-#define FE_SET_BLINDSCAN					_IOW('o', 84, struct dvbsx_blindscanpara)
-#define FE_GET_BLINDSCANSTATUS			_IOR('o', 85, struct dvbsx_blindscaninfo)
-#define FE_SET_BLINDSCANCANCEl				_IO('o', 86)
-#define FE_READ_BLINDSCANCHANNELINFO		_IOR('o', 87, struct dvb_frontend_parameters)
+#define FE_SET_PROPERTY		   _IOW('o', 82, struct dtv_properties)
+#define FE_GET_PROPERTY		   _IOR('o', 83, struct dtv_properties)
+
 
 /**
  * When set, this flag will disable any zigzagging or other "normal" tuning
@@ -435,5 +441,16 @@ struct dvbsx_blindscaninfo
 #define FE_DISHNETWORK_SEND_LEGACY_CMD _IO('o', 80) /* unsigned int */
 
 #define FE_SET_DELAY               _IO('o', 100)
+
+#if 1//for avl6211 blind scan
+#define FE_SET_BLINDSCAN				_IOW('o', 84, struct dvbsx_blindscanpara)
+#define FE_GET_BLINDSCANSTATUS		_IOR('o', 85, struct dvbsx_blindscaninfo)
+#define FE_SET_BLINDSCANCANCEl		_IO('o', 86)
+#define FE_READ_BLINDSCANCHANNELINFO  _IOR('o', 87, struct dvb_frontend_parameters)
+#define FE_SET_BLINDSCANRESET		_IO('o', 88)
+#endif
+
+#define FE_SET_MODE                _IO('o', 90)
+#define FE_READ_AFC                _IOR('o', 91, __u32)
 
 #endif /*_DVBFRONTEND_H_*/

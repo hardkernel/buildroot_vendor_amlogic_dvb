@@ -52,21 +52,26 @@ AM_ErrorCode_t AM_FENDCTRL_SetPara(int dev_no, const AM_FENDCTRL_DVBFrontendPara
 	
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
+	ret = AM_FEND_SetMode(dev_no, para->m_type);
+	if(ret != AM_SUCCESS){
+		return ret;
+	}
+
 	switch(para->m_type)
 	{
-		case AM_FEND_DEMOD_DVBS:
+		case FE_QPSK:
 			{
 				/* process sec */
 				ret = AM_SEC_PrepareTune(dev_no, &(para->sat), NULL, 0);
 				break;
 			}
-		case AM_FEND_DEMOD_DVBC:
+		case FE_QAM:
 			ret = AM_FEND_SetPara(dev_no, &(para->cable.para));
 			break;
-		case AM_FEND_DEMOD_DVBT:
+		case FE_OFDM:
 			ret = AM_FEND_SetPara(dev_no, &(para->terrestrial.para));
 			break;
-		case AM_FEND_DEMOD_ATSC:
+		case FE_ATSC:
 			ret = AM_FEND_SetPara(dev_no, &(para->atsc.para));
 			break;	
 		default:
@@ -91,21 +96,26 @@ AM_ErrorCode_t AM_FENDCTRL_Lock(int dev_no, const AM_FENDCTRL_DVBFrontendParamet
 	
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
+	ret = AM_FEND_SetMode(dev_no, para->m_type);
+	if(ret != AM_SUCCESS){
+		return ret;
+	}
+
 	switch(para->m_type)
 	{
-		case AM_FEND_DEMOD_DVBS:
+		case FE_QPSK:
 			{
 				/* process sec */
 				ret = AM_SEC_PrepareTune(dev_no, &(para->sat), status, 5000);
 			}
 			break;
-		case AM_FEND_DEMOD_DVBC:
+		case FE_QAM:
 			AM_FEND_Lock(dev_no, &(para->cable.para), status);
 			break;
-		case AM_FEND_DEMOD_DVBT:
+		case FE_OFDM:
 			AM_FEND_Lock(dev_no, &(para->terrestrial.para), status);
 			break;
-		case AM_FEND_DEMOD_ATSC:
+		case FE_ATSC:
 			AM_FEND_Lock(dev_no, &(para->atsc.para), status);
 			break;	
 		default:

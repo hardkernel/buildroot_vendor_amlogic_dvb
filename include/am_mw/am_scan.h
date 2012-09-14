@@ -214,10 +214,10 @@ typedef struct
 /**\brief 节目搜索结果数据结构*/
 typedef struct
 {
-	AM_FEND_DemodMode_t	src;		/**< 源标识*/
+	int                     src;		/**< 调制模式*/
 	AM_SCAN_Standard_t	standard;	/**< ATSC or DVB*/
-	int					mode;		/**< 搜索模式*/
-	sqlite3				*hdb;		/**< 数据库句柄*/
+	int                     mode;		/**< 搜索模式*/
+	sqlite3                 *hdb;		/**< 数据库句柄*/
 	dvbpsi_nit_t		*nits;		/**< 搜索到的NIT表*/
 	dvbpsi_bat_t		*bats;		/**< 搜索到的BAT表*/
 	AM_SCAN_TS_t		*tses;		/**< 所有TS列表*/
@@ -239,11 +239,11 @@ typedef void (*AM_SCAN_StoreCb) (AM_SCAN_Result_t *result);
 /**\brief 搜索创建参数*/
 typedef struct
 {
-	int								fend_dev_id;		/**< 前端设备号*/
-	int								dmx_dev_id;			/**< demux设备号*/
-	int								mode;				/**< 搜索模式组合，见AM_SCAN_Mode*/
-	AM_FEND_DemodMode_t				source;				/**< 源标识*/
-	AM_SCAN_Standard_t				standard;			/**< 搜索标准，DVB/ATSC*/
+	int                             fend_dev_id; /**< 前端设备号*/
+	int                             dmx_dev_id;  /**< demux设备号*/
+	int                             mode;        /**< 搜索模式组合，见AM_SCAN_Mode*/
+	int                             source;      /**< 前端调制模式*/
+	AM_SCAN_Standard_t              standard;    /**< 搜索标准，DVB/ATSC*/
 	
 	AM_SCAN_SatellitePara_t			sat_para;			/**< 卫星参数配置,只有当source位Satellite时有效*/
 	

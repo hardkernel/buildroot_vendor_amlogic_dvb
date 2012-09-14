@@ -703,6 +703,7 @@ AM_ErrorCode_t AM_FEND_Open(int dev_no, const AM_FEND_OpenPara_t *para)
 	dev->enable_thread = AM_TRUE;
 	dev->flags = 0;
 	dev->enable_cb = AM_TRUE;
+	dev->curr_mode = para->mode;
 	
 	rc = pthread_create(&dev->thread, NULL, fend_thread, dev);
 	if(rc)
@@ -761,6 +762,35 @@ AM_ErrorCode_t AM_FEND_Close(int dev_no)
 	return AM_SUCCESS;
 }
 
+/**\brief 设定前端解调模式
+ * \param dev_no 前端设备号
+ * \param mode 解调模式
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+AM_ErrorCode_t AM_FEND_SetMode(int dev_no, int mode)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	
+	if(!dev->drv->set_mode)
+	{
+		AM_DEBUG(1, "fronend %d no not support set_mode", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	ret = dev->drv->set_mode(dev, mode);
+	
+	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
+
 /**\brief 取得一个DVB前端设备的相关信息
  * \param dev_no 前端设备号
  * \param[out] info 返回前端信息数据
@@ -771,18 +801,25 @@ AM_ErrorCode_t AM_FEND_Close(int dev_no)
 AM_ErrorCode_t AM_FEND_GetInfo(int dev_no, struct dvb_frontend_info *info)
 {
 	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
 	
 	assert(info);
-	
+
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	
+	if(!dev->drv->get_info)
+	{
+		AM_DEBUG(1, "fronend %d no not support get_info", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
 	
 	pthread_mutex_lock(&dev->lock);
 	
-	*info = dev->info;
+	ret = dev->drv->get_info(dev, info);
 	
 	pthread_mutex_unlock(&dev->lock);
 	
-	return AM_SUCCESS;;
+	return ret;
 }
 
 /**\brief 设定前端参数
@@ -1142,7 +1179,7 @@ static void fend_lock_cb(int dev_no, struct dvb_frontend_event *evt, void *user_
 	
 	fend_get_openned_dev(dev_no, &dev);
 	
-	if(!fend_para_equal(dev->info.type, &evt->parameters, para->para))
+	if(!fend_para_equal(dev->curr_mode, &evt->parameters, para->para))
 		return;
 	
 	if(!evt->status)

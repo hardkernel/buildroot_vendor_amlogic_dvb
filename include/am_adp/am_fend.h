@@ -63,21 +63,10 @@ enum AM_FEND_EventType
  * Type definitions
  ***************************************************************************/
 
-typedef enum
-{
-	AM_FEND_DEMOD_AUTO,  /**< AUTO */
-	AM_FEND_DEMOD_DVBC,  /**< DVB-C*/
-	AM_FEND_DEMOD_DVBT,  /**< DVB-T*/
-	AM_FEND_DEMOD_DVBS,  /**< DVB-S*/
-	AM_FEND_DEMOD_ATSC, /**< ATSC*/
-	AM_FEND_DEMOD_ISDBT,  /**< ISDB-T*/
-	AM_FEND_DEMOD_COUNT
-} AM_FEND_DemodMode_t;
-
 /**\brief 前端设备开启参数*/
 typedef struct
 {
-	AM_FEND_DemodMode_t    mode; /**< 解调模式*/
+	int mode; /**< 解调模式*/
 } AM_FEND_OpenPara_t;
 
 /**\brief DVB前端监控回调函数*/
@@ -125,6 +114,15 @@ extern AM_ErrorCode_t AM_FEND_Open(int dev_no, const AM_FEND_OpenPara_t *para);
  *   - 其他值 错误代码(见am_fend.h)
  */
 extern AM_ErrorCode_t AM_FEND_Close(int dev_no);
+
+/**\brief 设定前端解调模式
+ * \param dev_no 前端设备号
+ * \param mode 解调模式
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_SetMode(int dev_no, int mode);
 
 /**\brief 取得一个DVB前端设备的相关信息
  * \param dev_no 前端设备号

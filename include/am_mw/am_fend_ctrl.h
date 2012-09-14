@@ -100,7 +100,7 @@ typedef struct AM_FENDCTRL_DVBFrontendParameters{
 		AM_FENDCTRL_DVBFrontendParametersTerrestrial_t terrestrial; 
 		AM_FENDCTRL_DVBFrontendParametersATSC_t atsc;
 	};	
-	AM_FEND_DemodMode_t m_type; /**< 前端控制模块模式*/
+	int m_type; /**< 前端控制模块解调模式*/
 }AM_FENDCTRL_DVBFrontendParameters_t;
   
 /**\brief DiSEqC参数*/

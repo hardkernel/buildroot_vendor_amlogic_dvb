@@ -34,6 +34,8 @@
  * Static functions
  ***************************************************************************/
 static AM_ErrorCode_t dvb_open (AM_FEND_Device_t *dev, const AM_FEND_OpenPara_t *para);
+static AM_ErrorCode_t dvb_set_mode (AM_FEND_Device_t *dev, int mode);
+static AM_ErrorCode_t dvb_get_info (AM_FEND_Device_t *dev, struct dvb_frontend_info *info);
 static AM_ErrorCode_t dvb_set_para (AM_FEND_Device_t *dev, const struct dvb_frontend_parameters *para);
 static AM_ErrorCode_t dvb_get_para (AM_FEND_Device_t *dev, struct dvb_frontend_parameters *para);
 static AM_ErrorCode_t dvb_get_status (AM_FEND_Device_t *dev, fe_status_t *status);
@@ -63,6 +65,8 @@ static AM_ErrorCode_t dvbsx_blindscan_readchannelinfo(AM_FEND_Device_t *dev, str
 const AM_FEND_Driver_t linux_dvb_fend_drv =
 {
 .open = dvb_open,
+.set_mode = dvb_set_mode,
+.get_info = dvb_get_info,
 .set_para = dvb_set_para,
 .get_para = dvb_get_para,
 .set_prop = dvb_set_prop,
@@ -93,16 +97,8 @@ const AM_FEND_Driver_t linux_dvb_fend_drv =
 static AM_ErrorCode_t dvb_open (AM_FEND_Device_t *dev, const AM_FEND_OpenPara_t *para)
 {
 	char name[PATH_MAX];
-	int fd;
+	int fd, ret;
 
-	if((para->mode>AM_FEND_DEMOD_AUTO) && (para->mode<AM_FEND_DEMOD_COUNT))
-	{
-		char mode[16], prop[32];
-		sprintf(prop, "/sys/class/amlfe-%d/mode", dev->dev_no);
-		sprintf(mode, "%d", para->mode-1);
-		AM_FileEcho(prop, mode);
-	}
-	
 	snprintf(name, sizeof(name), "/dev/dvb0.frontend%d", dev->dev_no);
 	
 	fd = open(name, O_RDWR);
@@ -112,14 +108,41 @@ static AM_ErrorCode_t dvb_open (AM_FEND_Device_t *dev, const AM_FEND_OpenPara_t 
 		return AM_FEND_ERR_CANNOT_OPEN;
 	}
 	
-	if(ioctl(fd, FE_GET_INFO, &dev->info))
-	{
-		close(fd);
-		AM_DEBUG(1, "cannot get frontend's infomation, error:%s", strerror(errno));
-		return AM_FEND_ERR_IO;
-	}
-	
 	dev->drv_data = (void*)fd;
+
+	ret = dvb_set_mode(dev, para->mode);
+	if(ret != AM_SUCCESS){
+		close(fd);
+		return ret;
+	}
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t dvb_set_mode (AM_FEND_Device_t *dev, int mode)
+{
+	int fd = (int)dev->drv_data;
+	int ret;
+
+	ret = ioctl(fd, FE_SET_MODE, mode);
+	if(ret != 0){
+		AM_DEBUG(1, "set mode %d failed (%d)\n", mode, errno);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t dvb_get_info (AM_FEND_Device_t *dev, struct dvb_frontend_info *info)
+{
+	int fd = (int)dev->drv_data;
+	int ret;
+
+	ret = ioctl(fd, FE_GET_INFO, info);
+	if(ret != 0){
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+
 	return AM_SUCCESS;
 }
 

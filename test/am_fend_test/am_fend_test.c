@@ -449,14 +449,13 @@ static void sec(int dev_no)
 int main(int argc, char **argv)
 {
 	AM_FEND_OpenPara_t para;
-	AM_Bool_t loop=AM_TRUE;
 	fe_status_t status;
 	int fe_id=-1;	
 	int blind_scan = 0;
 	struct dvb_frontend_parameters blindscan_para[128];
 	unsigned int count = 128;
 	
-	while(loop)
+	while(1)
 	{
 		struct dvb_frontend_parameters p;
 		int mode, current_mode;
@@ -470,84 +469,67 @@ int main(int argc, char **argv)
 		printf("id: ");
 		scanf("%d", &fe_id);
 		if(fe_id<0)
-			return 0;
-		
-		para.mode = AM_FEND_DEMOD_DVBS;
+			break;
 
-		if(para.mode != AM_FEND_DEMOD_DVBS){
-			printf("Input fontend mode: (0-DVBC, 1-DVBT)\n");
-			printf("mode(0/1): ");
-			scanf("%d", &mode);
-			
-			sprintf(name, "/sys/class/amlfe-%d/mode", fe_id);
-			if(AM_FileRead(name, buf, sizeof(buf))==AM_SUCCESS) {
-				if(sscanf(buf, ":%d", &current_mode)==1) {
-					if(current_mode != mode) {
-						int r;
-						printf("Frontend(%d) dose not match the mode expected, change it?: (y/N) ", fe_id);
-						getchar();/*CR*/
-						r=getchar();
-						if((r=='y') || (r=='Y'))
-							para.mode = (mode==0)?AM_FEND_DEMOD_DVBC : 
-										(mode==1)? AM_FEND_DEMOD_DVBT : 
-										AM_FEND_DEMOD_AUTO;
-					}
-				}
-			}
-		}else{
-			mode = 2;
-		}
+		printf("Input fontend mode: (0-DVBC, 1-DVBT, 2-DVBS)\n");
+		printf("mode(0/1/2): ");
+		scanf("%d", &mode);
+		para.mode = (mode==0)?FE_QAM : 
+				(mode==1)? FE_OFDM : FE_QPSK;
 
 		AM_TRY(AM_FEND_Open(/*FEND_DEV_NO*/fe_id, &para));
 
-		printf("blindscan(0/1): ");
-		scanf("%d", &blind_scan);
-		if(blind_scan == 1)
-		{
-			AM_FEND_BlindScan(fe_id, blindscan_cb, (void *)&fe_id, 950000000, 2150000000);
-			while(1){
-				if(blindscan_process == 100){
-					break;
+		while(1) {
+
+			if(mode == 2) {
+				printf("blindscan(0/1): ");
+				scanf("%d", &blind_scan);
+				if(blind_scan == 1)
+				{
+					AM_FEND_BlindScan(fe_id, blindscan_cb, (void *)&fe_id, 950000000, 2150000000);
+					while(1){
+						if(blindscan_process == 100){
+							break;
+						}
+						//printf("wait process %u\n", blindscan_process);
+						usleep(500 * 1000);
+					}
+
+					AM_FEND_BlindExit(fe_id); 
+
+					printf("start AM_FEND_BlindGetTPInfo\n");
+					
+					AM_FEND_BlindGetTPInfo(fe_id, blindscan_para, &count);
+
+					printf("dump TPInfo: %d\n", count);
+
+					int i = 0;
+					
+					printf("\n\n");
+					for(i=0; i < count; i++)
+					{
+						printf("Ch%2d: RF: %4d SR: %5d ",i+1, (blindscan_para[i].frequency/1000),(blindscan_para[i].u.qpsk.symbol_rate/1000));
+						printf("\n");
+					}	
+
+					blind_scan = 0;
 				}
-				//printf("wait process %u\n", blindscan_process);
-				usleep(500 * 1000);
 			}
-
-			AM_FEND_BlindExit(fe_id); 
-
-			printf("start AM_FEND_BlindGetTPInfo\n");
 			
-			AM_FEND_BlindGetTPInfo(fe_id, blindscan_para, &count);
-
-			printf("dump TPInfo: %d\n", count);
-
-			int i = 0;
+			AM_TRY(AM_FEND_SetCallback(/*FEND_DEV_NO*/fe_id, fend_cb, NULL));
 			
-			printf("\n\n");
-			for(i=0; i < count; i++)
-			{
-				printf("Ch%2d: RF: %4d SR: %5d ",i+1, (blindscan_para[i].frequency/1000),(blindscan_para[i].u.qpsk.symbol_rate/1000));
-				printf("\n");
-			}	
-
-			blind_scan = 0;
-		}
-		
-		AM_TRY(AM_FEND_SetCallback(/*FEND_DEV_NO*/fe_id, fend_cb, NULL));
-		
-		printf("input frontend parameters, frequency=0 quit\n");
-		if(para.mode != AM_FEND_DEMOD_DVBS){
-			printf("frequency(Hz): ");
-		}
-		else{
-			sec(fe_id);
+			printf("input frontend parameters, frequency=0 quit\n");
+			if(mode != 2) {
+				printf("frequency(Hz): ");
+			} else {
+				sec(fe_id);
+				printf("frequency(KHz): ");
+			}
 			
-			printf("frequency(KHz): ");
-		}
-		
-		scanf("%d", &freq);
-		if(freq!=0)
-		{
+			scanf("%d", &freq);
+			if(!freq)
+				break;
+			
 			if(mode==0) {
 				printf("symbol rate(kbps): ");
 				scanf("%d", &srate);
@@ -618,10 +600,6 @@ int main(int argc, char **argv)
 			AM_TRY(AM_FEND_Lock(/*FEND_DEV_NO*/fe_id, &p, &status));
 			printf("lock status: 0x%x\n", status);
 #endif
-		}
-		else
-		{
-			loop = AM_FALSE;
 		}
 		AM_TRY(AM_FEND_Close(/*FEND_DEV_NO*/fe_id));
 	}

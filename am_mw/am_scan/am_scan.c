@@ -852,7 +852,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	
 	/*检查该TS是否已经添加*/
 	dbid = insert_ts(stmts, src, (int)dvb_fend_para(ts->fend_para)->frequency, satpara_dbid, 
-		(src==AM_FEND_DEMOD_DVBS)?(int)ts->fend_para.sat.polarisation:-1);
+		(src==FE_QPSK)?(int)ts->fend_para.sat.polarisation:-1);
 	if (dbid == -1)
 	{
 		AM_DEBUG(1, "insert new ts error");
@@ -989,7 +989,7 @@ analog_vct_done:
 			strcpy(name, ts->analog_channel->name);
 		else
 			snprintf(name, sizeof(name), "%s %d", 
-				(src==AM_FEND_DEMOD_DVBC)?"Cable":((src==AM_FEND_DEMOD_DVBT)?"Terristrial":"Satellite"),
+				(src==FE_QAM)?"Cable":((src==FE_OFDM)?"Terristrial":"Satellite"),
 				major_chan_num);
 			
 		AM_DEBUG(0, "ATSC Analog Channel('%s':%d) TSID(%d) found!",name, major_chan_num, ts->analog_channel->TSID);
@@ -1431,7 +1431,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	}
 	
 	AM_DEBUG(1, "@@ Source is %d @@", result->src);
-	if (result->src == AM_FEND_DEMOD_DVBS)
+	if (result->src == FE_QPSK)
 	{
 		/* 存储卫星配置 */
 		satpara_dbid = insert_sat_para(stmts, &result->sat_para);
@@ -1505,7 +1505,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	
 	/*检查该TS是否已经添加*/
 	dbid = insert_ts(stmts, src, (int)dvb_fend_para(ts->fend_para)->frequency, satpara_dbid,
-		(src==AM_FEND_DEMOD_DVBS)?(int)ts->fend_para.sat.polarisation:-1);
+		(src==FE_QPSK)?(int)ts->fend_para.sat.polarisation:-1);
 	if (dbid == -1)
 	{
 		AM_DEBUG(1, "insert new ts error");
@@ -2289,7 +2289,7 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 		}
 	}
 	
-	if (result->src == AM_FEND_DEMOD_DVBS)
+	if (result->src == FE_QPSK)
 	{
 		int db_sat_id;
 		/* 删除同一卫星配置下的所有ts & srv */
@@ -2475,7 +2475,7 @@ static AM_ErrorCode_t am_scan_tablectl_mark_section(AM_SCAN_TableCtl_t * scl, AM
 	
 	if (!sub && !fsub)
 	{
-		AM_DEBUG(1, "No more subctl for adding new subtable");
+		AM_DEBUG(1, "No more subctl for adding new %s subtable", scl->tname);
 		return AM_FAILURE;
 	}
 	if (!sub)
@@ -2978,6 +2978,13 @@ static void am_scan_section_handler(int dev_no, int fid, const uint8_t *data, in
 	sec_ctrl = am_scan_get_section_ctrl_by_fid(scanner, fid);
 	if (sec_ctrl)
 	{
+		/* the section_syntax_indicator bit must be 1 */
+		if ((data[1]&0x80) == 0)
+		{
+			AM_DEBUG(1, "Scan: section_syntax_indicator is 0, skip this section");
+			goto parse_end;
+		}
+		
 		if (AM_SI_GetSectionHeader(scanner->hsi, (uint8_t*)data, len, &header) != AM_SUCCESS)
 		{
 			AM_DEBUG(1, "Scan: section header error");
@@ -3671,7 +3678,7 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 	scanner->curr_freq = -1;
 	scanner->end_code = AM_SCAN_RESULT_UNLOCKED;
 	
-	if (scanner->result.src == AM_FEND_DEMOD_DVBS)
+	if (scanner->result.src == FE_QPSK)
 	{
 		AM_DEBUG(1, "Set SEC settings...");
 		
@@ -3750,21 +3757,29 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 	unsigned int freq;
 	unsigned int cur_drift, max_drift;
 	
-	if (scanner->result.src == AM_FEND_DEMOD_DVBS)
-		AM_SEC_FreqConvert(scanner->fend_dev, scanner->fe_evt.parameters.frequency, &freq);
+	if (scanner->result.src == FE_QPSK)
+	{
+		AM_ErrorCode_t ret = AM_SEC_FreqConvert(scanner->fend_dev, scanner->fe_evt.parameters.frequency, &freq);
+		if(ret != AM_SUCCESS)
+		{
+			AM_DEBUG(1, "error sec freq convert, try next\n");
+			scanner->recv_status &= ~AM_SCAN_RECVING_WAIT_FEND;
+			goto try_next;
+		}
+	}
 	else
 		freq = scanner->fe_evt.parameters.frequency;
 		
 	if ((scanner->curr_freq >= 0) && 
 		(scanner->curr_freq < scanner->start_freqs_cnt))
 	{
-		AM_DEBUG(1, "%d %d, max_drift %d, unicable %d", freq, 
+		AM_DEBUG(1, "%d %d %d, max_drift %d, unicable %d", scanner->fe_evt.parameters.frequency, freq, 
 			dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency,
 			scanner->start_freqs[scanner->curr_freq].dtv_para.sat.para.u.qpsk.symbol_rate / 2000,
 			(scanner->result.mode&AM_SCAN_MODE_SAT_UNICABLE)?1:0);
 	}
 
-	if (scanner->result.src == AM_FEND_DEMOD_DVBS)
+	if (scanner->result.src == FE_QPSK)
 	{
 		int tmp_drift = dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency - freq;
 		cur_drift = AM_ABS(tmp_drift);
@@ -4239,8 +4254,8 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 			&& (! para->start_para_cnt))
 	{
 		use_default = 1;
-		para->start_para_cnt = (para->source==AM_FEND_DEMOD_DVBC) ? AM_ARRAY_SIZE(dvbc_std_freqs) 
-			: ((para->source==AM_FEND_DEMOD_DVBT || para->source==AM_FEND_DEMOD_ISDBT) ? 
+		para->start_para_cnt = (para->source==FE_QAM) ? AM_ARRAY_SIZE(dvbc_std_freqs) 
+			: ((para->source==FE_OFDM) ? 
 			(DEFAULT_DVBT_FREQ_STOP-DEFAULT_DVBT_FREQ_START)/8000+1
 			: 0/*Fix me*/);
 	}
@@ -4279,7 +4294,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	{
 		struct dvb_frontend_parameters tpara;
 		
-		if(para->source==AM_FEND_DEMOD_DVBC) {
+		if(para->source==FE_QAM) {
 			tpara.u.qam.modulation = DEFAULT_DVBC_MODULATION;
 			tpara.u.qam.symbol_rate = DEFAULT_DVBC_SYMBOLRATE;
 			for (i=0; i<para->start_para_cnt; i++)
@@ -4287,7 +4302,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 				tpara.frequency = dvbc_std_freqs[i]*1000;
 				*dvb_fend_para(scanner->start_freqs[i].dtv_para) = tpara;
 			}
-		} else if(para->source==AM_FEND_DEMOD_DVBT || para->source==AM_FEND_DEMOD_ISDBT) {
+		} else if(para->source==FE_OFDM) {
 			tpara.u.ofdm.bandwidth = DEFAULT_DVBT_BW;
 			for (i=0; i<para->start_para_cnt; i++)
 			{
