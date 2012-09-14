@@ -452,6 +452,9 @@ struct dvbsx_blindscaninfo
 
 #define FE_SET_MODE                _IO('o', 90)
 #define FE_READ_AFC                _IOR('o', 91, __u32)
-#define FE_READ_TS                 _IOR('o', 92, int)
-
+#define FE_FINE_TUNE               _IOW('o', 92, int)
+#define FE_READ_TUNER_STATUS       _IOR('o', 93, __u32)
+#define FE_READ_ANALOG_STATUS      _IOR('o', 94, __u32)
+#define FE_READ_SD_STATUS          _IOR('o', 95, __u32)
+#define FE_READ_TS                 _IOR('o', 96, int)
 #endif /*_DVBFRONTEND_H_*/
