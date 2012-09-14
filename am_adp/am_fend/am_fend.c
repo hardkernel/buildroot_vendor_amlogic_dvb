@@ -822,6 +822,37 @@ AM_ErrorCode_t AM_FEND_GetInfo(int dev_no, struct dvb_frontend_info *info)
 	return ret;
 }
 
+/**\brief 取得一个DVB前端设备连接的TS输入源
+ * \param dev_no 前端设备号
+ * \param[out] src 返回设备对应的TS输入源
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+AM_ErrorCode_t AM_FEND_GetTSSource(int dev_no, AM_DMX_Source_t *src)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	
+	assert(src);
+
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+	
+	if(!dev->drv->get_ts)
+	{
+		AM_DEBUG(1, "fronend %d no not support get_ts", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	ret = dev->drv->get_ts(dev, src);
+	
+	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
+
 /**\brief 设定前端参数
  * \param dev_no 前端设备号
  * \param[in] para 前端设置参数

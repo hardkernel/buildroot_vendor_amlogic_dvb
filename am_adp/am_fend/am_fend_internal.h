@@ -39,6 +39,7 @@ typedef struct
 	AM_ErrorCode_t (*open) (AM_FEND_Device_t *dev, const AM_FEND_OpenPara_t *para);
 	AM_ErrorCode_t (*set_mode) (AM_FEND_Device_t *dev, int mode);
 	AM_ErrorCode_t (*get_info) (AM_FEND_Device_t *dev, struct dvb_frontend_info *info);
+	AM_ErrorCode_t (*get_ts) (AM_FEND_Device_t *dev, AM_DMX_Source_t *src);
 	AM_ErrorCode_t (*set_para) (AM_FEND_Device_t *dev, const struct dvb_frontend_parameters *para);
 	AM_ErrorCode_t (*get_para) (AM_FEND_Device_t *dev, struct dvb_frontend_parameters *para);
 	AM_ErrorCode_t (*get_status) (AM_FEND_Device_t *dev, fe_status_t *status);

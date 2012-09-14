@@ -13,6 +13,7 @@
 
 #include "am_types.h"
 #include "am_evt.h"
+#include "am_dmx.h"
 #include <linux/dvb/frontend.h>
 
 #ifdef __cplusplus
@@ -132,6 +133,15 @@ extern AM_ErrorCode_t AM_FEND_SetMode(int dev_no, int mode);
  *   - 其他值 错误代码(见am_fend.h)
  */
 extern AM_ErrorCode_t AM_FEND_GetInfo(int dev_no, struct dvb_frontend_info *info);
+
+/**\brief 取得一个DVB前端设备连接的TS输入源
+ * \param dev_no 前端设备号
+ * \param[out] src 返回设备对应的TS输入源
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_GetTSSource(int dev_no, AM_DMX_Source_t *src);
 
 /**\brief 设定前端参数
  * \param dev_no 前端设备号

@@ -36,6 +36,7 @@
 static AM_ErrorCode_t dvb_open (AM_FEND_Device_t *dev, const AM_FEND_OpenPara_t *para);
 static AM_ErrorCode_t dvb_set_mode (AM_FEND_Device_t *dev, int mode);
 static AM_ErrorCode_t dvb_get_info (AM_FEND_Device_t *dev, struct dvb_frontend_info *info);
+static AM_ErrorCode_t dvb_get_ts (AM_FEND_Device_t *dev, AM_DMX_Source_t *src);
 static AM_ErrorCode_t dvb_set_para (AM_FEND_Device_t *dev, const struct dvb_frontend_parameters *para);
 static AM_ErrorCode_t dvb_get_para (AM_FEND_Device_t *dev, struct dvb_frontend_parameters *para);
 static AM_ErrorCode_t dvb_get_status (AM_FEND_Device_t *dev, fe_status_t *status);
@@ -67,6 +68,7 @@ const AM_FEND_Driver_t linux_dvb_fend_drv =
 .open = dvb_open,
 .set_mode = dvb_set_mode,
 .get_info = dvb_get_info,
+.get_ts   = dvb_get_ts,
 .set_para = dvb_set_para,
 .get_para = dvb_get_para,
 .set_prop = dvb_set_prop,
@@ -139,6 +141,19 @@ static AM_ErrorCode_t dvb_get_info (AM_FEND_Device_t *dev, struct dvb_frontend_i
 	int ret;
 
 	ret = ioctl(fd, FE_GET_INFO, info);
+	if(ret != 0){
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t dvb_get_ts (AM_FEND_Device_t *dev, AM_DMX_Source_t *src)
+{
+	int fd = (int)dev->drv_data;
+	int ret;
+
+	ret = ioctl(fd, FE_READ_TS, src);
 	if(ret != 0){
 		return AM_FEND_ERR_NOT_SUPPORTED;
 	}
