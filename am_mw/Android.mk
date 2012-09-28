@@ -92,19 +92,6 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 
 LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc 
 
-# support for atv_scan		   
-SUPPORT_ATV_SCAN := no
-
-ifeq ($(SUPPORT_ATV_SCAN), yes)
-LOCAL_SRC_FILES +=  am_scan/atv_scan.cpp
-LOCAL_CFLAGS += -DSUPPORT_ATV_SCAN
-LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../tvapi\
-		    $(LOCAL_PATH)/../../tvapi/include\
-		    $(LOCAL_PATH)/../../tvapi/libtvservice/atv\
-		    frameworks/base/core/jni
-LOCAL_SHARED_LIBRARIES += libutils libbinder libtv_client
-endif
-
 LOCAL_PRELINK_MODULE := false
 
 include $(BUILD_SHARED_LIBRARY)
@@ -199,19 +186,6 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 
 
 LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc 
-
-# support for atv_scan		   
-SUPPORT_ATV_SCAN := no
-
-ifeq ($(SUPPORT_ATV_SCAN), yes)
-LOCAL_SRC_FILES +=  am_scan/atv_scan.cpp
-LOCAL_CFLAGS += -DSUPPORT_ATV_SCAN
-LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../tvapi\
-		    $(LOCAL_PATH)/../../tvapi/include\
-		    $(LOCAL_PATH)/../../tvapi/libtvservice/atv\
-		    frameworks/base/core/jni
-LOCAL_SHARED_LIBRARIES += libutils libbinder libtv_client
-endif
 
 LOCAL_PRELINK_MODULE := false
 
