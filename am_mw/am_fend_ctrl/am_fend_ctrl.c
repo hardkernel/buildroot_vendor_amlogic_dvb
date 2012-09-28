@@ -73,6 +73,8 @@ AM_ErrorCode_t AM_FENDCTRL_SetPara(int dev_no, const AM_FENDCTRL_DVBFrontendPara
 			break;
 		case FE_ATSC:
 			ret = AM_FEND_SetPara(dev_no, &(para->atsc.para));
+		case FE_ANALOG:
+			ret = AM_FEND_SetPara(dev_no, &(para->analog.para));
 			break;	
 		default:
 			break;
@@ -117,6 +119,9 @@ AM_ErrorCode_t AM_FENDCTRL_Lock(int dev_no, const AM_FENDCTRL_DVBFrontendParamet
 			break;
 		case FE_ATSC:
 			AM_FEND_Lock(dev_no, &(para->atsc.para), status);
+			break;	
+		case FE_ANALOG:
+			ret = AM_FEND_SetPara(dev_no, &(para->analog.para));
 			break;	
 		default:
 			break;

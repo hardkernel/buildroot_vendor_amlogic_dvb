@@ -46,7 +46,6 @@ enum
 	AM_SCAN_RECVING_MGT			= 0x40,
 	AM_SCAN_RECVING_VCT			= 0x80,
 	AM_SCAN_RECVING_WAIT_FEND	= 0x100,
-	AM_SCAN_SEARCHING_ATV		= 0x200,
 };
 
 /*SCAN内部事件类型*/
@@ -63,8 +62,7 @@ enum
 	AM_SCAN_EVT_VCT_DONE 	= 0x100, /**< VCT表已经接收完毕*/
 	AM_SCAN_EVT_QUIT		= 0x200, /**< 退出搜索事件*/
 	AM_SCAN_EVT_START		= 0x400,/**< 开始搜索事件*/
-	AM_SCAN_EVT_ATV_SEARCH_DONE	= 0x800,	/**< 当前设置的ATV 频率搜索完毕*/
-	AM_SCAN_EVT_BLIND_SCAN_DONE = 0x2000,	/**< 当前卫星盲扫完毕*/
+	AM_SCAN_EVT_BLIND_SCAN_DONE = 0x800,	/**< 当前卫星盲扫完毕*/
 };
 
 /*SCAN 所在阶段*/
@@ -130,16 +128,30 @@ enum
 	MAX_STMT
 };
 
-/**\brief ATV msg定义*/
-enum CC_ATV_MSG_ID 
+enum
 {
-    CC_ATV_MSG_UPDATE_CHANNEL_INFO,
-    CC_ATV_MSG_UPDATE_SEARCHING_FREQ,
-    CC_ATV_MSG_AUTO_SEARCH_FINISHED,
-    CC_ATV_MSG_AUTO_SEARCH_ABORTED,
-    CC_ATV_MSG_MANUAL_SEARCH_FINISHED,
-    CC_ATV_MSG_MANUAL_SEARCH_ABORTED,
-    CC_ATV_MSG_DETECT_FREQUENCY_FINISHED,
+    ATV_10KHZ = 10000,
+    ATV_50KHZ = 50000,
+    ATV_250KHZ = 250000,
+    ATV_500KHZ = 500000,
+    ATV_750KHZ = 750000,
+    ATV_1MHZ = 1000000,
+    ATV_1_5MHZ = 1500000,
+    ATV_1_75MHZ = 1750000,
+    ATV_2MHZ = 2000000,
+    ATV_2_5MHZ = 2500000,
+    ATV_2_75MHZ = 2750000,
+    ATV_3MHZ = 3000000,
+    ATV_6MHZ = 6000000,
+    ATV_1GHZ = 1000000000,
+    ATV_FINE_TUNE_STEP_HZ = 50000,
+};
+
+enum
+{
+	DEFAULT_AFC_UNLOCK_STEP = ATV_1MHZ,
+	DEFAULT_CVBS_UNLOCK_STEP = ATV_1_5MHZ,
+	DEFAULT_CVBS_LOCK_STEP = ATV_6MHZ,
 };
 
 /**\brief 频点搜索状态*/
@@ -148,6 +160,13 @@ enum
 	AM_SCAN_FE_DONE,/**< ATV/DTV均搜索完毕*/
 	AM_SCAN_FE_ATV,	/**< ATV正在搜索*/
 	AM_SCAN_FE_DTV,	/**< DTV正在搜索*/
+};
+
+/**\brief ATV频率范围检查类型*/
+enum
+{
+	AM_SCAN_ATV_FREQ_RANGE_CHECK,
+	AM_SCAN_ATV_FREQ_LOOP_CHECK,
 };
 
 /**\brief 子表接收控制*/
@@ -195,50 +214,19 @@ typedef struct
 	int								start_freq;	/**< 起始频率*/
 	int								stop_freq;	/**< 结束频率*/
 	int								stage;		/**< HL,HH,VL,VH*/
-	AM_SCAN_BlindScanProgress_t		progress;	/**< Blind Scan 进度*/
+	AM_SCAN_DTVBlindScanProgress_t		progress;	/**< Blind Scan 进度*/
 	int								searched_tp_cnt;	/**< 已搜索到的 TP 个数*/
 	struct dvb_frontend_parameters	searched_tps[AM_SCAN_MAX_BS_TP_CNT];	/**< 已搜索到的TP*/
 }AM_SCAN_BlindScanCtrl_t;
 
 
-/**\brief 搜索中间数据*/
-struct AM_SCAN_Scanner_s
+typedef struct
 {
-	AM_SCAN_TableCtl_t				patctl;			/**< PAT接收控制*/
-	AM_SCAN_TableCtl_t				pmtctl[20];			/**< PMT接收控制*/
-	AM_SCAN_TableCtl_t				catctl;			/**< CAT接收控制*/
-	AM_SCAN_TableCtl_t				sdtctl;			/**< SDT接收控制*/
-	AM_SCAN_TableCtl_t				nitctl;			/**< NIT接收控制*/
-	AM_SCAN_TableCtl_t				batctl;			/**< BAT接收控制*/
-	/*ATSC tables*/
-	AM_SCAN_TableCtl_t				mgtctl;			/**< MGT接收控制*/
-	AM_SCAN_TableCtl_t				vctctl;			/**< VCT接收控制*/
-
-	int								standard;
-	int								evt_flag;		/**< 事件标志*/
-	int								recv_status;	/**< 接收状态*/
-	int								stage;			/**< 执行阶段*/
-	int								fend_dev;		/**< FEND 设备号*/
-	int								dmx_dev;		/**< DMX设备号*/
-	pthread_mutex_t     			lock;   		/**< 保护互斥体*/
-	pthread_cond_t      			cond;    		/**< 条件变量*/
-	pthread_t          				thread;         /**< 状态监控线程*/
-	int								hsi;			/**< SI解析句柄*/
-	int								curr_freq;		/**< 当前正在搜索的频点*/ 
-	int								start_freqs_cnt;/**< 需要搜索的频点个数*/
-	struct dvb_frontend_event		fe_evt;			/**< 前段事件*/
-	AM_SCAN_FrontEndPara_t		 	*start_freqs;	/**< 需要搜索的频点列表*/ 
-	AM_SCAN_TS_t					*curr_ts;		/**< 当前正在搜索的TS数据*/
-	dvbpsi_pat_t					*cur_pat;		/**< 当前搜索PMT时搜使用的PAT section */
-	dvbpsi_pat_program_t			*cur_prog;		/**< 当前正在接收PMT的Program*/
-	AM_SCAN_StoreCb 				store_cb;		/**< 存储回调*/
-	AM_SCAN_Result_t				result;			/**< 搜索结果*/
-	int								end_code;		/**< 搜索结束码*/
-	void							*user_data;		/**< 用户数据*/
-	AM_Bool_t						store;			/**< 是否存储*/
-	AM_SCAN_BlindScanCtrl_t			bs_ctl;			/**< 盲扫控制*/
-};
-
+	int    srv_cnt;
+	int    buf_size;
+	int   *srv_ids;
+	AM_SCAN_TS_t **tses;
+}AM_SCAN_RecTab_t;
 
 /**\brief 音频数据*/
 typedef struct
@@ -251,6 +239,78 @@ typedef struct
 		char	lang[10];	/**< audio language*/	
 	}audios[AM_SCAN_MAX_AUD_CNT];
 }AM_SCAN_AudioInfo_t;
+
+/**\brief service结构*/
+typedef struct
+{
+	uint8_t srv_type, eit_sche, eit_pf, rs, free_ca, access_controlled, hidden, hide_guide;;
+	uint16_t vid, aid1, aid2, srv_id;
+	int vfmt, chan_num, afmt_tmp, vfmt_tmp, scrambled_flag, major_chan_num, minor_chan_num, source_id;
+	int src, srv_dbid, satpara_dbid;
+	char name[AM_DB_MAX_SRV_NAME_LEN + 1];
+	char str_apids[256];
+	char str_afmts[256];
+	char str_alangs[256];
+	AM_SCAN_AudioInfo_t aud_info;
+}AM_SCAN_ServiceInfo_t;
+
+/**\brief 搜索中间数据*/
+struct AM_SCAN_Scanner_s
+{
+	AM_SCAN_CreatePara_t			start_para;		/**< AM_SCAN_Create()传入的参数*/
+	int								evt_flag;		/**< 事件标志*/
+	int								recv_status;	/**< 接收状态*/
+	int								stage;			/**< 执行阶段*/
+	pthread_mutex_t     			lock;   		/**< 保护互斥体*/
+	pthread_cond_t      			cond;    		/**< 条件变量*/
+	pthread_t          				thread;         /**< 状态监控线程*/
+	
+	int								curr_freq;		/**< 当前正在搜索的频点*/ 
+	int								start_freqs_cnt;/**< 需要搜索的频点个数*/
+	struct dvb_frontend_event		fe_evt;			/**< 前段事件*/
+	AM_SCAN_FrontEndPara_t		 	*start_freqs;	/**< 需要搜索的频点列表*/ 
+	AM_SCAN_TS_t					*curr_ts;		/**< 当前正在搜索的TS数据*/
+	
+	AM_SCAN_StoreCb 				store_cb;		/**< 存储回调*/
+	AM_SCAN_Result_t				result;			/**< 搜索结果*/
+	int								end_code;		/**< 搜索结束码*/
+	void							*user_data;		/**< 用户数据*/
+	AM_Bool_t						store;			/**< 是否存储*/
+
+	struct
+	{
+		AM_Bool_t						start;
+		int								start_idx;		/**< 起始频点参数在start_freqs中的索引*/
+		int								hsi;			/**< SI解析句柄*/
+		AM_SCAN_TableCtl_t				patctl;			/**< PAT接收控制*/
+		AM_SCAN_TableCtl_t				pmtctl[20];		/**< PMT接收控制*/
+		AM_SCAN_TableCtl_t				catctl;			/**< CAT接收控制*/
+		AM_SCAN_TableCtl_t				sdtctl;			/**< SDT接收控制*/
+		AM_SCAN_TableCtl_t				nitctl;			/**< NIT接收控制*/
+		AM_SCAN_TableCtl_t				batctl;			/**< BAT接收控制*/
+		/*ATSC tables*/
+		AM_SCAN_TableCtl_t				mgtctl;			/**< MGT接收控制*/
+		AM_SCAN_TableCtl_t				vctctl;			/**< VCT接收控制*/
+		dvbpsi_pat_t					*cur_pat;		/**< 当前搜索PMT时搜使用的PAT section */
+		dvbpsi_pat_program_t			*cur_prog;		/**< 当前正在接收PMT的Program*/
+		AM_SCAN_BlindScanCtrl_t			bs_ctl;			/**< 盲扫控制*/
+	}dtvctl;		/**< DTV控制*/
+	
+	struct
+	{
+		AM_Bool_t start;
+		int afe_fd;
+		int start_idx;		/**< 起始频点参数在start_freqs中的索引*/
+		int range_check;
+		int direction;	/**< -1/+1*/
+		int step;		/**< step*/
+		int min_freq;
+		int max_freq;
+		int start_freq;
+	}atvctl;		/**< ATV控制*/
+};
+
+
 
 
 /****************************************************************************

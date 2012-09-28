@@ -230,11 +230,14 @@ struct dvb_ofdm_parameters {
 	fe_hierarchy_t      hierarchy_information;
 };
 
+#define ANALOG_FLAG_ENABLE_AFC                 0X00000001
 struct dvb_analog_parameters {
-	unsigned int         mode;    /*V4L2_TUNER_RADIO,V4L2_TUNER_ANALOG_TV,V4L2_TUNER_DIGITAL_TV*/
 	unsigned int         audmode; /*V4L2_TUNER_MODE_MONO,V4L2_TUNER_MODE_STEREO,V4L2_TUNER_MODE_LANG2,V4L2_TUNER_MODE_SAP,V4L2_TUNER_MODE_LANG1,V4L2_TUNER_MODE_LANG1_LANG2*/
-	unsigned int         std_hi;
-	unsigned int         std_lo;
+	unsigned int         soundsys;/*A2,BTSC,EIAJ,NICAM*/
+	v4l2_std_id           std;
+	unsigned int         flag;
+                unsigned int         afc_range;
+        unsigned int         reserved;
 };
 
 struct dvb_frontend_parameters {
@@ -381,6 +384,48 @@ struct dtv_properties {
 	__u32 num;
 	struct dtv_property *props;
 };
+//for atv
+typedef struct tuner_status_s {
+	unsigned int frequency;
+	unsigned int rssi;
+	unsigned char mode;//dtv:0 or atv:1
+	unsigned char tuner_locked;//notlocked:0,locked:1
+	void 		 *ressrved;
+}tuner_status_t;
+
+typedef struct atv_status_s {
+	unsigned char atv_lock;//notlocked:0,locked 1
+	v4l2_std_id	  std;
+	unsigned int  audmode;
+			 int  snr;
+                         int  afc;
+	void     	  *resrvred;
+}atv_status_t;
+
+typedef struct sound_status_s {
+	unsigned short sound_sys;//A2DK/A2BG/NICAM BG/NICAM DK/BTSC/EIAJ
+	unsigned short sound_mode;//SETERO/DUAL/MONO/SAP
+	void     	       *resrvred;
+}sound_status_t;
+typedef enum tuner_param_cmd_e{
+	TUNER_CMD_AUDIO_MUTE = 0x0000,
+	TUNER_CMD_AUDIO_ON,// 0x0001,
+	TUNER_CMD_TUNER_POWER_ON,
+	TUNER_CMD_TUNER_POWER_DOWN,
+	TUNER_CMD_SET_VOLUME,
+	TUNER_CMD_SET_LEAP_SETP_SIZE,
+	TUNER_CMD_GET_MONO_MODE,
+	TUNER_CMD_SET_BEST_LOCK_RANGE,
+	TUNER_CMD_GET_BEST_LOCK_RANGE,
+    TUNER_CMD_NULL,
+}tuner_param_cmd_t;
+/*parameter for set param box*/
+typedef struct tuner_param_s {
+	tuner_param_cmd_t cmd;
+	unsigned int      parm;
+	unsigned int 	  resvred;
+}tuner_param_t;
+
 
 /*Stores the blind scan parameters which are passed to the FE_SET_BLINDSCAN ioctl.*/
 struct dvbsx_blindscanpara
@@ -452,9 +497,11 @@ struct dvbsx_blindscaninfo
 
 #define FE_SET_MODE                _IO('o', 90)
 #define FE_READ_AFC                _IOR('o', 91, __u32)
-#define FE_FINE_TUNE               _IOW('o', 92, int)
-#define FE_READ_TUNER_STATUS       _IOR('o', 93, __u32)
-#define FE_READ_ANALOG_STATUS      _IOR('o', 94, __u32)
-#define FE_READ_SD_STATUS          _IOR('o', 95, __u32)
+#define FE_FINE_TUNE               _IOW('o', 92, __u32)
+#define FE_READ_TUNER_STATUS       _IOR('o', 93, tuner_status_t)
+#define FE_READ_ANALOG_STATUS      _IOR('o', 94, atv_status_t)
+#define FE_READ_SD_STATUS          _IOR('o', 95, sound_status_t)
 #define FE_READ_TS                 _IOR('o', 96, int)
+//set & get the tuner parameters only atv
+#define FE_SET_PARAM_BOX           _IOWR('o', 97, tuner_param_t)
 #endif /*_DVBFRONTEND_H_*/

@@ -1,0 +1,5 @@
+/*region_table 字段列表*/
+"db_id integer primary key autoincrement",	/**< 数据库保存的唯一索引*/ 
+"name text",					/**< 区域名称*/
+"source integer",				/**< TS源*/
+"frequencies text",				/**< 频率表，以空格隔开*/

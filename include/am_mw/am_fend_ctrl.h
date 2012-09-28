@@ -91,6 +91,12 @@ typedef struct AM_FENDCTRL_DVBFrontendParametersATSC
 	struct dvb_frontend_parameters para; /**< 前端控制模块设置参数*/
 }AM_FENDCTRL_DVBFrontendParametersATSC_t;
 
+/**\brief ATSC前端控制模块设置参数*/
+typedef struct AM_FENDCTRL_DVBFrontendParametersAnalog
+{
+	struct dvb_frontend_parameters para; /**< 前端控制模块设置参数*/
+}AM_FENDCTRL_DVBFrontendParametersAnalog_t;
+
 /**\brief 前端控制模块设置参数*/
 typedef struct AM_FENDCTRL_DVBFrontendParameters{
 	union
@@ -99,6 +105,7 @@ typedef struct AM_FENDCTRL_DVBFrontendParameters{
 		AM_FENDCTRL_DVBFrontendParametersCable_t cable;
 		AM_FENDCTRL_DVBFrontendParametersTerrestrial_t terrestrial; 
 		AM_FENDCTRL_DVBFrontendParametersATSC_t atsc;
+		AM_FENDCTRL_DVBFrontendParametersAnalog_t analog;
 	};	
 	int m_type; /**< 前端控制模块解调模式*/
 }AM_FENDCTRL_DVBFrontendParameters_t;

@@ -14,7 +14,6 @@
 #define DMX_DEV_NO 0
 
 #include <am_debug.h>
-#include <iconv.h>
 #include <am_scan.h>
 #include <am_dmx.h>
 
@@ -159,17 +158,67 @@ static void progress_evt_callback(int dev_no, int event_type, void *param, void 
 			break;
 	}
 }
+
+static void init_dtv_fe_paras(AM_FENDCTRL_DVBFrontendParameters_t *fpara, int cnt)
+{
+	int i;
+	
+	for (i=0; i<cnt; i++,fpara++)
+	{
+#if 0
+		fpara->m_type = FE_OFDM;
+
+		memset(&fpara->terrestrial.para, 0, sizeof(fpara->terrestrial.para));
+		fpara->terrestrial.para.frequency = 474000000 + i*8000000;
+		fpara->terrestrial.para.inversion = INVERSION_AUTO;
+		fpara->terrestrial.para.u.ofdm.bandwidth = BANDWIDTH_8_MHZ;
+		fpara->terrestrial.para.u.ofdm.code_rate_HP = FEC_AUTO;
+		fpara->terrestrial.para.u.ofdm.code_rate_LP = FEC_AUTO;
+		fpara->terrestrial.para.u.ofdm.constellation = QAM_AUTO;
+		fpara->terrestrial.para.u.ofdm.guard_interval = GUARD_INTERVAL_AUTO;
+		fpara->terrestrial.para.u.ofdm.hierarchy_information = HIERARCHY_AUTO;
+		fpara->terrestrial.para.u.ofdm.transmission_mode = TRANSMISSION_MODE_AUTO;
+#else
+		fpara->m_type = FE_QAM;
+		memset(&fpara->cable.para, 0, sizeof(fpara->cable.para));
+		fpara->cable.para.frequency = 474000000 + i*8000000;
+		fpara->cable.para.u.qam.symbol_rate = 6875000;
+		fpara->cable.para.u.qam.fec_inner = FEC_AUTO;
+		fpara->cable.para.u.qam.modulation = QAM_64;
+#endif
+	}
+}
+
+static void init_atv_fe_paras(AM_FENDCTRL_DVBFrontendParameters_t *fpara, int cnt)
+{
+	int i;
+	
+	for (i=0; i<cnt; i++,fpara++)
+	{
+		fpara->m_type = FE_ANALOG;
+		memset(&fpara->analog.para, 0, sizeof(fpara->analog.para));
+		//fpara->analog.para.frequency = 200000000 + i*8000000;
+		if (i == 0)
+			fpara->analog.para.frequency = 40000000;
+		else if (i==1)
+			fpara->analog.para.frequency = 100000000;
+		else if (i==2)
+			fpara->analog.para.frequency = 40000000;
+		else
+			fpara->analog.para.frequency = 200000000 + i*8000000;
+	}
+}
+
 static int start_scan_test()
 {
 	int hscan = 0;
 	int i, mode;
-	struct dvb_frontend_parameters p[10];
-	int afreq[10];
+	AM_FENDCTRL_DVBFrontendParameters_t dtv_fes[10];
+	AM_FENDCTRL_DVBFrontendParameters_t atv_fes[10];
 	char buf[256];
 	AM_Bool_t go = AM_TRUE, new_scan = AM_FALSE;
 	
 	AM_DB_Init(&hdb);
-
 	printf("------------------------------------------------\n");
 	printf("commands:\n");
 	printf("\tauto [main freq start value]\n");
@@ -178,34 +227,26 @@ static int start_scan_test()
 	printf("\tquit\n");
 	printf("------------------------------------------------\n");
 
-	p[0].u.qam.symbol_rate = 6875*1000;
-	p[0].u.qam.modulation = QAM_64;
-	p[0].u.qam.fec_inner = FEC_AUTO;
+	init_dtv_fe_paras(dtv_fes, AM_ARRAY_SIZE(dtv_fes));
+	init_atv_fe_paras(atv_fes, AM_ARRAY_SIZE(atv_fes));
+	
 	while (go)
 	{
 		if (fgets(buf, sizeof(buf), stdin))
 		{
 			if(!strncmp(buf, "auto", 4))
 			{
-				sscanf(buf+4, "%u", &p[0].frequency);
-				
-				for (i=1; i<10; i++)
-				{
-					memcpy(&p[i], &p[i-1], sizeof(struct dvb_frontend_parameters));
-					p[i].frequency += 1000;
-				}
-				mode = AM_SCAN_MODE_AUTO|AM_SCAN_MODE_SEARCHBAT;
+				mode = AM_SCAN_DTVMODE_AUTO|AM_SCAN_DTVMODE_SEARCHBAT;
 				new_scan = AM_TRUE;
 			}
 			else if(!strncmp(buf, "manual", 6))
 			{
-				sscanf(buf+6, "%u", &p[0].frequency);
-				mode = AM_SCAN_MODE_MANUAL;
+				mode = AM_SCAN_DTVMODE_MANUAL;
 				new_scan = AM_TRUE;
 			}
 			else if(!strncmp(buf, "allband", 7))
 			{
-				mode = AM_SCAN_MODE_ALLBAND;
+				mode = AM_SCAN_DTVMODE_ALLBAND;
 				new_scan = AM_TRUE;
 			}
 			else if(!strncmp(buf, "save", 4))
@@ -244,17 +285,29 @@ static int start_scan_test()
 				hscan = 0;
 			}
 			para.fend_dev_id = FEND_DEV_NO;
-			para.dmx_dev_id = DMX_DEV_NO;
-			para.source = AM_SCAN_SRC_DVBC;
 			para.hdb = hdb;
-			para.start_para_cnt = AM_ARRAY_SIZE(p);
-			para.start_para = p;
-			para.mode = mode;
 			para.store_cb = NULL;
-			para.standard = AM_SCAN_STANDARD_ATSC;
-			para.atv_freq_cnt = 1;
-			afreq[0] = 52500000;
-			para.atv_freqs = afreq;
+			para.mode = AM_SCAN_MODE_ATV_DTV;
+			
+			para.dtv_para.dmx_dev_id = DMX_DEV_NO;
+			para.dtv_para.source = FE_QAM;
+			para.dtv_para.fe_cnt = 0;//AM_ARRAY_SIZE(dtv_fes);
+			para.dtv_para.fe_paras = dtv_fes;
+			para.dtv_para.mode = mode;
+			para.dtv_para.sort_method = AM_SCAN_SORT_BY_FREQ_SRV_ID;
+			para.dtv_para.resort_all = AM_FALSE;
+			para.dtv_para.standard = AM_SCAN_DTV_STD_DVB;
+			para.atv_para.fe_cnt = 3;
+			para.atv_para.fe_paras = atv_fes;
+			para.atv_para.mode = AM_SCAN_ATVMODE_AUTO;
+			para.atv_para.direction = 1;
+			para.atv_para.afe_dev_id = 0;
+			para.atv_para.default_aud_std = 0;
+			para.atv_para.default_vid_std = 0;
+			para.atv_para.afc_range = 2000000;
+			para.atv_para.afc_unlocked_step = 1000000;
+			para.atv_para.cvbs_unlocked_step = 1500000;
+			para.atv_para.cvbs_locked_step = 6000000;
 			
 			AM_SCAN_Create(&para, &hscan);
 			/*注册搜索进度通知事件*/
@@ -277,6 +330,7 @@ int main(int argc, char **argv)
 	AM_FEND_OpenPara_t fpara;
 	
 	memset(&fpara, 0, sizeof(fpara));
+	fpara.mode = FE_ANALOG;
 	AM_TRY(AM_FEND_Open(FEND_DEV_NO, &fpara));
 	
 	memset(&para, 0, sizeof(para));

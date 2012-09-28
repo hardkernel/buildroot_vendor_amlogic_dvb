@@ -128,6 +128,12 @@ static const char *sat_para_fields[] =
 #include "satellite_para.fld"
 };
 
+/**\brief region table */
+static const char *region_fields[] = 
+{
+#include "region.fld"
+};
+
 /*各表自动获取字段数目函数定义*/
 DEFINE_GET_FIELD_COUNT_FUNC(net_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(ts_fields)
@@ -140,6 +146,7 @@ DEFINE_GET_FIELD_COUNT_FUNC(subtitle_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(teletext_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(dimension_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(sat_para_fields)
+DEFINE_GET_FIELD_COUNT_FUNC(region_fields)
 
 /**\brief 所有的表定义*/
 static AM_DB_Table_t db_tables[] = 
@@ -155,6 +162,7 @@ static AM_DB_Table_t db_tables[] =
 	{"teletext_table", teletext_fields, db_get_teletext_fields_cnt},
 	{"dimension_table", dimension_fields, db_get_dimension_fields_cnt},
 	{"sat_para_table", sat_para_fields, db_get_sat_para_fields_cnt},
+	{"region_table", region_fields, db_get_region_fields_cnt},
 };
 
 /**\brief 分析数据类型列表，并生成相应结构*/

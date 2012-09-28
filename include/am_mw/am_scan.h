@@ -78,27 +78,53 @@ enum AM_SCAN_EventType
 	AM_SCAN_EVT_END
 };
 
-/**\brief 标准定义*/
-typedef enum 
+/**\ service type定义*/
+enum AM_SCAN_ServiceType
 {
-	AM_SCAN_STANDARD_DVB	= 0x00,	/**< DVB标准*/
-	AM_SCAN_STANDARD_ATSC	= 0x01,	/**< ATSC标准*/
-	AM_SCAN_STANDARD_ISDB   = 0x02, /**< ISDB标准*/
-}AM_SCAN_Standard_t;
-
-/**\brief 搜索模式定义*/
-enum AM_SCAN_Mode
-{
-	AM_SCAN_MODE_AUTO 			= 0x01,	/**< 自动搜索*/
-	AM_SCAN_MODE_MANUAL 		= 0x02,	/**< 手动搜索*/
-	AM_SCAN_MODE_ALLBAND 		= 0x03, /**< 全频段搜索*/
-	AM_SCAN_MODE_SAT_BLIND		= 0x04,	/**< 卫星盲扫*/
-	AM_SCAN_MODE_MAX			= 0x07,
-	/* OR option(s)*/
-	AM_SCAN_MODE_SEARCHBAT		= 0x08, /**< 是否搜索BAT表*/
-	AM_SCAN_MODE_SAT_UNICABLE	= 0x10,	/**< 卫星Unicable模式*/
+	AM_SCAN_SRV_UNKNOWN	= 0,	/**< 未知类型*/
+	AM_SCAN_SRV_DTV		= 1,	/**< 数字电视类型*/
+	AM_SCAN_SRV_DRADIO	= 2,	/**< 数字广播类型*/
+	AM_SCAN_SRV_ATV		= 3,	/**< 模拟电视类型*/	
 };
 
+/**\brief DTV标准定义*/
+typedef enum 
+{
+	AM_SCAN_DTV_STD_DVB		= 0x00,	/**< DVB标准*/
+	AM_SCAN_DTV_STD_ATSC	= 0x01,	/**< ATSC标准*/
+	AM_SCAN_DTV_STD_ISDB	= 0x02,	/**< ISDB标准*/
+	AM_SCAN_DTV_STD_MAX,
+}AM_SCAN_DTVStandard_t;
+
+/**\brief TV搜索模式定义*/
+enum AM_SCAN_Mode
+{
+	AM_SCAN_MODE_ATV_DTV,	/**< 首先搜索所有ATV，然后搜索所有DTV*/
+	AM_SCAN_MODE_DTV_ATV,	/**< 首先搜索所有DTV，然后搜索所有ATV*/
+	AM_SCAN_MODE_ADTV,		/**< A/DTV使用一个频率表，在一次搜索中完成逐个频率的A/DTV搜索*/
+};
+
+/**\brief DTV搜索模式定义*/
+enum AM_SCAN_DTVMode
+{
+	AM_SCAN_DTVMODE_AUTO 			= 0x01,	/**< 自动搜索*/
+	AM_SCAN_DTVMODE_MANUAL 			= 0x02,	/**< 手动搜索*/
+	AM_SCAN_DTVMODE_ALLBAND 		= 0x03, /**< 全频段搜索*/
+	AM_SCAN_DTVMODE_SAT_BLIND		= 0x04,	/**< 卫星盲扫*/
+	AM_SCAN_DTVMODE_NONE			= 0x07,	/**< 将不进行DTV搜索*/
+	/* OR option(s)*/
+	AM_SCAN_DTVMODE_SEARCHBAT		= 0x08, /**< 是否搜索BAT表*/
+	AM_SCAN_DTVMODE_SAT_UNICABLE	= 0x10,	/**< 卫星Unicable模式*/
+};
+
+/**\brief ATV搜索模式定义*/
+enum AM_SCAN_ATVMode
+{
+	AM_SCAN_ATVMODE_AUTO	= 0x01,	/**< 自动搜索*/
+	AM_SCAN_ATVMODE_MANUAL	= 0x02,	/**< 手动搜索*/
+	AM_SCAN_ATVMODE_FREQ	= 0x03,	/**< 按指定频率表逐个搜索*/
+	AM_SCAN_ATVMODE_NONE	= 0x07,	/**< 将不进行ATV搜索*/
+};
 
 /**\brief 搜索结果代码*/
 enum AM_SCAN_ResultCode
@@ -108,19 +134,19 @@ enum AM_SCAN_ResultCode
 };
 
 /**\brief TS信号类型*/
-enum AM_SCAN_TSType
+typedef enum 
 {
 	AM_SCAN_TS_DIGITAL,
 	AM_SCAN_TS_ANALOG
-};
+}AM_SCAN_TSType_t;
 
-/**\brief 频道排序方法*/
+/**\brief DTV频道排序方法*/
 typedef enum
 {
 	AM_SCAN_SORT_BY_FREQ_SRV_ID,	/**< 按照频率大小排序,同频率下按service_id排序*/
 	AM_SCAN_SORT_BY_SCAN_ORDER,		/**< 按照搜索先后顺序排序*/
 	AM_SCAN_SORT_BY_LCN,			/**< 按照LCN排序*/
-}AM_SCAN_SortMethod_t;
+}AM_SCAN_DTVSortMethod_t;
 
 /**\brief 频点进度数据*/
 typedef struct
@@ -137,7 +163,7 @@ typedef struct
 	void	*data;  /**< 事件数据，见AM_SCAN_ProgressEvt描述*/
 }AM_SCAN_Progress_t;
 
-/**\brief Blind Scan进度数据*/
+/**\brief DTV 卫星盲扫进度数据*/
 typedef struct
 {
 	int	progress;	/**< 盲扫总进度，0-100*/
@@ -146,61 +172,17 @@ typedef struct
 	int freq;		/**< 当前搜索的频点*/
 	int new_tp_cnt;	/**< 本次通知搜索到的新TP个数, <=0表示本次无新搜索到的TP*/
 	struct dvb_frontend_parameters	*new_tps;	/**< 本次通知搜索到的新TP信息*/
-}AM_SCAN_BlindScanProgress_t;
+}AM_SCAN_DTVBlindScanProgress_t;
 
 /**\brief 当前搜索的频点信号信息*/
 typedef struct
 {
+	AM_Bool_t locked;
 	int snr;
 	int ber;
 	int strength;
 	int frequency;
-}AM_SCAN_SignalInfo_t;
-
-/**\brief ATV 搜索频道信息*/
-typedef struct
-{
-	int		detect_freq;
-    int		freq;			/**<channel frequency*/
-    int		start_freq;		/**<start search frequency*/
-    int		min_freq;		/**<min frequency*/
-   	int		max_freq;		/**<max frequency*/
-    int		band; 			/**<channel band*/
-    int		audio_std;		/**<channel sound standard*/
-    int		video_std;		/**<channel video standard*/
-    int		vol_comp;		/**<channel volume compensation*/
-    int		chan_jump;		/**<channel jump*/
-    int		fine_tune_flag; /**<channel auto fine tune*/
-    int		TSID;			/**< Analog Transmmision Signal ID*/
-    char	name[15];		/**< Name associated from VCT*/
-    int		major_chan_num;
-    int		minor_chan_num;
-}AM_SCAN_ATVChannelInfo_t;
-
-/**\brief 搜索结果的单个TS数据*/
-typedef struct AM_SCAN_TS_s
-{
-	int								type;		/**< 数字/模拟*/
-	
-	/*数字信号数据*/
-	int								snr;		/**< SNR*/
-	int								ber;		/**< BER*/
-	int								strength;	/**< Strength*/
-	AM_FENDCTRL_DVBFrontendParameters_t fend_para;	/**< 频点信息*/
-	dvbpsi_nit_t					*nits;		/**< 搜索到的NIT表，为每个频点单独保存各自的NIT表，用于LCN等应用*/
-	dvbpsi_pat_t 					*pats;		/**< 搜索到的PAT表*/
-	dvbpsi_cat_t 					*cats;		/**< 搜索到的CAT表*/
-	dvbpsi_pmt_t 					*pmts;		/**< 搜索到的PMT表*/
-	dvbpsi_sdt_t 					*sdts;		/**< 搜索到的SDT表*/
-	mgt_section_info_t				*mgts;		/**< 搜索到的MGT表*/
-	cvct_section_info_t				*cvcts;		/**< 搜索到的CVCT表*/
-	tvct_section_info_t				*tvcts;		/**< 搜索到的TVCT表*/
-	
-	/*模拟信号数据*/
-	AM_SCAN_ATVChannelInfo_t		*analog_channel;	/**< 模拟频道数据*/
-
-	struct AM_SCAN_TS_s 			*p_next;	/**< 指向下一个TS*/
-}AM_SCAN_TS_t;
+}AM_SCAN_DTVSignalInfo_t;
 
 /**\brief 卫星配置参数*/
 typedef struct
@@ -209,26 +191,84 @@ typedef struct
 	int										lnb_num;		/**< LNB number*/
 	int										motor_num;		/**< Motor number*/
 	AM_SEC_DVBSatelliteEquipmentControl_t	sec;			/**< 卫星配置参数*/
-}AM_SCAN_SatellitePara_t;
+}AM_SCAN_DTVSatellitePara_t;
+
+/**\brief 搜索结果的单个TS数据*/
+typedef struct AM_SCAN_TS_s
+{
+	AM_SCAN_TSType_t type;		/**< 标识 数字/模拟*/
+	union
+	{
+		struct
+		{
+			int snr;		/**< SNR*/
+			int ber;		/**< BER*/
+			int strength;	/**< Strength*/
+			AM_FENDCTRL_DVBFrontendParameters_t fend_para;	/**< 频点信息*/
+			dvbpsi_nit_t *nits;		/**< 搜索到的NIT表，为每个频点单独保存各自的NIT表，用于LCN等应用*/
+			dvbpsi_pat_t *pats;		/**< 搜索到的PAT表*/
+			dvbpsi_cat_t *cats;		/**< 搜索到的CAT表*/
+			dvbpsi_pmt_t *pmts;		/**< 搜索到的PMT表*/
+			dvbpsi_sdt_t *sdts;		/**< 搜索到的SDT表*/
+			mgt_section_info_t *mgts;		/**< 搜索到的MGT表*/
+			cvct_section_info_t *cvcts;		/**< 搜索到的CVCT表*/
+			tvct_section_info_t *tvcts;		/**< 搜索到的TVCT表*/
+		}digital;
+		
+		struct
+		{
+			int freq;		/**< 频率*/
+			int audio_std;	/**<channel sound standard*/
+			int video_std;	/**<channel video standard*/	
+		}analog;
+	};
+
+	struct AM_SCAN_TS_s *p_next;	/**< 指向下一个TS*/
+}AM_SCAN_TS_t;
+
+/**\brief ATV搜索参数定义*/
+typedef struct
+{
+	int mode;		/**< ATV搜索模式,见AM_SCAN_ATVMode*/
+	int direction;	/**< Manual模式时设置*/
+	int afe_dev_id;			/**< AFE设备号*/
+	int default_aud_std;	/**< channel sound standard*/
+	int default_vid_std;	/**< channel video standard*/	
+	int afc_range;			/**< AFC range in Hz*/
+	int afc_unlocked_step;	/**< AFC unlocked step frequency in Hz*/
+	int cvbs_unlocked_step;	/**< CVBS unlocked step frequency in Hz*/
+	int cvbs_locked_step;	/**< CVBS locked step frequency in Hz*/
+	int fe_cnt;		/**< 前端参数个数*/
+	AM_FENDCTRL_DVBFrontendParameters_t *fe_paras;	/**< 前端参数列表，当mode!=AM_SCAN_ATVMODE_FREQ时，前3个参数分别
+														为min_freq, max_freq, start_freq*/
+}AM_SCAN_ATVCreatePara_t;
+
+/**\brief DTV搜索参数定义*/
+typedef struct
+{
+	int mode;						/**< DTV搜索模式*/
+	int dmx_dev_id;  				/**< demux设备号*/
+	int source;      				/**< 前端调制模式*/
+	AM_SCAN_DTVStandard_t standard;    /**< 搜索标准，DVB/ATSC*/
+	AM_SCAN_DTVSatellitePara_t sat_para;	/**< 卫星参数配置,只有当source位Satellite时有效*/
+ 	AM_SCAN_DTVSortMethod_t sort_method;	/**< 频道排序方法*/
+	AM_Bool_t resort_all;					/**< 重新排列数据库中的所有service*/
+	int fe_cnt;								/**< 前端参数个数*/
+	AM_FENDCTRL_DVBFrontendParameters_t *fe_paras;/**< 前端参数列表，自动搜索时对应主频点列表，手动搜索时为单个频点，
+ 														全频段搜索时可自定义频点列表或留空使用默认值*/
+}AM_SCAN_DTVCreatePara_t;
+
+typedef struct AM_SCAN_CreatePara_s AM_SCAN_CreatePara_t;
 
 /**\brief 节目搜索结果数据结构*/
 typedef struct
 {
-	int                     src;		/**< 调制模式*/
-	AM_SCAN_Standard_t	standard;	/**< ATSC or DVB*/
-	int                     mode;		/**< 搜索模式*/
-	sqlite3                 *hdb;		/**< 数据库句柄*/
-	dvbpsi_nit_t		*nits;		/**< 搜索到的NIT表*/
-	dvbpsi_bat_t		*bats;		/**< 搜索到的BAT表*/
-	AM_SCAN_TS_t		*tses;		/**< 所有TS列表*/
-	
+	struct AM_SCAN_CreatePara_s *start_para;/**< AM_SCAN_Create()传入的参数*/
+	dvbpsi_nit_t *nits;				/**< 搜索到的NIT表*/
+	dvbpsi_bat_t *bats;				/**< 搜索到的BAT表*/
 	cvct_channel_info_t	*cvcs;		/**<ATSC C virtual channels*/
 	tvct_channel_info_t	*tvcs;		/**<ATSC T virtual channels*/
-
-	AM_SCAN_SortMethod_t	sort_method;		/**< 频道排序方法*/
-	AM_Bool_t			resort_all; /**< 重新排列数据库中的所有service*/
-	
-	AM_SCAN_SatellitePara_t	sat_para;/**< 卫星参数配置,只有当source位Satellite时有效*/
+	AM_SCAN_TS_t *tses;				/**< 所有TS列表*/
 }AM_SCAN_Result_t;
 
 /**\brief 存储回调函数
@@ -237,28 +277,15 @@ typedef struct
 typedef void (*AM_SCAN_StoreCb) (AM_SCAN_Result_t *result);
 
 /**\brief 搜索创建参数*/
-typedef struct
+struct AM_SCAN_CreatePara_s
 {
-	int                             fend_dev_id; /**< 前端设备号*/
-	int                             dmx_dev_id;  /**< demux设备号*/
-	int                             mode;        /**< 搜索模式组合，见AM_SCAN_Mode*/
-	int                             source;      /**< 前端调制模式*/
-	AM_SCAN_Standard_t              standard;    /**< 搜索标准，DVB/ATSC*/
-	
-	AM_SCAN_SatellitePara_t			sat_para;			/**< 卫星参数配置,只有当source位Satellite时有效*/
-	
-	int								start_para_cnt;		/**< 前端参数个数*/
-	AM_FENDCTRL_DVBFrontendParameters_t	*start_para;		/**< 前端参数列表，自动搜索时对应主频点列表，
- 											手动搜索时为单个频点，全频段搜索时可自定义频点列表或留空使用默认值*/
- 	
- 	int								atv_freq_cnt;		/**< 模拟频点个数*/
-	int								*atv_freqs;			/*模拟频点列表*/
-
-	AM_SCAN_StoreCb					store_cb;			/**< 搜索完成时存储回调函数*/
-	sqlite3							*hdb;				/**< 数据库句柄*/
-	AM_SCAN_SortMethod_t			sort_method;		/**< 频道排序方法*/
-	AM_Bool_t						resort_all;			/**< 重新排列数据库中的所有service*/
-}AM_SCAN_CreatePara_t;
+	int fend_dev_id; 					/**< 前端设备号*/
+	int mode;							/**< TV 搜索模式，见AM_SCAN_Mode*/
+	AM_SCAN_StoreCb store_cb;			/**< 搜索完成时存储回调函数*/
+	sqlite3 *hdb;						/**< 数据库句柄*/
+	AM_SCAN_ATVCreatePara_t atv_para;	/**< ATV 搜索参数*/
+	AM_SCAN_DTVCreatePara_t dtv_para;	/**< DTV 搜索参数*/
+};
 
 
 /****************************************************************************
