@@ -126,6 +126,9 @@ static AM_ErrorCode_t dvb_set_mode (AM_FEND_Device_t *dev, int mode)
 	int fd = (int)dev->drv_data;
 	int ret;
 
+	if(mode < 0)
+		return AM_SUCCESS;
+
 	ret = ioctl(fd, FE_SET_MODE, mode);
 	if(ret != 0){
 		AM_DEBUG(1, "set mode %d failed (%d)\n", mode, errno);
@@ -155,6 +158,7 @@ static AM_ErrorCode_t dvb_get_ts (AM_FEND_Device_t *dev, AM_DMX_Source_t *src)
 
 	ret = ioctl(fd, FE_READ_TS, src);
 	if(ret != 0){
+		AM_DEBUG(1, "get ts failed (%d)\n", errno);
 		return AM_FEND_ERR_NOT_SUPPORTED;
 	}
 

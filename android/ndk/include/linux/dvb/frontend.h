@@ -232,11 +232,12 @@ struct dvb_ofdm_parameters {
 
 #define ANALOG_FLAG_ENABLE_AFC                 0X00000001
 struct dvb_analog_parameters {
+	unsigned int         mode;    /*V4L2_TUNER_RADIO,V4L2_TUNER_ANALOG_TV,V4L2_TUNER_DIGITAL_TV*/
 	unsigned int         audmode; /*V4L2_TUNER_MODE_MONO,V4L2_TUNER_MODE_STEREO,V4L2_TUNER_MODE_LANG2,V4L2_TUNER_MODE_SAP,V4L2_TUNER_MODE_LANG1,V4L2_TUNER_MODE_LANG1_LANG2*/
 	unsigned int         soundsys;/*A2,BTSC,EIAJ,NICAM*/
-	v4l2_std_id           std;
+	v4l2_std_id          std;
 	unsigned int         flag;
-                unsigned int         afc_range;
+	unsigned int         afc_range;
         unsigned int         reserved;
 };
 
