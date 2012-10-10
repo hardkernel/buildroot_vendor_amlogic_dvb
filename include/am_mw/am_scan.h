@@ -67,6 +67,7 @@ enum AM_SCAN_ProgressEvt
 	AM_SCAN_PROGRESS_STORE_BEGIN,	/**< 开始存储*/
 	AM_SCAN_PROGRESS_STORE_END,		/**< 存储完毕*/
 	AM_SCAN_PROGRESS_BLIND_SCAN,	/**< 卫星盲扫搜索进度，参数为AM_SCAN_BlindScanProgress_t给出的进度信息*/
+	AM_SCAN_PROGRESS_ATV_TUNING,	/**< ATV tuning a new frequency*/
 };
 
 /**\brief 搜索事件类型*/

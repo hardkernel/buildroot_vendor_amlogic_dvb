@@ -300,6 +300,7 @@ struct AM_SCAN_Scanner_s
 	{
 		AM_Bool_t start;
 		int afe_fd;
+		int vdin_fd;
 		int start_idx;		/**< 起始频点参数在start_freqs中的索引*/
 		int range_check;
 		int direction;	/**< -1/+1*/
@@ -307,6 +308,7 @@ struct AM_SCAN_Scanner_s
 		int min_freq;
 		int max_freq;
 		int start_freq;
+		int afc_locked_freq;
 	}atvctl;		/**< ATV控制*/
 };
 
