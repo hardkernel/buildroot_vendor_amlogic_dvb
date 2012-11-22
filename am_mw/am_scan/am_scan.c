@@ -1183,9 +1183,11 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	int net_dbid, dbid, orig_net_id = -1, satpara_dbid = -1;
 	char selbuf[256];
 	char insbuf[400];
-	sqlite3 *hdb = result->start_para->hdb;
 	AM_SCAN_ServiceInfo_t srv_info;
 	int frequency;
+	sqlite3 *hdb;
+
+	AM_DB_HANDLE_PREPARE(hdb);
 	
 	/*没有PAT，不存储*/
 	if (!ts->digital.pats)
@@ -1806,14 +1808,15 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 {
 	AM_SCAN_TS_t *ts;
 	char sqlstr[128];
-	sqlite3 *hdb = result->start_para->hdb;
 	sqlite3_stmt	*stmts[MAX_STMT];
 	int i, ret;
 	AM_SCAN_RecTab_t srv_tab;
 	AM_Bool_t sorted = 0, has_atv = AM_FALSE, has_dtv = AM_FALSE;
+	sqlite3 *hdb;
 	
 	assert(result);
 
+	AM_DB_HANDLE_PREPARE(hdb);
 	am_scan_rec_tab_init(&srv_tab);
 
 	/*Prepare sqlite3 stmts*/

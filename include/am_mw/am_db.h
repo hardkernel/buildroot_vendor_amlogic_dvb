@@ -32,6 +32,13 @@ extern "C"
 /**\brief 节目名称最大长度定义*/
 #define AM_DB_MAX_SRV_NAME_LEN 64
 
+#define AM_DB_HANDLE_PREPARE(hdb)	\
+	AM_MACRO_BEGIN \
+		AM_ErrorCode_t private_db_err = \
+			AM_DB_GetHandle(&hdb); \
+		assert((private_db_err==AM_SUCCESS) && hdb); \
+	AM_MACRO_END
+
 /****************************************************************************
  * Error code definitions
  ****************************************************************************/
@@ -64,6 +71,15 @@ enum AM_DB_ErrorCode
  *   - 其他值 错误代码(见am_db.h)
  */
 extern AM_ErrorCode_t AM_DB_Init(sqlite3 **handle);
+
+/**\brief 初始化数据库模块
+ * \param [in]  path   数据库文件路径
+ * \param [out] handle 返回数据库操作句柄
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_db.h)
+ */
+extern AM_ErrorCode_t AM_DB_Init2(char *path, sqlite3 **handle);
 
 /**\brief 终止数据库模块
  * param [in] handle AM_DB_Init()中返回的handle
@@ -108,6 +124,32 @@ extern AM_ErrorCode_t AM_DB_Select(sqlite3 *handle, const char *sql, int *max_ro
  *   - 其他值 错误代码(见am_db.h)
  */
 extern AM_ErrorCode_t AM_DB_CreateTables(sqlite3 *handle);
+
+/**\brief 设置数据库文件路径和默认数据库句柄
+ * param [in] path 数据库文件路径
+ * param [in] defhandle 默认数据库句柄
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_db.h)
+ */
+extern AM_ErrorCode_t AM_DB_Setup(char *path, sqlite3 *defhandle);
+
+/**\brief 释放数据库配置
+		  注意：在sqlite3多线程配置状态下（SQLITE_THREADSAFE=2），
+		        需在所有包含数据库操作的线程退出后执行
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_db.h)
+ */
+extern AM_ErrorCode_t AM_DB_UnSetup(void);
+
+/**\brief 获得sqlite3数据库句柄
+ * param [out] handle 数据库句柄
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_db.h)
+ */
+extern AM_ErrorCode_t AM_DB_GetHandle(sqlite3 **handle);
 
 #ifdef __cplusplus
 }

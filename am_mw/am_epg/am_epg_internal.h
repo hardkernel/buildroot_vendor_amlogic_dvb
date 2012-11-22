@@ -134,11 +134,10 @@ struct AM_EPG_Monitor_s
 	eit_section_info_t	*psip_eits;
 
 	struct dvb_frontend_event 		fe_evt;			/**< 前端事件*/
-	struct dvb_frontend_parameters 	curr_param;		/**< 当前正在监控的频点*/ 
 
-	uint16_t			mon_service;	/**< 当前监控的service_id*/
+	int				mon_service;	/**< 当前监控的db_srv_id*/
 	void			*user_data;
-	sqlite3			*hdb;	/**< 数据库句柄，可用于预约播放查询等数据库操作*/
+	int				curr_ts;	/**< 当前监控的TS*/
 };
 
 /**\brief 当前时间管理*/
@@ -149,6 +148,16 @@ typedef struct
 	int offset;				/**< 时区偏移，秒为单位，可以为负数*/
 }AM_EPG_Time_t;
 
+typedef struct
+{
+	int		audio_count;
+	struct
+	{
+		int		pid;	/**< audio PID*/
+		int		fmt;	/**< audio format*/
+		char	lang[10];	/**< audio language*/	
+	}audios[32];
+}AM_EPG_AudioInfo_t;
 
 /****************************************************************************
  * Function prototypes  

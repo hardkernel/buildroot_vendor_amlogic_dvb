@@ -101,6 +101,8 @@ enum AM_EPG_EventType
 	AM_EPG_EVT_NEW_SUB_PLAY,	/**< 提前通知有将开始的预约节目要播放,参数为db_evt_id*/
 	AM_EPG_EVT_SUB_PLAY_START,	/**< 预约节目即将切换播放,参数为db_evt_id*/
 	AM_EPG_EVT_CHANGE_TS,	/**< 频点切换*/
+	AM_EPG_EVT_UPDATE_PROGRAM,	/**< 节目信息更新*/
+	AM_EPG_EVT_UPDATE_TS,	/**< 节目信息更新*/
 	AM_EPG_EVT_END
 };
 
@@ -109,6 +111,7 @@ enum AM_EPG_ModeOp
 {
 	AM_EPG_MODE_OP_ADD, 	 /**< 增加一个或几个监控模式*/
 	AM_EPG_MODE_OP_REMOVE,	 /**< 取消一个或几个监控模式*/
+	AM_EPG_MODE_OP_SET,		 /**< 设置EPG监控模式*/
 };
 
 /**\brief EPG创建参数*/
@@ -153,12 +156,12 @@ extern AM_ErrorCode_t AM_EPG_ChangeMode(int handle, int op, int mode);
 
 /**\brief 设置当前监控的service，监控其PMT和EIT actual pf
  * \param handle 句柄
- * \param service_id	需要监控的service的service_id
+ * \param service_id	需要监控的service的数据库索引
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-extern AM_ErrorCode_t AM_EPG_MonitorService(int handle, uint16_t service_id);
+extern AM_ErrorCode_t AM_EPG_MonitorService(int handle, int db_srv_id);
 
 /**\brief 设置EPG PF 自动更新间隔
  * \param handle 句柄

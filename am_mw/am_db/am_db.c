@@ -14,6 +14,7 @@
 #include <assert.h>
 #include <string.h>
 #include <ctype.h>
+#include <pthread.h>
 #include <am_debug.h>
 #include <am_util.h>
 #include "am_db_internal.h"
@@ -165,6 +166,24 @@ static AM_DB_Table_t db_tables[] =
 	{"region_table", region_fields, db_get_region_fields_cnt},
 };
 
+static int multithread;
+
+/**\brief 数据库文件路径*/
+static char *dbpath;
+
+/**\brief 默认数据库句柄*/
+static sqlite3 *dbdef;
+/**\brief 是否本地打开*/
+static int dbdef_local;
+
+/**\brief 各线程的db key*/
+static pthread_key_t dbkey;
+static int dbkey_enable;
+
+/**\brief 全局锁*/
+static pthread_mutex_t dblock;
+
+
 /**\brief 分析数据类型列表，并生成相应结构*/
 static AM_ErrorCode_t db_select_parse_types(const char *fmt, AM_DB_TableSelect_t *ps)
 {
@@ -292,6 +311,10 @@ static char *db_get_sql_string_buf(void)
 	return (char*)malloc(max);
 }
 
+static void dbkey_destructor(void *p)
+{
+	AM_DB_Quit((sqlite3 *)p);
+}
 
 /****************************************************************************
  * API functions
@@ -318,6 +341,37 @@ AM_ErrorCode_t AM_DB_Init(sqlite3 **handle)
 	AM_TRY(AM_DB_CreateTables(*handle));
 	
 	AM_DEBUG(1, "DBase handle %p", *handle);
+	return AM_SUCCESS;
+}
+
+/**\brief 初始化数据库模块
+ * \param [in]  path   数据库文件路径
+ * \param [out] handle 返回数据库操作句柄
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_db.h)
+ */
+AM_ErrorCode_t AM_DB_Init2(char *path, sqlite3 **handle)
+{
+	assert(handle);
+
+	*handle = NULL;
+	
+	if(!path)
+		return AM_DB_Init(handle);
+
+	/*打开数据库*/
+	AM_DEBUG(1, "Opening DBase [%s]...", path);
+	if (sqlite3_open(path, handle) != SQLITE_OK)
+	{
+		AM_DEBUG(1, "DBase:Cannot open DB %s!", path);
+		return AM_DB_ERR_OPEN_DB_FAILED;
+	}
+
+	AM_TRY(AM_DB_CreateTables(*handle));
+	
+	AM_DEBUG(1, "DBase handle %p", *handle);
+
 	return AM_SUCCESS;
 }
 
@@ -497,5 +551,155 @@ AM_ErrorCode_t AM_DB_CreateTables(sqlite3 *handle)
 	free(buf);
 
 	return AM_SUCCESS;
+}
+
+/**\brief 设置数据库文件路径和默认数据库句柄
+ * param [in] path 数据库文件路径
+ * param [in] defhandle 默认数据库句柄
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_db.h)
+ */
+AM_ErrorCode_t AM_DB_Setup(char *path, sqlite3 *defhandle)
+{
+	int ret;
+	pthread_mutexattr_t mta;	
+
+	assert(path || defhandle);
+	
+	multithread = 
+		(sqlite3_threadsafe()==SQLITE_CONFIG_MULTITHREAD)?1:0;
+
+	if(dbpath)
+	{
+		AM_DEBUG(1, "DBase:Setup Already");
+		return AM_FAILURE;
+	}
+	
+	if(multithread && (!path))
+	{
+		AM_DEBUG(1, "DBase:Database file path is necessary as sqlite3 works with MULTITHREAD configuration");
+		return AM_FAILURE;
+	}
+
+	dbdef = defhandle;
+	
+	if(multithread)
+	{
+		ret = pthread_key_create(&dbkey, dbkey_destructor);
+		if(ret!=0)
+		{
+			AM_DEBUG(1, "DBase key create: %s", strerror(ret));
+			return AM_FAILURE;
+		}
+		dbkey_enable =  1;
+	}
+	else if(!dbdef)
+	{
+		/*打开数据库*/
+		AM_DEBUG(1, "Opening DBase[%s] for default...", path);
+		if (sqlite3_open(path, &dbdef) != SQLITE_OK)
+		{
+			AM_DEBUG(1, "DBase:Cannot open DB %s!", path);
+			return AM_DB_ERR_OPEN_DB_FAILED;
+		}
+	}
+			
+	pthread_mutexattr_init(&mta);
+	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE_NP);
+	pthread_mutex_init(&dblock, &mta);
+
+	if(path)
+		dbpath = strdup(path);
+
+	AM_DEBUG(1, "DB SETUP : path[%s], defhandle[%p], multithread[%d]", dbpath, dbdef, multithread);
+	
+	return AM_SUCCESS;
+}
+
+/**\brief 释放数据库配置
+		  注意：在sqlite3多线程配置状态下（SQLITE_THREADSAFE=2），
+		        需在所有包含数据库操作的线程退出后执行
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_db.h)
+ */
+AM_ErrorCode_t AM_DB_UnSetup(void)
+{
+	pthread_mutex_lock(&dblock);
+
+	if(dbpath)
+	{
+		free(dbpath);
+		dbpath = NULL;
+	}
+
+	if(dbkey_enable)
+	{
+		pthread_key_delete(dbkey);
+		dbkey_enable = 0;
+	}
+
+	if(dbdef_local) {
+		sqlite3_close(dbdef);
+		dbdef = NULL;
+	}
+
+	pthread_mutex_unlock(&dblock);
+
+	return AM_SUCCESS;
+}
+
+/**\brief 获得sqlite3数据库句柄
+ * param [out] handle 数据库句柄
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_db.h)
+ */
+AM_ErrorCode_t AM_DB_GetHandle(sqlite3 **handle)
+{
+	sqlite3 *hdb = NULL;
+	AM_ErrorCode_t err = AM_SUCCESS;
+	char *path = dbpath;
+	
+	assert(handle);
+
+	*handle = NULL;
+	
+	if(multithread)
+	{
+		pthread_mutex_lock(&dblock);
+		
+		hdb = (sqlite3*)pthread_getspecific(dbkey);
+		if(!hdb)
+		{
+			int rc;
+			
+			/*打开数据库*/
+			AM_DEBUG(1, "Opening DBase[%s] for thread[%ld]...", path, pthread_self());
+			if (sqlite3_open(path, &hdb) != SQLITE_OK)
+			{
+				AM_DEBUG(1, "DBase:Cannot open DB %s!", path);
+				err = AM_DB_ERR_OPEN_DB_FAILED;
+				goto next;
+			}
+			rc = pthread_setspecific(dbkey, (void*)hdb);
+			if(rc)
+			{
+				AM_DEBUG(1, "DBase key set: %s", strerror(rc));
+				err = AM_FAILURE;
+				goto next;
+			}
+		}
+next:
+		pthread_mutex_unlock(&dblock);
+	}
+	else
+	{
+		hdb = dbdef;
+	}
+
+	*handle = hdb;
+	return err;
 }
 
