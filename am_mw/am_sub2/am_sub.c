@@ -31,9 +31,12 @@ static void sub2_check(AM_SUB2_Parser_t *parser)
 	AM_SUB2_Picture_t *npic;
 	uint64_t pts;
 	int64_t diff;
+	AM_Bool_t loop;
 
 	do
 	{
+		loop = AM_TRUE;
+
 		if(parser->pic)
 		{
 			npic = parser->pic->p_next;
@@ -53,6 +56,10 @@ static void sub2_check(AM_SUB2_Parser_t *parser)
 				dvbsub_remove_display_picture(parser->handle, parser->pic);
 				parser->pic = npic;
 			}
+			else
+			{
+				loop = AM_FALSE;
+			}
 		}
 
 		if(parser->pic)
@@ -67,7 +74,7 @@ static void sub2_check(AM_SUB2_Parser_t *parser)
 			}
 		}
 	}
-	while(npic && !parser->pic);
+	while(npic && !parser->pic && loop);
 	
 	if(parser->running && (old != parser->pic))
 	{
