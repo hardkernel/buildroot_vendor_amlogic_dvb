@@ -102,7 +102,7 @@ static AM_INLINE AM_ErrorCode_t dmx_get_openned_dev(int dev_no, AM_DMX_Device_t 
 {
 	AM_TRY(dmx_get_dev(dev_no, dev));
 	
-	if(!(*dev)->openned)
+	if((*dev)->open_count <= 0)
 	{
 		AM_DEBUG(1, "demux device %d has not been openned", dev_no);
 		return AM_DMX_ERR_INVALID_DEV_NO;
@@ -326,10 +326,11 @@ AM_ErrorCode_t AM_DMX_Open(int dev_no, const AM_DMX_OpenPara_t *para)
 	
 	pthread_mutex_lock(&am_gAdpLock);
 	
-	if(dev->openned)
+	if(dev->open_count > 0)
 	{
 		AM_DEBUG(1, "demux device %d has already been openned", dev_no);
-		ret = AM_DMX_ERR_BUSY;
+		dev->open_count++;
+		ret = AM_SUCCESS;
 		goto final;
 	}
 	
@@ -357,7 +358,7 @@ AM_ErrorCode_t AM_DMX_Open(int dev_no, const AM_DMX_OpenPara_t *para)
 	
 	if(ret==AM_SUCCESS)
 	{
-		dev->openned = AM_TRUE;
+		dev->open_count = 1;
 	}
 final:
 	pthread_mutex_unlock(&am_gAdpLock);
@@ -381,23 +382,25 @@ AM_ErrorCode_t AM_DMX_Close(int dev_no)
 	
 	pthread_mutex_lock(&am_gAdpLock);
 
-	dev->enable_thread = AM_FALSE;
-	pthread_join(dev->thread, NULL);
-
-	for(i=0; i<DMX_FILTER_COUNT; i++)
+	if (dev->open_count == 1)
 	{
-		dmx_free_filter(dev, &dev->filters[i]);
-	}
+		dev->enable_thread = AM_FALSE;
+		pthread_join(dev->thread, NULL);
 
-	if(dev->drv->close)
-	{
-		dev->drv->close(dev);
-	}
+		for(i=0; i<DMX_FILTER_COUNT; i++)
+		{
+			dmx_free_filter(dev, &dev->filters[i]);
+		}
 
-	pthread_mutex_destroy(&dev->lock);
-	pthread_cond_destroy(&dev->cond);
-	
-	dev->openned = AM_FALSE;
+		if(dev->drv->close)
+		{
+			dev->drv->close(dev);
+		}
+
+		pthread_mutex_destroy(&dev->lock);
+		pthread_cond_destroy(&dev->cond);
+	}
+	dev->open_count--;
 	
 	pthread_mutex_unlock(&am_gAdpLock);
 	

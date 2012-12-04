@@ -91,7 +91,7 @@ static AM_INLINE AM_ErrorCode_t fend_get_openned_dev(int dev_no, AM_FEND_Device_
 {
 	AM_TRY(fend_get_dev(dev_no, dev));
 	
-	if(!(*dev)->openned)
+	if((*dev)->open_count <= 0)
 	{
 		AM_DEBUG(1, "frontend device %d has not been openned", dev_no);
 		return AM_FEND_ERR_INVALID_DEV_NO;
@@ -683,10 +683,11 @@ AM_ErrorCode_t AM_FEND_Open(int dev_no, const AM_FEND_OpenPara_t *para)
 	
 	pthread_mutex_lock(&am_gAdpLock);
 	
-	if(dev->openned)
+	if(dev->open_count > 0)
 	{
 		AM_DEBUG(1, "frontend device %d has already been openned", dev_no);
-		ret = AM_FEND_ERR_BUSY;
+		dev->open_count++;
+		ret = AM_SUCCESS;
 		goto final;
 	}
 	
@@ -699,7 +700,7 @@ AM_ErrorCode_t AM_FEND_Open(int dev_no, const AM_FEND_OpenPara_t *para)
 	pthread_cond_init(&dev->cond, NULL);
 	
 	dev->dev_no = dev_no;
-	dev->openned = AM_TRUE;
+	dev->open_count = 1;
 	dev->enable_thread = AM_TRUE;
 	dev->flags = 0;
 	dev->enable_cb = AM_TRUE;
@@ -716,7 +717,7 @@ AM_ErrorCode_t AM_FEND_Open(int dev_no, const AM_FEND_OpenPara_t *para)
 		}
 		pthread_mutex_destroy(&dev->lock);
 		pthread_cond_destroy(&dev->cond);
-		dev->openned = AM_FALSE;
+		dev->open_count = 0;
 		
 		ret = AM_FEND_ERR_CANNOT_CREATE_THREAD;
 		goto final;
@@ -740,22 +741,25 @@ AM_ErrorCode_t AM_FEND_Close(int dev_no)
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
 
 	pthread_mutex_lock(&am_gAdpLock);
-
-	dev->enable_cb = AM_FALSE;
 	
-	/*Stop the thread*/
-	dev->enable_thread = AM_FALSE;
-	pthread_join(dev->thread, NULL);
-	
-	/*Release the device*/
-	if(dev->drv->close)
+	if (dev->open_count == 1)
 	{
-		dev->drv->close(dev);
-	}
+		dev->enable_cb = AM_FALSE;
 	
-	pthread_mutex_destroy(&dev->lock);
-	pthread_cond_destroy(&dev->cond);
-	dev->openned = AM_FALSE;
+		/*Stop the thread*/
+		dev->enable_thread = AM_FALSE;
+		pthread_join(dev->thread, NULL);
+	
+		/*Release the device*/
+		if(dev->drv->close)
+		{
+			dev->drv->close(dev);
+		}
+	
+		pthread_mutex_destroy(&dev->lock);
+		pthread_cond_destroy(&dev->cond);
+	}
+	dev->open_count--;
 	
 	pthread_mutex_unlock(&am_gAdpLock);
 	

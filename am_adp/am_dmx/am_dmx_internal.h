@@ -80,7 +80,7 @@ struct AM_DMX_Device
 	const AM_DMX_Driver_t *drv;  /**< 设备驱动*/
 	void               *drv_data;/**< 驱动私有数据*/
 	AM_DMX_Filter_t     filters[DMX_FILTER_COUNT];   /**< 设备中的Filter*/
-	AM_Bool_t           openned; /**< 设备已经打开*/
+	int                 open_count; /**< 设备已经打开次数*/
 	AM_Bool_t           enable_thread; /**< 数据线程已经运行*/
 	int                 flags;   /**< 线程运行状态控制标志*/
 	pthread_t           thread;  /**< 数据检测线程*/

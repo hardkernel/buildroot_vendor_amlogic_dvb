@@ -113,7 +113,7 @@ struct AM_FEND_Device
 	int                dev_no;        /**< 设备号*/
 	const AM_FEND_Driver_t  *drv;     /**< 设备驱动*/
 	void              *drv_data;      /**< 驱动私有数据*/
-	AM_Bool_t          openned;       /**< 设备是否已经打开*/
+	int                open_count;    /**< 设备打开次数计数*/
 	AM_Bool_t          enable_thread; /**< 状态监控线程是否运行*/
 	pthread_t          thread;        /**< 状态监控线程*/
 	pthread_mutex_t    lock;          /**< 设备数据保护互斥体*/
