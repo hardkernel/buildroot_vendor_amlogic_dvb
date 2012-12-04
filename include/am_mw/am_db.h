@@ -151,6 +151,21 @@ extern AM_ErrorCode_t AM_DB_UnSetup(void);
  */
 extern AM_ErrorCode_t AM_DB_GetHandle(sqlite3 **handle);
 
+/**\brief 获得sqlite3 SQL Statement句柄
+ * param [out] stmt SQL Statement句柄
+ * param [in]  name statement名称，方便再次获取
+ * param [in]  sql  生成statement的sql语句
+ *                  如果statement不存在，则使用此sql语句生成statement
+ * param [in]  reset_if_exist 重新生成statement
+ *                  如果statement存在，则重新生成该statement。
+ *                  当数据库文件改变导致statement出错时使用
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_db.h)
+ */
+extern AM_ErrorCode_t AM_DB_GetSTMT(sqlite3_stmt **stmt, const char *name, const char *sql, int reset_if_exist);
+
+
 #ifdef __cplusplus
 }
 #endif

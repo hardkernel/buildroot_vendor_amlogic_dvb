@@ -166,15 +166,112 @@ static AM_DB_Table_t db_tables[] =
 	{"region_table", region_fields, db_get_region_fields_cnt},
 };
 
+
+/*list util -----------------------------------------------------------*/
+#ifndef offsetof
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#endif
+
+#ifndef container_of
+#define container_of(ptr, type, member) ({			\
+	const typeof(((type *)0)->member) * __mptr = (ptr);	\
+	(type *)((char *)__mptr - offsetof(type, member)); })
+#endif
+
+#define prefetch(x) (x)
+
+#define LIST_POISON1  ((void *) 0x00100100)
+#define LIST_POISON2  ((void *) 0x00200200)
+
+struct list_head {
+	struct list_head *next, *prev;
+};
+#define LIST_HEAD_INIT(name) { &(name), &(name) }
+#define LIST_HEAD(name) \
+	struct list_head name = LIST_HEAD_INIT(name)
+static inline void INIT_LIST_HEAD(struct list_head *list)
+{
+	list->next = list;
+	list->prev = list;
+}
+static inline void __list_add(struct list_head *new,
+			      struct list_head *prev,
+			      struct list_head *next)
+{
+	next->prev = new;
+	new->next = next;
+	new->prev = prev;
+	prev->next = new;
+}
+static inline void list_add(struct list_head *new, struct list_head *head)
+{
+	__list_add(new, head, head->next);
+}
+static inline void list_add_tail(struct list_head *new, struct list_head *head)
+{
+	__list_add(new, head->prev, head);
+}
+static inline void __list_del(struct list_head * prev, struct list_head * next)
+{
+	next->prev = prev;
+	prev->next = next;
+}
+static inline void list_del(struct list_head *entry)
+{
+	__list_del(entry->prev, entry->next);
+	entry->next = LIST_POISON1;
+	entry->prev = LIST_POISON2;
+}
+static inline int list_empty(const struct list_head *head)
+{
+	return head->next == head;
+}
+#define list_entry(ptr, type, member) \
+	container_of(ptr, type, member)
+#define list_for_each(pos, head) \
+	for (pos = (head)->next; prefetch(pos->next), pos != (head); \
+        	pos = pos->next)
+#define list_for_each_safe(pos, n, head) \
+	for (pos = (head)->next, n = pos->next; pos != (head); \
+		pos = n, n = pos->next)
+#define list_for_each_entry(pos, head, member)				\
+	for (pos = list_entry((head)->next, typeof(*pos), member);	\
+	     prefetch(pos->member.next), &pos->member != (head); 	\
+	     pos = list_entry(pos->member.next, typeof(*pos), member))
+#define list_for_each_entry_safe(pos, n, head, member)			\
+	for (pos = list_entry((head)->next, typeof(*pos), member),	\
+		n = list_entry(pos->member.next, typeof(*pos), member);	\
+	     &pos->member != (head); 					\
+	     pos = n, n = list_entry(n->member.next, typeof(*n), member))	     
+/*---------------------------------------------------------------*/
+
+
+typedef struct {
+	struct list_head head;
+	
+	char *name;
+	sqlite3_stmt *stmt;
+} stmt_t;
+
+typedef struct {
+	/*db handle*/
+	sqlite3 *db;
+
+	/*stmt list*/
+	struct list_head stmts;
+}dbinfo_t;
+
+
 static int multithread;
 
 /**\brief 数据库文件路径*/
 static char *dbpath;
 
 /**\brief 默认数据库句柄*/
-static sqlite3 *dbdef;
+static dbinfo_t *dbdef;
+//static sqlite3 *dbdef;
 /**\brief 是否本地打开*/
-static int dbdef_local;
+static int dbdb_local;
 
 /**\brief 各线程的db key*/
 static pthread_key_t dbkey;
@@ -311,10 +408,143 @@ static char *db_get_sql_string_buf(void)
 	return (char*)malloc(max);
 }
 
+static sqlite3 *db_open_db(const char *path)
+{
+	sqlite3 *hdb = NULL;
+	/*打开数据库*/
+	AM_DEBUG(1, "Dbase: Opening DBase[%s] for thread[%ld]...", path, pthread_self());
+	if (sqlite3_open(path, &hdb) != SQLITE_OK)
+	{
+		AM_DEBUG(1, "DBase:Cannot open DB %s!", path);
+		return NULL;
+	}
+	return hdb;
+}
+
+static dbinfo_t * db_get_dbinfo_multithread(const char *path)
+{
+	dbinfo_t *db = NULL;
+	sqlite3 *hdb = NULL;
+
+	db = (dbinfo_t *)pthread_getspecific(dbkey);
+	if(!db)
+	{
+		int rc;
+		
+		hdb = db_open_db(path);
+		if(!hdb)
+			return NULL;
+
+		db = malloc(sizeof(dbinfo_t));
+		assert(db);
+		memset(db, 0, sizeof(dbinfo_t));
+		db->db = hdb;
+		INIT_LIST_HEAD(&db->stmts);
+		rc = pthread_setspecific(dbkey, (void*)db);
+		if(rc)
+		{
+			AM_DEBUG(1, "DBase: key set: %s", strerror(rc));
+			sqlite3_close(hdb);
+			free(db);
+			return NULL;
+		}
+	}
+	return db;
+}
+
+static AM_ErrorCode_t db_get_stmt(sqlite3_stmt **stmt, dbinfo_t *dbinfo, const char *name, const char *sql, int reset_if_exist)
+{
+	stmt_t *st = NULL;
+	AM_ErrorCode_t err = AM_SUCCESS;
+
+	*stmt = NULL;
+
+	/*looking for stmt exsits already.*/
+	list_for_each_entry(st, &dbinfo->stmts, head)
+	{
+		if(0 == strcmp(st->name, name)) {
+			if(reset_if_exist)
+			{
+				sqlite3_stmt *sttmp;
+				if(sqlite3_prepare(dbinfo->db, sql, strlen(sql), &sttmp, NULL) == SQLITE_OK)
+					err = AM_FAILURE;
+				else
+				{
+					sqlite3_finalize(st->stmt);
+					st->stmt = sttmp;
+				}
+			}
+			*stmt = st->stmt;
+			return err;
+		}
+	}
+
+	/*not found, create one*/
+	AM_DEBUG(1, "Dbase: stmt[%s] not exist, prepare a new one.", name);
+	st = malloc(sizeof(stmt_t));
+	assert(st);
+	memset(st, 0, sizeof(stmt_t));
+	if(sqlite3_prepare(dbinfo->db, sql, strlen(sql), &st->stmt, NULL) != SQLITE_OK)
+	{
+		free(st);
+		st = NULL;
+		return AM_FAILURE;
+	}
+	
+	if(name)
+		st->name = strdup(name);
+
+	list_add_tail(&st->head, &dbinfo->stmts);
+
+	*stmt = st->stmt;
+
+	return err;
+}
+
+static int db_put_stmt(sqlite3_stmt *sqst, dbinfo_t *dbinfo)
+{
+	stmt_t *pos, *ptmp;
+
+	list_for_each_entry_safe(pos, ptmp, &dbinfo->stmts, head)
+	{
+		if(pos->stmt == sqst) {
+			sqlite3_finalize(pos->stmt);
+			if(pos->name)
+				free(pos->name);
+			list_del(&pos->head);
+			free(pos);
+			return 0;
+		}
+	}
+	return -1;
+}
+
+static void db_clear_dbinfo(dbinfo_t *dbinfo, int freedb)
+{
+	stmt_t *pos, *ptmp;
+	list_for_each_entry_safe(pos, ptmp, &dbinfo->stmts, head)
+	{
+		sqlite3_finalize(pos->stmt);
+		if(pos->name)
+			free(pos->name);
+		list_del(&pos->head);
+		free(pos);
+	}
+
+	if(freedb)
+		AM_DB_Quit(dbinfo->db);
+}
+
 static void dbkey_destructor(void *p)
 {
-	AM_DB_Quit((sqlite3 *)p);
+	AM_DEBUG(1, "Dbase: Closing DBase[%p] for thread[%ld]...", p, pthread_self());
+	if(p)
+	{
+		db_clear_dbinfo((dbinfo_t*)p, 1);
+		free(p);
+	}
 }
+
 
 /****************************************************************************
  * API functions
@@ -454,7 +684,7 @@ AM_ErrorCode_t AM_DB_Select(sqlite3 *handle, const char *sql, int *max_row, cons
 	/*从数据库查询数据*/
 	if (sqlite3_get_table(handle, sql, &db_result, &row, &col, &errmsg) != SQLITE_OK)
 	{
-		AM_DEBUG(1, "DBase Select:get table failed, reason [%s]", errmsg);
+		AM_DEBUG(1, "DBase Select:get table failed, reason [%s], sql [%s]", errmsg, sql);
 		if (db_result != NULL)
 			sqlite3_free_table(db_result);
 		return AM_DB_ERR_SELECT_FAILED;
@@ -582,8 +812,6 @@ AM_ErrorCode_t AM_DB_Setup(char *path, sqlite3 *defhandle)
 		return AM_FAILURE;
 	}
 
-	dbdef = defhandle;
-	
 	if(multithread)
 	{
 		ret = pthread_key_create(&dbkey, dbkey_destructor);
@@ -594,15 +822,13 @@ AM_ErrorCode_t AM_DB_Setup(char *path, sqlite3 *defhandle)
 		}
 		dbkey_enable =  1;
 	}
-	else if(!dbdef)
+	else
 	{
-		/*打开数据库*/
-		AM_DEBUG(1, "Opening DBase[%s] for default...", path);
-		if (sqlite3_open(path, &dbdef) != SQLITE_OK)
-		{
-			AM_DEBUG(1, "DBase:Cannot open DB %s!", path);
-			return AM_DB_ERR_OPEN_DB_FAILED;
-		}
+		dbdef = malloc(sizeof(dbinfo_t));
+		assert(dbdef);
+		memset(dbdef, 0, sizeof(dbinfo_t));
+		dbdef->db = defhandle;
+		INIT_LIST_HEAD(&dbdef->stmts);
 	}
 			
 	pthread_mutexattr_init(&mta);
@@ -640,9 +866,12 @@ AM_ErrorCode_t AM_DB_UnSetup(void)
 		dbkey_enable = 0;
 	}
 
-	if(dbdef_local) {
-		sqlite3_close(dbdef);
+	if(dbdef)
+	{
+		db_clear_dbinfo(dbdef, dbdb_local?1:0);
+		free(dbdef);
 		dbdef = NULL;
+		dbdb_local = 0;
 	}
 
 	pthread_mutex_unlock(&dblock);
@@ -658,6 +887,7 @@ AM_ErrorCode_t AM_DB_UnSetup(void)
  */
 AM_ErrorCode_t AM_DB_GetHandle(sqlite3 **handle)
 {
+	dbinfo_t *db = NULL;
 	sqlite3 *hdb = NULL;
 	AM_ErrorCode_t err = AM_SUCCESS;
 	char *path = dbpath;
@@ -666,40 +896,149 @@ AM_ErrorCode_t AM_DB_GetHandle(sqlite3 **handle)
 
 	*handle = NULL;
 	
+	pthread_mutex_lock(&dblock);
+
 	if(multithread)
 	{
-		pthread_mutex_lock(&dblock);
-		
-		hdb = (sqlite3*)pthread_getspecific(dbkey);
-		if(!hdb)
-		{
-			int rc;
-			
-			/*打开数据库*/
-			AM_DEBUG(1, "Opening DBase[%s] for thread[%ld]...", path, pthread_self());
-			if (sqlite3_open(path, &hdb) != SQLITE_OK)
-			{
-				AM_DEBUG(1, "DBase:Cannot open DB %s!", path);
-				err = AM_DB_ERR_OPEN_DB_FAILED;
-				goto next;
-			}
-			rc = pthread_setspecific(dbkey, (void*)hdb);
-			if(rc)
-			{
-				AM_DEBUG(1, "DBase key set: %s", strerror(rc));
-				err = AM_FAILURE;
-				goto next;
-			}
-		}
-next:
-		pthread_mutex_unlock(&dblock);
+		db = db_get_dbinfo_multithread(path);
+		if(db)
+			hdb = db->db;
 	}
 	else
 	{
-		hdb = dbdef;
+		if(!dbdef->db)
+		{
+			AM_DEBUG(1, "Dbase: Opening DBase[%s] for default...", path);
+			dbdef->db = db_open_db(path);
+			if (dbdef->db)
+				dbdb_local = 1;
+			else
+				err = AM_DB_ERR_OPEN_DB_FAILED;
+		}
+		hdb = dbdef->db;
 	}
+
+	pthread_mutex_unlock(&dblock);
 
 	*handle = hdb;
 	return err;
+}
+
+/**\brief 获得sqlite3 SQL Statement句柄
+ * param [out] stmt SQL Statement句柄
+ * param [in]  name statement名称，方便再次获取
+ * param [in]  sql  生成statement的sql语句
+ *                  如果statement不存在，则使用此sql语句生成statement
+ * param [in]  reset_if_exist 重新生成statement
+ *                  如果statement存在，则重新生成该statement。
+ *                  当数据库文件改变导致statement出错时使用
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_db.h)
+ */
+AM_ErrorCode_t AM_DB_GetSTMT(sqlite3_stmt **stmt, const char *name, const char *sql, int reset_if_exist)
+{
+	dbinfo_t *db = NULL;
+	sqlite3 *hdb = NULL;
+	sqlite3_stmt *sqst = NULL;
+	AM_ErrorCode_t err = AM_FAILURE;
+	
+	assert(stmt && name);
+
+	*stmt = NULL;
+	
+	pthread_mutex_lock(&dblock);
+
+	if(multithread)
+	{
+		db = db_get_dbinfo_multithread(dbpath);
+		if(db)
+			err = db_get_stmt(&sqst, db, name, sql, reset_if_exist);
+	}
+	else
+	{
+		err = db_get_stmt(&sqst, dbdef, name, sql, reset_if_exist);
+	}
+
+	pthread_mutex_unlock(&dblock);
+
+	*stmt = sqst;
+
+	return err;
+}
+
+/**\brief 释放sqlite3数据库句柄
+ *        只能用于释放通过AM_DB_GetHandle()获得的handle
+ *        sqlite库编译配置为多线程时，必须与对应的AM_DB_GetHandle()在同一线程中使用
+ *        -==非公开函数，谨慎使用==-
+ * param [in] handle 数据库句柄
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_db.h)
+ */
+AM_ErrorCode_t AM_DB_PutHandle(sqlite3 *handle)
+{
+	dbinfo_t *db = NULL;
+	AM_ErrorCode_t err = AM_SUCCESS;
+	
+	assert(handle);
+
+	pthread_mutex_lock(&dblock);
+
+	if(multithread)
+	{
+		db = (dbinfo_t *)pthread_getspecific(dbkey);
+		if(db)
+			db_clear_dbinfo(db, 1);
+		else
+			err = AM_DB_ERR_INVALID_PARAM;
+	}
+	else
+	{
+		db_clear_dbinfo(dbdef, dbdb_local?1:0);
+		dbdb_local = 0;
+	}
+
+	pthread_mutex_unlock(&dblock);
+
+	return err;
+}
+
+/**\brief 释放sqlite3 SQL Statement句柄
+ *        只能用于释放通过AM_DB_GetSTMT()获得的handle
+ *        sqlite库编译配置为多线程时，必须与对应的AM_DB_GetSTMT()在同一线程中使用
+ *        -==非公开函数，谨慎使用==-
+ * param [in] stmt Statement句柄
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_db.h)
+ */
+AM_ErrorCode_t AM_DB_PutSTMT(sqlite3_stmt *stmt)
+{
+	dbinfo_t *db = NULL;
+	sqlite3 *hdb = NULL;
+	sqlite3_stmt *sqst = NULL;
+	int err = -1;
+	
+	assert(stmt);
+
+	pthread_mutex_lock(&dblock);
+
+	if(multithread)
+	{
+		db = (dbinfo_t *)pthread_getspecific(dbkey);
+		if(db)
+		{
+			err = db_put_stmt(stmt, db);
+		}
+	}
+	else
+	{
+		err = db_put_stmt(stmt, dbdef);
+	}
+
+	pthread_mutex_unlock(&dblock);
+
+	return (err==0)? AM_SUCCESS : AM_FAILURE;
 }
 
