@@ -8,7 +8,7 @@
  * \date 2010-11-04: create the document
  ***************************************************************************/
 
-#define AM_DEBUG_LEVEL 3
+#define AM_DEBUG_LEVEL 1
 
 #include <errno.h>
 #include <time.h>
@@ -57,9 +57,6 @@
 #define EPG_SUB_CHECK_TIME (10*1000)
 /*预约播放提前通知时间*/
 #define EPG_PRE_NOTIFY_TIME (60*1000)
-
-/*输入字符默认编码*/
-#define FORCE_DEFAULT_CODE ""/*"GB2312"*/
 
  /*位操作*/
 #define BIT_MASK(b) (1 << ((b) % 8))
@@ -111,15 +108,37 @@
 #define COLLECT_SECTION(type, list)\
 	AM_MACRO_BEGIN\
 		type *p_table;\
-		if (AM_SI_DecodeSection(mon->hsi, sec_ctrl->pid, (uint8_t*)data, len, (void**)&p_table) == AM_SUCCESS)\
-		{\
-			p_table->p_next = NULL;\
-			ADD_TO_LIST(p_table, list); /*添加到搜索结果列表中*/\
-			am_epg_tablectl_mark_section(sec_ctrl, &header); /*设置为已接收*/\
+		if (AM_SI_DecodeSection(mon->hsi, sec_ctrl->pid, (uint8_t*)data, len, (void**)&p_table) == AM_SUCCESS){\
+			/* process this section */\
+			if (sec_ctrl->proc_sec) {\
+				sec_ctrl->proc_sec(mon, (void*)p_table);\
+			}\
+			if (sec_ctrl->pid != AM_SI_PID_EIT && sec_ctrl->pid != AM_SI_PID_TOT \
+				&& data[0] != AM_SI_TID_PSIP_EIT) {\
+				/*For non-eit/tot sections, store to table list*/\
+				p_table->p_next = NULL;\
+				ADD_TO_LIST(p_table, list); /*添加到搜索结果列表中*/\
+				am_epg_tablectl_mark_section(sec_ctrl, &header); /*设置为已接收*/\
+			} else if (sec_ctrl->pid == AM_SI_PID_EIT){\
+				/* notify dvb eit */\
+				am_epg_tablectl_mark_section_eit(sec_ctrl, &header, data[12]);\
+				SIGNAL_EVENT(AM_EPG_EVT_NEW_EIT, (void*)p_table);\
+				AM_SI_ReleaseSection(mon->hsi, data[0], (void*)p_table);\
+			} else if (sec_ctrl->pid == AM_SI_PID_TOT) {\
+				/* dvb tdt/tot, TDT/TOT has only 1 section */\
+				p_table->p_next = NULL;\
+				ADD_TO_LIST(p_table, list);\
+				TABLE_DONE();\
+			} else if (data[0] == AM_SI_TID_PSIP_EIT){\
+				/* notify atsc eit */\
+				am_epg_tablectl_mark_section(sec_ctrl, &header); \
+				SIGNAL_EVENT(AM_EPG_EVT_NEW_PSIP_EIT, (void*)p_table);\
+				AM_SI_ReleaseSection(mon->hsi, data[0], (void*)p_table);\
+			}\
+		} else {\
+			AM_DEBUG(1, "EPG: Decode %s section failed", sec_ctrl->tname);\
 		}\
 	AM_MACRO_END
-
-
 
 /*判断并设置某个表的监控*/
 #define SET_MODE(table, ctl, f, reset)\
@@ -161,6 +180,17 @@
 		pthread_mutex_lock(&mon->lock);\
 	AM_MACRO_END
 	
+#define STEP_STMT(_stmt, _name, _sql)\
+	AM_MACRO_BEGIN\
+		int ret1, ret2;\
+			ret1 = sqlite3_step(_stmt);\
+			ret2 = sqlite3_reset(_stmt);\
+			if (ret1 == SQLITE_ERROR && ret2 == SQLITE_SCHEMA){\
+				AM_DEBUG(1, "Database schema changed, now re-prepare the stmts...");\
+				AM_DB_GetSTMT(&(_stmt), _name, _sql, 1);\
+			}\
+	AM_MACRO_END
+	
 /****************************************************************************
  * Static data
  ***************************************************************************/
@@ -177,422 +207,6 @@ static pthread_mutex_t time_lock = PTHREAD_MUTEX_INITIALIZER;
  * Static functions
  ***************************************************************************/
 static int am_epg_get_current_service_id(AM_EPG_Monitor_t *mon);
-
-/**\brief 将ISO6937转换为UTF-8编码*/
-static AM_ErrorCode_t am_epg_convert_iso6937_to_utf8(const char *src, int src_len, char *dest, int *dest_len)
-{     
-	uint16_t ch;
-	int dlen, i;
-	uint8_t b;
-	char *ucs2 = NULL;
-
-#define READ_BYTE()\
-	({\
-		uint8_t ret;\
-		if (i >= src_len) ret=0;\
-		else ret = (uint8_t)src[i];\
-		i++;\
-		ret;\
-	})
-	
-	if (!src || !dest || !dest_len || src_len <= 0)
-		return -1;
-		
-	/* first covert to UCS-2, then iconv to utf8 */
-	ucs2 = (char *)malloc(src_len*2);
-	if (!ucs2)
-		return -1;
-	dlen = 0;
-	i=0;
-	b = READ_BYTE();
-	if (b < 0x20)
-	{
-		/* ISO 6937 encoding must start with character between 0x20 and 0xFF
-		 otherwise it is dfferent encoding table
-		 for example 0x05 means encoding table 8859-9 */
-		return -1;
-	}
-	
-	while (b != 0)
-	{
-		ch = 0x00;
-		switch (b)
-		{
-			/* at first single byte characters */
-			case 0xA8: ch = 0x00A4; break;
-			case 0xA9: ch = 0x2018; break;
-			case 0xAA: ch = 0x201C; break;
-			case 0xAC: ch = 0x2190; break;
-			case 0xAD: ch = 0x2191; break;
-			case 0xAE: ch = 0x2192; break;
-			case 0xAF: ch = 0x2193; break;
-			case 0xB4: ch = 0x00D7; break;
-			case 0xB8: ch = 0x00F7; break;
-			case 0xB9: ch = 0x2019; break;
-			case 0xBA: ch = 0x201D; break;
-			case 0xD0: ch = 0x2014; break;
-			case 0xD1: ch = 0xB9; break;
-			case 0xD2: ch = 0xAE; break;
-			case 0xD3: ch = 0xA9; break;
-			case 0xD4: ch = 0x2122; break;
-			case 0xD5: ch = 0x266A; break;
-			case 0xD6: ch = 0xAC; break;
-			case 0xD7: ch = 0xA6; break;
-			case 0xDC: ch = 0x215B; break;
-			case 0xDD: ch = 0x215C; break;
-			case 0xDE: ch = 0x215D; break;
-			case 0xDF: ch = 0x215E; break;
-			case 0xE0: ch = 0x2126; break;
-			case 0xE1: ch = 0xC6; break;
-			case 0xE2: ch = 0xD0; break;
-			case 0xE3: ch = 0xAA; break;
-			case 0xE4: ch = 0x126; break;
-			case 0xE6: ch = 0x132; break;
-			case 0xE7: ch = 0x013F; break;
-			case 0xE8: ch = 0x141; break;
-			case 0xE9: ch = 0xD8; break;
-			case 0xEA: ch = 0x152; break;
-			case 0xEB: ch = 0xBA; break;
-			case 0xEC: ch = 0xDE; break;
-			case 0xED: ch = 0x166; break;
-			case 0xEE: ch = 0x014A; break;
-			case 0xEF: ch = 0x149; break;
-			case 0xF0: ch = 0x138; break;
-			case 0xF1: ch = 0xE6; break;
-			case 0xF2: ch = 0x111; break;
-			case 0xF3: ch = 0xF0; break;
-			case 0xF4: ch = 0x127; break;
-			case 0xF5: ch = 0x131; break;
-			case 0xF6: ch = 0x133; break;
-			case 0xF7: ch = 0x140; break;
-			case 0xF8: ch = 0x142; break;
-			case 0xF9: ch = 0xF8; break;
-			case 0xFA: ch = 0x153; break;
-			case 0xFB: ch = 0xDF; break;
-			case 0xFC: ch = 0xFE; break;
-			case 0xFD: ch = 0x167; break;
-			case 0xFE: ch = 0x014B; break;
-			case 0xFF: ch = 0xAD; break;
-			/* multibyte */
-			case 0xC1:
-				b = READ_BYTE();
-				switch (b)
-				{
-					case 0x41: ch = 0xC0; break;
-					case 0x45: ch = 0xC8; break;
-					case 0x49: ch = 0xCC; break;
-					case 0x4F: ch = 0xD2; break;
-					case 0x55: ch = 0xD9; break;
-					case 0x61: ch = 0xE0; break;
-					case 0x65: ch = 0xE8; break;
-					case 0x69: ch = 0xEC; break;
-					case 0x6F: ch = 0xF2; break;
-					case 0x75: ch = 0xF9; break;
-					// unknown character --> fallback
-					default: ch = b; break;
-				}
-				break;
-			case 0xC2:
-				b = READ_BYTE();
-				switch (b)
-				{
-					case 0x20: ch = 0xB4; break;
-					case 0x41: ch = 0xC1; break;
-					case 0x43: ch = 0x106; break;
-					case 0x45: ch = 0xC9; break;
-					case 0x49: ch = 0xCD; break;
-					case 0x4C: ch = 0x139; break;
-					case 0x4E: ch = 0x143; break;
-					case 0x4F: ch = 0xD3; break;
-					case 0x52: ch = 0x154; break;
-					case 0x53: ch = 0x015A; break;
-					case 0x55: ch = 0xDA; break;
-					case 0x59: ch = 0xDD; break;
-					case 0x5A: ch = 0x179; break;
-					case 0x61: ch = 0xE1; break;
-					case 0x63: ch = 0x107; break;
-					case 0x65: ch = 0xE9; break;
-					case 0x69: ch = 0xED; break;
-					case 0x6C: ch = 0x013A; break;
-					case 0x6E: ch = 0x144; break;
-					case 0x6F: ch = 0xF3; break;
-					case 0x72: ch = 0x155; break;
-					case 0x73: ch = 0x015B; break;
-					case 0x75: ch = 0xFA; break;
-					case 0x79: ch = 0xFD; break;
-					case 0x7A: ch = 0x017A; break;
-					// unknown character --> fallback
-					default: ch = b; break;
-				}
-				break;
-
-			case 0xC3:
-				b = READ_BYTE();
-				switch (b)
-				{
-					case 0x41: ch = 0xC2; break;
-					case 0x43: ch = 0x108; break;
-					case 0x45: ch = 0xCA; break;
-					case 0x47: ch = 0x011C; break;
-					case 0x48: ch = 0x124; break;
-					case 0x49: ch = 0xCE; break;
-					case 0x4A: ch = 0x134; break;
-					case 0x4F: ch = 0xD4; break;
-					case 0x53: ch = 0x015C; break;
-					case 0x55: ch = 0xDB; break;
-					case 0x57: ch = 0x174; break;
-					case 0x59: ch = 0x176; break;
-					case 0x61: ch = 0xE2; break;
-					case 0x63: ch = 0x109; break;
-					case 0x65: ch = 0xEA; break;
-					case 0x67: ch = 0x011D; break;
-					case 0x68: ch = 0x125; break;
-					case 0x69: ch = 0xEE; break;
-					case 0x6A: ch = 0x135; break;
-					case 0x6F: ch = 0xF4; break;
-					case 0x73: ch = 0x015D; break;
-					case 0x75: ch = 0xFB; break;
-					case 0x77: ch = 0x175; break;
-					case 0x79: ch = 0x177; break;
-					// unknown character --> fallback
-					default: ch = b; break;
-				}
-				break;
-			case 0xC4:
-				b = READ_BYTE();
-				switch (b)
-				{
-					case 0x41: ch = 0xC3; break;
-					case 0x49: ch = 0x128; break;
-					case 0x4E: ch = 0xD1; break;
-					case 0x4F: ch = 0xD5; break;
-					case 0x55: ch = 0x168; break;
-					case 0x61: ch = 0xE3; break;
-					case 0x69: ch = 0x129; break;
-					case 0x6E: ch = 0xF1; break;
-					case 0x6F: ch = 0xF5; break;
-					case 0x75: ch = 0x169; break;
-					// unknown character --> fallback
-					default: ch = b; break;
-				}
-				break;
-			case 0xC5:
-				b = READ_BYTE();
-				switch (b)
-				{
-					case 0x20: ch = 0xAF; break;
-					case 0x41: ch = 0x100; break;
-					case 0x45: ch = 0x112; break;
-					case 0x49: ch = 0x012A; break;
-					case 0x4F: ch = 0x014C; break;
-					case 0x55: ch = 0x016A; break;
-					case 0x61: ch = 0x101; break;
-					case 0x65: ch = 0x113; break;
-					case 0x69: ch = 0x012B; break;
-					case 0x6F: ch = 0x014D; break;
-					case 0x75: ch = 0x016B; break;
-					// unknown character --> fallback
-					default: ch = b; break;
-				}
-				break;
-			case 0xC6:
-				b = READ_BYTE();
-				switch (b)
-				{
-					case 0x20: ch = 0x02D8; break;
-					case 0x41: ch = 0x102; break;
-					case 0x47: ch = 0x011E; break;
-					case 0x55: ch = 0x016C; break;
-					case 0x61: ch = 0x103; break;
-					case 0x67: ch = 0x011F; break;
-					case 0x75: ch = 0x016D; break;
-					// unknown character --> fallback
-					default: ch = b; break;
-				}
-				break;
-			case 0xC7:
-				b = READ_BYTE();
-				switch (b)
-				{
-					case 0x20: ch = 0x02D9; break;
-					case 0x43: ch = 0x010A; break;
-					case 0x45: ch = 0x116; break;
-					case 0x47: ch = 0x120; break;
-					case 0x49: ch = 0x130; break;
-					case 0x5A: ch = 0x017B; break;
-					case 0x63: ch = 0x010B; break;
-					case 0x65: ch = 0x117; break;
-					case 0x67: ch = 0x121; break;
-					case 0x7A: ch = 0x017C; break;
-					// unknown character --> fallback
-					default: ch = b; break;
-				}
-				break;
-			case 0xC8:
-				b = READ_BYTE();
-				switch (b)
-				{
-					case 0x20: ch = 0xA8; break;
-					case 0x41: ch = 0xC4; break;
-					case 0x45: ch = 0xCB; break;
-					case 0x49: ch = 0xCF; break;
-					case 0x4F: ch = 0xD6; break;
-					case 0x55: ch = 0xDC; break;
-					case 0x59: ch = 0x178; break;
-					case 0x61: ch = 0xE4; break;
-					case 0x65: ch = 0xEB; break;
-					case 0x69: ch = 0xEF; break;
-					case 0x6F: ch = 0xF6; break;
-					case 0x75: ch = 0xFC; break;
-					case 0x79: ch = 0xFF; break;
-					// unknown character --> fallback
-					default: ch = b; break;
-				}
-				break;
-			case 0xCA:
-				b = READ_BYTE();
-				switch (b)
-				{
-					case 0x20: ch = 0x02DA; break;
-					case 0x41: ch = 0xC5; break;
-					case 0x55: ch = 0x016E; break;
-					case 0x61: ch = 0xE5; break;
-					case 0x75: ch = 0x016F; break;
-					// unknown character --> fallback
-					default: ch = b; break;
-				}
-				break;
-			case 0xCB:
-				b = READ_BYTE();
-				switch (b)
-				{
-					case 0x20: ch = 0xB8; break;
-					case 0x43: ch = 0xC7; break;
-					case 0x47: ch = 0x122; break;
-					case 0x4B: ch = 0x136; break;
-					case 0x4C: ch = 0x013B; break;
-					case 0x4E: ch = 0x145; break;
-					case 0x52: ch = 0x156; break;
-					case 0x53: ch = 0x015E; break;
-					case 0x54: ch = 0x162; break;
-					case 0x63: ch = 0xE7; break;
-					case 0x67: ch = 0x123; break;
-					case 0x6B: ch = 0x137; break;
-					case 0x6C: ch = 0x013C; break;
-					case 0x6E: ch = 0x146; break;
-					case 0x72: ch = 0x157; break;
-					case 0x73: ch = 0x015F; break;
-					case 0x74: ch = 0x163; break;
-					// unknown character --> fallback
-					default: ch = b; break;
-				}
-				break;
-			case 0xCD:
-				b = READ_BYTE();
-				switch (b)
-				{
-					case 0x20: ch = 0x02DD; break;
-					case 0x4F: ch = 0x150; break;
-					case 0x55: ch = 0x170; break;
-					case 0x6F: ch = 0x151; break;
-					case 0x75: ch = 0x171; break;
-					// unknown character --> fallback
-					default: ch = b; break;
-				}
-				break;
-			case 0xCE:
-				b = READ_BYTE();
-				switch (b)
-				{
-					case 0x20: ch = 0x02DB; break;
-					case 0x41: ch = 0x104; break;
-					case 0x45: ch = 0x118; break;
-					case 0x49: ch = 0x012E; break;
-					case 0x55: ch = 0x172; break;
-					case 0x61: ch = 0x105; break;
-					case 0x65: ch = 0x119; break;
-					case 0x69: ch = 0x012F; break;
-					case 0x75: ch = 0x173; break;
-					// unknown character --> fallback
-					default: ch = b; break;
-				}
-				break;
-			case 0xCF:
-				b = READ_BYTE();
-				switch (b)
-				{
-					case 0x20: ch = 0x02C7; break;
-					case 0x43: ch = 0x010C; break;
-					case 0x44: ch = 0x010E; break;
-					case 0x45: ch = 0x011A; break;
-					case 0x4C: ch = 0x013D; break;
-					case 0x4E: ch = 0x147; break;
-					case 0x52: ch = 0x158; break;
-					case 0x53: ch = 0x160; break;
-					case 0x54: ch = 0x164; break;
-					case 0x5A: ch = 0x017D; break;
-					case 0x63: ch = 0x010D; break;
-					case 0x64: ch = 0x010F; break;
-					case 0x65: ch = 0x011B; break;
-					case 0x6C: ch = 0x013E; break;
-					case 0x6E: ch = 0x148; break;
-					case 0x72: ch = 0x159; break;
-					case 0x73: ch = 0x161; break;
-					case 0x74: ch = 0x165; break;
-					case 0x7A: ch = 0x017E; break;
-					// unknown character --> fallback
-					default: ch = b; break;
-				}
-				break;
-			/* rest is the same */
-			default: ch = b; break;
-		}
-		if (b != 0)
-		{
-			b = READ_BYTE();
-		}
-		if (ch != 0)
-		{
-			/* dest buffer not enough, and this will not happen */
-			if ((dlen+1) >= (src_len*2))
-				goto iso6937_end;
-			ucs2[dlen++] = (ch&0xff00) >> 8;
-			ucs2[dlen++] = ch;
-		}
-	}
-	
-iso6937_end:
-	if (dlen > 0)
-	{
-		iconv_t handle;
-		char *org_ucs2 = ucs2;
-		char **pin=&ucs2;
-		char **pout=&dest;
-		
-		handle=iconv_open("utf-8","ucs-2");
-
-		if (handle == (iconv_t)-1)
-		{
-			AM_DEBUG(1, "iconv_open err: %s",strerror(errno));
-			return AM_FAILURE;
-		}
-
-		if(iconv(handle,pin,(size_t *)&dlen,pout,(size_t *)dest_len) == -1)
-		{
-		    AM_DEBUG(1, "iconv err: %s", strerror(errno));
-		    iconv_close(handle);
-		    return AM_FAILURE;
-		}
-		
-		free(org_ucs2);
-
-		return iconv_close(handle);
-    }
-    
-    free(ucs2);
-    
-    return -1;
-} 
 
 static inline int am_epg_convert_fetype_to_source(int fe_type)
 {
@@ -716,7 +330,8 @@ static void am_epg_tablectl_clear(AM_EPG_TableCtl_t * mcl)
 static AM_ErrorCode_t am_epg_tablectl_init(AM_EPG_TableCtl_t * mcl, int evt_flag,
 											uint16_t pid, uint8_t tid, uint8_t tid_mask,
 											const char *name, uint16_t sub_cnt, 
-											void (*done)(struct AM_EPG_Monitor_s *), int distance)
+											void (*done)(struct AM_EPG_Monitor_s *), int distance,
+											void (*proc_sec)(struct AM_EPG_Monitor_s *, void *))
 {
 	memset(mcl, 0, sizeof(AM_EPG_TableCtl_t));
 	mcl->fid = -1;
@@ -726,6 +341,7 @@ static AM_ErrorCode_t am_epg_tablectl_init(AM_EPG_TableCtl_t * mcl, int evt_flag
 	mcl->tid_mask = tid_mask;
 	mcl->done = done;
 	mcl->repeat_distance = distance;
+	mcl->proc_sec = proc_sec;
 	strcpy(mcl->tname, name);
 
 	mcl->subs = sub_cnt;
@@ -866,6 +482,564 @@ static AM_ErrorCode_t am_epg_tablectl_mark_section(AM_EPG_TableCtl_t * mcl, AM_S
 	return am_epg_tablectl_mark_section_eit(mcl, header, -1);
 }
 
+static void am_epg_proc_tot_section(AM_EPG_Monitor_t *mon, void *tot_section)
+{
+	dvbpsi_tot_t *p_tot = (dvbpsi_tot_t*)tot_section;
+	uint16_t mjd;
+	uint8_t hour, min, sec;
+
+	/*取UTC时间*/
+	mjd = (uint16_t)(p_tot->i_utc_time >> 24);
+	hour = (uint8_t)(p_tot->i_utc_time >> 16);
+	min = (uint8_t)(p_tot->i_utc_time >> 8);
+	sec = (uint8_t)p_tot->i_utc_time;
+
+	pthread_mutex_lock(&time_lock);
+	curr_time.tdt_utc_time = AM_EPG_MJD2SEC(mjd) + AM_EPG_BCD2SEC(hour, min, sec);
+	/*更新system time，用于时间自动累加*/
+	AM_TIME_GetClock(&curr_time.tdt_sys_time);
+	pthread_mutex_unlock(&time_lock);
+}
+
+static void am_epg_proc_stt_section(AM_EPG_Monitor_t *mon, void *stt_section)
+{
+	stt_section_info_t *p_stt = (stt_section_info_t *)stt_section;
+	uint16_t mjd;
+	uint8_t hour, min, sec;
+	
+	AM_DEBUG(1, "STT UTC time is %u", p_stt->utc_time);
+	/*取UTC时间*/
+	pthread_mutex_lock(&time_lock);
+	curr_time.tdt_utc_time = p_stt->utc_time;
+	/*更新system time，用于时间自动累加*/
+	AM_TIME_GetClock(&curr_time.tdt_sys_time);
+	pthread_mutex_unlock(&time_lock);
+}
+
+static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
+{
+	dvbpsi_eit_t *eit = (dvbpsi_eit_t*)eit_section;
+	dvbpsi_eit_event_t *event;
+	dvbpsi_descriptor_t *descr;
+	char name[EVT_NAME_LEN+1];
+	char desc[EVT_TEXT_LEN+1];
+	char item_descr[ITEM_DESCR_LEN+1];
+	char ext_descr[EXT_TEXT_LEN + 1];
+	char sql[256];
+	char *db_item;
+	int row = 1;
+	int srv_dbid, net_dbid, ts_dbid, evt_dbid;
+	int start, end, nibble, now;
+	int item_len;
+	int ext_descr_len;
+	int parental_rating = 0;
+	uint16_t mjd;
+	uint8_t hour, min, sec;
+	ExtendedEventItem *item, *next;
+	ExtendedEventItem *items;
+	ExtendedEventItem *items_tail;
+	dvbpsi_extended_event_dr_t *eedecrs[16];
+	int ii;
+	sqlite3 *hdb;
+	sqlite3_stmt *stmt;
+	const char *insert_evt_sql = "insert into evt_table(src,db_net_id, db_ts_id, \
+		db_srv_id, event_id, name, start, end, descr, items, ext_descr,nibble_level,\
+		sub_flag,sub_status,parental_rating,source_id,db_dimension_ids,rating_values) \
+		values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+	const char *insert_evt_sql_name = "insert epg events";
+
+	AM_DB_HANDLE_PREPARE(hdb);
+	if (AM_DB_GetSTMT(&stmt, insert_evt_sql_name, insert_evt_sql, 0) != AM_SUCCESS)
+	{
+		AM_DEBUG(1, "EPG: prepare insert events stmt failed");
+		return;
+	}
+	if (mon->curr_ts < 0)
+	{
+		AM_DEBUG(1, "EPG: current ts not set, skip this section");
+		return;
+	}
+	
+	/*查询service*/
+	snprintf(sql, sizeof(sql), "select db_net_id,db_ts_id,db_id from srv_table where db_ts_id=%d \
+								and service_id=%d limit 1", mon->curr_ts, eit->i_service_id);
+	if (AM_DB_Select(hdb, sql, &row, "%d,%d,%d", &net_dbid, &ts_dbid, &srv_dbid) != AM_SUCCESS || row == 0)
+	{
+		/*No such service*/
+		return;
+	}
+	AM_SI_LIST_BEGIN(eit->p_first_event, event)
+		/*取UTC时间*/
+		mjd = (uint16_t)(event->i_start_time >> 24);
+		hour = (uint8_t)(event->i_start_time >> 16);
+		min = (uint8_t)(event->i_start_time >> 8);
+		sec = (uint8_t)event->i_start_time;
+		start = AM_EPG_MJD2SEC(mjd) + AM_EPG_BCD2SEC(hour, min, sec);
+		/*取持续事件*/
+		hour = (uint8_t)(event->i_duration >> 16);
+		min = (uint8_t)(event->i_duration >> 8);
+		sec = (uint8_t)event->i_duration;
+		end = AM_EPG_BCD2SEC(hour, min, sec);
+
+		end += start;
+		
+		/*Donot add the expired event*/
+		AM_EPG_GetUTCTime(&now);
+		if (end < now)
+			continue;
+		
+		row = 1;
+		/*查找该事件是否已经被添加*/
+		snprintf(sql, sizeof(sql), "select db_id from evt_table where db_srv_id=%d \
+									and start=%d", srv_dbid, start);
+		if (AM_DB_Select(hdb, sql, &row, "%d", &evt_dbid) == AM_SUCCESS && row > 0)
+			continue;
+
+		items = NULL;
+		items_tail = NULL;
+		db_item = NULL;
+		name[0] = 0;
+		desc[0] = 0;
+		item_descr[0] = 0;
+		ext_descr[0] = 0;
+		ext_descr_len = 0;
+		nibble = 0;
+		
+		memset(eedecrs, 0, sizeof(eedecrs));
+		AM_SI_LIST_BEGIN(event->p_first_descriptor, descr)
+			if (descr->i_tag == AM_SI_DESCR_SHORT_EVENT && descr->p_decoded)
+			{
+				dvbpsi_short_event_dr_t *pse = (dvbpsi_short_event_dr_t*)descr->p_decoded;
+
+				AM_SI_ConvertDVBTextCode((char*)pse->i_event_name, pse->i_event_name_length,\
+								name, EVT_NAME_LEN);
+				name[EVT_NAME_LEN] = 0;
+
+				AM_SI_ConvertDVBTextCode((char*)pse->i_text, pse->i_text_length,\
+								desc, EVT_TEXT_LEN);
+				desc[EVT_TEXT_LEN] = 0;
+				//AM_DEBUG(1, "event_id 0x%x, name '%s'", event->i_event_id, name);
+			}
+			else if (descr->i_tag == AM_SI_DESCR_EXTENDED_EVENT && descr->p_decoded)
+			{
+				dvbpsi_extended_event_dr_t *pee = (dvbpsi_extended_event_dr_t*)descr->p_decoded;
+				
+				if (pee->i_descriptor_number < 16)
+				{
+					AM_DEBUG(2, "Add a extended event descr, descr_number %d, last_number %d",
+						pee->i_descriptor_number, pee->i_last_descriptor_number);
+					eedecrs[pee->i_descriptor_number] = pee;
+				}
+			}
+			else if (descr->i_tag == AM_SI_DESCR_CONTENT && descr->p_decoded)
+			{
+				dvbpsi_content_dr_t *pcd = (dvbpsi_content_dr_t*)descr->p_decoded;
+
+				nibble = pcd->i_nibble_level;
+				//AM_DEBUG(1, "content_nibble_level is 0x%x", nibble);
+			}
+			else if (descr->i_tag == AM_SI_DESCR_PARENTAL_RATING && descr->p_decoded)
+			{
+				dvbpsi_parental_rating_dr_t *prd = (dvbpsi_parental_rating_dr_t*)descr->p_decoded;
+				dvbpsi_parental_rating_t *pr = prd->p_parental_rating;
+				int i;
+
+				for(i=0; i<prd->i_ratings_number; i++){
+					if(pr->i_rating){
+						if(!parental_rating || parental_rating<pr->i_rating)
+							parental_rating = pr->i_rating;
+					}
+					pr++;
+				}
+			}
+		AM_SI_LIST_END()
+		
+		for (ii=0; ii<16; ii++)
+		{
+			if (eedecrs[ii] != NULL)
+			{
+				dvbpsi_extended_event_dr_t *pee = eedecrs[ii];
+				int j;
+				
+				AM_DEBUG(2, "extended event descr %d, entry count %d", ii, pee->i_entry_count);
+				/*取所有item*/
+				for (j=0; j<pee->i_entry_count; j++)
+				{
+					AM_SI_ConvertDVBTextCode((char*)pee->i_item_description[j], pee->i_item_description_length[j],\
+								item_descr, ITEM_DESCR_LEN);
+					item_descr[ITEM_DESCR_LEN] = 0;
+
+					item = items;
+					while (item != NULL)
+					{
+						if (! strcmp(item_descr, item->item_descr))
+							break;
+						item = item->next;
+					}
+					if (item == NULL)
+					{
+						/*Add a new Item*/
+						item = (ExtendedEventItem *)malloc(sizeof(ExtendedEventItem));
+						if (item == NULL)
+						{
+							AM_DEBUG(1, "Cannot alloc memory for new item");
+							continue;
+						}
+						memset(item, 0, sizeof(ExtendedEventItem));
+						if (items == NULL)
+							items = item;
+						else
+							items_tail->next = item;
+						items_tail = item;
+						snprintf(item->item_descr, sizeof(item->item_descr), "%s", item_descr);
+					}
+					/*Merge the item_char*/
+					if (item->char_len >= (int)(sizeof(item->item_char)-1))
+						continue;
+
+					if (AM_SI_ConvertDVBTextCode((char*)pee->i_item[j], pee->i_item_length[j],\
+								item->item_char+item->char_len, \
+								sizeof(item->item_char)-item->char_len) == AM_SUCCESS)
+					{
+						item->item_char[ITEM_CHAR_LEN] = 0;
+						item->char_len = strlen(item->item_char);
+					}
+				}
+
+				/*融合详细描述文本*/
+				if (ext_descr_len < (int)(sizeof(ext_descr)-1) && AM_SI_ConvertDVBTextCode(\
+								(char*)pee->i_text, pee->i_text_length,\
+								ext_descr+ext_descr_len, \
+								sizeof(ext_descr)-ext_descr_len) == AM_SUCCESS)
+				{
+					ext_descr[EXT_TEXT_LEN] = 0;
+					ext_descr_len = strlen(ext_descr);
+				}			
+			}
+		}
+				
+				
+		/*Merge all the items*/
+		item_len = 0;
+		item = items;
+		while (item != NULL)
+		{
+			item_len += strlen(":\n");
+			item_len += strlen(item->item_descr);
+			item_len += item->char_len;
+			item = item->next;
+		}
+		item_len += ext_descr_len;
+		if (item_len > 0)
+		{
+			db_item = (char*)malloc(item_len+1);
+			if (db_item != NULL)
+			{
+				db_item[0] = 0;
+				item = items;
+				while (item != NULL)
+				{
+					next = item->next;
+					strcat(db_item, item->item_descr);
+					strcat(db_item, ":");
+					strcat(db_item, item->item_char);
+					strcat(db_item, "\n");
+					free(item);
+					item = next;
+				}
+				if (ext_descr_len > 0)
+					strcat(db_item, ext_descr);
+				db_item[item_len] = 0;
+			}
+		}
+
+		/*添加新事件到evt_table*/
+		if (sqlite3_bind_int(stmt, 1, 0)!=SQLITE_OK)
+		{
+			AM_DEBUG(1, "sqlite3_bind failed!!!");
+		}
+		sqlite3_bind_int(stmt, 2, net_dbid);
+		sqlite3_bind_int(stmt, 3, ts_dbid);
+		sqlite3_bind_int(stmt, 4, srv_dbid);
+		sqlite3_bind_int(stmt, 5, event->i_event_id);
+		sqlite3_bind_text(stmt, 6, name, -1, SQLITE_STATIC);
+		sqlite3_bind_int(stmt, 7, start);
+		sqlite3_bind_int(stmt, 8, end);
+		sqlite3_bind_text(stmt, 9, desc, -1, SQLITE_STATIC);
+		if (db_item != NULL)
+		{
+			sqlite3_bind_text(stmt, 10, db_item, -1, SQLITE_STATIC);
+			free(db_item);
+		}
+		else
+		{
+			sqlite3_bind_text(stmt, 10, "", -1, SQLITE_STATIC);
+		}
+		sqlite3_bind_text(stmt, 11, ext_descr, -1, SQLITE_STATIC);
+		sqlite3_bind_int(stmt, 12, nibble);
+		sqlite3_bind_int(stmt, 13, 0);
+		sqlite3_bind_int(stmt, 14, 0);
+		sqlite3_bind_int(stmt, 15, parental_rating);
+		sqlite3_bind_int(stmt, 16, -1);
+		sqlite3_bind_text(stmt, 17, "", -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 18, "", -1, SQLITE_STATIC);
+		STEP_STMT(stmt, insert_evt_sql_name, insert_evt_sql);
+		
+		/*设置更新通知标志*/
+		if (! mon->eit_has_data)
+		{
+			if (mon->mon_service == srv_dbid)
+			{
+				AM_DEBUG(1, "Set EPG service(%d) update flag to 1", srv_dbid);
+				mon->eit_has_data = AM_TRUE;
+			}
+		}
+
+	AM_SI_LIST_END()
+}
+
+static void am_epg_proc_rrt_section(AM_EPG_Monitor_t *mon, void *rrt_section)
+{
+	rrt_section_info_t *rrt = (rrt_section_info_t *)rrt_section;
+	rrt_dimensions_info_t *dimension;
+	rrt_rating_value_t *value;
+	int i, j = 0;
+	int row, version;
+	char sql[256];
+	sqlite3 *hdb;
+	sqlite3_stmt *stmt;
+	const char *new_dimension_sql =
+        "insert into dimension_table(rating_region,rating_region_name,name,graduated_scale,values_defined,index_j,version,\
+        abbrev0,text0,locked0,abbrev1,text1,locked1,abbrev2,text2,locked2,abbrev3,text3,locked3,abbrev4,text4,locked4,\
+        abbrev5,text5,locked5,abbrev6,text6,locked6,abbrev7,text7,locked7,abbrev8,text8,locked8,abbrev9,text9,locked9,\
+        abbrev10,text10,locked10,abbrev11,text11,locked11,abbrev12,text12,locked12,abbrev13,text13,locked13,\
+        abbrev14,text14,locked14,abbrev15,text15,locked15) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,\
+        ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+	const char *new_dimension_sql_name = "new dimension";
+
+	AM_DB_HANDLE_PREPARE(hdb);
+	if (AM_DB_GetSTMT(&stmt, new_dimension_sql_name, new_dimension_sql, 0) != AM_SUCCESS)
+	{
+		AM_DEBUG(1, "EPG: prepare new dimension stmt failed");
+		return;
+	}
+	
+	AM_DEBUG(1, "region %d, name(lang0 '%c%c%c') '%s'", rrt->rating_region, 
+		rrt->rating_region_name.string[0].iso_639_code[0],
+		rrt->rating_region_name.string[0].iso_639_code[1],
+		rrt->rating_region_name.string[0].iso_639_code[2],
+		rrt->rating_region_name.string[0].string);
+		
+	/*check the RRT version*/
+	snprintf(sql, sizeof(sql), "select version from dimension_table where rating_region=%d", rrt->rating_region);
+	row = 1;
+	if (AM_DB_Select(hdb, sql, &row, "%d", &version) == AM_SUCCESS && row > 0)
+	{
+		if (version == rrt->version_number)
+		{
+			AM_DEBUG(1, "RRT for region %d version not changed, version = %d", rrt->rating_region, version);
+		}
+		else
+		{
+			AM_DEBUG(1, "RRT for region %d version changed, %d->%d", rrt->rating_region, version, rrt->version_number);
+			/* Delete the previous data */
+			snprintf(sql, sizeof(sql), "delete from dimension_table where rating_region=%d", rrt->rating_region);
+			sqlite3_exec(hdb, sql, NULL, NULL, NULL);
+		}
+	}
+	else
+	{
+		AM_DEBUG(1, "row = %d", row);
+	}
+		
+	AM_SI_LIST_BEGIN(rrt->dimensions_info, dimension)
+		AM_DEBUG(1, "dimension name(lang0 '%c%c%c') '%s'",
+			dimension->dimensions_name.string[0].iso_639_code[0],
+			dimension->dimensions_name.string[0].iso_639_code[1],
+			dimension->dimensions_name.string[0].iso_639_code[2],
+			dimension->dimensions_name.string[0].string);
+		
+		/* Add this new dimension */
+		sqlite3_bind_int(stmt, 1, rrt->rating_region);
+		sqlite3_bind_text(stmt, 2, (const char*)rrt->rating_region_name.string[0].string, -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 3, (const char*)dimension->dimensions_name.string[0].string, -1, SQLITE_STATIC);
+		sqlite3_bind_int(stmt, 4, dimension->graduated_scale);
+		sqlite3_bind_int(stmt, 5, dimension->values_defined);
+		sqlite3_bind_int(stmt, 6, j);
+		sqlite3_bind_int(stmt, 7, rrt->version_number);
+		for (i=0; i<16; i++)
+		{
+			AM_DEBUG(1, "value%d (lang0 '%c%c%c') abbrev '%s', text '%s'", i,
+				dimension->rating_value[i].abbrev_rating_value_text.string[0].iso_639_code[0],
+				dimension->rating_value[i].abbrev_rating_value_text.string[0].iso_639_code[1],
+				dimension->rating_value[i].abbrev_rating_value_text.string[0].iso_639_code[2],
+				dimension->rating_value[i].abbrev_rating_value_text.string[0].string,
+				dimension->rating_value[i].rating_value_text.string[0].string);
+			sqlite3_bind_text(stmt, 8+3*i, 
+				(i<dimension->values_defined)?(const char*)dimension->rating_value[i].abbrev_rating_value_text.string[0].string:"", 
+				-1, SQLITE_STATIC);
+			sqlite3_bind_text(stmt, 8+3*i+1, 
+				(i<dimension->values_defined)?(const char*)dimension->rating_value[i].rating_value_text.string[0].string:"", 
+				-1, SQLITE_STATIC);	
+			sqlite3_bind_int(stmt, 8+3*i+2, 0);
+		}
+		STEP_STMT(stmt, new_dimension_sql_name, new_dimension_sql);
+		j++;
+	AM_SI_LIST_END()
+
+}
+
+static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
+{
+	eit_section_info_t *eit = (eit_section_info_t*)eit_section;
+	eit_event_info_t *event;
+	char sql[256];
+	char title[256];
+	char dimension_dbids[1024];
+	char values[1024];
+	int srv_dbid, row = 1, starttime, endtime, evt_dbid;
+	AM_Bool_t need_update;
+	atsc_descriptor_t *descr;
+	sqlite3 *hdb;
+	sqlite3_stmt *stmt, *update_startend_stmt;
+	const char *insert_evt_sql = "insert into evt_table(src,db_net_id, db_ts_id, \
+		db_srv_id, event_id, name, start, end, descr, items, ext_descr,nibble_level,\
+		sub_flag,sub_status,parental_rating,source_id,db_dimension_ids,rating_values) \
+		values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+	const char *insert_evt_sql_name = "insert epg events";
+	const char *update_startend_sql = "update evt_table set start=?, end=? where db_id=?";
+	const char *update_startend_sql_name = "update startend";
+	
+	if (eit == NULL)
+		return;
+		
+	AM_DB_HANDLE_PREPARE(hdb);
+	if (AM_DB_GetSTMT(&stmt, insert_evt_sql_name, insert_evt_sql, 0) != AM_SUCCESS)
+	{
+		AM_DEBUG(1, "EPG: prepare insert events stmt failed");
+		return;
+	}
+	if (AM_DB_GetSTMT(&update_startend_stmt, update_startend_sql_name, update_startend_sql, 0) != AM_SUCCESS)
+	{
+		AM_DEBUG(1, "EPG: prepare insert events stmt failed");
+		return;
+	}
+	
+	/*查询source_id*/
+	snprintf(sql, sizeof(sql), "select db_id from srv_table where source_id=%d limit 1", eit->source_id);
+	if (AM_DB_Select(hdb, sql, &row, "%d", &srv_dbid) != AM_SUCCESS || row == 0)
+	{
+		/*No such source*/
+		AM_DEBUG(1, "No such source %d", eit->source_id);
+		return;
+	}
+	AM_SI_LIST_BEGIN(eit->eit_event_info, event)
+		AM_DEBUG(1, "got a event, id 0x%x", event->event_id);
+		row = 1;
+		/*查找是否有span EIT time interval的相同event_id的事件*/
+		snprintf(sql, sizeof(sql), "select start,end,db_id from evt_table where source_id=%d \
+									and event_id=%d", eit->source_id, event->event_id);
+		if (AM_DB_Select(hdb, sql, &row, "%d,%d,%d", &starttime, &endtime, &evt_dbid) == AM_SUCCESS && row > 0)
+		{
+			need_update = AM_FALSE;
+			/*合并相同event_id的事件*/
+			if (starttime > (int)event->start_time)
+			{
+				starttime = event->start_time;
+				need_update = AM_TRUE;
+			}
+			if ((int)(event->start_time + event->length_in_seconds) > endtime)
+			{
+				endtime = event->start_time + event->length_in_seconds;
+				need_update = AM_TRUE;
+			}
+			if (need_update)
+			{
+				sqlite3_bind_int(update_startend_stmt, 1, starttime);
+				sqlite3_bind_int(update_startend_stmt, 2, endtime);
+				sqlite3_bind_int(update_startend_stmt, 3, evt_dbid);
+				STEP_STMT(update_startend_stmt, update_startend_sql_name, update_startend_sql);
+			}
+			continue;
+		}
+		
+		dimension_dbids[0] = 0;
+		values[0] = 0;
+		/*取级别控制信息*/
+		AM_SI_LIST_BEGIN(event->desc, descr)
+			AM_DEBUG(1, "descr tag 0x%x", descr->i_tag);
+			if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_CONTENT_ADVISORY)
+			{
+				int i, j, dmn_dbid; 
+				atsc_content_advisory_dr_t *pcad = (atsc_content_advisory_dr_t*)descr->p_decoded;
+				
+				for (i=0; i<pcad->i_region_count; i++)
+				{
+					for (j=0; j<pcad->region[i].i_dimension_count; j++)
+					{
+						/*从dimension table中查找该dimension*/
+						row = 1;
+						snprintf(sql, sizeof(sql), "select db_id from dimension_table where rating_region=%d and index_j=%d limit 1", 
+							pcad->region[i].i_rating_region, pcad->region[i].dimension[j].i_dimension_j);
+						if (AM_DB_Select(hdb, sql, &row, "%d", &dmn_dbid) != AM_SUCCESS || row == 0)
+						{
+							/*No such dimension*/
+							AM_DEBUG(1, "Cannot find dimension%d from region %d", pcad->region[i].dimension[j].i_dimension_j,
+								pcad->region[i].i_rating_region);
+							continue;
+						}
+						
+						if (dimension_dbids[0] == 0)
+							snprintf(dimension_dbids, sizeof(dimension_dbids), "%d", dmn_dbid);
+						else
+							snprintf(dimension_dbids, sizeof(dimension_dbids), "%s %d", dimension_dbids, dmn_dbid);
+							
+						if (values[0] == 0)
+							snprintf(values, sizeof(values), "%d", pcad->region[i].dimension[j].i_rating_value);
+						else
+							snprintf(values, sizeof(values), "%s %d", values, pcad->region[i].dimension[j].i_rating_value);
+					}
+				}
+			}
+		AM_SI_LIST_END()
+		
+		/*添加新事件到evt_table*/
+		sqlite3_bind_int(stmt, 1, 0);
+		sqlite3_bind_int(stmt, 2, -1);
+		sqlite3_bind_int(stmt, 3, -1);
+		sqlite3_bind_int(stmt, 4, -1);
+		sqlite3_bind_int(stmt, 5, event->event_id);
+		/*NOTE：title没有string时，event->title.string[0].string是空字符串*/
+		sqlite3_bind_text(stmt, 6, (const char*)event->title.string[0].string, -1, SQLITE_STATIC);
+		sqlite3_bind_int(stmt, 7, event->start_time);
+		sqlite3_bind_int(stmt, 8, event->start_time+event->length_in_seconds);
+		{
+			int ii;
+			
+			for (ii=0; ii<event->title.i_string_count; ii++)
+			{
+				AM_DEBUG(1, "lang:'%c%c%c': '%s'", 
+					event->title.string[ii].iso_639_code[0],
+					event->title.string[ii].iso_639_code[1],
+					event->title.string[ii].iso_639_code[2],
+					event->title.string[ii].string);
+			}
+		}
+		AM_DEBUG(2, "event starttime %u, duration %d, source_id %d", event->start_time, event->length_in_seconds, eit->source_id);
+		sqlite3_bind_text(stmt, 9, "", -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 10, "", -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 11, "", -1, SQLITE_STATIC);
+		sqlite3_bind_int(stmt, 12, 0);
+		sqlite3_bind_int(stmt, 13, 0);
+		sqlite3_bind_int(stmt, 14, 0);
+		sqlite3_bind_int(stmt, 15, 0);
+		sqlite3_bind_int(stmt, 16, eit->source_id);
+		sqlite3_bind_text(stmt, 17, (const char*)dimension_dbids, -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 18, (const char*)values, -1, SQLITE_STATIC);
+		STEP_STMT(stmt, insert_evt_sql_name, insert_evt_sql);
+	AM_SI_LIST_END()
+}
+
 /**\brief 根据过滤器号取得相应控制数据*/
 static AM_EPG_TableCtl_t *am_epg_get_section_ctrl_by_fid(AM_EPG_Monitor_t *mon, int fid)
 {
@@ -945,15 +1119,13 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 			if ((data[1]&0x80) == 0)
 			{
 				AM_DEBUG(1, "EPG: section_syntax_indicator is 0, skip this section");
-				pthread_mutex_unlock(&mon->lock);
-				return;
+				goto handler_done;
 			}
 			
 			if (AM_SI_GetSectionHeader(mon->hsi, (uint8_t*)data, len, &header) != AM_SUCCESS)
 			{
 				AM_DEBUG(1, "EPG: section header error");
-				pthread_mutex_unlock(&mon->lock);
-				return;
+				goto handler_done;
 			}
 		
 			/*该section是否已经接收过*/
@@ -973,8 +1145,7 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 						((now - sec_ctrl->data_arrive_time) > sec_ctrl->repeat_distance))
 						TABLE_DONE();
 				}
-				pthread_mutex_unlock(&mon->lock);
-				return;
+				goto handler_done;
 			}
 		}
 		else
@@ -983,8 +1154,7 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 			if ((data[1]&0x80) != 0)
 			{
 				AM_DEBUG(1, "EPG: TDT/TOT section_syntax_indicator is 1, skip this section");
-				pthread_mutex_unlock(&mon->lock);
-				return;
+				goto handler_done;
 			}
 		}
 		/*数据处理*/
@@ -1007,42 +1177,8 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 				break;
 			case AM_SI_TID_TOT:
 			case AM_SI_TID_TDT:
-#ifdef USE_TDT_TIME
-			{
-				dvbpsi_tot_t *p_tot;
-				
-				if (AM_SI_DecodeSection(mon->hsi, sec_ctrl->pid, (uint8_t*)data, len, (void**)&p_tot) == AM_SUCCESS)
-				{
-					uint16_t mjd;
-					uint8_t hour, min, sec;
-					
-					p_tot->p_next = NULL;
-
-					/*取UTC时间*/
-					mjd = (uint16_t)(p_tot->i_utc_time >> 24);
-					hour = (uint8_t)(p_tot->i_utc_time >> 16);
-					min = (uint8_t)(p_tot->i_utc_time >> 8);
-					sec = (uint8_t)p_tot->i_utc_time;
-
-					pthread_mutex_lock(&time_lock);
-					curr_time.tdt_utc_time = AM_EPG_MJD2SEC(mjd) + AM_EPG_BCD2SEC(hour, min, sec);
-					/*更新system time，用于时间自动累加*/
-					AM_TIME_GetClock(&curr_time.tdt_sys_time);
-					pthread_mutex_unlock(&time_lock);
-	   
-					/*触发通知事件*/
-					AM_EVT_Signal((int)mon, AM_EPG_EVT_NEW_TDT, (void*)p_tot);
-					
-					/*释放改TDT/TOT*/
-					AM_SI_ReleaseSection(mon->hsi, p_tot->i_table_id, (void*)p_tot);
-
-					TABLE_DONE();
-				}
-			}
-#endif
-				pthread_mutex_unlock(&mon->lock);
-
-				return;
+				COLLECT_SECTION(dvbpsi_tot_t, mon->tots);
+				goto handler_done;
 				break;
 			case AM_SI_TID_EIT_PF_ACT:
 			case AM_SI_TID_EIT_PF_OTH:
@@ -1050,87 +1186,22 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 			case AM_SI_TID_EIT_SCHE_OTH:
 			case (AM_SI_TID_EIT_SCHE_ACT + 1):
 			case (AM_SI_TID_EIT_SCHE_OTH + 1):
-			{
-				dvbpsi_eit_t *p_eit;
-				
-				if (AM_SI_DecodeSection(mon->hsi, sec_ctrl->pid, (uint8_t*)data, len, (void**)&p_eit) == AM_SUCCESS)
-				{
-					AM_DEBUG(5, "EIT tid 0x%x, ext 0x%x, sec %x, last %x", header.table_id,
-								header.extension, header.sec_num, header.last_sec_num);
-					am_epg_tablectl_mark_section_eit(sec_ctrl, &header, data[12]);
-					/*触发通知事件*/
-					SIGNAL_EVENT(AM_EPG_EVT_NEW_EIT, (void*)p_eit);
-					/*释放该section*/
-					AM_SI_ReleaseSection(mon->hsi, p_eit->i_table_id, (void*)p_eit);
-
-					if (! mon->eit_has_data)
-						mon->eit_has_data = AM_TRUE;
-				}
-			}
+				COLLECT_SECTION(dvbpsi_eit_t, mon->eits);
 				break;
 			case AM_SI_TID_PSIP_MGT:
 				COLLECT_SECTION(dvbpsi_mgt_t, mon->mgts);
 				break;
 			case AM_SI_TID_PSIP_RRT:
-				AM_DEBUG(1, ">>>>>>>>>>>>RRT received! sec %x, last %x <<<<<<<<<<<<<", header.sec_num, header.last_sec_num);
+				AM_DEBUG(1, "RRT received! sec %x, last %x", header.sec_num, header.last_sec_num);
 				COLLECT_SECTION(dvbpsi_rrt_t, mon->rrts);
 				break;
 			case AM_SI_TID_PSIP_EIT:
-			{
-				eit_section_info_t *p_eit;
-
 				AM_DEBUG(1, "%s: tid 0x%x, source_id 0x%x, sec %x, last %x", sec_ctrl->tname, header.table_id,
 								header.extension, header.sec_num, header.last_sec_num);
-				if (AM_SI_DecodeSection(mon->hsi, sec_ctrl->pid, (uint8_t*)data, len, (void**)&p_eit) == AM_SUCCESS)
-				{
-					/*设置为已接收*/
-					am_epg_tablectl_mark_section(sec_ctrl, &header); 
-					/*触发通知事件*/
-					SIGNAL_EVENT(AM_EPG_EVT_NEW_PSIP_EIT, (void*)p_eit);
-					/*释放该section*/
-					AM_SI_ReleaseSection(mon->hsi, p_eit->i_table_id, (void*)p_eit);
-
-					if (! mon->eit_has_data)
-						mon->eit_has_data = AM_TRUE;
-				}
-				else
-				{
-					AM_DEBUG(1, "PSIP EIT decode failed");
-				}
-			}
+				COLLECT_SECTION(eit_section_info_t, mon->psip_eits);
 				break;
 			case AM_SI_TID_PSIP_STT:
-#ifdef USE_TDT_TIME
-			{
-				stt_section_info_t *p_stt;
-				
-				AM_DEBUG(1, ">>>>>>>New STT found");
-				
-				if (AM_SI_DecodeSection(mon->hsi, sec_ctrl->pid, (uint8_t*)data, len, (void**)&p_stt) == AM_SUCCESS)
-				{
-					uint16_t mjd;
-					uint8_t hour, min, sec;
-					
-					p_stt->p_next = NULL;
-					AM_DEBUG(1, ">>>>>>>STT UTC time is %u", p_stt->utc_time);
-					/*取UTC时间*/
-					pthread_mutex_lock(&time_lock);
-					curr_time.tdt_utc_time = p_stt->utc_time;
-					/*更新system time，用于时间自动累加*/
-					AM_TIME_GetClock(&curr_time.tdt_sys_time);
-					pthread_mutex_unlock(&time_lock);
-	   
-					/*触发通知事件*/
-					AM_EVT_Signal((int)mon, AM_EPG_EVT_NEW_STT, (void*)p_stt);
-					
-					/*释放改STT*/
-					AM_SI_ReleaseSection(mon->hsi, p_stt->i_table_id, (void*)p_stt);
-					
-					/*设置为已接收*/
-					am_epg_tablectl_mark_section(sec_ctrl, &header); 
-				}
-			}
-#endif			
+				COLLECT_SECTION(dvbpsi_stt_t, mon->stts);
 				break;
 			default:
 				AM_DEBUG(1, "EPG: Unkown section data, table_id 0x%x", data[0]);
@@ -1147,7 +1218,8 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 	{
 		AM_DEBUG(1, "EPG: Unknown filter id %d in dmx callback", fid);
 	}
-	
+
+handler_done:	
 	pthread_mutex_unlock(&mon->lock);
 
 }
@@ -1176,8 +1248,8 @@ static AM_ErrorCode_t am_epg_request_section(AM_EPG_Monitor_t *mon, AM_EPG_Table
 	param.filter.filter[0] = mcl->tid;
 	param.filter.mask[0] = mcl->tid_mask;
 
-	/*当前设置了需要监控的service,则设置PMT和EIT actual pf的extension*/
-	if (mon->mon_service != -1 && (mcl->tid == AM_SI_TID_PMT || mcl->tid == AM_SI_TID_EIT_PF_ACT))
+	/*当前设置了需要监控的service,则设置PMT的extension*/
+	if (mon->mon_service != -1 && mcl->tid == AM_SI_TID_PMT)
 	{
 		int srv_id = am_epg_get_current_service_id(mon);
 		AM_DEBUG(1, "Set filter for service %d", srv_id);
@@ -1249,40 +1321,8 @@ static int am_epg_get_current_db_ts_id(AM_EPG_Monitor_t *mon)
 	return db_ts_id;
 }
 
-static void add_audio(AM_EPG_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang[3])
-{
-	int i;
-	
-	for (i=0; i<ai->audio_count; i++)
-	{
-		if (ai->audios[i].pid == aud_pid)
-			return;
-	}
-	if (ai->audio_count >= 32)
-	{
-		AM_DEBUG(1, "Too many audios, Max count %d", 32);
-		return;
-	}
-	if (ai->audio_count < 0)
-		ai->audio_count = 0;
-	ai->audios[ai->audio_count].pid = aud_pid;
-	ai->audios[ai->audio_count].fmt = aud_fmt;
-	memset(ai->audios[ai->audio_count].lang, 0, sizeof(ai->audios[ai->audio_count].lang));
-	if (lang[0] != 0)
-	{
-		memcpy(ai->audios[ai->audio_count].lang, lang, 3);
-	}
-	else
-	{
-		sprintf(ai->audios[ai->audio_count].lang, "Audio%d", ai->audio_count+1);
-	}
-	
-	AM_DEBUG(1, "Add a audio: pid %d, language: %s", aud_pid, ai->audios[ai->audio_count].lang);
 
-	ai->audio_count++;
-}
-
-static void format_audio_strings(AM_EPG_AudioInfo_t *ai, char *pids, char *fmts, char *langs)
+static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, char *langs)
 {
 	int i;
 	
@@ -1415,7 +1455,7 @@ static void am_epg_check_pmt_update(AM_EPG_Monitor_t *mon)
 	int vfmt = -1, prev_vfmt = -1;
 	int vid = 0x1fff, prev_vid = 0x1fff;
 	int afmt_tmp, vfmt_tmp, db_ts_id;
-	AM_EPG_AudioInfo_t aud_info;
+	AM_SI_AudioInfo_t aud_info;
 	char lang_tmp[3];
 	char str_apids[256];
 	char str_afmts[256];
@@ -1460,94 +1500,7 @@ static void am_epg_check_pmt_update(AM_EPG_Monitor_t *mon)
 	AM_SI_LIST_BEGIN(mon->pmts, pmt)
 		/*取ES流信息*/
 		AM_SI_LIST_BEGIN(pmt->p_first_es, es)
-			afmt_tmp = -1;
-			vfmt_tmp = -1;
-			memset(lang_tmp, 0, sizeof(lang_tmp));
-			switch (es->i_type)
-			{
-				/*override by parse descriptor*/
-				case 0x6:
-					AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
-						switch (descr->i_tag)
-						{
-							case AM_SI_DESCR_AC3:
-							case AM_SI_DESCR_ENHANCED_AC3:
-								AM_DEBUG(0, "!!Found AC3 Descriptor!!!");
-								afmt_tmp = AFORMAT_AC3;
-								break;
-							case AM_SI_DESCR_AAC:
-								AM_DEBUG(0, "!!Found AAC Descriptor!!!");
-								afmt_tmp = AFORMAT_AAC;
-								break;
-							case AM_SI_DESCR_DTS:
-								AM_DEBUG(0, "!!Found DTS Descriptor!!!");
-								afmt_tmp = AFORMAT_DTS;
-								break;
-							default:
-								break;
-						}
-					AM_SI_LIST_END()
-					break;
-				/*video pid and video format*/
-				case 0x1:
-				case 0x2:
-					vfmt_tmp = VFORMAT_MPEG12;
-					break;
-				case 0x10:
-					vfmt_tmp = VFORMAT_MPEG4;
-					break;
-				case 0x1b:
-					vfmt_tmp = VFORMAT_H264;
-					break;
-				case 0xea:
-					vfmt_tmp = VFORMAT_VC1;
-					break;
-				/*audio pid and audio format*/ 
-				case 0x3:
-				case 0x4:
-					afmt_tmp = AFORMAT_MPEG;
-					break;
-				case 0x0f:
-					afmt_tmp = AFORMAT_AAC;
-					break;
-				case 0x11:
-					afmt_tmp = AFORMAT_AAC_LATM;
-					break;
-				case 0x81:
-					afmt_tmp = AFORMAT_AC3;
-					break;
-				case 0x8A:
-                case 0x82:
-                case 0x85:
-                case 0x86:
-                	afmt_tmp = AFORMAT_DTS;
-					break;
-				default:
-					break;
-			}
-			
-			/*添加音视频流*/
-			if (vfmt_tmp != -1)
-			{
-				vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
-				AM_DEBUG(3, "Set video format to %d", vfmt_tmp);
-				vfmt = vfmt_tmp;
-			}
-			if (afmt_tmp != -1)
-			{
-				AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
-					if (descr->i_tag == AM_SI_DESCR_ISO639 && descr->p_decoded != NULL)
-					{
-						dvbpsi_iso639_dr_t *pisod = (dvbpsi_iso639_dr_t*)descr->p_decoded;
-						if (pisod->i_code_count > 0) 
-						{
-							memcpy(lang_tmp, pisod->code[0].iso_639_code, sizeof(lang_tmp));
-							break;
-						}
-					}
-				AM_SI_LIST_END()
-				add_audio(&aud_info, es->i_pid, afmt_tmp, lang_tmp);
-			}
+			AM_SI_ExtractAVFromDVBES(es, &vid, &vfmt, &aud_info);
 		AM_SI_LIST_END()
 	AM_SI_LIST_END()
 	
@@ -1584,7 +1537,11 @@ static void am_epg_check_pmt_update(AM_EPG_Monitor_t *mon)
 					aud_pids='%s',aud_fmts='%s',aud_langs='%s', current_aud=-1 where db_id=%d", 
 					vid, vfmt, str_apids, str_afmts, str_alangs, mon->mon_service);
 				sqlite3_exec(hdb, sql, NULL, NULL, NULL);
-				
+				/* delete the previous teletext & subtitle */
+				snprintf(sql, sizeof(sql), "delete from subtitle_table where db_srv_id=%d", mon->mon_service);
+				sqlite3_exec(hdb, sql, NULL, NULL, NULL);
+				snprintf(sql, sizeof(sql), "delete from teletext_table where db_srv_id=%d", mon->mon_service);
+				sqlite3_exec(hdb, sql, NULL, NULL, NULL);
 				/*遍历PMT表*/
 				AM_SI_LIST_BEGIN(mon->pmts, pmt)
 					/*取ES流信息*/
@@ -1625,7 +1582,7 @@ static void am_epg_check_pmt_update(AM_EPG_Monitor_t *mon)
 				AM_SI_LIST_END()
 			
 				/*触发通知事件*/
-				SIGNAL_EVENT(AM_EPG_EVT_UPDATE_PROGRAM, (void*)mon->mon_service);
+				SIGNAL_EVENT(AM_EPG_EVT_UPDATE_PROGRAM_AV, (void*)mon->mon_service);
 			}
 		}
 	}
@@ -1718,7 +1675,7 @@ static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 				/*取节目名称*/
 				if (psd->i_service_name_length > 0)
 				{
-					AM_EPG_ConvertCode((char*)psd->i_service_name, psd->i_service_name_length,\
+					AM_SI_ConvertDVBTextCode((char*)psd->i_service_name, psd->i_service_name_length,\
 								name, AM_DB_MAX_SRV_NAME_LEN);
 					name[AM_DB_MAX_SRV_NAME_LEN] = 0;
 
@@ -1736,6 +1693,8 @@ static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 							sqlite3_step(update_stmt);
 							sqlite3_reset(update_stmt);
 							AM_DEBUG(1, "Update '%s' done!", name);
+							/*触发通知事件*/
+							SIGNAL_EVENT(AM_EPG_EVT_UPDATE_PROGRAM_NAME, (void*)db_srv_id);
 							if (! update)
 								update = AM_TRUE;
 						}
@@ -1760,11 +1719,6 @@ update_end:
 			sqlite3_finalize(stmt);
 		if (update_stmt != NULL)
 			sqlite3_finalize(update_stmt);
-		if (update)
-		{
-			/*触发通知事件*/
-			SIGNAL_EVENT(AM_EPG_EVT_UPDATE_PROGRAM, (void*)mon->mon_service);
-		}
 	}
 }
 
@@ -1775,7 +1729,8 @@ static void am_epg_nit_done(AM_EPG_Monitor_t *mon)
 
 	/*触发通知事件*/
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_NIT, (void*)mon->nits);
-
+	/* release for updating new tables */
+	RELEASE_TABLE_FROM_LIST(dvbpsi_nit_t, mon->nits);
 	/*监控下一版本*/
 	if (mon->nitctl.subctl)
 	{
@@ -1819,7 +1774,8 @@ static void am_epg_pat_done(AM_EPG_Monitor_t *mon)
 			AM_SI_LIST_END()
 		AM_SI_LIST_END()
 	}
-			
+	/* release for updating new tables */
+	RELEASE_TABLE_FROM_LIST(dvbpsi_pat_t, mon->pats);		
 }
 
 /**\brief PMT搜索完毕处理*/
@@ -1831,11 +1787,12 @@ static void am_epg_pmt_done(AM_EPG_Monitor_t *mon)
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_PMT, (void*)mon->pmts);
 	
 	am_epg_check_pmt_update(mon);
+	/* release for updating new tables */
+	RELEASE_TABLE_FROM_LIST(dvbpsi_pmt_t, mon->pmts);
 	
 	/*监控下一版本*/
 	if (mon->pmtctl.subctl)
 	{
-		//mon->pmtctl.subctl->ver++;
 		am_epg_request_section(mon, &mon->pmtctl);
 	}
 }
@@ -1847,11 +1804,12 @@ static void am_epg_cat_done(AM_EPG_Monitor_t *mon)
 
 	/*触发通知事件*/
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_CAT, (void*)mon->cats);
+	/* release for updating new tables */
+	RELEASE_TABLE_FROM_LIST(dvbpsi_cat_t, mon->cats);
 	
 	/*监控下一版本*/
 	if (mon->catctl.subctl)
 	{
-		//mon->catctl.subctl->ver++;
 		am_epg_request_section(mon, &mon->catctl);
 	}
 }
@@ -1865,11 +1823,12 @@ static void am_epg_sdt_done(AM_EPG_Monitor_t *mon)
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_SDT, (void*)mon->sdts);
 	
 	am_epg_check_sdt_update(mon);
+	/* release for updating new tables */
+	RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, mon->sdts);
 	
 	/*监控下一版本*/
 	if (mon->sdtctl.subctl)
 	{
-		//mon->sdtctl.subctl->ver++;
 		am_epg_request_section(mon, &mon->sdtctl);
 	}
 }
@@ -1878,7 +1837,9 @@ static void am_epg_sdt_done(AM_EPG_Monitor_t *mon)
 static void am_epg_tdt_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->totctl.fid);
-
+	
+	SIGNAL_EVENT(AM_EPG_EVT_NEW_TDT, (void*)mon->tots);\
+	
 	/*设置完成时间以进行下一次刷新*/
 	AM_TIME_GetClock(&mon->totctl.check_time);
 }
@@ -1888,21 +1849,9 @@ static void am_epg_eit4e_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->eit4ectl.fid);
 
-	if (mon->mon_service == -1)
-	{
-		/*设置完成时间以进行下一次刷新*/
-		AM_TIME_GetClock(&mon->eit4ectl.check_time);
-		mon->eit4ectl.data_arrive_time = 0;
-	}
-	else
-	{
-		/*监控下一版本*/
-		if (mon->eit4ectl.subctl)
-		{
-			//mon->eit4ectl.subctl->ver++;
-			am_epg_request_section(mon, &mon->eit4ectl);
-		}
-	}
+	/*设置完成时间以进行下一次刷新*/
+	AM_TIME_GetClock(&mon->eit4ectl.check_time);
+	mon->eit4ectl.data_arrive_time = 0;
 }
 
 /**\brief EIT pf other 搜索完毕处理*/
@@ -1972,7 +1921,10 @@ static void am_epg_eit61_done(AM_EPG_Monitor_t *mon)
 static void am_epg_stt_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->sttctl.fid);
-
+	
+	/*触发通知事件*/
+	SIGNAL_EVENT(AM_EPG_EVT_NEW_STT, (void*)mon->stts);
+		
 	/*设置完成时间以进行下一次刷新*/
 	AM_TIME_GetClock(&mon->sttctl.check_time);
 }
@@ -1984,11 +1936,12 @@ static void am_epg_rrt_done(AM_EPG_Monitor_t *mon)
 
 	/*触发通知事件*/
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_RRT, (void*)mon->rrts);
+	/* release for updating new tables */
+	RELEASE_TABLE_FROM_LIST(dvbpsi_rrt_t, mon->rrts);
 	
 	/*监控下一版本*/
 	if (mon->rrtctl.subctl)
 	{
-		//mon->rrtctl.subctl->ver++;
 		am_epg_request_section(mon, &mon->rrtctl);
 	}
 }
@@ -2037,11 +1990,12 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 	AM_SI_LIST_END()
 	AM_SI_LIST_END()
 	
+	/* release for updating new tables */
+	RELEASE_TABLE_FROM_LIST(dvbpsi_mgt_t, mon->mgts);
+	
 	/*监控下一版本*/
 	if (mon->mgtctl.subctl)
 	{
-		//mon->mgtctl.subctl->ver++;
-		AM_DEBUG(1, "Try next MGT, version = %d", mon->mgtctl.subctl->ver);
 		am_epg_request_section(mon, &mon->mgtctl);
 	}
 }
@@ -2072,35 +2026,35 @@ static void am_epg_tablectl_data_init(AM_EPG_Monitor_t *mon)
 	char name[32];
 	
 	am_epg_tablectl_init(&mon->patctl, AM_EPG_EVT_PAT_DONE, AM_SI_PID_PAT, AM_SI_TID_PAT,
-							 0xff, "PAT", 1, am_epg_pat_done, 0);
+							 0xff, "PAT", 1, am_epg_pat_done, 0, NULL);
 	am_epg_tablectl_init(&mon->pmtctl, AM_EPG_EVT_PMT_DONE, 0x1fff, 	   AM_SI_TID_PMT,
-							 0xff, "PMT", 1, am_epg_pmt_done, 0);
+							 0xff, "PMT", 1, am_epg_pmt_done, 0, NULL);
 	am_epg_tablectl_init(&mon->catctl, AM_EPG_EVT_CAT_DONE, AM_SI_PID_CAT, AM_SI_TID_CAT,
-							 0xff, "CAT", 1, am_epg_cat_done, 0);
+							 0xff, "CAT", 1, am_epg_cat_done, 0, NULL);
 	am_epg_tablectl_init(&mon->sdtctl, AM_EPG_EVT_SDT_DONE, AM_SI_PID_SDT, AM_SI_TID_SDT_ACT,
-							 0xff, "SDT", 1, am_epg_sdt_done, 0);
+							 0xff, "SDT", 1, am_epg_sdt_done, 0, NULL);
 	am_epg_tablectl_init(&mon->nitctl, AM_EPG_EVT_NIT_DONE, AM_SI_PID_NIT, AM_SI_TID_NIT_ACT,
-							 0xff, "NIT", 1, am_epg_nit_done, 0);
+							 0xff, "NIT", 1, am_epg_nit_done, 0, NULL);
 	am_epg_tablectl_init(&mon->totctl, AM_EPG_EVT_TDT_DONE, AM_SI_PID_TDT, AM_SI_TID_TOT,
-							 0xfc, "TDT/TOT", 1, am_epg_tdt_done, 0);
+							 0xfc, "TDT/TOT", 1, am_epg_tdt_done, 0, am_epg_proc_tot_section);
 	am_epg_tablectl_init(&mon->eit4ectl, AM_EPG_EVT_EIT4E_DONE, AM_SI_PID_EIT, AM_SI_TID_EIT_PF_ACT,
-							 0xff, "EIT pf actual", MAX_EIT4E_SUBTABLE_CNT, am_epg_eit4e_done, EIT4E_REPEAT_DISTANCE);
+							 0xff, "EIT pf actual", MAX_EIT4E_SUBTABLE_CNT, am_epg_eit4e_done, EIT4E_REPEAT_DISTANCE, am_epg_proc_eit_section);
 	am_epg_tablectl_init(&mon->eit4fctl, AM_EPG_EVT_EIT4F_DONE, AM_SI_PID_EIT, AM_SI_TID_EIT_PF_OTH,
-							 0xff, "EIT pf other", MAX_EIT_SUBTABLE_CNT, am_epg_eit4f_done, EIT4F_REPEAT_DISTANCE);
+							 0xff, "EIT pf other", MAX_EIT_SUBTABLE_CNT, am_epg_eit4f_done, EIT4F_REPEAT_DISTANCE, am_epg_proc_eit_section);
 	am_epg_tablectl_init(&mon->eit50ctl, AM_EPG_EVT_EIT50_DONE, AM_SI_PID_EIT, AM_SI_TID_EIT_SCHE_ACT,
-							 0xff, "EIT sche act(50)", MAX_EIT_SUBTABLE_CNT, am_epg_eit50_done, EIT50_REPEAT_DISTANCE);
+							 0xff, "EIT sche act(50)", MAX_EIT_SUBTABLE_CNT, am_epg_eit50_done, EIT50_REPEAT_DISTANCE, am_epg_proc_eit_section);
 	am_epg_tablectl_init(&mon->eit51ctl, AM_EPG_EVT_EIT51_DONE, AM_SI_PID_EIT, AM_SI_TID_EIT_SCHE_ACT + 1,
-							 0xff, "EIT sche act(51)", MAX_EIT_SUBTABLE_CNT, am_epg_eit51_done, EIT51_REPEAT_DISTANCE);
+							 0xff, "EIT sche act(51)", MAX_EIT_SUBTABLE_CNT, am_epg_eit51_done, EIT51_REPEAT_DISTANCE, am_epg_proc_eit_section);
 	am_epg_tablectl_init(&mon->eit60ctl, AM_EPG_EVT_EIT60_DONE, AM_SI_PID_EIT, AM_SI_TID_EIT_SCHE_OTH,
-							 0xff, "EIT sche other(60)", MAX_EIT_SUBTABLE_CNT, am_epg_eit60_done, EIT60_REPEAT_DISTANCE);
+							 0xff, "EIT sche other(60)", MAX_EIT_SUBTABLE_CNT, am_epg_eit60_done, EIT60_REPEAT_DISTANCE, am_epg_proc_eit_section);
 	am_epg_tablectl_init(&mon->eit61ctl, AM_EPG_EVT_EIT61_DONE, AM_SI_PID_EIT, AM_SI_TID_EIT_SCHE_OTH + 1,
-							 0xff, "EIT sche other(61)", MAX_EIT_SUBTABLE_CNT, am_epg_eit61_done, EIT61_REPEAT_DISTANCE);
+							 0xff, "EIT sche other(61)", MAX_EIT_SUBTABLE_CNT, am_epg_eit61_done, EIT61_REPEAT_DISTANCE, am_epg_proc_eit_section);
 	am_epg_tablectl_init(&mon->sttctl, AM_EPG_EVT_STT_DONE, AM_SI_ATSC_BASE_PID, AM_SI_TID_PSIP_STT,
-							 0xff, "STT", 1, am_epg_stt_done, 0);
+							 0xff, "STT", 1, am_epg_stt_done, 0, am_epg_proc_stt_section);
 	am_epg_tablectl_init(&mon->mgtctl, AM_EPG_EVT_MGT_DONE, AM_SI_ATSC_BASE_PID, AM_SI_TID_PSIP_MGT,
-							 0xff, "MGT", 1, am_epg_mgt_done, 0);
+							 0xff, "MGT", 1, am_epg_mgt_done, 0, NULL);
 	am_epg_tablectl_init(&mon->rrtctl, AM_EPG_EVT_RRT_DONE, AM_SI_ATSC_BASE_PID, AM_SI_TID_PSIP_RRT,
-							 0xff, "RRT", 1, am_epg_rrt_done, 0);
+							 0xff, "RRT", 1, am_epg_rrt_done, 0, am_epg_proc_rrt_section);
 	/*Set for USA
 	if (mon->rrtctl.subctl != NULL)
 		mon->rrtctl.subctl[0].ext = 0x1;*/
@@ -2109,7 +2063,7 @@ static void am_epg_tablectl_data_init(AM_EPG_Monitor_t *mon)
 	{
 		snprintf(name, sizeof(name), "ATSC EIT%d", i);
 		am_epg_tablectl_init(&mon->psip_eitctl[i], AM_EPG_EVT_PSIP_EIT_DONE, 0x1fff, AM_SI_TID_PSIP_EIT,
-							 0xff, name, MAX_EIT_SUBTABLE_CNT, am_epg_psip_eit_done, 5000);
+							 0xff, name, MAX_EIT_SUBTABLE_CNT, am_epg_psip_eit_done, 5000, am_epg_proc_psip_eit_section);
 	}
 }
 
@@ -2170,74 +2124,13 @@ static void am_epg_solve_fend_evt(AM_EPG_Monitor_t *mon)
 
 }
 
-/**\brief 检查并通知已预约的EPG事件*/
-static void am_epg_check_sub_events(AM_EPG_Monitor_t *mon)
-{
-	int now, row, db_evt_id;
-	int expired[32];
-	char sql[512];
-	sqlite3 *hdb;
-
-	AM_DB_HANDLE_PREPARE(hdb);
-
-	AM_EPG_GetUTCTime(&now);
-	
-	/*从evt_table中查找接下来即将开始播放的事件*/
-	snprintf(sql, sizeof(sql), "select evt_table.db_id from evt_table left join srv_table on srv_table.db_id = evt_table.db_srv_id \
-						where skip=0 and lock=0 and start>%d and start<=%d and sub_flag=1 and sub_status=0 order by start limit 1", 
-						now, now+EPG_PRE_NOTIFY_TIME/1000);
-	row = 1;
-	if (AM_DB_Select(hdb, sql, &row, "%d", &db_evt_id) == AM_SUCCESS && row > 0)
-	{
-		/*通知用户*/
-		SIGNAL_EVENT(AM_EPG_EVT_NEW_SUB_PLAY, (void*)db_evt_id);
-
-		/*更新预约播放状态*/
-		snprintf(sql, sizeof(sql), "update evt_table set sub_status=1 where db_id=%d", db_evt_id);
-		sqlite3_exec(hdb, sql, NULL, NULL, NULL);
-	}
-
-	/*从evt_table中查找立即开始的事件*/
-	snprintf(sql, sizeof(sql), "select evt_table.db_id from evt_table left join srv_table on srv_table.db_id = evt_table.db_srv_id \
-						where skip=0 and lock=0 and start<=%d and start>=%d and end>%d and \
-						sub_status=1 order by start limit 1", now, now-EPG_SUB_CHECK_TIME/1000, now);
-	row = 1;
-	if (AM_DB_Select(hdb, sql, &row, "%d", &db_evt_id) == AM_SUCCESS && row > 0)
-	{
-		/*通知用户*/
-		SIGNAL_EVENT(AM_EPG_EVT_SUB_PLAY_START, (void*)db_evt_id);
-
-		/*通知播放后取消预约标志*/
-		snprintf(sql, sizeof(sql), "update evt_table set sub_flag=0,sub_status=0 where db_id=%d", db_evt_id);
-		sqlite3_exec(hdb, sql, NULL, NULL, NULL);
-	}
-
-	/*从evt_table中查找过期的预约*/
-	snprintf(sql, sizeof(sql), "select db_id from evt_table where sub_flag=1 and (start<%d or end<%d)", 
-						now-EPG_SUB_CHECK_TIME/1000, now);
-	row = AM_ARRAY_SIZE(expired);
-	if (AM_DB_Select(hdb, sql, &row, "%d", expired) == AM_SUCCESS && row > 0)
-	{
-		int i;
-		for (i=0; i<row; i++)
-		{
-			/*取消预约标志*/
-			AM_DEBUG(1, "@@Subscription %d expired.",  expired[i]);
-			snprintf(sql, sizeof(sql), "update evt_table set sub_flag=0,sub_status=0 where db_id=%d", expired[i]);
-			sqlite3_exec(hdb, sql, NULL, NULL, NULL);
-		}
-	}
-	/*设置进行下次检查*/
-	AM_TIME_GetClock(&mon->sub_check_time);
-}
-
 /**\brief 检查EPG更新通知*/
 static void am_epg_check_update(AM_EPG_Monitor_t *mon)
 {
 	/*触发通知事件*/
 	if (mon->eit_has_data)
 	{
-		SIGNAL_EVENT(AM_EPG_EVT_EIT_UPDATE, NULL);
+		SIGNAL_EVENT(AM_EPG_EVT_UPDATE_EVENTS, NULL);
 		mon->eit_has_data = AM_FALSE;
 	}
 	AM_TIME_GetClock(&mon->new_eit_check_time);
@@ -2299,13 +2192,10 @@ static void am_epg_get_next_ms(AM_EPG_Monitor_t *mon, int *ms)
 	REFRESH_CHECK(eit, eit51, AM_EPG_SCAN_EIT_SCHE_ACT, mon->eitsche_check_time);
 	REFRESH_CHECK(eit, eit60, AM_EPG_SCAN_EIT_SCHE_OTH, mon->eitsche_check_time);
 	REFRESH_CHECK(eit, eit61, AM_EPG_SCAN_EIT_SCHE_OTH, mon->eitsche_check_time);
-	
 	REFRESH_CHECK(stt, stt, AM_EPG_SCAN_STT, STT_CHECK_DISTANCE);
 
 	/*EIT数据更新通知检查*/
 	EVENT_CHECK(mon->new_eit_check_time, NEW_EIT_CHECK_DISTANCE, am_epg_check_update);
-	/*EPG预约播放检查*/
-	EVENT_CHECK(mon->sub_check_time, EPG_SUB_CHECK_TIME, am_epg_check_sub_events);
 
 	AM_DEBUG(2, "Next timeout is %d ms", min);
 	*ms = min;
@@ -2318,7 +2208,6 @@ static void *am_epg_thread(void *para)
 	AM_Bool_t go = AM_TRUE;
 	int distance, ret, evt_flag, i;
 	struct timespec rt;
-	struct dvb_frontend_info info;
 	int dbopen = 0;
 	
 	/*Reset the TDT time while epg start*/
@@ -2330,11 +2219,6 @@ static void *am_epg_thread(void *para)
 
 	/*控制数据初始化*/
 	am_epg_tablectl_data_init(mon);
-
-	/*获得当前前端参数*/
-	AM_FEND_GetInfo(mon->fend_dev, &info);
-	mon->src = am_epg_convert_fetype_to_source(info.type);
-	mon->curr_ts = -1;
 	
 	/*注册前端事件*/
 	AM_EVT_Subscribe(mon->fend_dev, AM_FEND_EVT_STATUS_CHANGED, am_epg_fend_callback, (void*)mon);
@@ -2421,7 +2305,7 @@ handle_events:
 				mon->psip_eitctl[0].done(mon);
 			/*设置监控模式事件*/
 			if (evt_flag & AM_EPG_EVT_SET_MODE)
-				am_epg_set_mode(mon, AM_TRUE);
+				am_epg_set_mode(mon, AM_FALSE);
 			/*设置EIT PF自动更新间隔*/
 			if (evt_flag & AM_EPG_EVT_SET_EITPF_CHECK_TIME)
 			{
@@ -2454,12 +2338,7 @@ handle_events:
 				{
 					AM_DEBUG(1, "TS changed, %d -> %d", mon->curr_ts, db_ts_id);
 					mon->curr_ts = db_ts_id;
-					SIGNAL_EVENT(AM_EPG_EVT_CHANGE_TS, (void*)db_ts_id);
 				}
-				mon->eit4ectl.subs = 1;
-				/*重新设置PAT 和 EIT actual pf*/
-				SET_MODE(pat, patctl, AM_EPG_SCAN_PAT, AM_TRUE);
-				SET_MODE(eit, eit4ectl, AM_EPG_SCAN_EIT_PF_ACT, AM_TRUE);
 			}
 
 			/*退出事件*/
@@ -2555,6 +2434,7 @@ AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, int *handle)
 	mon->eitpf_check_time = EITPF_CHECK_DISTANCE;
 	mon->eitsche_check_time = EITSCHE_CHECK_DISTANCE;
 	mon->mon_service = -1;
+	mon->curr_ts = -1;
 	mon->psip_eit_count = 2;
 	AM_TIME_GetClock(&mon->new_eit_check_time);
 	mon->eit_has_data = AM_FALSE;
@@ -2738,113 +2618,6 @@ AM_ErrorCode_t AM_EPG_SetEITScheCheckDistance(int handle, int distance)
 	pthread_mutex_unlock(&mon->lock);
 
 	return AM_SUCCESS;
-}
-
-/**\brief 字符编码转换
- * \param [in] in_code 需要转换的字符数据
- * \param in_len 需要转换的字符数据长度
- * \param [out] out_code 转换后的字符数据
- * \param out_len 输出字符缓冲区大小
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
- */
-AM_ErrorCode_t AM_EPG_ConvertCode(char *in_code,int in_len,char *out_code,int out_len)
-{
-    iconv_t handle;
-    char **pin=&in_code;
-    char **pout=&out_code;
-    char fbyte;
-    char cod[32];
-    
-	if (!in_code || !out_code || in_len <= 0 || out_len <= 0)
-		return AM_FAILURE;
-
-	memset(out_code,0,out_len);
-	 
-	/*查找输入编码方式*/
-	if (strcmp(FORCE_DEFAULT_CODE, ""))
-	{
-		/*强制将输入按默认编码处理*/
-		strcpy(cod, FORCE_DEFAULT_CODE);
-	}
-	else if (in_len <= 1)
-	{
-		pin = &in_code;
-		strcpy(cod, "ISO-8859-1");
-	}
-	else
-	{
-		fbyte = in_code[0];
-		if (fbyte >= 0x01 && fbyte <= 0x0B)
-			sprintf(cod, "ISO-8859-%d", fbyte + 4);
-		else if (fbyte >= 0x0C && fbyte <= 0x0F)
-		{
-			/*Reserved for future use, we set to ISO8859-1*/
-			strcpy(cod, "ISO-8859-1");
-		}
-		else if (fbyte == 0x10 && in_len >= 3)
-		{
-			uint16_t val = (uint16_t)(((uint16_t)in_code[1]<<8) | (uint16_t)in_code[2]);
-			if (val >= 0x0001 && val <= 0x000F)
-			{
-				sprintf(cod, "ISO-8859-%d", val);
-			}
-			else
-			{
-				/*Reserved for future use, we set to ISO8859-1*/
-				strcpy(cod, "ISO-8859-1");
-			}
-			in_code += 2;
-			in_len -= 2;
-		}
-		else if (fbyte == 0x11)
-			strcpy(cod, "UTF-16");
-		else if (fbyte == 0x13)
-			strcpy(cod, "GB2312");
-		else if (fbyte == 0x14)
-			strcpy(cod, "UCS-2BE");
-		else if (fbyte == 0x15)
-			strcpy(cod, "utf-8");
-		else if (fbyte >= 0x20)
-			strcpy(cod, "ISO6937");
-		else
-			return AM_FAILURE;
-
-		/*调整输入*/
-		if (fbyte < 0x20)
-		{
-			in_code++;
-			in_len--;
-		}
-		pin = &in_code;
-		
-	}
-
-	if (! strcmp(cod, "ISO6937"))
-	{
-		return am_epg_convert_iso6937_to_utf8(in_code,in_len,out_code,&out_len);
-	}
-	else
-	{
-		AM_DEBUG(7, "%s --> utf-8, in_len %d, out_len %d", cod, in_len, out_len);	
-		handle=iconv_open("utf-8",cod);
-
-		if (handle == (iconv_t)-1)
-		{
-			AM_DEBUG(1, "AM_EPG_ConvertCode iconv_open err: %s",strerror(errno));
-			return AM_FAILURE;
-		}
-
-		if(iconv(handle,pin,(size_t *)&in_len,pout,(size_t *)&out_len) == -1)
-		{
-		    AM_DEBUG(1, "AM_EPG_ConvertCode iconv err: %s, in_len %d, out_len %d", strerror(errno), in_len, out_len);
-		    iconv_close(handle);
-		    return AM_FAILURE;
-		}
-
-		return iconv_close(handle);
-	}
 }
 
 /**\brief 获得当前UTC时间

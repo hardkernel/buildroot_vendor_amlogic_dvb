@@ -21,7 +21,11 @@ extern "C"
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
-
+#define EVT_NAME_LEN 256
+#define ITEM_DESCR_LEN 256
+#define ITEM_CHAR_LEN 1024
+#define EVT_TEXT_LEN 1024
+#define EXT_TEXT_LEN 2048
 
 /****************************************************************************
  * Type definitions
@@ -80,6 +84,7 @@ typedef struct
 	int				repeat_distance;	/**< 多子表时允许的最小数据重复间隔，用于多子表时收齐判断*/
 	char			tname[20];
 	void 			(*done)(struct AM_EPG_Monitor_s *);
+	void 			(*proc_sec)(struct AM_EPG_Monitor_s *, void *);
 	
 	uint16_t subs;				/**< 子表个数*/
 	AM_EPG_SubCtl_t *subctl; 	/**< 子表控制数据*/
@@ -148,16 +153,15 @@ typedef struct
 	int offset;				/**< 时区偏移，秒为单位，可以为负数*/
 }AM_EPG_Time_t;
 
-typedef struct
+typedef struct ExtendedEventItem_s
 {
-	int		audio_count;
-	struct
-	{
-		int		pid;	/**< audio PID*/
-		int		fmt;	/**< audio format*/
-		char	lang[10];	/**< audio language*/	
-	}audios[32];
-}AM_EPG_AudioInfo_t;
+	int char_len;
+	char item_descr[ITEM_DESCR_LEN+1];
+	char item_char[ITEM_CHAR_LEN+1]; /**< 1KB*/
+
+	struct ExtendedEventItem_s *next;
+}ExtendedEventItem;
+
 
 /****************************************************************************
  * Function prototypes  

@@ -97,11 +97,9 @@ enum AM_EPG_EventType
 	AM_EPG_EVT_NEW_MGT,		/**< 发新新版本MGT， 参数为mgt_section_info_t*/
 	AM_EPG_EVT_NEW_PSIP_EIT,/**< 发新新版本ATSC EIT， 参数为eit_section_info_t*/
 	AM_EPG_EVT_EIT_DONE,   /**< 所有EIT接收完毕*/
-	AM_EPG_EVT_EIT_UPDATE,	/**< 通知接收到新的EIT数据，用于上层实现更新*/
-	AM_EPG_EVT_NEW_SUB_PLAY,	/**< 提前通知有将开始的预约节目要播放,参数为db_evt_id*/
-	AM_EPG_EVT_SUB_PLAY_START,	/**< 预约节目即将切换播放,参数为db_evt_id*/
-	AM_EPG_EVT_CHANGE_TS,	/**< 频点切换*/
-	AM_EPG_EVT_UPDATE_PROGRAM,	/**< 节目信息更新*/
+	AM_EPG_EVT_UPDATE_EVENTS,	/**< 通知接收到新的EIT events 数据，用于上层实现更新*/
+	AM_EPG_EVT_UPDATE_PROGRAM_AV,	/**< 节目音视频播放信息更新*/
+	AM_EPG_EVT_UPDATE_PROGRAM_NAME,	/**< 节目名更新*/
 	AM_EPG_EVT_UPDATE_TS,	/**< 节目信息更新*/
 	AM_EPG_EVT_END
 };
