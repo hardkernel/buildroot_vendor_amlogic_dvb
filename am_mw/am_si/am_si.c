@@ -17,6 +17,9 @@
 #include "am_si.h"
 #include "am_si_internal.h"
 #include <am_mem.h>
+#include <am_av.h>
+#include <am_iconv.h>
+#include <errno.h>
 
 /****************************************************************************
  * Macro definitions
@@ -45,6 +48,9 @@
 			p_table = NULL;\
 		}\
 	AM_MACRO_END
+
+/*DVB字符默认编码,在进行DVB字符转码时会强制使用该编码为输入编码*/
+#define DEFAULT_DVB_CODE ""/*"GB2312"*/
 
 /****************************************************************************
  * Static data
@@ -447,6 +453,456 @@ void si_decode_descriptor(dvbpsi_descriptor_t *des)
 	
 }
 
+
+/**\brief 将ISO6937转换为UTF-8编码*/
+static AM_ErrorCode_t si_convert_iso6937_to_utf8(const char *src, int src_len, char *dest, int *dest_len)
+{     
+	uint16_t ch;
+	int dlen, i;
+	uint8_t b;
+	char *ucs2 = NULL;
+
+#define READ_BYTE()\
+	({\
+		uint8_t ret;\
+		if (i >= src_len) ret=0;\
+		else ret = (uint8_t)src[i];\
+		i++;\
+		ret;\
+	})
+	
+	if (!src || !dest || !dest_len || src_len <= 0)
+		return -1;
+		
+	/* first covert to UCS-2, then iconv to utf8 */
+	ucs2 = (char *)malloc(src_len*2);
+	if (!ucs2)
+		return -1;
+	dlen = 0;
+	i=0;
+	b = READ_BYTE();
+	if (b < 0x20)
+	{
+		/* ISO 6937 encoding must start with character between 0x20 and 0xFF
+		 otherwise it is dfferent encoding table
+		 for example 0x05 means encoding table 8859-9 */
+		return -1;
+	}
+	
+	while (b != 0)
+	{
+		ch = 0x00;
+		switch (b)
+		{
+			/* at first single byte characters */
+			case 0xA8: ch = 0x00A4; break;
+			case 0xA9: ch = 0x2018; break;
+			case 0xAA: ch = 0x201C; break;
+			case 0xAC: ch = 0x2190; break;
+			case 0xAD: ch = 0x2191; break;
+			case 0xAE: ch = 0x2192; break;
+			case 0xAF: ch = 0x2193; break;
+			case 0xB4: ch = 0x00D7; break;
+			case 0xB8: ch = 0x00F7; break;
+			case 0xB9: ch = 0x2019; break;
+			case 0xBA: ch = 0x201D; break;
+			case 0xD0: ch = 0x2014; break;
+			case 0xD1: ch = 0xB9; break;
+			case 0xD2: ch = 0xAE; break;
+			case 0xD3: ch = 0xA9; break;
+			case 0xD4: ch = 0x2122; break;
+			case 0xD5: ch = 0x266A; break;
+			case 0xD6: ch = 0xAC; break;
+			case 0xD7: ch = 0xA6; break;
+			case 0xDC: ch = 0x215B; break;
+			case 0xDD: ch = 0x215C; break;
+			case 0xDE: ch = 0x215D; break;
+			case 0xDF: ch = 0x215E; break;
+			case 0xE0: ch = 0x2126; break;
+			case 0xE1: ch = 0xC6; break;
+			case 0xE2: ch = 0xD0; break;
+			case 0xE3: ch = 0xAA; break;
+			case 0xE4: ch = 0x126; break;
+			case 0xE6: ch = 0x132; break;
+			case 0xE7: ch = 0x013F; break;
+			case 0xE8: ch = 0x141; break;
+			case 0xE9: ch = 0xD8; break;
+			case 0xEA: ch = 0x152; break;
+			case 0xEB: ch = 0xBA; break;
+			case 0xEC: ch = 0xDE; break;
+			case 0xED: ch = 0x166; break;
+			case 0xEE: ch = 0x014A; break;
+			case 0xEF: ch = 0x149; break;
+			case 0xF0: ch = 0x138; break;
+			case 0xF1: ch = 0xE6; break;
+			case 0xF2: ch = 0x111; break;
+			case 0xF3: ch = 0xF0; break;
+			case 0xF4: ch = 0x127; break;
+			case 0xF5: ch = 0x131; break;
+			case 0xF6: ch = 0x133; break;
+			case 0xF7: ch = 0x140; break;
+			case 0xF8: ch = 0x142; break;
+			case 0xF9: ch = 0xF8; break;
+			case 0xFA: ch = 0x153; break;
+			case 0xFB: ch = 0xDF; break;
+			case 0xFC: ch = 0xFE; break;
+			case 0xFD: ch = 0x167; break;
+			case 0xFE: ch = 0x014B; break;
+			case 0xFF: ch = 0xAD; break;
+			/* multibyte */
+			case 0xC1:
+				b = READ_BYTE();
+				switch (b)
+				{
+					case 0x41: ch = 0xC0; break;
+					case 0x45: ch = 0xC8; break;
+					case 0x49: ch = 0xCC; break;
+					case 0x4F: ch = 0xD2; break;
+					case 0x55: ch = 0xD9; break;
+					case 0x61: ch = 0xE0; break;
+					case 0x65: ch = 0xE8; break;
+					case 0x69: ch = 0xEC; break;
+					case 0x6F: ch = 0xF2; break;
+					case 0x75: ch = 0xF9; break;
+					// unknown character --> fallback
+					default: ch = b; break;
+				}
+				break;
+			case 0xC2:
+				b = READ_BYTE();
+				switch (b)
+				{
+					case 0x20: ch = 0xB4; break;
+					case 0x41: ch = 0xC1; break;
+					case 0x43: ch = 0x106; break;
+					case 0x45: ch = 0xC9; break;
+					case 0x49: ch = 0xCD; break;
+					case 0x4C: ch = 0x139; break;
+					case 0x4E: ch = 0x143; break;
+					case 0x4F: ch = 0xD3; break;
+					case 0x52: ch = 0x154; break;
+					case 0x53: ch = 0x015A; break;
+					case 0x55: ch = 0xDA; break;
+					case 0x59: ch = 0xDD; break;
+					case 0x5A: ch = 0x179; break;
+					case 0x61: ch = 0xE1; break;
+					case 0x63: ch = 0x107; break;
+					case 0x65: ch = 0xE9; break;
+					case 0x69: ch = 0xED; break;
+					case 0x6C: ch = 0x013A; break;
+					case 0x6E: ch = 0x144; break;
+					case 0x6F: ch = 0xF3; break;
+					case 0x72: ch = 0x155; break;
+					case 0x73: ch = 0x015B; break;
+					case 0x75: ch = 0xFA; break;
+					case 0x79: ch = 0xFD; break;
+					case 0x7A: ch = 0x017A; break;
+					// unknown character --> fallback
+					default: ch = b; break;
+				}
+				break;
+
+			case 0xC3:
+				b = READ_BYTE();
+				switch (b)
+				{
+					case 0x41: ch = 0xC2; break;
+					case 0x43: ch = 0x108; break;
+					case 0x45: ch = 0xCA; break;
+					case 0x47: ch = 0x011C; break;
+					case 0x48: ch = 0x124; break;
+					case 0x49: ch = 0xCE; break;
+					case 0x4A: ch = 0x134; break;
+					case 0x4F: ch = 0xD4; break;
+					case 0x53: ch = 0x015C; break;
+					case 0x55: ch = 0xDB; break;
+					case 0x57: ch = 0x174; break;
+					case 0x59: ch = 0x176; break;
+					case 0x61: ch = 0xE2; break;
+					case 0x63: ch = 0x109; break;
+					case 0x65: ch = 0xEA; break;
+					case 0x67: ch = 0x011D; break;
+					case 0x68: ch = 0x125; break;
+					case 0x69: ch = 0xEE; break;
+					case 0x6A: ch = 0x135; break;
+					case 0x6F: ch = 0xF4; break;
+					case 0x73: ch = 0x015D; break;
+					case 0x75: ch = 0xFB; break;
+					case 0x77: ch = 0x175; break;
+					case 0x79: ch = 0x177; break;
+					// unknown character --> fallback
+					default: ch = b; break;
+				}
+				break;
+			case 0xC4:
+				b = READ_BYTE();
+				switch (b)
+				{
+					case 0x41: ch = 0xC3; break;
+					case 0x49: ch = 0x128; break;
+					case 0x4E: ch = 0xD1; break;
+					case 0x4F: ch = 0xD5; break;
+					case 0x55: ch = 0x168; break;
+					case 0x61: ch = 0xE3; break;
+					case 0x69: ch = 0x129; break;
+					case 0x6E: ch = 0xF1; break;
+					case 0x6F: ch = 0xF5; break;
+					case 0x75: ch = 0x169; break;
+					// unknown character --> fallback
+					default: ch = b; break;
+				}
+				break;
+			case 0xC5:
+				b = READ_BYTE();
+				switch (b)
+				{
+					case 0x20: ch = 0xAF; break;
+					case 0x41: ch = 0x100; break;
+					case 0x45: ch = 0x112; break;
+					case 0x49: ch = 0x012A; break;
+					case 0x4F: ch = 0x014C; break;
+					case 0x55: ch = 0x016A; break;
+					case 0x61: ch = 0x101; break;
+					case 0x65: ch = 0x113; break;
+					case 0x69: ch = 0x012B; break;
+					case 0x6F: ch = 0x014D; break;
+					case 0x75: ch = 0x016B; break;
+					// unknown character --> fallback
+					default: ch = b; break;
+				}
+				break;
+			case 0xC6:
+				b = READ_BYTE();
+				switch (b)
+				{
+					case 0x20: ch = 0x02D8; break;
+					case 0x41: ch = 0x102; break;
+					case 0x47: ch = 0x011E; break;
+					case 0x55: ch = 0x016C; break;
+					case 0x61: ch = 0x103; break;
+					case 0x67: ch = 0x011F; break;
+					case 0x75: ch = 0x016D; break;
+					// unknown character --> fallback
+					default: ch = b; break;
+				}
+				break;
+			case 0xC7:
+				b = READ_BYTE();
+				switch (b)
+				{
+					case 0x20: ch = 0x02D9; break;
+					case 0x43: ch = 0x010A; break;
+					case 0x45: ch = 0x116; break;
+					case 0x47: ch = 0x120; break;
+					case 0x49: ch = 0x130; break;
+					case 0x5A: ch = 0x017B; break;
+					case 0x63: ch = 0x010B; break;
+					case 0x65: ch = 0x117; break;
+					case 0x67: ch = 0x121; break;
+					case 0x7A: ch = 0x017C; break;
+					// unknown character --> fallback
+					default: ch = b; break;
+				}
+				break;
+			case 0xC8:
+				b = READ_BYTE();
+				switch (b)
+				{
+					case 0x20: ch = 0xA8; break;
+					case 0x41: ch = 0xC4; break;
+					case 0x45: ch = 0xCB; break;
+					case 0x49: ch = 0xCF; break;
+					case 0x4F: ch = 0xD6; break;
+					case 0x55: ch = 0xDC; break;
+					case 0x59: ch = 0x178; break;
+					case 0x61: ch = 0xE4; break;
+					case 0x65: ch = 0xEB; break;
+					case 0x69: ch = 0xEF; break;
+					case 0x6F: ch = 0xF6; break;
+					case 0x75: ch = 0xFC; break;
+					case 0x79: ch = 0xFF; break;
+					// unknown character --> fallback
+					default: ch = b; break;
+				}
+				break;
+			case 0xCA:
+				b = READ_BYTE();
+				switch (b)
+				{
+					case 0x20: ch = 0x02DA; break;
+					case 0x41: ch = 0xC5; break;
+					case 0x55: ch = 0x016E; break;
+					case 0x61: ch = 0xE5; break;
+					case 0x75: ch = 0x016F; break;
+					// unknown character --> fallback
+					default: ch = b; break;
+				}
+				break;
+			case 0xCB:
+				b = READ_BYTE();
+				switch (b)
+				{
+					case 0x20: ch = 0xB8; break;
+					case 0x43: ch = 0xC7; break;
+					case 0x47: ch = 0x122; break;
+					case 0x4B: ch = 0x136; break;
+					case 0x4C: ch = 0x013B; break;
+					case 0x4E: ch = 0x145; break;
+					case 0x52: ch = 0x156; break;
+					case 0x53: ch = 0x015E; break;
+					case 0x54: ch = 0x162; break;
+					case 0x63: ch = 0xE7; break;
+					case 0x67: ch = 0x123; break;
+					case 0x6B: ch = 0x137; break;
+					case 0x6C: ch = 0x013C; break;
+					case 0x6E: ch = 0x146; break;
+					case 0x72: ch = 0x157; break;
+					case 0x73: ch = 0x015F; break;
+					case 0x74: ch = 0x163; break;
+					// unknown character --> fallback
+					default: ch = b; break;
+				}
+				break;
+			case 0xCD:
+				b = READ_BYTE();
+				switch (b)
+				{
+					case 0x20: ch = 0x02DD; break;
+					case 0x4F: ch = 0x150; break;
+					case 0x55: ch = 0x170; break;
+					case 0x6F: ch = 0x151; break;
+					case 0x75: ch = 0x171; break;
+					// unknown character --> fallback
+					default: ch = b; break;
+				}
+				break;
+			case 0xCE:
+				b = READ_BYTE();
+				switch (b)
+				{
+					case 0x20: ch = 0x02DB; break;
+					case 0x41: ch = 0x104; break;
+					case 0x45: ch = 0x118; break;
+					case 0x49: ch = 0x012E; break;
+					case 0x55: ch = 0x172; break;
+					case 0x61: ch = 0x105; break;
+					case 0x65: ch = 0x119; break;
+					case 0x69: ch = 0x012F; break;
+					case 0x75: ch = 0x173; break;
+					// unknown character --> fallback
+					default: ch = b; break;
+				}
+				break;
+			case 0xCF:
+				b = READ_BYTE();
+				switch (b)
+				{
+					case 0x20: ch = 0x02C7; break;
+					case 0x43: ch = 0x010C; break;
+					case 0x44: ch = 0x010E; break;
+					case 0x45: ch = 0x011A; break;
+					case 0x4C: ch = 0x013D; break;
+					case 0x4E: ch = 0x147; break;
+					case 0x52: ch = 0x158; break;
+					case 0x53: ch = 0x160; break;
+					case 0x54: ch = 0x164; break;
+					case 0x5A: ch = 0x017D; break;
+					case 0x63: ch = 0x010D; break;
+					case 0x64: ch = 0x010F; break;
+					case 0x65: ch = 0x011B; break;
+					case 0x6C: ch = 0x013E; break;
+					case 0x6E: ch = 0x148; break;
+					case 0x72: ch = 0x159; break;
+					case 0x73: ch = 0x161; break;
+					case 0x74: ch = 0x165; break;
+					case 0x7A: ch = 0x017E; break;
+					// unknown character --> fallback
+					default: ch = b; break;
+				}
+				break;
+			/* rest is the same */
+			default: ch = b; break;
+		}
+		if (b != 0)
+		{
+			b = READ_BYTE();
+		}
+		if (ch != 0)
+		{
+			/* dest buffer not enough, and this will not happen */
+			if ((dlen+1) >= (src_len*2))
+				goto iso6937_end;
+			ucs2[dlen++] = (ch&0xff00) >> 8;
+			ucs2[dlen++] = ch;
+		}
+	}
+	
+iso6937_end:
+	if (dlen > 0)
+	{
+		iconv_t handle;
+		char *org_ucs2 = ucs2;
+		char **pin=&ucs2;
+		char **pout=&dest;
+		
+		handle=iconv_open("utf-8","ucs-2");
+
+		if (handle == (iconv_t)-1)
+		{
+			AM_DEBUG(1, "iconv_open err: %s",strerror(errno));
+			return AM_FAILURE;
+		}
+
+		if((int)iconv(handle,pin,(size_t *)&dlen,pout,(size_t *)dest_len) == -1)
+		{
+		    AM_DEBUG(1, "iconv err: %s", strerror(errno));
+		    iconv_close(handle);
+		    return AM_FAILURE;
+		}
+		
+		free(org_ucs2);
+
+		return iconv_close(handle);
+    }
+    
+    free(ucs2);
+    
+    return -1;
+} 
+
+static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang[3])
+{
+	int i;
+	
+	for (i=0; i<ai->audio_count; i++)
+	{
+		if (ai->audios[i].pid == aud_pid)
+			return;
+	}
+	if (ai->audio_count >= AM_SI_MAX_AUD_CNT)
+	{
+		AM_DEBUG(1, "Too many audios, Max count %d", AM_SI_MAX_AUD_CNT);
+		return;
+	}
+	if (ai->audio_count < 0)
+		ai->audio_count = 0;
+	ai->audios[ai->audio_count].pid = aud_pid;
+	ai->audios[ai->audio_count].fmt = aud_fmt;
+	memset(ai->audios[ai->audio_count].lang, 0, sizeof(ai->audios[ai->audio_count].lang));
+	if (lang[0] != 0)
+	{
+		memcpy(ai->audios[ai->audio_count].lang, lang, 3);
+	}
+	else
+	{
+		sprintf(ai->audios[ai->audio_count].lang, "Audio%d", ai->audio_count+1);
+	}
+	
+	AM_DEBUG(1, "Add a audio: pid %d, language: %s", aud_pid, ai->audios[ai->audio_count].lang);
+
+	ai->audio_count++;
+}
+
 /****************************************************************************
  * API functions
  ***************************************************************************/
@@ -727,3 +1183,278 @@ AM_ErrorCode_t AM_SI_GetSectionHeader(int handle, uint8_t *buf, uint16_t len, AM
 
 	return AM_SUCCESS;
 }
+
+
+/**\brief 按DVB标准将输入字符转成UTF-8编码
+ * \param [in] in_code 需要转换的字符数据
+ * \param in_len 需要转换的字符数据长度
+ * \param [out] out_code 转换后的字符数据
+ * \param out_len 输出字符缓冲区大小
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_si.h)
+ */
+AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,int out_len)
+{
+    iconv_t handle;
+    char **pin=&in_code;
+    char **pout=&out_code;
+    char fbyte;
+    char cod[32];
+    
+	if (!in_code || !out_code || in_len <= 0 || out_len <= 0)
+		return AM_FAILURE;
+
+	memset(out_code,0,out_len);
+	 
+	/*查找输入编码方式*/
+	if (strcmp(DEFAULT_DVB_CODE, ""))
+	{
+		/*强制将输入按默认编码处理*/
+		strcpy(cod, DEFAULT_DVB_CODE);
+	}
+	else if (in_len <= 1)
+	{
+		pin = &in_code;
+		strcpy(cod, "ISO-8859-1");
+	}
+	else
+	{
+		fbyte = in_code[0];
+		if (fbyte >= 0x01 && fbyte <= 0x0B)
+			sprintf(cod, "ISO-8859-%d", fbyte + 4);
+		else if (fbyte >= 0x0C && fbyte <= 0x0F)
+		{
+			/*Reserved for future use, we set to ISO8859-1*/
+			strcpy(cod, "ISO-8859-1");
+		}
+		else if (fbyte == 0x10 && in_len >= 3)
+		{
+			uint16_t val = (uint16_t)(((uint16_t)in_code[1]<<8) | (uint16_t)in_code[2]);
+			if (val >= 0x0001 && val <= 0x000F)
+			{
+				sprintf(cod, "ISO-8859-%d", val);
+			}
+			else
+			{
+				/*Reserved for future use, we set to ISO8859-1*/
+				strcpy(cod, "ISO-8859-1");
+			}
+			in_code += 2;
+			in_len -= 2;
+		}
+		else if (fbyte == 0x11)
+			strcpy(cod, "UTF-16");
+		else if (fbyte == 0x13)
+			strcpy(cod, "GB2312");
+		else if (fbyte == 0x14)
+			strcpy(cod, "UCS-2BE");
+		else if (fbyte == 0x15)
+			strcpy(cod, "utf-8");
+		else if (fbyte >= 0x20)
+			strcpy(cod, "ISO6937");
+		else
+			return AM_FAILURE;
+
+		/*调整输入*/
+		if (fbyte < 0x20)
+		{
+			in_code++;
+			in_len--;
+		}
+		pin = &in_code;
+		
+	}
+
+	if (! strcmp(cod, "ISO6937"))
+	{
+		return si_convert_iso6937_to_utf8(in_code,in_len,out_code,&out_len);
+	}
+	else
+	{
+		handle=iconv_open("utf-8",cod);
+
+		if (handle == (iconv_t)-1)
+		{
+			AM_DEBUG(1, "Covert DVB text code failed, iconv_open err: %s",strerror(errno));
+			return AM_FAILURE;
+		}
+
+		if((int)iconv(handle,pin,(size_t *)&in_len,pout,(size_t *)&out_len) == -1)
+		{
+		    AM_DEBUG(1, "Covert DVB text code failed, iconv err: %s, in_len %d, out_len %d", 
+		    	strerror(errno), in_len, out_len);
+		    iconv_close(handle);
+		    return AM_FAILURE;
+		}
+
+		return iconv_close(handle);
+	}
+}
+
+/**\brief 按DVB标准从一个ES流中提取音视频
+ * \param [in] es ES流
+ * \param [out] vid 提取出的视频PID
+ * \param [out] vfmt 提取出的视频压缩格式
+ * \param [out] aud_info 提取出的音频数据
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_si.h)
+ */
+AM_ErrorCode_t AM_SI_ExtractAVFromDVBES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info)
+{
+	char lang_tmp[3];
+	int afmt_tmp, vfmt_tmp;
+	dvbpsi_descriptor_t *descr;
+	
+	afmt_tmp = -1;
+	vfmt_tmp = -1;
+	memset(lang_tmp, 0, sizeof(lang_tmp));
+	switch (es->i_type)
+	{
+		/*override by parse descriptor*/
+		case 0x6:
+			AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+				switch (descr->i_tag)
+				{
+					case AM_SI_DESCR_AC3:
+					case AM_SI_DESCR_ENHANCED_AC3:
+						AM_DEBUG(1, "!!Found AC3 Descriptor!!!");
+						afmt_tmp = AFORMAT_AC3;
+						break;
+					case AM_SI_DESCR_AAC:
+						AM_DEBUG(1, "!!Found AAC Descriptor!!!");
+						afmt_tmp = AFORMAT_AAC;
+						break;
+					case AM_SI_DESCR_DTS:
+						AM_DEBUG(1, "!!Found DTS Descriptor!!!");
+						afmt_tmp = AFORMAT_DTS;
+						break;
+					default:
+						break;
+				}
+			AM_SI_LIST_END()
+			break;
+		/*video pid and video format*/
+		case 0x1:
+		case 0x2:
+			vfmt_tmp = VFORMAT_MPEG12;
+			break;
+		case 0x10:
+			vfmt_tmp = VFORMAT_MPEG4;
+			break;
+		case 0x1b:
+			vfmt_tmp = VFORMAT_H264;
+			break;
+		case 0xea:
+			vfmt_tmp = VFORMAT_VC1;
+			break;
+		/*audio pid and audio format*/ 
+		case 0x3:
+		case 0x4:
+			afmt_tmp = AFORMAT_MPEG;
+			break;
+		case 0x0f:
+			afmt_tmp = AFORMAT_AAC;
+			break;
+		case 0x11:
+			afmt_tmp = AFORMAT_AAC_LATM;
+			break;
+		case 0x81:
+			afmt_tmp = AFORMAT_AC3;
+			break;
+		case 0x8A:
+        case 0x82:
+        case 0x85:
+        case 0x86:
+        	afmt_tmp = AFORMAT_DTS;
+			break;
+		default:
+			break;
+	}
+	
+	/*添加音视频流*/
+	if (vfmt_tmp != -1)
+	{
+		*vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;	
+		AM_DEBUG(3, "Set video format to %d", vfmt_tmp);
+		*vfmt = vfmt_tmp;
+	}
+	if (afmt_tmp != -1)
+	{
+		AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+			if (descr->i_tag == AM_SI_DESCR_ISO639 && descr->p_decoded != NULL)
+			{
+				dvbpsi_iso639_dr_t *pisod = (dvbpsi_iso639_dr_t*)descr->p_decoded;
+				if (pisod->i_code_count > 0) 
+				{
+					memcpy(lang_tmp, pisod->code[0].iso_639_code, sizeof(lang_tmp));
+					break;
+				}
+			}
+		AM_SI_LIST_END()
+		/* Add a audio */
+		si_add_audio(aud_info, es->i_pid, afmt_tmp, lang_tmp);
+	}
+	
+	return AM_SUCCESS;
+}
+
+/**\brief 按ATSC标准从一个ES流中提取音视频
+ * \param [in] es ES流
+ * \param [out] vid 提取出的视频PID
+ * \param [out] vfmt 提取出的视频压缩格式
+ * \param [out] aud_info 提取出的音频数据
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_si.h)
+ */
+AM_ErrorCode_t AM_SI_ExtractAVFromATSCES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info)
+{
+	char lang_tmp[3];
+	int afmt_tmp, vfmt_tmp;
+	dvbpsi_descriptor_t *descr;
+	
+	afmt_tmp = -1;
+	vfmt_tmp = -1;
+	memset(lang_tmp, 0, sizeof(lang_tmp));
+
+	switch (es->i_type)
+	{
+		/*video pid and video format*/
+		case 0x02:
+			vfmt_tmp = VFORMAT_MPEG12;
+			break;
+		/*audio pid and audio format*/
+		case 0x81:
+			afmt_tmp = AFORMAT_AC3;
+			break;
+		default:
+			break;
+	}
+	if (vfmt_tmp != -1)
+	{
+		*vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
+		*vfmt = vfmt_tmp;
+	}
+	if (afmt_tmp != -1)
+	{
+		AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+			if (descr->i_tag == AM_SI_DESCR_ISO639 && descr->p_decoded != NULL)
+			{
+				dvbpsi_iso639_dr_t *pisod = (dvbpsi_iso639_dr_t*)descr->p_decoded;
+				if (pisod->i_code_count > 0) 
+				{
+					memcpy(lang_tmp, pisod->code[0].iso_639_code, sizeof(lang_tmp));
+					break;
+				}
+			}
+		AM_SI_LIST_END()
+		/* Add a audio */
+		si_add_audio(aud_info, es->i_pid, afmt_tmp, lang_tmp);
+	}
+
+	return AM_SUCCESS;
+}
+
+

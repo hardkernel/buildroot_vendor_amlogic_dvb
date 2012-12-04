@@ -164,6 +164,9 @@ extern "C"
 /**\brief 遍历SI提供的链表结束*/
 #define AM_SI_LIST_END() }
 
+/*单个Program最大支持的音频个数*/
+#define AM_SI_MAX_AUD_CNT 32
+
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
@@ -194,6 +197,19 @@ typedef struct
     uint8_t		sec_num;			/**< section_number*/
     uint8_t		last_sec_num;		/**< last_section_number*/
 }AM_SI_SectionHeader_t;
+
+/**\brief ES流中描述的音视频数据*/
+typedef struct
+{
+	int		audio_count;
+	struct
+	{
+		int		pid;	/**< audio PID*/
+		int		fmt;	/**< audio format*/
+		char	lang[10];	/**< audio language*/	
+	}audios[32];
+}AM_SI_AudioInfo_t;
+
 
 /****************************************************************************
  * Function prototypes  
@@ -254,6 +270,39 @@ extern AM_ErrorCode_t AM_SI_ReleaseSection(int handle, uint8_t table_id, void *s
  *   - 其他值 错误代码(见am_si.h)
  */
 extern AM_ErrorCode_t AM_SI_GetSectionHeader(int handle, uint8_t *buf, uint16_t len, AM_SI_SectionHeader_t *sec_header);
+
+/**\brief 按DVB标准将输入字符转成UTF-8编码
+ * \param [in] in_code 需要转换的字符数据
+ * \param in_len 需要转换的字符数据长度
+ * \param [out] out_code 转换后的字符数据
+ * \param out_len 输出字符缓冲区大小
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_si.h)
+ */
+extern AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,int out_len);
+
+/**\brief 按DVB标准从一个ES流中提取音视频
+ * \param [in] es ES流
+ * \param [out] vid 提取出的视频PID
+ * \param [out] vfmt 提取出的视频压缩格式
+ * \param [out] aud_info 提取出的音频数据
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_si.h)
+ */
+extern AM_ErrorCode_t AM_SI_ExtractAVFromDVBES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info);
+
+/**\brief 按ATSC标准从一个ES流中提取音视频
+ * \param [in] es ES流
+ * \param [out] vid 提取出的视频PID
+ * \param [out] vfmt 提取出的视频压缩格式
+ * \param [out] aud_info 提取出的音频数据
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_si.h)
+ */
+extern AM_ErrorCode_t AM_SI_ExtractAVFromATSCES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info);
 
 #ifdef __cplusplus
 }
