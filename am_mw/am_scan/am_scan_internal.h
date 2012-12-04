@@ -21,9 +21,6 @@ extern "C"
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
-/*最大支持的音频个数*/
-#define AM_SCAN_MAX_AUD_CNT 32
-
 /*卫星盲扫最大缓冲TP个数*/
 #define AM_SCAN_MAX_BS_TP_CNT 128
 
@@ -228,30 +225,18 @@ typedef struct
 	AM_SCAN_TS_t **tses;
 }AM_SCAN_RecTab_t;
 
-/**\brief 音频数据*/
-typedef struct
-{
-	int		audio_count;
-	struct
-	{
-		int		pid;	/**< audio PID*/
-		int		fmt;	/**< audio format*/
-		char	lang[10];	/**< audio language*/	
-	}audios[AM_SCAN_MAX_AUD_CNT];
-}AM_SCAN_AudioInfo_t;
-
 /**\brief service结构*/
 typedef struct
 {
 	uint8_t srv_type, eit_sche, eit_pf, rs, free_ca, access_controlled, hidden, hide_guide;;
-	uint16_t vid, aid1, aid2, srv_id;
+	int vid, aid1, aid2, srv_id;
 	int vfmt, chan_num, afmt_tmp, vfmt_tmp, scrambled_flag, major_chan_num, minor_chan_num, source_id;
 	int src, srv_dbid, satpara_dbid;
 	char name[AM_DB_MAX_SRV_NAME_LEN + 1];
 	char str_apids[256];
 	char str_afmts[256];
 	char str_alangs[256];
-	AM_SCAN_AudioInfo_t aud_info;
+	AM_SI_AudioInfo_t aud_info;
 }AM_SCAN_ServiceInfo_t;
 
 /**\brief 搜索中间数据*/

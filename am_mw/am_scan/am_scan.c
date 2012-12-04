@@ -252,7 +252,7 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner);
 static AM_ErrorCode_t am_scan_start_dtv(AM_SCAN_Scanner_t *scanner);
 static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner);
 
-extern AM_ErrorCode_t AM_EPG_ConvertCode(char *in_code,int in_len,char *out_code,int out_len);
+extern AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,int out_len);
 
 static void am_scan_rec_tab_init(AM_SCAN_RecTab_t *tab)
 {
@@ -574,42 +574,8 @@ static int insert_teletext(sqlite3_stmt **stmts, int db_srv_id, int pid, dvbpsi_
 	return 0;
 }
 
-/**\brief 添加一个audio*/
-static void add_audio(AM_SCAN_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang[3])
-{
-	int i;
-	
-	for (i=0; i<ai->audio_count; i++)
-	{
-		if (ai->audios[i].pid == aud_pid)
-			return;
-	}
-	if (ai->audio_count >= AM_SCAN_MAX_AUD_CNT)
-	{
-		AM_DEBUG(1, "Too many audios, Max count %d", AM_SCAN_MAX_AUD_CNT);
-		return;
-	}
-	if (ai->audio_count < 0)
-		ai->audio_count = 0;
-	ai->audios[ai->audio_count].pid = aud_pid;
-	ai->audios[ai->audio_count].fmt = aud_fmt;
-	memset(ai->audios[ai->audio_count].lang, 0, sizeof(ai->audios[ai->audio_count].lang));
-	if (lang[0] != 0)
-	{
-		memcpy(ai->audios[ai->audio_count].lang, lang, 3);
-	}
-	else
-	{
-		sprintf(ai->audios[ai->audio_count].lang, "Audio%d", ai->audio_count+1);
-	}
-	
-	AM_DEBUG(1, "Add a audio: pid %d, language: %s", aud_pid, ai->audios[ai->audio_count].lang);
-
-	ai->audio_count++;
-}
-
 /**\brief 将audio数据格式化成字符串已便存入数据库*/
-static void format_audio_strings(AM_SCAN_AudioInfo_t *ai, char *pids, char *fmts, char *langs)
+static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, char *langs)
 {
 	int i;
 	
@@ -768,7 +734,7 @@ static int am_scan_get_ts_network(sqlite3_stmt **stmts, int src, dvbpsi_nit_t *n
 					/*取网络名称*/
 					if (descr->i_length > 0)
 					{
-						AM_EPG_ConvertCode((char*)pnn->i_network_name, descr->i_length,\
+						AM_SI_ConvertDVBTextCode((char*)pnn->i_network_name, descr->i_length,\
 									netname, 255);
 						netname[255] = 0;
 						break;
@@ -916,105 +882,6 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, int standard, AM_S
 		srv_info->str_apids, srv_info->str_afmts, srv_info->str_alangs);
 }
 
-
-/**\brief 从一个ES流中提取音视频*/
-static void am_scan_extract_dvb_av_from_es(dvbpsi_pmt_es_t *es, uint16_t *vid, int *vfmt, AM_SCAN_AudioInfo_t *aud_info)
-{
-	char lang_tmp[3];
-	int afmt_tmp, vfmt_tmp;
-	dvbpsi_descriptor_t *descr;
-	
-	afmt_tmp = -1;
-	vfmt_tmp = -1;
-	memset(lang_tmp, 0, sizeof(lang_tmp));
-	switch (es->i_type)
-	{
-		/*override by parse descriptor*/
-		case 0x6:
-			AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
-				switch (descr->i_tag)
-				{
-					case AM_SI_DESCR_AC3:
-					case AM_SI_DESCR_ENHANCED_AC3:
-						AM_DEBUG(1, "!!Found AC3 Descriptor!!!");
-						afmt_tmp = AFORMAT_AC3;
-						break;
-					case AM_SI_DESCR_AAC:
-						AM_DEBUG(1, "!!Found AAC Descriptor!!!");
-						afmt_tmp = AFORMAT_AAC;
-						break;
-					case AM_SI_DESCR_DTS:
-						AM_DEBUG(1, "!!Found DTS Descriptor!!!");
-						afmt_tmp = AFORMAT_DTS;
-						break;
-					default:
-						break;
-				}
-			AM_SI_LIST_END()
-			break;
-		/*video pid and video format*/
-		case 0x1:
-		case 0x2:
-			vfmt_tmp = VFORMAT_MPEG12;
-			break;
-		case 0x10:
-			vfmt_tmp = VFORMAT_MPEG4;
-			break;
-		case 0x1b:
-			vfmt_tmp = VFORMAT_H264;
-			break;
-		case 0xea:
-			vfmt_tmp = VFORMAT_VC1;
-			break;
-		/*audio pid and audio format*/ 
-		case 0x3:
-		case 0x4:
-			afmt_tmp = AFORMAT_MPEG;
-			break;
-		case 0x0f:
-			afmt_tmp = AFORMAT_AAC;
-			break;
-		case 0x11:
-			afmt_tmp = AFORMAT_AAC_LATM;
-			break;
-		case 0x81:
-			afmt_tmp = AFORMAT_AC3;
-			break;
-		case 0x8A:
-        case 0x82:
-        case 0x85:
-        case 0x86:
-        	afmt_tmp = AFORMAT_DTS;
-			break;
-		default:
-			break;
-	}
-	
-	/*添加音视频流*/
-	if (vfmt_tmp != -1)
-	{
-		*vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
-		AM_DEBUG(3, "Set video format to %d", vfmt_tmp);
-		*vfmt = vfmt_tmp;
-	}
-	if (afmt_tmp != -1)
-	{
-		AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
-			if (descr->i_tag == AM_SI_DESCR_ISO639 && descr->p_decoded != NULL)
-			{
-				dvbpsi_iso639_dr_t *pisod = (dvbpsi_iso639_dr_t*)descr->p_decoded;
-				if (pisod->i_code_count > 0) 
-				{
-					memcpy(lang_tmp, pisod->code[0].iso_639_code, sizeof(lang_tmp));
-					break;
-				}
-			}
-		AM_SI_LIST_END()
-		/* Add a audio */
-		add_audio(aud_info, es->i_pid, afmt_tmp, lang_tmp);
-	}
-}
-
 /**\brief 从一个ES流中提取teletext & subtitle*/
 static void am_scan_extract_ttx_sub_from_es(sqlite3_stmt **stmts, int srv_dbid, dvbpsi_pmt_es_t *es)
 {
@@ -1095,7 +962,7 @@ static void am_scan_extract_srv_info_from_sdt(dvbpsi_sdt_t *sdts, AM_SCAN_Servic
 				/*取节目名称*/
 				if (psd->i_service_name_length > 0)
 				{
-					AM_EPG_ConvertCode((char*)psd->i_service_name, psd->i_service_name_length,\
+					AM_SI_ConvertDVBTextCode((char*)psd->i_service_name, psd->i_service_name_length,\
 								srv_info->name, AM_DB_MAX_SRV_NAME_LEN);
 					srv_info->name[AM_DB_MAX_SRV_NAME_LEN] = 0;
 				}
@@ -1114,6 +981,39 @@ static void am_scan_extract_srv_info_from_sdt(dvbpsi_sdt_t *sdts, AM_SCAN_Servic
 		}
 	AM_SI_LIST_END()
 	AM_SI_LIST_END()
+}
+
+static void add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang[3])
+{
+	int i;
+	
+	for (i=0; i<ai->audio_count; i++)
+	{
+		if (ai->audios[i].pid == aud_pid)
+			return;
+	}
+	if (ai->audio_count >= AM_SI_MAX_AUD_CNT)
+	{
+		AM_DEBUG(1, "Too many audios, Max count %d", AM_SI_MAX_AUD_CNT);
+		return;
+	}
+	if (ai->audio_count < 0)
+		ai->audio_count = 0;
+	ai->audios[ai->audio_count].pid = aud_pid;
+	ai->audios[ai->audio_count].fmt = aud_fmt;
+	memset(ai->audios[ai->audio_count].lang, 0, sizeof(ai->audios[ai->audio_count].lang));
+	if (lang[0] != 0)
+	{
+		memcpy(ai->audios[ai->audio_count].lang, lang, 3);
+	}
+	else
+	{
+		sprintf(ai->audios[ai->audio_count].lang, "Audio%d", ai->audio_count+1);
+	}
+	
+	AM_DEBUG(1, "Add a audio: pid %d, language: %s", aud_pid, ai->audios[ai->audio_count].lang);
+
+	ai->audio_count++;
 }
 
 /**\brief Store a Analog TS to database */
@@ -1254,7 +1154,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 		/*取ES流信息*/
 		AM_SI_LIST_BEGIN(pmt->p_first_es, es)
 			/* 提取音视频流 */
-			am_scan_extract_dvb_av_from_es(es, &srv_info.vid, &srv_info.vfmt, &srv_info.aud_info);
+			AM_SI_ExtractAVFromDVBES(es, &srv_info.vid, &srv_info.vfmt, &srv_info.aud_info);
 			/* 提取subtitle & teletext */
 			am_scan_extract_ttx_sub_from_es(stmts, srv_info.srv_dbid, es);
 			/* 查找CA加扰标识 */
