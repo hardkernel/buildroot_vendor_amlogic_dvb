@@ -344,11 +344,18 @@ static AM_ErrorCode_t am_scan_open_vdin(AM_SCAN_Scanner_t *scanner)
 
 static AM_ErrorCode_t am_scan_close_vdin(AM_SCAN_Scanner_t *scanner)
 {
-	if (scanner->atvctl.vdin_fd >= 0) 
-	{
-		close(scanner->atvctl.vdin_fd);
-		scanner->atvctl.vdin_fd = -1;
-	}
+if (scanner->atvctl.vdin_fd >= 0) 
+{
+//*************************ADD**********************************
+if (ioctl(scanner->atvctl.vdin_fd, TVIN_IOC_CLOSE) < 0) 
+{
+            AM_DEBUG(1, "Vdin openTVIN_IOC_CLOSEport, error(%s)!", strerror(errno));
+        }
+//*************************FINISH**********************************
+        close(scanner->atvctl.vdin_fd);
+        scanner->atvctl.vdin_fd = -1;
+}
+
 	
 	return AM_SUCCESS;
 }
