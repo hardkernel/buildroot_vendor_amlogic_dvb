@@ -312,6 +312,27 @@ static int am_scan_rec_tab_have_src(AM_SCAN_RecTab_t *tab, int id)
 	return 0;
 }
 
+static int am_scan_format_atv_freq(int tmp_freq) 
+{
+	int tmp_val = 0;
+
+	tmp_val = (tmp_freq % ATV_1MHZ) / ATV_10KHZ;
+
+	if (tmp_val >= 0 && tmp_val <= 30) 
+	{
+		tmp_val = 25;
+	} 
+	else if (tmp_val >= 70 && tmp_val <= 80) 
+	{
+		tmp_val = 75;
+	}
+
+	tmp_freq = (tmp_freq / ATV_1MHZ) * ATV_1MHZ + tmp_val * ATV_10KHZ;
+
+	return tmp_freq;
+}
+
+
 /**\brief Open VDIN device*/
 static AM_ErrorCode_t am_scan_open_vdin(AM_SCAN_Scanner_t *scanner)
 {
@@ -3419,7 +3440,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			
 			/* Analog processing */
 			scanner->curr_ts->type = AM_SCAN_TS_ANALOG;
-			scanner->curr_ts->analog.freq = scanner->atvctl.afc_locked_freq;
+			scanner->curr_ts->analog.freq = am_scan_format_atv_freq(scanner->atvctl.afc_locked_freq);
 			scanner->curr_ts->analog.audio_std = dvb_fend_para(cur_fe_para)->u.analog.soundsys;
 			scanner->curr_ts->analog.video_std = dvb_fend_para(cur_fe_para)->u.analog.std;
 			/*添加到搜索结果列表*/
