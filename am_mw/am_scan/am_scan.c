@@ -199,7 +199,7 @@ const char *sql_stmts[MAX_STMT] =
 	"update net_table set name=? where db_id=?",
 	"select db_id from ts_table where src=? and freq=? and db_sat_para_id=? and polar=?",
 	"insert into ts_table(src,freq,db_sat_para_id,polar) values(?,?,?,?)",
-	"update ts_table set db_net_id=?,ts_id=?,symb=?,mod=?,bw=?,snr=?,ber=?,strength=?,aud_fmt=?,vid_fmt=?,flags=0 where db_id=?",
+	"update ts_table set db_net_id=?,ts_id=?,symb=?,mod=?,bw=?,snr=?,ber=?,strength=?,std=?,aud_mode=?,flags=0 where db_id=?",
 	"delete  from srv_table where db_ts_id=?",
 	"select db_id from srv_table where db_net_id=? and db_ts_id=? and service_id=?",
 	"insert into srv_table(db_net_id, db_ts_id,service_id) values(?,?,?)",
@@ -799,8 +799,8 @@ static void am_scan_update_ts_info(sqlite3_stmt **stmts, int net_dbid, int dbid,
 	sqlite3_bind_int(stmts[UPDATE_TS], 6, (ts->type!=AM_SCAN_TS_ANALOG) ? ts->digital.snr : 0);
 	sqlite3_bind_int(stmts[UPDATE_TS], 7, (ts->type!=AM_SCAN_TS_ANALOG) ? ts->digital.ber : 0);
 	sqlite3_bind_int(stmts[UPDATE_TS], 8, (ts->type!=AM_SCAN_TS_ANALOG) ? ts->digital.strength : 0);
-	sqlite3_bind_int(stmts[UPDATE_TS], 9, (ts->type==AM_SCAN_TS_ANALOG) ? ts->analog.audio_std : -1);
-	sqlite3_bind_int(stmts[UPDATE_TS], 10,(ts->type==AM_SCAN_TS_ANALOG) ?  ts->analog.video_std : -1);
+	sqlite3_bind_int(stmts[UPDATE_TS], 9, (ts->type==AM_SCAN_TS_ANALOG) ? ts->analog.std : -1);
+	sqlite3_bind_int(stmts[UPDATE_TS], 10,(ts->type==AM_SCAN_TS_ANALOG) ?  1/*Stereo*/ : -1);
 	sqlite3_bind_int(stmts[UPDATE_TS], 11, dbid);
 	sqlite3_step(stmts[UPDATE_TS]);
 	sqlite3_reset(stmts[UPDATE_TS]);
@@ -1080,9 +1080,9 @@ static void store_analog_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_S
 			AM_DEBUG(1, "insert new srv error");
 			return;
 		}
-		srv_info.vfmt = ts->analog.video_std;
+		srv_info.vfmt = -1;
 		memset(lang_tmp, 0, sizeof(lang_tmp));
-		add_audio(&srv_info.aud_info, 0x1fff, ts->analog.audio_std, lang_tmp);
+		add_audio(&srv_info.aud_info, 0x1fff, -1, lang_tmp);
 		format_audio_strings(&srv_info.aud_info, srv_info.str_apids, srv_info.str_afmts, srv_info.str_alangs);
 		srv_info.chan_num = 0;
 		srv_info.srv_type = AM_SCAN_SRV_ATV; 
@@ -3448,8 +3448,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			/* Analog processing */
 			scanner->curr_ts->type = AM_SCAN_TS_ANALOG;
 			scanner->curr_ts->analog.freq = am_scan_format_atv_freq(scanner->atvctl.afc_locked_freq);
-			scanner->curr_ts->analog.audio_std = dvb_fend_para(cur_fe_para)->u.analog.soundsys;
-			scanner->curr_ts->analog.video_std = dvb_fend_para(cur_fe_para)->u.analog.std;
+			scanner->curr_ts->analog.std = dvb_fend_para(cur_fe_para)->u.analog.std;
 			/*添加到搜索结果列表*/
 			APPEND_TO_LIST(AM_SCAN_TS_t, scanner->curr_ts, scanner->result.tses);
 			if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL)
@@ -3896,8 +3895,7 @@ static void am_scan_copy_atv_feparas(AM_SCAN_ATVCreatePara_t *para, AM_SCAN_Fron
 		AM_DEBUG(1, "ATV fe_para mode %d, freq %u", fe_start->dtv_para.m_type, dvb_fend_para(fe_start->dtv_para)->frequency);
 		if (para->mode != AM_SCAN_ATVMODE_FREQ)
 		{
-			dvb_fend_para(fe_start->dtv_para)->u.analog.soundsys = para->default_aud_std;
-			dvb_fend_para(fe_start->dtv_para)->u.analog.std = para->default_vid_std;
+			dvb_fend_para(fe_start->dtv_para)->u.analog.std = para->default_std;
 		}
 		dvb_fend_para(fe_start->dtv_para)->u.analog.flag |= ANALOG_FLAG_ENABLE_AFC;
 		if (para->afc_range <= 0)
