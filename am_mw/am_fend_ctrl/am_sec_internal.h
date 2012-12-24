@@ -135,6 +135,7 @@ typedef enum {
 	CUR_TONE,             // current continuous tone
 	SATCR,                // current SatCR
 	SEC_TIMEOUTCOUNT,	// needed for timeout
+	CUR_LOCALOSCILLATOR,
 	NUM_DATA_ENTRIES
 }AM_SEC_FEND_DATA;
 

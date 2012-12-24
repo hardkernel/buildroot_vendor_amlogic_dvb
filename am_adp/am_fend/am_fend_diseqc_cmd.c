@@ -758,6 +758,8 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetChannelFreq(int dev_no, int freq)
 AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerHalt(int dev_no)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_DEBUG(1, "AM_FEND_Diseqccmd_SetPositionerHalt\n");
 	
 	struct dvb_diseqc_master_cmd cmd;
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
@@ -811,6 +813,8 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_EnablePositionerLimit(int dev_no)
 AM_ErrorCode_t AM_FEND_Diseqccmd_DisablePositionerLimit(int dev_no)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_DEBUG(1, "AM_FEND_Diseqccmd_DisablePositionerLimit\n");
 	
 	struct dvb_diseqc_master_cmd cmd;
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
@@ -837,6 +841,8 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_DisablePositionerLimit(int dev_no)
 AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerELimit(int dev_no)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_DEBUG(1, "AM_FEND_Diseqccmd_SetPositionerELimit\n");
 	
 	struct dvb_diseqc_master_cmd cmd;
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
@@ -863,6 +869,8 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerELimit(int dev_no)
 AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerWLimit(int dev_no)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_DEBUG(1, "AM_FEND_Diseqccmd_SetPositionerWLimit\n");
 	
 	struct dvb_diseqc_master_cmd cmd;
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
@@ -890,6 +898,8 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetPositionerWLimit(int dev_no)
 AM_ErrorCode_t AM_FEND_Diseqccmd_PositionerGoE(int dev_no, unsigned char unit)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_DEBUG(1, "AM_FEND_Diseqccmd_PositionerGoE\n");
 	
 	struct dvb_diseqc_master_cmd cmd;
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
@@ -918,6 +928,8 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_PositionerGoE(int dev_no, unsigned char unit)
 AM_ErrorCode_t AM_FEND_Diseqccmd_PositionerGoW(int dev_no, unsigned char unit)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_DEBUG(1, "AM_FEND_Diseqccmd_PositionerGoW\n");
 	
 	struct dvb_diseqc_master_cmd cmd;
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
@@ -946,6 +958,8 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_PositionerGoW(int dev_no, unsigned char unit)
 AM_ErrorCode_t AM_FEND_Diseqccmd_StorePosition(int dev_no, unsigned char position)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_DEBUG(1, "AM_FEND_Diseqccmd_StorePosition %d\n", position);
 	
 	struct dvb_diseqc_master_cmd cmd;
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
@@ -974,6 +988,8 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_StorePosition(int dev_no, unsigned char positio
 AM_ErrorCode_t AM_FEND_Diseqccmd_GotoPositioner(int dev_no, unsigned char position)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_DEBUG(1, "AM_FEND_Diseqccmd_GotoPositioner %d\n", position);
 	
 	struct dvb_diseqc_master_cmd cmd;
 	memset(&cmd, 0, sizeof(struct dvb_diseqc_master_cmd));
@@ -1477,7 +1493,7 @@ int AM_ProduceAngularPositioner(int dev_no, double local_longitude, double local
 			RotorCmd |= 0xE000;
 		}
 	}
-	AM_DEBUG(1, "RotorCmd = %04x", RotorCmd);	
+	AM_DEBUG(1, "AM_ProduceAngularPositioner RotorCmd = %04x", RotorCmd);	
 
 	return RotorCmd;
 }

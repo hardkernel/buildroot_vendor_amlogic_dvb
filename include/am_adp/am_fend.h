@@ -57,6 +57,10 @@ enum AM_FEND_EventType
 {
 	AM_FEND_EVT_BASE=AM_EVT_TYPE_BASE(AM_MOD_FEND),
 	AM_FEND_EVT_STATUS_CHANGED,    /**< 前端状态发生改变，参数为struct dvb_frontend_event*/
+	AM_FEND_EVT_ROTOR_MOVING,    /**< Rotor移动*/
+	AM_FEND_EVT_ROTOR_STOP,    /**< Rotor停止*/
+	AM_FEND_EVT_SHORT_CIRCUIT, /**< Frontend短路*/ 
+	AM_FEND_EVT_SHORT_CIRCUIT_REPAIR, /**< Frontend短路修复*/	
 	AM_FEND_EVT_END
 };
 
@@ -76,8 +80,9 @@ typedef void (*AM_FEND_Callback_t) (int dev_no, struct dvb_frontend_event *evt, 
 /**\brief 卫星盲扫状态*/
 typedef enum
 {
-	AM_FEND_BLIND_START,   /**< 卫星盲扫开始*/
-	AM_FEND_BLIND_UPDATE  /**< 卫星盲扫更新*/
+	AM_FEND_BLIND_START,			/**< 卫星盲扫开始*/
+	AM_FEND_BLIND_UPDATEPROCESS,	/**< 卫星盲扫更新进度*/
+	AM_FEND_BLIND_UPDATETP			/**< 卫星盲扫更新频点信息*/
 } AM_FEND_BlindStatus_t;
 
 /**\brief 卫星盲扫事件*/
