@@ -651,9 +651,9 @@ AM_ErrorCode_t AM_DMX_StopFilter(int dev_no, int fhandle)
 	
 	ret = dmx_get_used_filter(dev, fhandle, &filter);
 	
-	if(filter->enable)
+	if(ret==AM_SUCCESS)
 	{
-		if(ret==AM_SUCCESS)
+		if(filter->enable)
 		{
 			dmx_wait_cb(dev);
 			ret = dmx_stop_filter(dev, filter);
