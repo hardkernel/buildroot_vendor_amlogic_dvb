@@ -69,7 +69,9 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/atsc/huffman_decode.c\
 		   am_fend_ctrl/am_sec.c\
 		   am_fend_ctrl/am_fend_ctrl.c\
-		   am_pes/am_pes.c
+		   am_pes/am_pes.c \
+		   am_caman/am_caman.c \
+		   am_caman/ca_dummy.c
 
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M
@@ -104,7 +106,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_epg/am_epg.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
-		   am_sub2/am_sub.c am_sub2/dvb_sub.c\
+		   am_sub2/am_sub.c am_sub2/dvb_sub.c \
 		   am_tt2/am_tt.c \
 		   am_si/am_si.c\
 		   am_si/libdvbsi/tables/bat.c\
@@ -164,7 +166,10 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/atsc/atsc_descriptor.c\
 		   am_si/atsc/huffman_decode.c\
 		   am_fend_ctrl/am_sec.c\
-		   am_fend_ctrl/am_fend_ctrl.c
+		   am_fend_ctrl/am_fend_ctrl.c\
+		   am_pes/am_pes.c \
+		   am_caman/am_caman.c \
+		   am_caman/ca_dummy.c
 
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M
@@ -183,7 +188,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    external/libzvbi/src\
 		    external/sqlite/dist\
 		    external/icu4c/common
-
+		    
 
 LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc 
 
