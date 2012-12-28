@@ -408,6 +408,9 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq)
 				(mode==1)? FE_OFDM : FE_QPSK;
 		
 		AM_FEND_Open(FEND_DEV_NO, &para);
+
+		AM_FEND_SetMode(FEND_DEV_NO, para.mode);
+	
 		
 		p.frequency = freq;
 #if 1	
