@@ -472,7 +472,7 @@ static AM_ErrorCode_t dvb_fine_tune(AM_FEND_Device_t *dev, unsigned int freq)
 {
 	int fd = (int)dev->drv_data;
 
-	if(ioctl(fd, FE_FINE_TUNE, freq)==-1)
+	if(ioctl(fd, FE_FINE_TUNE, &freq)==-1)
 	{
 		AM_DEBUG(1, "ioctl FE_FINE_TUNE failed, errno: %s", strerror(errno));
 		return AM_FAILURE;
