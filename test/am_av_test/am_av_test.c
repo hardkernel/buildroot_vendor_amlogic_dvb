@@ -398,6 +398,7 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq)
 		AM_FEND_OpenPara_t para;
 		struct dvb_frontend_parameters p;
 		fe_status_t status;
+		int mode;
 		
 		memset(&para, 0, sizeof(para));
 
