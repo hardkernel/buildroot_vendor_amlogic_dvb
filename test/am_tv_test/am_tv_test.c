@@ -9,17 +9,23 @@
  ***************************************************************************/
 
 #define AM_DEBUG_LEVEL 1
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
 
 #include <string.h>
 #include <assert.h>
 #include <am_debug.h>
 #include <am_fend.h>
+#include <am_fend_ctrl.h>
 #include <am_dmx.h>
 #include <am_db.h>
 #include <am_av.h>
 #include <am_tv.h>
 #include <am_scan.h>
 #include <am_epg.h>
+
+#include "am_caman.h"
 
 /****************************************************************************
  * Macro definitions
@@ -58,8 +64,7 @@ typedef struct
 
 
 static CommandMenu *curr_menu;
-static struct dvb_frontend_parameters fend_param;
-static sqlite3 *hdb;
+static AM_FENDCTRL_DVBFrontendParameters_t fend_param;
 static AM_Bool_t go = AM_TRUE;
 static int hscan, htv, hepg;
 static int chan_num[MAX_PROG_CNT];
@@ -85,7 +90,8 @@ static void show_main_menu(void);
 static void epg_evt_call_back(int dev_no, int event_type, void *param, void *user_data)
 {
 	char *errmsg = NULL;
-	
+	sqlite3 *hdb;
+
 	switch (event_type)
 	{
 		case AM_EPG_EVT_NEW_EIT:
@@ -103,6 +109,8 @@ static void epg_evt_call_back(int dev_no, int event_type, void *param, void *use
 			
 			AM_DEBUG(2, "got event AM_EPG_EVT_NEW_EIT ");
 			AM_DEBUG(2, "Service id 0x%x:", eit->i_service_id);
+
+			AM_DB_HANDLE_PREPARE(hdb);
 
 			/*查询service*/
 			snprintf(sql, sizeof(sql), "select db_net_id,db_ts_id,db_id from srv_table where db_ts_id=\
@@ -145,7 +153,7 @@ static void epg_evt_call_back(int dev_no, int event_type, void *param, void *use
 					{
 						dvbpsi_short_event_dr_t *pse = (dvbpsi_short_event_dr_t*)descr->p_decoded;
 
-						AM_EPG_ConvertCode((char*)pse->i_event_name, pse->i_event_name_length,\
+						AM_SI_ConvertDVBTextCode((char*)pse->i_event_name, pse->i_event_name_length,\
 										name, 64);
 						name[64] = 0;
 						AM_DEBUG(2, "event_id 0x%x, name '%s'", event->i_event_id, name);
@@ -176,13 +184,17 @@ static void display_pf_info(void)
 	int row = 1;
 	int chan_num;
 	struct tm stim, etim;
-	
+	sqlite3 *hdb;
+
 	if (AM_TV_GetCurrentChannel(htv, &srv_dbid) != AM_SUCCESS)
 		return;
 		
 	AM_EPG_GetUTCTime(&now);
 
 	printf("------------------------------------------------------------------------------------\n");
+
+	AM_DB_HANDLE_PREPARE(hdb);
+
 	/*频道号，频道名称*/
 	snprintf(sql, sizeof(sql), "select chan_num,name from srv_table where db_id='%d'", srv_dbid);
 	if (AM_DB_Select(hdb, sql, &row, "%d,%s:64", &chan_num, evt) == AM_SUCCESS && row > 0)
@@ -233,13 +245,16 @@ static void display_detail_epg(int day)
 	int now, start, end, lnow;
 	int row = 1;
 	struct tm stim, etim;
+	sqlite3 *hdb;
 
 	if (day < 0)
 		return ;
 		
 	if (AM_TV_GetCurrentChannel(htv, &srv_dbid) != AM_SUCCESS)
 		return;
-		
+
+	AM_DB_HANDLE_PREPARE(hdb);
+
 	AM_EPG_GetUTCTime(&now);
 
 	AM_EPG_UTCToLocal(now, &lnow);
@@ -363,7 +378,7 @@ static void epg_input(const char *cmd)
 	display_detail_epg(day);
 }
 
-
+#if 0
 static void store_db_to_file(void)
 {
 	char *errmsg;
@@ -428,6 +443,7 @@ static void load_db_from_file(void)
 		AM_DEBUG(1, "error, %s", errmsg);
 	}
 }
+#endif
 
 static void progress_evt_callback(int dev_no, int event_type, void *param, void *user_data)
 {
@@ -443,17 +459,21 @@ static void progress_evt_callback(int dev_no, int event_type, void *param, void 
 			switch (prog->evt)
 			{
 				case AM_SCAN_PROGRESS_SCAN_END:
-					/*播放*/
-					AM_TV_Play(htv);
-					
 					printf("-------------------------------------------------------------\n");
 					printf("Scan End, input 'b' back to main menu\n");
 					printf("-------------------------------------------------------------\n\n");
+
+					AM_CAMAN_Resume();
+
+					printf("CAMAN Resumed. Start Playing..\n");
+
+					/*播放*/
+					AM_TV_Play(htv);
 					
 					break;
 				case AM_SCAN_PROGRESS_STORE_END:
 					/*保存到文件*/
-					store_db_to_file();
+					//store_db_to_file();
 					break;
 				default:
 					//AM_DEBUG(1, "Unkonwn EVT");
@@ -471,9 +491,9 @@ static void run_quit(void)
 
 static void run_freq_setting(void)
 {
-	printf("Input main frequency(kHz):");
-	scanf("%u", &fend_param.frequency);
-	printf("New main frequency is %u kHz\n", fend_param.frequency);
+	printf("Input main frequency(Hz):");
+	scanf("%u", &fend_param.terrestrial.para.frequency);
+	printf("New main frequency is %u kHz\n", fend_param.terrestrial.para.frequency);
 	printf("-------------------------------------------------------------\n");
 	printf("Input 'b' back to main menu\n");
 	printf("-------------------------------------------------------------\n\n");
@@ -488,6 +508,10 @@ static void run_restore(void)
 
 	if (asw == 'y')
 	{
+		sqlite3 *hdb;
+
+		AM_DB_HANDLE_PREPARE(hdb);
+
 		AM_TV_StopPlay(htv);
 	
 		AM_DEBUG(1, "Restoring...");
@@ -495,7 +519,7 @@ static void run_restore(void)
 		sqlite3_exec(hdb, "delete from ts_table", NULL, NULL, NULL);
 		sqlite3_exec(hdb, "delete from srv_table", NULL, NULL, NULL);
 		sqlite3_exec(hdb, "delete from evt_table", NULL, NULL, NULL);
-		store_db_to_file();
+		//store_db_to_file();
 		AM_DEBUG(1, "OK");
 	}
 	
@@ -506,12 +530,28 @@ static void run_restore(void)
 
 static void run_auto_scan(void)
 {
+	AM_SCAN_CreatePara_t para;
+
 	AM_TV_StopPlay(htv);
+
+	AM_CAMAN_Pause();
 
 	/*停止监控所有表*/
 	AM_EPG_ChangeMode(hepg, AM_EPG_MODE_OP_REMOVE,  AM_EPG_SCAN_ALL);
 	
-	AM_SCAN_Create(FEND_DEV_NO, DMX_DEV_NO, 0, hdb, &fend_param, 1, AM_SCAN_MODE_AUTO, NULL, &hscan);
+	memset(&para, 0, sizeof(para));
+	para.fend_dev_id = FEND_DEV_NO;
+	para.mode = AM_SCAN_MODE_DTV_ATV;
+	para.store_cb = NULL;
+	para.dtv_para.standard = AM_SCAN_DTV_STD_DVB;
+	para.dtv_para.dmx_dev_id = DMX_DEV_NO;
+	para.dtv_para.source = FE_OFDM;
+	para.dtv_para.mode = AM_SCAN_DTVMODE_ALLBAND;
+	para.dtv_para.sort_method = AM_SCAN_SORT_BY_FREQ_SRV_ID;
+	para.dtv_para.fe_cnt = 0;
+	para.dtv_para.fe_paras = NULL;
+	para.dtv_para.resort_all = 0;
+	AM_SCAN_Create(&para, &hscan);
 	/*注册搜索进度通知事件*/
 	AM_EVT_Subscribe(hscan, AM_SCAN_EVT_PROGRESS, progress_evt_callback, NULL);
 
@@ -520,21 +560,48 @@ static void run_auto_scan(void)
 
 static void run_manual_scan(void)
 {
-	struct dvb_frontend_parameters param;
+	AM_FENDCTRL_DVBFrontendParameters_t fend_para;
+	AM_SCAN_CreatePara_t para;
 	
 	AM_TV_StopPlay(htv);
+
+	AM_CAMAN_Pause();
+
 	/*停止监控所有表*/
 	AM_EPG_ChangeMode(hepg, AM_EPG_MODE_OP_REMOVE,  AM_EPG_SCAN_ALL);
 	
-	param = fend_param;
-	printf("Input frequency(kHz):");
-	scanf("%u", &param.frequency);
+	fend_para = fend_param;
+	fend_para.m_type = FE_OFDM;
+	printf("Input frequency(Hz):");
+	scanf("%u", &fend_para.terrestrial.para.frequency);
+	fend_para.terrestrial.para.u.ofdm.bandwidth = BANDWIDTH_8_MHZ;
+
+	memset(&para, 0, sizeof(para));
+	para.fend_dev_id = FEND_DEV_NO;
+	para.mode = AM_SCAN_MODE_DTV_ATV;
+	para.store_cb = NULL;
+
+	para.atv_para.mode = AM_SCAN_ATVMODE_NONE;
 	
-	AM_SCAN_Create(FEND_DEV_NO, DMX_DEV_NO, 0, hdb, &param, 1, AM_SCAN_MODE_MANUAL, NULL, &hscan);
+	para.dtv_para.mode = AM_SCAN_DTVMODE_MANUAL;
+	para.dtv_para.standard = AM_SCAN_DTV_STD_DVB;
+	para.dtv_para.dmx_dev_id = DMX_DEV_NO;
+	para.dtv_para.source = FE_OFDM;
+	para.dtv_para.sort_method = AM_SCAN_SORT_BY_FREQ_SRV_ID;
+	para.dtv_para.fe_cnt = 1;
+	para.dtv_para.fe_paras = &fend_para;
+	para.dtv_para.resort_all = 0;
+
+	printf("-------------------<\n");
+	AM_SCAN_Create(&para, &hscan);
+
+	printf("------------------2-<\n");
 	/*注册搜索进度通知事件*/
 	AM_EVT_Subscribe(hscan, AM_SCAN_EVT_PROGRESS, progress_evt_callback, NULL);
 
+	printf("------------------3-<\n");
 	AM_SCAN_Start(hscan);
+	printf("------------------4-<\n");
 }
 
 static void leave_scan(void)
@@ -543,11 +610,11 @@ static void leave_scan(void)
 	{
 		AM_DEBUG(1, "Destroying scan");
 		AM_EVT_Unsubscribe(hscan, AM_SCAN_EVT_PROGRESS, progress_evt_callback, NULL);
-		AM_SCAN_Destroy(hscan);
+		AM_SCAN_Destroy(hscan, AM_TRUE);
 		hscan = 0;
 
 		/*开启EPG监控*/
-		AM_EPG_ChangeMode(hepg, AM_EPG_MODE_OP_ADD,  AM_EPG_SCAN_ALL /*& (~AM_EPG_SCAN_EIT_SCHE_ALL)*/);
+		//AM_EPG_ChangeMode(hepg, AM_EPG_MODE_OP_ADD,  AM_EPG_SCAN_ALL /*& (~AM_EPG_SCAN_EIT_SCHE_ALL)*/);
 	}
 }
 
@@ -555,7 +622,10 @@ static void run_tv_list(void)
 {
 	int row = MAX_PROG_CNT;
 	int i;
-	
+	sqlite3 *hdb;
+
+	AM_DB_HANDLE_PREPARE(hdb);
+
 	/*从数据库取节目*/
 	if (AM_DB_Select(hdb, "select chan_num,name from srv_table where service_type='1' order by chan_num", 
 					&row, "%d,%s:64", chan_num, programs) != AM_SUCCESS)
@@ -584,7 +654,10 @@ static void run_radio_list(void)
 {
 	int row = MAX_PROG_CNT;
 	int i;
-	
+	sqlite3 *hdb;
+
+	AM_DB_HANDLE_PREPARE(hdb);
+
 	/*从数据库取节目*/
 	if (AM_DB_Select(hdb, "select chan_num,name from srv_table where service_type='2' order by chan_num", 
 					&row, "%d,%s:64", chan_num, programs) != AM_SUCCESS)
@@ -702,25 +775,65 @@ static int menu_input(const char *cmd)
 static int start_tv_test()
 {
 	char buf[256];
-	
-	AM_TRY(AM_DB_Init(&hdb));
-	load_db_from_file();
-	
-	AM_TV_Create(FEND_DEV_NO, AV_DEV_NO, hdb, &htv);
+	AM_EPG_CreatePara_t epara;
+	sqlite3 *db;
 
-	AM_TRY(AM_EPG_Create(FEND_DEV_NO, DMX_DEV_NO, 0, &hepg));
+
+	AM_CAMAN_OpenParam_t caman_para;
+	AM_CA_Opt_t ca_opt;
+	
+	memset(&caman_para, 0, sizeof(caman_para));
+	
+	caman_para.ts.dmx_fd = DMX_DEV_NO;
+	caman_para.ts.fend_fd = FEND_DEV_NO;
+	AM_TRY(AM_CAMAN_Open(&caman_para));
+
+	memset(&ca_opt, 0, sizeof(ca_opt));
+	ca_opt.auto_disable = 0;
+	/*register the dummy*/
+	AM_CAMAN_registerCA("dummy",  NULL, &ca_opt);
+
+	AM_CAMAN_openCA("dummy");
+
+	if(NULL==opendir("/system"))
+	{
+		AM_TRY(AM_DB_Setup("/tvtest.db", NULL));
+	}
+	else
+	{
+		AM_TRY(AM_DB_Setup("/system/tvtest.db", NULL));
+	}
+
+
+	AM_TRY(AM_DB_GetHandle(&db));	
+	AM_TRY(AM_DB_CreateTables(db));
+
+	AM_TV_Create(FEND_DEV_NO, AV_DEV_NO, NULL, &htv);
+
+	epara.fend_dev = FEND_DEV_NO;
+	epara.dmx_dev = DMX_DEV_NO;
+	epara.source = 0;
+	AM_TRY(AM_EPG_Create(&epara, &hepg));
 
 	AM_EVT_Subscribe(hepg, AM_EPG_EVT_NEW_EIT, epg_evt_call_back, NULL);
 
-	AM_EPG_ChangeMode(hepg, AM_EPG_MODE_OP_ADD,  AM_EPG_SCAN_ALL/* & (~AM_EPG_SCAN_EIT_SCHE_ALL)*/);
+	//AM_EPG_ChangeMode(hepg, AM_EPG_MODE_OP_ADD,  AM_EPG_SCAN_ALL/* & (~AM_EPG_SCAN_EIT_SCHE_ALL)*/);
+	AM_EPG_ChangeMode(hepg, AM_EPG_MODE_OP_REMOVE,  AM_EPG_SCAN_ALL/* & (~AM_EPG_SCAN_EIT_SCHE_ALL)*/);
 
 	/*设置时间偏移*/
 	AM_EPG_SetLocalOffset(8*3600);
-	
-	fend_param.frequency = 419000;
-	fend_param.u.qam.symbol_rate = 6875*1000;
-	fend_param.u.qam.modulation = QAM_64;
-	fend_param.u.qam.fec_inner = FEC_AUTO;
+
+#if 1
+	fend_param.m_type = FE_OFDM;
+	fend_param.terrestrial.para.frequency = 474000000;
+	fend_param.terrestrial.para.u.ofdm.bandwidth = BANDWIDTH_8_MHZ;
+#else	
+	fend_param.m_type = AM_FEND_DEMOD_DVBC
+	fend_param.cable.para.frequency = 474000000;
+	fend_param.cable.para.u.qam.symbol_rate = 6875*1000;
+	fend_param.cable.para.u.qam.modulation = QAM_64;
+	fend_param.cable.para.u.qam.fec_inner = FEC_AUTO;
+#endif
 
 	hscan = 0;
 	show_main_menu();
@@ -747,7 +860,10 @@ static int start_tv_test()
 	
 	AM_TV_Destroy(htv);
 	
-	AM_TRY(AM_DB_Quit(hdb));
+	AM_TRY(AM_DB_UnSetup());
+
+	AM_CAMAN_unregisterCA("dummy");
+	AM_CAMAN_Close();
 
 	return 0;
 }
@@ -757,9 +873,8 @@ int main(int argc, char **argv)
 	AM_FEND_OpenPara_t fpara;
 	AM_AV_OpenPara_t apara;
 	
-	
-	
 	memset(&fpara, 0, sizeof(fpara));
+	fpara.mode = -1;
 	AM_TRY(AM_FEND_Open(FEND_DEV_NO, &fpara));
 	
 	memset(&para, 0, sizeof(para));
@@ -767,7 +882,10 @@ int main(int argc, char **argv)
 
 	memset(&apara, 0, sizeof(apara));
 	AM_TRY(AM_AV_Open(AV_DEV_NO, &apara));
-	
+
+	AM_DMX_SetSource(DMX_DEV_NO, AM_DMX_SRC_TS2);
+	AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_TS2);
+
 	start_tv_test();
 
 	AM_AV_Close(AV_DEV_NO);

@@ -19,6 +19,8 @@
 #include <am_tv.h>
 #include "am_tv_internal.h"
 
+#include "am_caman.h"
+
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
@@ -42,14 +44,15 @@
 static AM_Bool_t am_tv_set_fend(AM_TV_Data_t *tv, struct dvb_frontend_parameters *para)
 {
 	struct dvb_frontend_parameters fparam;
+	fe_status_t status;
 
 	AM_FEND_GetPara(tv->fend_dev, &fparam);
 	/*是否需要重新锁频*/
-	if (fparam.frequency == para->frequency)
-		return AM_FALSE;
+//	if (fparam.frequency == para->frequency)
+//		return AM_FALSE;
 
 	AM_DEBUG(1, "TV try lock %u", para->frequency);
-	AM_FEND_SetPara(tv->fend_dev, para);
+	AM_FEND_SetPara(tv->fend_dev, para/*, &status*/);
 
 	tv->status &= ~AM_TV_ST_LOCKED;
 	tv->fend_para = *para;
@@ -64,7 +67,12 @@ static AM_ErrorCode_t am_tv_play(AM_TV_Data_t *tv)
 	AM_ErrorCode_t ret;
 	int vid, aid, vfmt, afmt;
 	int row = 1;
+	char str_apids[256];
+	char str_afmts[256];
+	int sid;
 
+	AM_DB_HANDLE_PREPARE(tv->hdb);
+	
 	if (tv->status & AM_TV_ST_PLAYING)
 		return AM_SUCCESS;
 		
@@ -77,20 +85,23 @@ static AM_ErrorCode_t am_tv_play(AM_TV_Data_t *tv)
 
 	/*从数据库获取该频道播放信息*/
 	snprintf(selstr, sizeof(selstr), 
-	"select vid_pid,aud1_pid,vid_fmt,aud1_fmt from srv_table where db_id='%d'", tv->srv_dbid);
-	ret = AM_DB_Select(tv->hdb, selstr, &row, "%d,%d,%d,%d", &vid, &aid, &vfmt, &afmt);
-	vfmt = VFORMAT_MPEG12; 
-	afmt = AFORMAT_MPEG;
+		"select vid_pid,aud_pids,vid_fmt,aud_fmts,service_id from srv_table where db_id='%d'", tv->srv_dbid);
+	ret = AM_DB_Select(tv->hdb, selstr, &row, "%d,%s:255,%d,%s:255,%d", &vid, str_apids, &vfmt, str_afmts, &sid);
 	if (ret != AM_SUCCESS || row == 0)
 	{
 		AM_DEBUG(1, "TV: cannot get play info for channel %d from dbase!", tv->chan_num);
 		return ret;
 	}
 
-	AM_DEBUG(1, "TV Play(C%03d) vid(%d), aid(%d), vfmt(%d), afmt(%d) on av(%d)", 
-				tv->chan_num, vid, aid, vfmt, afmt ,tv->av_dev);
-	AM_TRY(AM_AV_StartTS(tv->av_dev, vid, aid, vfmt, afmt));
+	sscanf(str_apids, "%d,", &aid);
+	sscanf(str_afmts, "%d,", &afmt);
 	
+	AM_DEBUG(1, "TV Play(C%03d) vid(%d), aid[%s](%d), vfmt(%d), afmt[%s](%d) on av(%d)", 
+				tv->chan_num, vid, str_apids, aid, vfmt, str_afmts, afmt ,tv->av_dev);
+	AM_TRY(AM_AV_StartTS(tv->av_dev, vid, aid, vfmt, afmt));
+
+	AM_TRY(AM_CAMAN_startService(sid, "dummy"));
+
 	tv->status |= AM_TV_ST_PLAYING;
 	
 	return ret;
@@ -102,9 +113,11 @@ static AM_ErrorCode_t am_tv_try_play(AM_TV_Data_t *tv)
 	char selstr[64];
 	AM_ErrorCode_t ret;
 	int ts_dbid;
-	int freq, symb, mod;
+	int freq, symb, mod, bw;
 	int row = 1;
 	struct dvb_frontend_parameters para;
+
+	AM_DB_HANDLE_PREPARE(tv->hdb);
 
 	if (tv->status & AM_TV_ST_PLAYING)
 	{
@@ -129,19 +142,28 @@ static AM_ErrorCode_t am_tv_try_play(AM_TV_Data_t *tv)
 	}
 	
 	/*从数据库获取该频道频点信息*/
-	row = 1;
-	snprintf(selstr, sizeof(selstr), "select freq,symb,mod from ts_table where db_id='%d'", ts_dbid);
-	ret = AM_DB_Select(tv->hdb, selstr, &row, "%d,%d,%d", &freq, &symb, &mod);
+	row = 1;	
+	snprintf(selstr, sizeof(selstr), "select freq,symb,mod,bw from ts_table where db_id='%d'", ts_dbid);
+	ret = AM_DB_Select(tv->hdb, selstr, &row, "%d,%d,%d,%d", &freq, &symb, &mod, &bw);
 	if (ret != AM_SUCCESS || row == 0)
 	{
 		AM_DEBUG(1, "TV: cannot get fend param for channel %d from dbase!", tv->chan_num);
 		return ret;
 	}
 
-	/*DVBC*/
+#define DVBT 1
+
 	para.frequency = freq;
+
+#if DVBC
 	para.u.qam.symbol_rate = symb;
 	para.u.qam.modulation = mod;
+#else
+#if DVBT
+	para.u.ofdm.bandwidth = bw;
+#endif
+#endif
+	printf("freq:%d, bw:%d\n", freq, bw);
 	/*是否需要更换前端参数*/
 	if (! am_tv_set_fend(tv, &para))
 	{
@@ -196,11 +218,28 @@ static void am_tv_fend_callback(int dev_no, int event_type, void *param, void *u
 /**\brief 停止播放当前节目*/
 static AM_ErrorCode_t am_tv_stop(AM_TV_Data_t *tv)
 {
+	char selstr[64];
+	int row = 1;
+	int sid;
+	AM_ErrorCode_t ret;
+	
 	if (!(tv->status & AM_TV_ST_PLAYING))
 		return AM_SUCCESS;
 
 	tv->status &= ~AM_TV_ST_PLAYING;
-	
+
+	AM_DB_HANDLE_PREPARE(tv->hdb);
+
+	snprintf(selstr, sizeof(selstr), "select service_id from srv_table where db_id='%d'", tv->srv_dbid);
+	ret = AM_DB_Select(tv->hdb, selstr, &row, "%d", &sid);
+	if (ret != AM_SUCCESS || row == 0)
+	{
+		AM_DEBUG(1, "TV: cannot get service_id from dbase!");
+		return ret;
+	}
+
+	AM_CAMAN_stopService(sid);
+
 	return AM_AV_StopTS(tv->av_dev);
 }
 
@@ -210,6 +249,8 @@ static AM_ErrorCode_t am_tv_get_channel(AM_TV_Data_t *tv, int op, int chan_num, 
 	char selstr[256];
 	int row = 1;
 	int srv_type;
+
+	AM_DB_HANDLE_PREPARE(tv->hdb);
 
 	if (tv->status & AM_TV_ST_PLAY_TV)
 		srv_type = 0x1;
@@ -238,7 +279,6 @@ static AM_ErrorCode_t am_tv_get_channel(AM_TV_Data_t *tv, int op, int chan_num, 
 		"select chan_num,db_id from srv_table where chan_num='%d' and service_type='%d'", 
 		chan_num, srv_type);
 	}
-
 	if (AM_DB_Select(tv->hdb, selstr, &row, "%d,%d", chnum, srv_dbid) != AM_SUCCESS)
 	{
 		AM_DEBUG(1, "Cannot get the specified channel from dbase");
@@ -266,6 +306,7 @@ static AM_ErrorCode_t am_tv_get_channel(AM_TV_Data_t *tv, int op, int chan_num, 
 		}
 		
 		row = 1;
+
 		if (AM_DB_Select(tv->hdb, selstr, &row, "%d,%d", chnum, srv_dbid) != AM_SUCCESS || row == 0)
 			return AM_TV_ERR_NO_CHANNEL;
 	}
@@ -282,7 +323,7 @@ static AM_ErrorCode_t am_tv_get_channel(AM_TV_Data_t *tv, int op, int chan_num, 
 static AM_ErrorCode_t am_tv_play_channel(AM_TV_Data_t *tv, int op, int chan_num)
 {
 	int srv_dbid, cnum;
-	
+
 	/*获取下一个频道*/
 	AM_TRY(am_tv_get_channel(tv, op, chan_num, &cnum, &srv_dbid));
 	
@@ -472,7 +513,6 @@ AM_ErrorCode_t AM_TV_Play(int handle)
 
 	/*播放已停止的节目*/
 	ret = am_tv_play_channel(tv, 0, tv->chan_num);
-	
 	if (ret != AM_SUCCESS)
 	{
 		/*尝试播放频道号最小的电视节目*/
@@ -483,7 +523,6 @@ AM_ErrorCode_t AM_TV_Play(int handle)
 			/*尝试播放频道号最小的广播节目*/
 			tv->status &= 0xFFFF;
 			tv->status |= AM_TV_ST_PLAY_RADIO;
-
 			ret = am_tv_play_channel(tv, 1, 0);
 			if (ret != AM_SUCCESS)
 				tv->status &= 0xFFFF;

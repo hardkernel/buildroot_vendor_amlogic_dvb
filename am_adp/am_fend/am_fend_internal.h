@@ -64,6 +64,7 @@ typedef struct
 	AM_ErrorCode_t (*blindscan_scan)(AM_FEND_Device_t *dev, struct dvbsx_blindscanpara *pbspara);
 	AM_ErrorCode_t (*blindscan_getscanevent)(AM_FEND_Device_t *dev, struct dvbsx_blindscanevent *pbsevent);
 	AM_ErrorCode_t (*blindscan_cancel)(AM_FEND_Device_t *dev);
+	AM_ErrorCode_t (*fine_tune)(AM_FEND_Device_t *dev, unsigned int freq);
 } AM_FEND_Driver_t;
 
 /**\brief Defines the status of blind scan process.*/

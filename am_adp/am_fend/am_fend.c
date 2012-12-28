@@ -1682,4 +1682,32 @@ AM_ErrorCode_t AM_FEND_BlindGetTPInfo(int dev_no, struct dvb_frontend_parameters
 	return ret;
 }
 
+/**\brief 模拟微调
+ *\param dev_no 前端设备号
+ *\param freq 频率，单位为Hz
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+AM_ErrorCode_t AM_FEND_FineTune(int dev_no, unsigned int freq)
+{
+	AM_FEND_Device_t *dev = NULL;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+
+	if(!dev->drv->fine_tune)
+	{
+		AM_DEBUG(1, "fronend %d no not support fine_tune", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+
+	pthread_mutex_lock(&dev->lock);
+
+	ret = dev->drv->fine_tune(dev, freq);
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
 
