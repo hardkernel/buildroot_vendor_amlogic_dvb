@@ -366,6 +366,15 @@ extern AM_ErrorCode_t AM_FEND_BlindGetProcess(int dev_no, unsigned int *process)
  */
 extern AM_ErrorCode_t AM_FEND_BlindGetTPInfo(int dev_no, struct dvb_frontend_parameters *para, unsigned int *count);  
 
+/**\brief 模拟微调
+ *\param dev_no 前端设备号
+ *\param freq 频率，单位为Hz
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_FineTune(int dev_no, unsigned int freq);
+
 #ifdef __cplusplus
 }
 #endif
