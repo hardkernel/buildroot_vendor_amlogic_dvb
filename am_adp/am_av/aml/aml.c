@@ -257,12 +257,12 @@ typedef struct
 typedef enum
 {
 	AV_TIMESHIFT_STAT_STOP,
-	AV_TIMESHIFT_STAT_INITOK = 0x10003,
-	AV_TIMESHIFT_STAT_PLAY = 0x20001,
-	AV_TIMESHIFT_STAT_PAUSE = 0x20003,
-	AV_TIMESHIFT_STAT_FFFB = 0x20004,
-	AV_TIMESHIFT_STAT_SEARCHOK = 0x20005,
-	AV_TIMESHIFT_STAT_EXIT	= 0x30004
+	AV_TIMESHIFT_STAT_PLAY,
+	AV_TIMESHIFT_STAT_PAUSE,
+	AV_TIMESHIFT_STAT_FFFB,
+	AV_TIMESHIFT_STAT_EXIT,
+	AV_TIMESHIFT_STAT_INITOK,
+	AV_TIMESHIFT_STAT_SEARCHOK,
 } AV_TimeshiftState_t;
 
 /**\brief Timeshift文件*/
@@ -310,6 +310,8 @@ typedef struct
 	AV_TimeshiftFile_t	file;
 	AM_AV_TimeshiftPara_t para;
 	AM_AV_Device_t       *dev;
+	AM_AV_TimeshiftInfo_t	info;
+	char 				last_stb_src[16];
 } AV_TimeshiftData_t;
 
 /****************************************************************************
@@ -334,6 +336,7 @@ static AM_ErrorCode_t aml_get_astatus(AM_AV_Device_t *dev, AM_AV_AudioStatus_t *
 static AM_ErrorCode_t aml_get_vstatus(AM_AV_Device_t *dev, AM_AV_VideoStatus_t *para);
 static AM_ErrorCode_t aml_timeshift_fill_data(AM_AV_Device_t *dev, uint8_t *data, int size);
 static AM_ErrorCode_t aml_timeshift_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *para);
+static AM_ErrorCode_t aml_timeshift_get_info(AM_AV_Device_t *dev, AM_AV_TimeshiftInfo_t *info);
 static AM_ErrorCode_t aml_set_vpath(AM_AV_Device_t *dev);
 static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt);
 
@@ -356,6 +359,7 @@ const AM_AV_Driver_t aml_av_drv =
 .get_video_status = aml_get_vstatus,
 .timeshift_fill = aml_timeshift_fill_data,
 .timeshift_cmd = aml_timeshift_cmd,
+.get_timeshift_info = aml_timeshift_get_info,
 .set_vpath   = aml_set_vpath,
 .switch_ts_audio = aml_switch_ts_audio
 };
@@ -1289,7 +1293,6 @@ static void aml_destroy_inject_data(AV_InjectData_t *inj)
 static AM_ErrorCode_t aml_timeshift_file_open(AV_TimeshiftFile_t *tfile, const char *file_name)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
-
 	
 	if (tfile->opened)
 	{
@@ -1298,38 +1301,31 @@ static AM_ErrorCode_t aml_timeshift_file_open(AV_TimeshiftFile_t *tfile, const c
 	}
 		
 	/*尝试打开输出文件*/
-	if (tfile->loop)
-	{
+	if (strstr(file_name, "TimeShifting") != NULL)
 		tfile->wfd = open(file_name, O_TRUNC | O_WRONLY | O_CREAT, 0777);
-		if (tfile->wfd != -1)
-		{
-			tfile->rfd = open(file_name, O_RDONLY);
-			if (tfile->rfd == -1)
-			{
-				AM_DEBUG(0, "Cannot open timeshift output file '%s' for reading: %s", file_name, strerror(errno));
-				close(tfile->wfd);
-				tfile->wfd = -1;
-				ret = AM_AV_ERR_CANNOT_OPEN_FILE;
-			}
-		}
-		else
-		{
-			AM_DEBUG(0, "Cannot open timeshift output file '%s' for writing: %s", file_name, strerror(errno));
-			ret = AM_AV_ERR_CANNOT_OPEN_FILE;
-		}
-		tfile->name = strdup(file_name);
-	}
 	else
+		tfile->wfd = open(file_name, O_WRONLY, 0777);
+	
+	if (tfile->wfd != -1)
 	{
-		tfile->wfd = -1;
 		tfile->rfd = open(file_name, O_RDONLY);
 		if (tfile->rfd == -1)
 		{
-			AM_DEBUG(0, "Cannot open playback output file '%s' for reading: %s", file_name, strerror(errno));
+			AM_DEBUG(0, "Cannot open timeshift output file '%s' for reading: %s", file_name, strerror(errno));
+			close(tfile->wfd);
+			tfile->wfd = -1;
 			ret = AM_AV_ERR_CANNOT_OPEN_FILE;
 		}
-		tfile->name = NULL;
 	}
+	else
+	{
+		AM_DEBUG(0, "Cannot open timeshift output file '%s' for writing: %s", file_name, strerror(errno));
+		ret = AM_AV_ERR_CANNOT_OPEN_FILE;
+	}
+	if (strstr(file_name, "TimeShifting") != NULL)
+		tfile->name = strdup(file_name);
+	else
+		tfile->name = NULL;
 
 	if (ret == AM_SUCCESS)
 	{
@@ -1518,11 +1514,28 @@ static ssize_t aml_timeshift_file_write(AV_TimeshiftFile_t *tfile, uint8_t *buf,
 	size_t  split;
 	loff_t fsize, wpos;
 	
-	if (! tfile->opened || ! tfile->loop)
+	if (! tfile->opened)
 	{
 		AM_DEBUG(1, "Timeshift file has not opened");
 		return AM_AV_ERR_INVAL_ARG;
 	}
+	
+	if (! tfile->loop)
+	{
+		/* Normal write */
+		ret = aml_timeshift_data_write(tfile->wfd, buf, size);
+		if (ret > 0)
+		{
+			pthread_mutex_lock(&tfile->lock);
+			tfile->size += ret;
+			tfile->write += ret;
+			tfile->total += ret;
+			tfile->avail += ret;
+			pthread_mutex_unlock(&tfile->lock);
+		}
+		goto write_done;
+	}
+	
 	pthread_mutex_lock(&tfile->lock);
 	fsize = tfile->size;
 	wpos = tfile->write;
@@ -1596,7 +1609,11 @@ static int aml_timeshift_file_seek(AV_TimeshiftFile_t *tfile, loff_t offset)
 	int ret = 1;
 
 	pthread_mutex_lock(&tfile->lock);
-	
+	if (tfile->size <= 0)
+	{
+		pthread_mutex_unlock(&tfile->lock);
+		return ret;
+	}	
 	if (offset > tfile->total)
 		offset = tfile->total - 1;
 	else if (offset < 0)
@@ -1614,7 +1631,7 @@ static int aml_timeshift_file_seek(AV_TimeshiftFile_t *tfile, loff_t offset)
 	AM_DEBUG(0, "Timeshift file Seek: start %lld, read %lld, write %lld, avail %lld, total %lld", 
 				tfile->start, tfile->read, tfile->write, tfile->avail, tfile->total);
 	pthread_mutex_unlock(&tfile->lock);
-	return ret;;
+	return ret;
 }
 /**\brief 创建Timeshift相关数据*/
 static AV_TimeshiftData_t* aml_create_timeshift_data(void)
@@ -1775,6 +1792,7 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 		return AM_AV_ERR_CANNOT_OPEN_DEV;
 	}
 
+	AM_FileRead("/sys/class/stb/source", tshift->last_stb_src, 16);
 	AM_FileEcho("/sys/class/stb/source", "hiu");
 	snprintf(buf, sizeof(buf), "/sys/class/stb/demux%d_source", para->dmx_id);
 	AM_FileEcho(buf, "hiu");
@@ -1884,7 +1902,11 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 		tshift->state = AV_TIMESHIFT_STAT_STOP;
 		tshift->speed = 0;
 		tshift->duration = para->duration;
-		tshift->file.loop = !para->playback_only;
+		AM_DEBUG(1, "po %d, duration %d", para->playback_only , tshift->duration);
+		if (para->playback_only || tshift->duration <= 0)
+			tshift->file.loop = AM_FALSE;
+		else
+			tshift->file.loop = AM_TRUE;
 		AM_TRY(aml_timeshift_file_open(&tshift->file, para->file_path));
 		if (! tshift->file.loop && tshift->duration)
 		{
@@ -1899,7 +1921,7 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 		}
 		else
 		{
-			tshift->para = *para;
+			tshift->info.play_para = *para;
 			pthread_mutex_init(&tshift->lock, NULL);
 			pthread_cond_init(&tshift->cond, NULL);
 		}
@@ -1943,7 +1965,7 @@ static void aml_destroy_timeshift_data(AV_TimeshiftData_t *tshift, AM_Bool_t des
 	if (tshift->cntl_fd != -1)
 		close(tshift->cntl_fd);
 
-	AM_FileEcho("/sys/class/stb/source", "ts2");
+	AM_FileEcho("/sys/class/stb/source", tshift->last_stb_src);
 
 	if (destroy_thread)
 		free(tshift);
@@ -1953,7 +1975,7 @@ static int am_timeshift_reset(AV_TimeshiftData_t *tshift, int deinterlace_val, A
 {
 	aml_destroy_timeshift_data(tshift, AM_FALSE);
 
-	aml_start_timeshift(tshift, &tshift->para, AM_FALSE, start_audio);
+	aml_start_timeshift(tshift, &tshift->info.play_para, AM_FALSE, start_audio);
 
 	/*Set the left to 0, we will read from the new point*/
 	tshift->left = 0;
@@ -1978,7 +2000,7 @@ static int am_timeshift_fffb(AV_TimeshiftData_t *tshift)
 		tshift->fffb_time = now;
 
 		next_time /= 1000;
-		offset = next_time * tshift->rate;
+		offset = (loff_t)next_time * (loff_t)tshift->rate;
 		AM_DEBUG(1, "fffb_base is %d, distance is %d, speed is %d", tshift->fffb_base, speed *(now - tshift->fffb_time)/1000, speed);
 		ret = aml_timeshift_file_seek(&tshift->file, offset);
 		AM_DEBUG(1,"FFFB next offset is %lld, next time is %d, reach end %d, speed %d, distance %d", offset, next_time, ret, tshift->speed, now - tshift->fffb_time);
@@ -2004,7 +2026,7 @@ static int am_timeshift_fffb(AV_TimeshiftData_t *tshift)
 
 static int aml_timeshift_pause_av(AV_TimeshiftData_t *tshift)
 {
-	if (tshift->para.aud_id >= 0)
+	if (tshift->info.play_para.aud_id >= 0)
 	{
 #if defined(ADEC_API_NEW)
 		audio_decode_pause(adec_handle);
@@ -2012,7 +2034,7 @@ static int aml_timeshift_pause_av(AV_TimeshiftData_t *tshift)
 		//TODO
 #endif
 	}
-	if (tshift->para.vid_id >= 0)
+	if (tshift->info.play_para.vid_id >= 0)
 	{
 		ioctl(tshift->cntl_fd, AMSTREAM_IOC_VPAUSE, 1);
 	}
@@ -2022,7 +2044,7 @@ static int aml_timeshift_pause_av(AV_TimeshiftData_t *tshift)
 
 static int aml_timeshift_resume_av(AV_TimeshiftData_t *tshift)
 {
-	if (tshift->para.aud_id >= 0)
+	if (tshift->info.play_para.aud_id >= 0)
 	{
 #if defined(ADEC_API_NEW)
 		audio_decode_resume(adec_handle);
@@ -2030,7 +2052,7 @@ static int aml_timeshift_resume_av(AV_TimeshiftData_t *tshift)
 		//TODO
 #endif
 	}
-	if (tshift->para.vid_id >= 0)
+	if (tshift->info.play_para.vid_id >= 0)
 	{
 		ioctl(tshift->cntl_fd, AMSTREAM_IOC_VPAUSE, 0);
 	}
@@ -2039,7 +2061,7 @@ static int aml_timeshift_resume_av(AV_TimeshiftData_t *tshift)
 	return 0;
 }
 
-static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cmd, player_info_t *info)
+static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cmd, AM_AV_TimeshiftInfo_t *info)
 {
 	AV_TimeshiftState_t	last_state = tshift->state;
 	loff_t offset;
@@ -2061,10 +2083,17 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 				tshift->timeout = 0;
 				tshift->state = AV_TIMESHIFT_STAT_PLAY;
 				AM_DEBUG(1, "@@@Timeshift start normal play, seek to time %d s...", info->current_time);
-				offset = (info->current_time / 1000) * tshift->rate ;
+				offset = (loff_t)(info->current_time / 1000) * (loff_t)tshift->rate ;
 				aml_timeshift_file_seek(&tshift->file, offset);
 				ioctl(tshift->cntl_fd, AMSTREAM_IOC_TRICKMODE, TRICKMODE_NONE);
 				am_timeshift_reset(tshift, 2, AM_TRUE);
+				
+				if (tshift->last_cmd == AV_PLAY_FF || tshift->last_cmd == AV_PLAY_FB)
+				{
+					usleep(200*1000);
+					AM_DEBUG(1, "set di bypass_all to 0");
+					AM_FileEcho("/sys/module/di/parameters/bypass_all","0");
+				}
 			}
 			break;
 		case AV_PLAY_PAUSE:
@@ -2096,16 +2125,23 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 				tshift->inject_size = 64*1024;
 				tshift->timeout = 0;
 				tshift->state = AV_TIMESHIFT_STAT_FFFB;
+				
+				if (tshift->last_cmd == AV_PLAY_START)
+				{
+					AM_DEBUG(1, "set di bypass_all to 1");	
+					AM_FileEcho("/sys/module/di/parameters/bypass_all","1");
+					usleep(200*1000);
+				}
 			
 				ioctl(tshift->cntl_fd, AMSTREAM_IOC_TRICKMODE, TRICKMODE_FFFB);
 
 				AM_TIME_GetClock(&tshift->fffb_time);
-				tshift->fffb_base = info->current_time;
+				tshift->fffb_base = info->current_time*1000;
 				am_timeshift_fffb(tshift);
 			}
 			break;
 		case AV_PLAY_SEEK:
-			offset = tshift->seek_pos * tshift->rate;
+			offset = (loff_t)tshift->seek_pos * (loff_t)tshift->rate;
 			AM_DEBUG(1, "Timeshift seek to offset %lld, time %d s", offset, tshift->seek_pos);
 			aml_timeshift_file_seek(&tshift->file, offset);
 			ioctl(tshift->cntl_fd, AMSTREAM_IOC_TRICKMODE, TRICKMODE_NONE);
@@ -2123,7 +2159,7 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 			/*reset the vpath*/
 			aml_set_vpath(tshift->dev);
 			/*restart play now*/
-			aml_start_timeshift(tshift, &tshift->para, AM_FALSE, AM_TRUE);
+			aml_start_timeshift(tshift, &tshift->info.play_para, AM_FALSE, AM_TRUE);
 
 			/*Set the left to 0, we will read from the new point*/
 			tshift->left = 0;
@@ -2134,7 +2170,7 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 			break;
 		case AV_PLAY_SWITCH_AUDIO:
 			/* just restart play using the new audio para */
-			AM_DEBUG(1, "Switch audio to pid=%d, fmt=%d",tshift->para.aud_id, tshift->para.aud_fmt);
+			AM_DEBUG(1, "Switch audio to pid=%d, fmt=%d",tshift->info.play_para.aud_id, tshift->info.play_para.aud_fmt);
 			/*Set the left to 0, we will read from the new point*/
 			tshift->left = 0;
 			tshift->inject_size = 0;
@@ -2180,14 +2216,11 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 	return 0;
 }
 
-static unsigned int aml_timeshift_get_pts(AV_TimeshiftData_t *tshift)
+static void aml_timeshift_update_info(AV_TimeshiftData_t *tshift, AM_AV_TimeshiftInfo_t *info)
 {
-	if (tshift->para.vid_id >= 0)
-		return aml_get_pts_video();
-	else if (tshift->para.aud_id >= 0) 
-		return aml_get_pts_audio();
-	else
-		return 0;
+	pthread_mutex_lock(&tshift->lock);
+	tshift->info = *info;
+	pthread_mutex_unlock(&tshift->lock);
 }
 
 /**\brief Timeshift 线程*/
@@ -2200,7 +2233,7 @@ static void *aml_timeshift_thread(void *arg)
 	uint8_t buf[64*1024];
 	const int FFFB_STEP = 150;
 	struct timespec rt;
-	player_info_t info;
+	AM_AV_TimeshiftInfo_t info;
 	struct am_io_param astatus;
 	struct am_io_param vstatus;
 	AV_PlayCmd_t cmd;
@@ -2208,6 +2241,7 @@ static void *aml_timeshift_thread(void *arg)
 	int playback_alen=0, playback_vlen=0;
 
 	memset(&info, 0, sizeof(info));
+	info.play_para = tshift->info.play_para;
 	tshift->last_cmd = -1;
 	AM_DEBUG(1, "!!!!!!!!!!!Timeshift player thread start!!!!!!!!!!!!");
 	info.status = AV_TIMESHIFT_STAT_INITOK;
@@ -2215,7 +2249,7 @@ static void *aml_timeshift_thread(void *arg)
 	AM_TIME_GetClock(&update_time);
 
 	aml_set_black_policy(0);
-	while (tshift->running)
+	while (tshift->running||tshift->cmd!= tshift->last_cmd )
 	{
 		pthread_mutex_lock(&tshift->lock);
 		cmd = tshift->cmd;
@@ -2238,6 +2272,20 @@ static void *aml_timeshift_thread(void *arg)
 		/*Inject*/
 		if (tshift->inject_size > 0)
 		{
+			if (tshift->state == AV_TIMESHIFT_STAT_PLAY &&
+				ioctl(tshift->av_fd, AMSTREAM_IOC_AB_STATUS, (unsigned long)&astatus) != -1 && 
+				ioctl(tshift->av_fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1) 
+			{
+				if (vstatus.status.data_len == 0 && astatus.status.data_len > 100*1024)
+				{
+					tshift->timeout = 10;
+					goto wait_for_next_loop;
+				}
+				else
+				{
+					tshift->timeout = 0;
+				}
+			}
 			AM_DEBUG(7, "left %d, inject_size %d", tshift->left, tshift->inject_size);
 			ret = AM_MIN(tshift->left , tshift->inject_size);
 			if (ret > 0)
@@ -2263,12 +2311,15 @@ static void *aml_timeshift_thread(void *arg)
 		if (tshift->state == AV_TIMESHIFT_STAT_FFFB)
 		{
 			tshift->timeout = 0;
-			trick_stat = aml_timeshift_get_trick_stat(tshift);
+			if (tshift->info.play_para.vid_id > 0 && tshift->info.play_para.vid_id < 0x1fff)
+				trick_stat = aml_timeshift_get_trick_stat(tshift);
+			else
+				trick_stat = 1;
 			AM_DEBUG(7, "trick_stat is %d", trick_stat);
 			if (trick_stat > 0)
 			{
 				tshift->timeout = FFFB_STEP;
-				info.current_time = tshift->fffb_base;
+				info.current_time = tshift->fffb_base/1000;
 
 				if (tshift->rate)
 					info.full_time = tshift->file.total/tshift->rate;
@@ -2276,8 +2327,9 @@ static void *aml_timeshift_thread(void *arg)
 					info.full_time = 0;
 				info.status = tshift->state;
 
-				AM_DEBUG(1, "!!!!!!!!!Notify time update");
+				AM_DEBUG(1, "Notify time update");
 				AM_EVT_Signal(0, AM_AV_EVT_PLAYER_UPDATE_INFO, (void*)&info);
+				aml_timeshift_update_info(tshift, &info);
 				am_timeshift_fffb(tshift);
 			}
 			else if ((now - tshift->fffb_time) > 2000)
@@ -2293,6 +2345,12 @@ static void *aml_timeshift_thread(void *arg)
 			ioctl(tshift->av_fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1)
 			{
 				update_time = now;
+				if (tshift->rate)
+					info.full_time = tshift->file.total/tshift->rate;
+				else
+					info.full_time = 0;
+				if (!tshift->info.play_para.playback_only && !tshift->file.loop)
+					tshift->duration = info.full_time;
 				AM_DEBUG(1, "total %lld, avail %lld, alen %d, vlen %d, duration %d, size %lld", 
 					tshift->file.total , tshift->file.avail , astatus.status.data_len , vstatus.status.data_len, tshift->duration, tshift->file.size);
 				if (tshift->rate)
@@ -2307,25 +2365,24 @@ static void *aml_timeshift_thread(void *arg)
 					am_timeshift_reset(tshift, -1, AM_TRUE);
 					info.current_time = 0;
 				}
-				info.current_time *= 1000;
-				if (tshift->rate)
-					info.full_time = tshift->file.total/tshift->rate;
-				else
-					info.full_time = 0;
+				
 				info.status = tshift->state;
 
-				AM_DEBUG(1, "!!!!!!!!!Notify time update");
+				AM_DEBUG(1, "Notify time update, current %d, total %d", info.current_time, info.full_time);
 				AM_EVT_Signal(0, AM_AV_EVT_PLAYER_UPDATE_INFO, (void*)&info);
-
+				aml_timeshift_update_info(tshift, &info);
+				
 				/*If there is no data available in playback only mode, we send exit event*/
-				if (tshift->para.playback_only && !tshift->file.avail)
+				if (tshift->info.play_para.playback_only && !tshift->file.avail)
 				{
 					if (playback_alen == astatus.status.data_len && 
 						playback_vlen == vstatus.status.data_len)
 					{
-						AM_DEBUG(1, "@@@Playback End");
+						AM_DEBUG(1, "Playback End");
+						info.current_time = info.full_time;
 						info.status = AV_TIMESHIFT_STAT_EXIT;
 						AM_EVT_Signal(0, AM_AV_EVT_PLAYER_UPDATE_INFO, (void*)&info);
+						aml_timeshift_update_info(tshift, &info);
 						break;
 					}
 					else
@@ -2337,6 +2394,7 @@ static void *aml_timeshift_thread(void *arg)
 			}
 		}
 
+wait_for_next_loop:
 		if (tshift->timeout == -1)
 		{
 			pthread_mutex_lock(&tshift->lock);
@@ -2383,7 +2441,7 @@ static AM_ErrorCode_t aml_timeshift_fill_data(AM_AV_Device_t *dev, uint8_t *data
 					tshift->rtotal += size;
 					/*Calcaulate the rate*/
 					tshift->rate = (tshift->rtotal*1000)/(now - tshift->rtime);
-					if (tshift->rate)
+					if (tshift->rate && tshift->file.loop)
 					{
 						/*Calculate the file size*/
 						tshift->file.size = tshift->rate * tshift->duration;
@@ -2441,6 +2499,19 @@ static AM_ErrorCode_t aml_timeshift_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, v
 		}
 	}
 	pthread_cond_signal(&data->cond);
+	pthread_mutex_unlock(&data->lock);
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t aml_timeshift_get_info(AM_AV_Device_t *dev, AM_AV_TimeshiftInfo_t *info)
+{
+	AV_TimeshiftData_t *data;
+	
+	data = (AV_TimeshiftData_t*)dev->timeshift_player.drv_data;
+	
+	pthread_mutex_lock(&data->lock);
+	*info = data->info;
 	pthread_mutex_unlock(&data->lock);
 
 	return AM_SUCCESS;
@@ -4461,7 +4532,6 @@ aml_set_vpath(AM_AV_Device_t *dev)
 	int times = 10;
 
 	AM_DEBUG(1, "set video path fs:%d di:%d ppmgr:%d", dev->vpath_fs, dev->vpath_di, dev->vpath_ppmgr);
-	
 	AM_FileEcho("/sys/class/deinterlace/di0/config", "disable");
 
 		
@@ -4504,6 +4574,10 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			snprintf(ppr, sizeof(ppr), "%d %d %d %d 0", x, y, x+w, y+h);
 		}
 #endif
+		AM_FileRead("/sys/class/graphics/fb0/request2XScale", mode, sizeof(mode));
+		if (blank && !strncmp(mode, "2", 1)) {
+			blank = AM_FALSE;
+		}
 		if(blank){
 			AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
 		}
@@ -4518,6 +4592,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","1");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect", ppr);
 			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", "0");
+			usleep(200*1000);
 		}
 #endif
 	}else{
@@ -4542,6 +4617,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 				scale = AM_FALSE;
 			}
 
+			AM_FileRead("/sys/class/graphics/fb0/request2XScale", verstr, sizeof(verstr));
 			if(!strncmp(mode, "480i", 4) || !strncmp(mode, "480p", 4)){
 				reqcmd   = "16 720 480";
 				osd1axis = "1280 720 720 480";
@@ -4560,6 +4636,10 @@ aml_set_vpath(AM_AV_Device_t *dev)
 				osd1cmd  = "0";
 				blank    = AM_FALSE;
 			}
+			
+			if (blank && !strncmp(verstr, reqcmd, strlen(reqcmd))) {
+				blank = AM_FALSE;
+			}
 
 			property_get("ro.build.version.sdk",verstr,"10");
 			if(sscanf(verstr, "%d", &version)==1){
@@ -4569,7 +4649,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			}
 		}
 #endif
-		if(blank){
+		if(blank && scale){
 			AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
 		}
 		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "0");
@@ -4586,7 +4666,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			}
 
 			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "3");
-			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "30");
+			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "62");
 			AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","0");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");

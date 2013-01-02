@@ -52,38 +52,14 @@ enum
 /**\brief 录像管理数据*/
 typedef struct
 {
-	int				fend_dev;
-	int				av_dev;
-	int				dvr_dev;
-	int				fifo_id;
-	int				evt;
+	AM_REC_CreatePara_t	create_para;
+	AM_REC_RecPara_t	rec_para;
+	pthread_t		rec_thread;
+	pthread_mutex_t	lock;
 	int				stat_flag;
 	int				rec_fd;
 	int				rec_start_time;
-	int				rec_end_time;
-	int				tshift_play_check_time;
-	int				rec_check_time;
-	int				rec_end_check_time;
-	int				speed;
-	int				seek_pos;
-	int				rec_db_id;
-	int				timeshift_duration;
-	int				timeshift_dmx_dev;
-	int				rec_duration;
-	int				apid;
-	int				vpid;
-	AM_AV_VFormat_t	vfmt;
-	AM_AV_AFormat_t	afmt;
-	AM_Bool_t		seek_start;
-	pthread_t		thread;
-	pthread_t		rec_thread;
-	pthread_mutex_t	lock;
-	pthread_cond_t	cond;
-	sqlite3			*hdb;
-	AM_REC_Pid_t		rec_pids;
-	AM_REC_RecPara_t	rec_para;
 	char			rec_file_name[256];
-	char			store_dir[256];
 	void			*user_data;
 }AM_REC_Recorder_t;
 

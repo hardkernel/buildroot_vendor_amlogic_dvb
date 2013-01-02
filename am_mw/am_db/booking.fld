@@ -1,10 +1,8 @@
-/*rec_table 字段列表*/
-"db_id integer primary key autoincrement",				/**< 数据库保存的唯一索引*/ 
-"fend_no integer",									/**< 使用的前端设备*/ 
-"dvr_no integer",									/**< 使用的DVR设备*/ 
-"db_ts_id integer",									/**< 录像所属TS*/
-"db_srv_id integer",								/**< 录像所属SRV*/
-"db_evt_id integer",								/**< 录像事件*/
+/*booking_table 字段列表*/
+"db_id integer primary key autoincrement",			/**< 数据库保存的唯一索引*/ 
+"db_srv_id integer",								/**< 预约所属SRV*/
+"db_evt_id integer",								/**< 预约事件*/
+"flag integer",										/**< 预约标志*/
 "status integer",									/**< 录像状态信息，如未开始，已完成等*/
 "start integer",									/**< 开始时间，以秒为单位*/  
 "duration integer",									/**< 持续时间，以秒为单位*/ 
@@ -37,3 +35,5 @@
 
 /* Other streams */
 "other_pids text",									/**< 其他的录像PID信息*/
+
+"from_storage text",								/**< 录像所在的存储器路径*/

@@ -44,19 +44,18 @@
  * Type definitions
  ***************************************************************************/
 
-/**\brief 等待管理线程处理完所有事件*/
-static void am_rec_wait_events_done(AM_REC_Recorder_t *rec)
+/**\brief 获取录像文件长度*/
+static inline long long am_rec_get_file_size(AM_REC_Recorder_t *rec)
 {
-	/*同一线程下允许嵌套调用*/
-	if (rec->thread == pthread_self())
-		return;
-	
-	while (rec->evt != REC_EVT_NONE)
-	{
-		//AM_DEBUG(0, "wait_events_done start");
-		pthread_cond_wait(&rec->cond, &rec->lock);
-		//AM_DEBUG(0, "wait_events_done end");
+	long long size = 0;
+	struct stat statbuff;  
+		
+	if(stat(rec->rec_file_name, &statbuff) >= 0)
+	{  
+		size = statbuff.st_size;
 	}
+	
+	return size;
 }
 
 /**\brief 写录像数据到文件*/
@@ -86,85 +85,51 @@ static int am_rec_data_write(int fd, uint8_t *buf, int size)
 	return (size - left);
 }
 
-/**\brief 更新录像状态到数据库*/
-static void am_rec_db_update_record_status(sqlite3 *hdb, int db_rec_id, int status)
-{
-	char sql[128];
-
-	snprintf(sql, sizeof(sql), "update rec_table set status=%d where db_id=%d",status, db_rec_id);
-
-	sqlite3_exec(hdb, sql, NULL, NULL, NULL);
-}
-
-/**\brief 更新录像持续时间到数据库*/
-static void am_rec_db_update_record_duration(sqlite3 *hdb, int db_rec_id, int duration)
-{
-	char sql[128];
-
-	snprintf(sql, sizeof(sql), "update rec_table set duration=%d where db_id=%d",duration, db_rec_id);
-
-	sqlite3_exec(hdb, sql, NULL, NULL, NULL);
-}
-
-/**\brief 更新录像文件名到数据库*/
-static void am_rec_db_update_record_file_name(sqlite3 *hdb, int db_rec_id, const char *name)
-{
-	char sql[128];
-
-	snprintf(sql, sizeof(sql), "update rec_table set file_name='%s' where db_id=%d", name, db_rec_id);
-
-	sqlite3_exec(hdb, sql, NULL, NULL, NULL);
-}
-
 /**\brief 录像线程*/
 static void *am_rec_record_thread(void* arg)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)arg;
-	int cnt, err = 0;
+	int cnt, err = 0, check_time;
 	uint8_t buf[256*1024];
 	AM_DVR_OpenPara_t para;
 	AM_DVR_StartRecPara_t spara;
-	int tshift_ready = 0, start_time;
-
+	AM_REC_RecEndPara_t epara;
+	
+	memset(&epara, 0, sizeof(epara));
+	epara.hrec = (int)rec;
 	/*设置DVR设备参数*/
 	memset(&para, 0, sizeof(para));
-	if (AM_DVR_Open(rec->dvr_dev, &para) != AM_SUCCESS)
+	if (AM_DVR_Open(rec->create_para.dvr_dev, &para) != AM_SUCCESS)
 	{
-		AM_DEBUG(0, "Open DVR%d failed", rec->dvr_dev);
+		AM_DEBUG(0, "Open DVR%d failed", rec->create_para.dvr_dev);
 		err = AM_REC_ERR_DVR;
 		goto close_file;
 	}
 
-	AM_DVR_SetSource(rec->dvr_dev, rec->fifo_id);
+	AM_DVR_SetSource(rec->create_para.dvr_dev, rec->create_para.async_fifo_id);
 	
-	spara.pid_count = rec->rec_pids.pid_count;
-	memcpy(spara.pids, rec->rec_pids.pids, sizeof(spara.pids));
-	if (AM_DVR_StartRecord(rec->dvr_dev, &spara) != AM_SUCCESS)
+	spara.pid_count = rec->rec_para.pid_count;
+	memcpy(spara.pids, rec->rec_para.pids, sizeof(spara.pids));
+	if (AM_DVR_StartRecord(rec->create_para.dvr_dev, &spara) != AM_SUCCESS)
 	{
-		AM_DEBUG(0, "Start DVR%d failed", rec->dvr_dev);
+		AM_DEBUG(0, "Start DVR%d failed", rec->create_para.dvr_dev);
 		err = AM_REC_ERR_DVR;
 		goto close_dvr;
 	}
 
-	AM_TIME_GetClock(&start_time);
-	
-	rec->tshift_play_check_time = 0;
-
 	/*从DVR设备读取数据并存入文件*/
 	while (rec->stat_flag & REC_STAT_FL_RECORDING)
 	{
-		/*if (rec->rec_fd == -1)
-			break;*/
-		cnt = AM_DVR_Read(rec->dvr_dev, buf, sizeof(buf), 1000);
+		cnt = AM_DVR_Read(rec->create_para.dvr_dev, buf, sizeof(buf), 1000);
 		if (cnt <= 0)
 		{
-			AM_DEBUG(1, "No data available from DVR%d", rec->dvr_dev);
+			AM_DEBUG(1, "No data available from DVR%d", rec->create_para.dvr_dev);
 			usleep(200*1000);
 			continue;
 		}
-		if ((rec->stat_flag & REC_STAT_FL_TIMESHIFTING))
+		if (rec->rec_para.is_timeshift)
 		{
-			if (AM_AV_TimeshiftFillData(rec->av_dev, buf, cnt) != AM_SUCCESS)
+			if (AM_AV_TimeshiftFillData(0, buf, cnt) != AM_SUCCESS)
 			{
 				err = AM_REC_ERR_CANNOT_WRITE_FILE;
 				break;
@@ -181,16 +146,22 @@ static void *am_rec_record_thread(void* arg)
 			{
 				/*已有数据写入文件，记录开始时间*/
 				AM_TIME_GetClock(&rec->rec_start_time);
-				/*重新设置结束检查时间*/
-				if (rec->rec_end_check_time)
-					AM_TIME_GetClock(&rec->rec_end_check_time);
+			}
+			else if (rec->rec_para.total_time > 0)
+			{
+				AM_TIME_GetClock(&check_time);
+				if ((check_time-rec->rec_start_time) >= rec->rec_para.total_time)
+				{
+					AM_DEBUG(1, "Reach record end time, now will stop recording...");
+					break;
+				}
 			}
 		}
 	}
 
 close_dvr:
-	AM_DVR_StopRecord(rec->dvr_dev);
-	AM_DVR_Close(rec->dvr_dev);
+	AM_DVR_StopRecord(rec->create_para.dvr_dev);
+	AM_DVR_Close(rec->create_para.dvr_dev);
 close_file:
 	if (rec->rec_fd != -1)
 	{
@@ -198,463 +169,42 @@ close_file:
 		rec->rec_fd = -1;
 	}
 
-	/*设置定时录像完成标志，更新录像持续时间*/
-	if (!(rec->stat_flag & REC_STAT_FL_TIMESHIFTING))
+	if (! rec->rec_para.is_timeshift)
 	{
 		int duration = 0;
-		
-		am_rec_db_update_record_status(rec->hdb, rec->rec_db_id, AM_REC_STAT_COMPLETE);
-		if (rec->rec_start_time)
+	
+		if (rec->rec_start_time > 0)
 		{
-			AM_TIME_GetClock(&rec->rec_end_time);
-			duration = rec->rec_end_time - rec->rec_start_time;
-			
+			AM_TIME_GetClock(&check_time);
+			duration = check_time - rec->rec_start_time;
 		}
 		duration /= 1000;
-		am_rec_db_update_record_duration(rec->hdb, rec->rec_db_id, duration);
-		
+		epara.total_size = am_rec_get_file_size(rec);
+		epara.total_time = duration;
+		epara.error_code = err;
 		AM_DEBUG(1, "Record end , duration %d:%02d:%02d", duration/3600, (duration%3600)/60, duration%60);
 	}
 
-	if (err != 0)
-	{
-		/*通知错误*/
-		AM_EVT_Signal((int)rec, AM_REC_EVT_NOTIFY_ERROR, (void*)err);
-	}
-
 	/*通知录像结束*/
-	AM_EVT_Signal((int)rec, AM_REC_EVT_RECORD_END, (void*)NULL);
+	AM_EVT_Signal((int)rec, AM_REC_EVT_RECORD_END, (void*)&epara);
 	
 	return NULL;
 }
 
-/**\brief 增加一个录像到数据库*/
-static int am_rec_db_add_record(AM_REC_Recorder_t *rec, int start, int duration, AM_REC_RecPara_t *para)
-{
-#define MAX_SUBS 16
-#define MAX_TTXS 16
-#define MAX_AUDS 32
-
-	int now, row, db_rec_id, end, db_srv_id = -1, db_ts_id = -1, db_evt_id = -1;
-	int pid_cnt = 0, i;
-	int pids[AM_DVR_MAX_PID_COUNT];
-	int sub_cnt;
-	int sub_pids[MAX_SUBS];
-	int sub_types[MAX_SUBS];
-	int sub_composition_page_ids[MAX_SUBS];
-	int sub_ancillary_page_ids[MAX_SUBS];
-	char sub_languages[MAX_SUBS][4];
-	int ttx_cnt;
-	int ttx_pids[MAX_TTXS];
-	int ttx_types[MAX_TTXS];
-	int ttx_magazine_numbers[MAX_TTXS];
-	int ttx_page_numbers[MAX_TTXS];
-	char ttx_languages[MAX_TTXS][4];
-	char sql[512];
-	char srv_name[64];
-	char evt_name[64];
-	char apids[256], afmts[256], alangs[256];
-	int aud_idx;
-	int vpid, vfmt;
-	sqlite3_stmt *ins_stmt = NULL;
-	char temp_str[1024];
-	
-#define GET_SUBTITLE()\
-	AM_MACRO_BEGIN\
-		snprintf(sql, sizeof(sql),\
-			"select pid,type,composition_page_id,ancillary_page_id,language \
-			from subtitle_table where db_srv_id=%d", db_srv_id);\
-		row = MAX_SUBS;\
-		sub_cnt = 0;\
-		if (AM_DB_Select(rec->hdb, sql, &row, "%d,%d,%d,%d,%s:4",\
-			sub_pids, sub_types, sub_composition_page_ids, \
-			sub_ancillary_page_ids, sub_languages) == AM_SUCCESS && row > 0)\
-		{\
-			sub_cnt = row;\
-		}\
-		AM_DEBUG(1, "db_srv_id %d, subtitle count %d", db_srv_id, sub_cnt);\
-	AM_MACRO_END
-#define GET_TELETEXT()\
-	AM_MACRO_BEGIN\
-		snprintf(sql, sizeof(sql),\
-			"select pid,type,magazine_number,page_number,language from \
-			teletext_table where db_srv_id=%d", db_srv_id);\
-		row = MAX_TTXS;\
-		ttx_cnt = 0;\
-		if (AM_DB_Select(rec->hdb, sql, &row, "%d,%d,%d,%d,%s:4",\
-			ttx_pids, ttx_types, ttx_magazine_numbers, \
-			ttx_page_numbers, ttx_languages) == AM_SUCCESS && row > 0)\
-		{\
-			ttx_cnt = row;\
-		}\
-		AM_DEBUG(1, "teletext count %d", ttx_cnt);\
-	AM_MACRO_END
-#define MAKE_VALUE_STRING(_values, _cnt)\
-	AM_MACRO_BEGIN\
-		temp_str[0] = 0;\
-		for (i=0; i<_cnt; i++)\
-		{\
-			if (i == 0)\
-				snprintf(temp_str, sizeof(temp_str), "%d", _values[i]);\
-			else\
-				snprintf(temp_str, sizeof(temp_str), "%s %d", temp_str, _values[i]);\
-		}\
-		AM_DEBUG(1, "value count %d, temp_str %s",_cnt, temp_str);\
-	AM_MACRO_END
-#define MAKE_STRING_STRING(_string, _cnt)\
-	AM_MACRO_BEGIN\
-		temp_str[0] = 0;\
-		for (i=0; i<_cnt; i++)\
-		{\
-			if (i == 0)\
-				snprintf(temp_str, sizeof(temp_str), "%s", _string[i]);\
-			else\
-				snprintf(temp_str, sizeof(temp_str), "%s %s", temp_str, _string[i]);\
-		}\
-	AM_MACRO_END
-	
-	srv_name[0] = 0;
-	evt_name[0] = 0;
-	apids[0] = 0;
-	afmts[0] = 0;
-	alangs[0] = 0;
-	memset(sub_languages, 0, sizeof(sub_languages));
-	memset(ttx_languages, 0, sizeof(ttx_languages));
-	if (para->type == AM_REC_TYPE_EVENT)
-	{
-		db_evt_id = para->u.event.db_evt_id;
-		/*取出事件的时间信息*/
-		row = 1;
-		snprintf(sql, sizeof(sql), 
-			"select evt_table.db_ts_id,evt_table.db_srv_id,evt_table.name,evt_table.start,\
-			evt_table.end,srv_table.name,srv_table.vid_pid,srv_table.aud_pids,srv_table.vid_fmt,\
-			srv_table.aud_fmts,srv_table.aud_langs,srv_table.current_aud from evt_table,srv_table \
-			where evt_table.db_id=%d and srv_table.db_id=evt_table.db_srv_id", para->u.event.db_evt_id);
-			
-		if (AM_DB_Select(rec->hdb, sql, &row, 
-			"%d,%d,%s:64,%d,%d,%s:64,%d,%s:256,%d,%s:256,%s:256,%d",
-		 	&db_ts_id, &db_srv_id, evt_name, &start, &end, srv_name, 
-		 	&vpid, apids, &vfmt, afmts, alangs, &aud_idx) == AM_SUCCESS && row > 0)
-		{
-			duration = end - start;
-			if (start == 0 || end == 0 || duration <= 0)
-			{
-				AM_DEBUG(0, "Cannot get start time and duration from dbase for evt '%s'", evt_name);
-				return AM_REC_ERR_INVALID_PARAM;
-			}
-		}
-		else
-		{
-			AM_DEBUG(0, "Cannot get event info for db_id = %d", para->u.event.db_evt_id);
-			return AM_REC_ERR_INVALID_PARAM;
-		}
-		
-		GET_SUBTITLE();
-		GET_TELETEXT();
-	
-		pid_cnt = 0;
-	}
-	else if (para->type == AM_REC_TYPE_PID)
-	{
-		strcpy(srv_name, "PID Record");
-		pid_cnt =para->u.pid.pid_count;
-		if (pid_cnt <= 0)
-		{
-			AM_DEBUG(0, "Invalid pid count %d", pid_cnt);
-			return AM_REC_ERR_INVALID_PARAM;
-		}
-		if (pid_cnt > AM_DVR_MAX_PID_COUNT)
-			pid_cnt = AM_DVR_MAX_PID_COUNT;
-		memcpy(pids,para->u.pid.pids, pid_cnt*sizeof(int));
-	}
-	else if (para->type == AM_REC_TYPE_SERVICE)
-	{
-		db_srv_id = para->u.service.db_srv_id;
-		row = 1;
-		snprintf(sql, sizeof(sql), "select db_ts_id,name,vid_pid,aud_pids,vid_fmt,aud_fmts,\
-			aud_langs,current_aud from srv_table where db_id=%d", db_srv_id);
-		if (AM_DB_Select(rec->hdb, sql, &row, "%d,%s:64,%d,%s:256,%d,%s:256,%s:256,%d",
-		&db_ts_id, srv_name, &vpid, apids,&vfmt,afmts,alangs,&aud_idx) != AM_SUCCESS || row< 1)
-		{
-			AM_DEBUG(0, "Cannot get srv info for db_id = %d", db_srv_id);
-			return AM_REC_ERR_INVALID_PARAM;
-		}
-		GET_SUBTITLE();
-		GET_TELETEXT();
-		
-		pid_cnt = 0;
-	}
-	else if (para->type == AM_REC_TYPE_CHAN_NUM)
-	{
-		row = 1;
-		snprintf(sql, sizeof(sql), "select db_ts_id,db_id,name,vid_pid,aud_pids,vid_fmt,aud_fmts,\
-			aud_langs,current_aud from srv_table where chan_num=%d", para->u.chan_num.num);
-		if (AM_DB_Select(rec->hdb, sql, &row, "%d,%d,%s:64,%d,%s:256,%d,%s:256,%s:256,%d",
-		&db_ts_id, &db_srv_id,srv_name, &vpid, apids,&vfmt,afmts,alangs,&aud_idx) != AM_SUCCESS || row< 1)
-		{
-			AM_DEBUG(0, "Cannot get srv info for chan_num = %d", para->u.chan_num.num);
-			return AM_REC_ERR_INVALID_PARAM;
-		}
-		GET_SUBTITLE();
-		GET_TELETEXT();
-		
-		pid_cnt = 0;
-	}
-	
-	/*添加到数据库*/
-	snprintf(sql, sizeof(sql), 
-		"insert into rec_table(fend_no,dvr_no, db_ts_id, db_srv_id, db_evt_id, srv_name, evt_name, \
-		start, duration, status,file_name,vid_pid,vid_fmt,aud_pids,aud_fmts,aud_languages, \
-		sub_pids,sub_types,sub_composition_page_ids,sub_ancillary_page_ids,sub_languages,\
-		ttx_pids,ttx_types,ttx_magazine_numbers,ttx_page_numbers,ttx_languages, other_pids) \
-		values(%d,%d,%d,%d,%d,?,?,%d,%d,%d,'',%d,%d,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-		rec->fend_dev, rec->dvr_dev, db_ts_id, db_srv_id, db_evt_id, start, duration, AM_REC_STAT_NOT_START,vpid, vfmt);
-		
-	if (sqlite3_prepare(rec->hdb, sql, -1, &ins_stmt, NULL) != SQLITE_OK)
-	{
-		AM_DEBUG(0, "Prepare sqlite3 failed for adding new record");
-		return AM_REC_ERR_SQLITE;
-	}
-	sqlite3_bind_text(ins_stmt, 1, srv_name, strlen(srv_name), SQLITE_STATIC);
-	sqlite3_bind_text(ins_stmt, 2, evt_name, strlen(evt_name), SQLITE_STATIC);
-	sqlite3_bind_text(ins_stmt, 3, apids, strlen(apids), SQLITE_STATIC);
-	sqlite3_bind_text(ins_stmt, 4, afmts, strlen(afmts), SQLITE_STATIC);
-	sqlite3_bind_text(ins_stmt, 5, alangs, strlen(alangs), SQLITE_STATIC);
-	MAKE_VALUE_STRING(sub_pids, sub_cnt);
-	sqlite3_bind_text(ins_stmt, 6, temp_str, strlen(temp_str), SQLITE_TRANSIENT);
-	MAKE_VALUE_STRING(sub_types, sub_cnt);
-	sqlite3_bind_text(ins_stmt, 7, temp_str, strlen(temp_str), SQLITE_TRANSIENT);
-	MAKE_VALUE_STRING(sub_composition_page_ids, sub_cnt);
-	sqlite3_bind_text(ins_stmt, 8, temp_str, strlen(temp_str), SQLITE_TRANSIENT);
-	MAKE_VALUE_STRING(sub_ancillary_page_ids, sub_cnt);
-	sqlite3_bind_text(ins_stmt, 9, temp_str, strlen(temp_str), SQLITE_TRANSIENT);
-	MAKE_STRING_STRING(sub_languages, sub_cnt);
-	sqlite3_bind_text(ins_stmt, 10, temp_str, strlen(temp_str), SQLITE_TRANSIENT);
-	MAKE_VALUE_STRING(ttx_pids, ttx_cnt);
-	sqlite3_bind_text(ins_stmt, 11, temp_str, strlen(temp_str), SQLITE_TRANSIENT);
-	MAKE_VALUE_STRING(ttx_types, ttx_cnt);
-	sqlite3_bind_text(ins_stmt, 12, temp_str, strlen(temp_str), SQLITE_TRANSIENT);
-	MAKE_VALUE_STRING(ttx_magazine_numbers, ttx_cnt);
-	sqlite3_bind_text(ins_stmt, 13, temp_str, strlen(temp_str), SQLITE_TRANSIENT);
-	MAKE_VALUE_STRING(ttx_page_numbers, ttx_cnt);
-	sqlite3_bind_text(ins_stmt, 14, temp_str, strlen(temp_str), SQLITE_TRANSIENT);
-	MAKE_STRING_STRING(ttx_languages, ttx_cnt);
-	sqlite3_bind_text(ins_stmt, 15, temp_str, strlen(temp_str), SQLITE_TRANSIENT);
-	MAKE_VALUE_STRING(pids, pid_cnt);
-	sqlite3_bind_text(ins_stmt, 16, temp_str, strlen(temp_str), SQLITE_TRANSIENT);
-	
-	sqlite3_step(ins_stmt);
-	sqlite3_finalize(ins_stmt);
-
-	/*如果时事件录像，则更新事件预约状态*/
-	if (db_evt_id != -1)
-	{
-		snprintf(sql, sizeof(sql), "update evt_table set sub_flag=2,sub_status=0 where db_id=%d", db_evt_id);
-		sqlite3_exec(rec->hdb, sql, NULL, NULL, NULL);
-	}
-		
-	return AM_SUCCESS;
-}
 
 /**\brief 取录像参数*/
-static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
+static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start_para)
 {
-	int db_rec_id, row, duration = 0;
-	char sql[200];
-	int sub_cnt, ttx_cnt;
-	int sub_pids[MAX_SUBS];
-	int ttx_pids[MAX_TTXS];
-	int i;
-	char *pid_tok;
-
-	/*获取PID信息*/
-	rec->rec_pids.pid_count = 0;
-	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
-	{
-		char apids[256];
-		char afmts[256];
-		int aud_idx;
-	
-		apids[0] = afmts[0] = 0;
-		if (rec->rec_para.type == AM_REC_TYPE_EVENT)
-		{
-			AM_DEBUG(0, "Timeshifting dose not support the event type");
-			return AM_REC_ERR_INVALID_PARAM;
-		}
-		else if (rec->rec_para.type == AM_REC_TYPE_PID)
-		{
-			/*直接获取PID*/
-			rec->rec_pids.pid_count = rec->rec_para.u.pid.pid_count;
-			if (rec->rec_para.u.pid.pid_count <= 0)
-			{
-				AM_DEBUG(0, "Invalid pid count %d", rec->rec_para.u.pid.pid_count);
-				return AM_REC_ERR_INVALID_PARAM;
-			}
-			if (rec->rec_pids.pid_count > AM_DVR_MAX_PID_COUNT)
-				rec->rec_pids.pid_count = AM_DVR_MAX_PID_COUNT;
-			memcpy(rec->rec_pids.pids, rec->rec_para.u.pid.pids, rec->rec_pids.pid_count*sizeof(int));
-		}
-		else if (rec->rec_para.type == AM_REC_TYPE_SERVICE)
-		{
-			/*从srv_table查询音视频PID*/
-			row = 1;
-			snprintf(sql, sizeof(sql), "select vid_pid,aud_pids,vid_fmt,aud_fmts,current_aud \
-				from srv_table where db_id=%d", rec->rec_para.u.service.db_srv_id);
-			if (AM_DB_Select(rec->hdb, sql, &row, "%d,%s:256,%d,%s:256,%d",&rec->vpid, 
-				apids,&rec->vfmt, afmts, &aud_idx) != AM_SUCCESS || row< 1)
-			{
-				AM_DEBUG(0, "Cannot get srv info for db_id = %d", rec->rec_para.u.service.db_srv_id);
-				return AM_REC_ERR_INVALID_PARAM;
-			}
-			if (aud_idx < 0 || aud_idx >= (int)AM_ARRAY_SIZE(rec->rec_pids.pids))
-				aud_idx = 0;
-			/* Extract PIDs */
-			rec->rec_pids.pids[0] = rec->vpid;
-			i = 1;
-			AM_TOKEN_PARSE_BEGIN(apids, " ", pid_tok)
-				if (i < AM_DVR_MAX_PID_COUNT)
-					rec->rec_pids.pids[i] = atoi(pid_tok);
-				else
-					break;
-				i++;
-			AM_TOKEN_PARSE_END(apids, " ", pid_tok)
-			rec->rec_pids.pid_count = i;
-			rec->apid = AM_TOKEN_VALUE_INT(apids, " ", aud_idx, 0x1fff);
-			rec->afmt = AM_TOKEN_VALUE_INT(afmts, " ", aud_idx, 0);
-			AM_DEBUG(0, "apids %s, afmts %s, aud_idx %d, apid %d, afmt %d",
-				apids, afmts, aud_idx, rec->apid, rec->afmt);
-			/* Subtitle PIDs */
-			snprintf(sql, sizeof(sql),"select pid from subtitle_table \
-				where db_srv_id=%d", rec->rec_para.u.service.db_srv_id);
-			row = MAX_SUBS;
-			sub_cnt = 0;
-			if (AM_DB_Select(rec->hdb, sql, &row, "%d",sub_pids) == AM_SUCCESS && row > 0)
-			{
-				sub_cnt = row;
-				i = AM_MIN(AM_DVR_MAX_PID_COUNT-rec->rec_pids.pid_count, sub_cnt);
-				if (i > 0)
-				{
-					memcpy(rec->rec_pids.pids+rec->rec_pids.pid_count, sub_pids, i*sizeof(int));
-					rec->rec_pids.pid_count += i;
-				}
-			}
-			/* Teletext PIDs */
-			snprintf(sql, sizeof(sql),"select pid from teletext_table \
-				where db_srv_id=%d", rec->rec_para.u.service.db_srv_id);
-			row = MAX_TTXS;
-			ttx_cnt = 0;
-			if (AM_DB_Select(rec->hdb, sql, &row, "%d",ttx_pids) == AM_SUCCESS && row > 0)
-			{
-				ttx_cnt = row;
-				i = AM_MIN(AM_DVR_MAX_PID_COUNT-rec->rec_pids.pid_count, ttx_cnt);
-				if (i > 0)
-				{
-					memcpy(rec->rec_pids.pids+rec->rec_pids.pid_count, ttx_pids, i*sizeof(int));
-					rec->rec_pids.pid_count += i;
-				}
-			}
-		}
-		else if (rec->rec_para.type == AM_REC_TYPE_CHAN_NUM)
-		{
-			int db_srv_id = -1;
-			
-			row = 1;
-			snprintf(sql, sizeof(sql), "select db_id,vid_pid,aud_pids,vid_fmt,aud_fmts,current_aud \
-				from srv_table where chan_num=%d", rec->rec_para.u.chan_num.num);
-			if (AM_DB_Select(rec->hdb, sql, &row, "%d,%d,%s:256,%d,%s:256,%d", &db_srv_id, &rec->vpid, 
-				apids,&rec->vfmt, afmts, &aud_idx) != AM_SUCCESS || row< 1)
-			{
-				AM_DEBUG(0, "Cannot get srv info for chan_num = %d", rec->rec_para.u.chan_num.num);
-				return AM_REC_ERR_INVALID_PARAM;
-			}
-			if (aud_idx < 0 || aud_idx >= (int)AM_ARRAY_SIZE(rec->rec_pids.pids))
-				aud_idx = 0;
-			/* Extract PIDs */
-			rec->rec_pids.pids[0] = rec->vpid;
-			i = 1;
-			AM_TOKEN_PARSE_BEGIN(apids, " ", pid_tok)
-				if (i < AM_DVR_MAX_PID_COUNT)
-					rec->rec_pids.pids[i] = atoi(pid_tok);
-				else
-					break;
-				i++;
-			AM_TOKEN_PARSE_END(apids, " ", pid_tok)
-			rec->rec_pids.pid_count = i;
-			rec->apid = AM_TOKEN_VALUE_INT(apids, " ", aud_idx, 0x1fff);
-			rec->afmt = AM_TOKEN_VALUE_INT(afmts, " ", aud_idx, 0);
-			
-			/* Subtitle PIDs */
-			snprintf(sql, sizeof(sql),
-				"select pid from subtitle_table where db_srv_id=%d", db_srv_id);
-			row = MAX_SUBS;
-			sub_cnt = 0;
-			if (AM_DB_Select(rec->hdb, sql, &row, "%d",sub_pids) == AM_SUCCESS && row > 0)
-			{
-				sub_cnt = row;
-				i = AM_MIN(AM_DVR_MAX_PID_COUNT-rec->rec_pids.pid_count, sub_cnt);
-				if (i > 0)
-				{
-					memcpy(rec->rec_pids.pids+rec->rec_pids.pid_count, sub_pids, i*sizeof(int));
-					rec->rec_pids.pid_count += i;
-				}
-			}
-			/* Teletext PIDs */
-			snprintf(sql, sizeof(sql),
-				"select pid from teletext_table where db_srv_id=%d", db_srv_id);
-			row = MAX_TTXS;
-			ttx_cnt = 0;
-			if (AM_DB_Select(rec->hdb, sql, &row, "%d",ttx_pids) == AM_SUCCESS && row > 0)
-			{
-				ttx_cnt = row;
-				i = AM_MIN(AM_DVR_MAX_PID_COUNT-rec->rec_pids.pid_count, ttx_cnt);
-				if (i > 0)
-				{
-					memcpy(rec->rec_pids.pids+rec->rec_pids.pid_count, ttx_pids, i*sizeof(int));
-					rec->rec_pids.pid_count += i;
-				}
-			}
-		}
-	}
-	else if (rec->rec_db_id != -1)
-	{	
-		char pid_para[4][256];
-		int j;
-		
-		memset(pid_para, 0, sizeof(pid_para));
-		row = 1;
-		snprintf(sql, sizeof(sql), "select duration,vid_pid,aud_pids,sub_pids,ttx_pids,other_pids \
-			from rec_table where db_id=%d", rec->rec_db_id);
-		if (AM_DB_Select(rec->hdb, sql, &row, "%d,%d,%s:256,%s:256,%s:256,%s:256", 
-			&duration, &rec->vpid, pid_para[0], pid_para[1], pid_para[2], pid_para[3]) != AM_SUCCESS || row< 1)
-		{
-			AM_DEBUG(0, "Cannot get record info for db_id= %d", rec->rec_db_id);
-			return AM_REC_ERR_INVALID_PARAM;
-		}
-		/*取出PID信息*/
-		rec->rec_pids.pids[0] = rec->vpid;
-		i = 1;
-		for (j=0; j<4; j++)
-		{
-			AM_DEBUG(0, "pid[%d] %s", j, pid_para[j]);
-			AM_TOKEN_PARSE_BEGIN(pid_para[j], " ", pid_tok)
-				if (i < AM_DVR_MAX_PID_COUNT)
-					rec->rec_pids.pids[i] = atoi(pid_tok);
-				else
-					break;
-				i++;
-			AM_TOKEN_PARSE_END(pid_para[j], " ", pid_tok)
-		}
-		rec->rec_pids.pid_count = AM_MIN(rec->rec_pids.pid_count+i, AM_DVR_MAX_PID_COUNT);
-	}
-	
-	if (rec->rec_pids.pid_count <= 0)
+	if (start_para->pid_count <= 0)
 		return AM_REC_ERR_INVALID_PARAM;
-
-	snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), "%s/DVBRecordFiles", rec->store_dir);	
+		
+	snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), 
+		"%s/DVBRecordFiles", rec->create_para.store_dir);	
 	/*尝试创建录像文件夹*/
 	if (mkdir(rec->rec_file_name, 0666) && errno != EEXIST)
 	{
-		AM_DEBUG(0, "Cannot create record store directory '%s', error: %s.", rec->rec_file_name, strerror(errno));	
+		AM_DEBUG(0, "Cannot create record store directory '%s', error: %s.", 
+			rec->rec_file_name, strerror(errno));	
 		if (errno == EACCES)
 			return AM_REC_ERR_CANNOT_ACCESS_FILE;
 			
@@ -664,9 +214,9 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 	/*设置输出文件名*/
 	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
 	{
-		snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), "%s/DVBRecordFiles/REC_TimeShifting%d.ts", rec->store_dir, rec->av_dev);
-		//snprintf(rec->rec_file_name, sizeof(rec->rec_file_name),"/mnt/sda/sda1/REC_TimeShifting0.ts");
-		rec->rec_end_check_time = 0;
+		snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), 
+			"%s/DVBRecordFiles/REC_TimeShifting%d.amrec", 
+			rec->create_para.store_dir, 0/*AV_DEV*/);
 	}
 	else
 	{
@@ -683,8 +233,9 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 		do
 		{
 			now = rand();
-			snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), "%s/DVBRecordFiles/REC_%04d%02d%02d_%d.ts", 
-				rec->store_dir, stim.tm_year + 1900, stim.tm_mon+1, stim.tm_mday, now);
+			snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), 
+				"%s/DVBRecordFiles/REC_%04d%02d%02d_%d.amrec", rec->create_para.store_dir, 
+				stim.tm_year + 1900, stim.tm_mon+1, stim.tm_mday, now);
 			if (!stat(rec->rec_file_name, &st))
 			{
 				continue;
@@ -695,38 +246,20 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec)
 			}
 			else
 			{
-				AM_DEBUG(1, "Try search file in %s/DVBRecordFiles Failed, error: %s", rec->store_dir, strerror(errno));
+				AM_DEBUG(1, "Try search file in %s/DVBRecordFiles Failed, error: %s", 
+					rec->create_para.store_dir, strerror(errno));
 				if (errno == EACCES)
 					return AM_REC_ERR_CANNOT_ACCESS_FILE;
 				return AM_REC_ERR_CANNOT_OPEN_FILE;
 			}	
 		}while(1);
-
-		if (rec->rec_db_id != -1)
-		{
-			AM_DEBUG(0, "Assign record file name to : %s", rec->rec_file_name);
-			am_rec_db_update_record_file_name(rec->hdb, rec->rec_db_id, rec->rec_file_name + strlen(rec->store_dir) + 1);
-		}
-	
-		/*设置定时录像结束检查时间*/
-		if (duration > 0)
-		{
-			AM_TIME_GetClock(&rec->rec_end_check_time);
-			//rec->rec_end_check_time += duration*1000;
-			rec->rec_duration = duration*1000;
-		}
-		else
-		{
-			/*即时录像时不检查结束时间*/
-			rec->rec_end_check_time = 0;
-		}
 	}
 	
 	return 0;
 }
 
 /**\brief 开始录像*/
-static int am_rec_start_record(AM_REC_Recorder_t *rec)
+static int am_rec_start_record(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start_para)
 {
 	int rc, ret = 0;
 	
@@ -737,11 +270,12 @@ static int am_rec_start_record(AM_REC_Recorder_t *rec)
 		goto start_end;
 	}
 	/*取录像相关参数*/
-	if ((ret = am_rec_fill_rec_param(rec)) != 0)
+	if ((ret = am_rec_fill_rec_param(rec, start_para)) != 0)
 		goto start_end;
 		
 	/*打开录像文件*/
-	if (! (rec->stat_flag & REC_STAT_FL_TIMESHIFTING))
+	rec->rec_fd = -1;
+	if (! rec->rec_para.is_timeshift)
 	{
 		rec->rec_fd = open(rec->rec_file_name, O_TRUNC|O_CREAT|O_WRONLY, 0666);
 		if (rec->rec_fd == -1)
@@ -751,23 +285,14 @@ static int am_rec_start_record(AM_REC_Recorder_t *rec)
 			goto start_end;
 		}
 	}
-	else
-	{
-		rec->rec_fd = -1;
-	}
+	
 	rec->rec_start_time = 0;
-	rec->rec_end_time = 0;
 	rec->stat_flag |= REC_STAT_FL_RECORDING;
-		
+	rec->rec_para = *start_para;
 	rc = pthread_create(&rec->rec_thread, NULL, am_rec_record_thread, (void*)rec);
 	if (rc)
 	{
-		AM_DEBUG(0, "%s", strerror(rc));
-		rec->stat_flag &= ~REC_STAT_FL_RECORDING;
-		close(rec->rec_fd);
-		rec->rec_fd = -1;
-		rec->rec_end_check_time = 0;
-		rec->rec_db_id = -1;
+		AM_DEBUG(0, "Create record thread failed: %s", strerror(rc));
 		ret = AM_REC_ERR_CANNOT_CREATE_THREAD;
 		goto start_end;
 	}
@@ -776,18 +301,19 @@ start_end:
 	AM_DEBUG(0, "start record return %d", ret);
 	if (ret != 0)
 	{
-		/*通知录像错误*/
-		AM_EVT_Signal((int)rec, AM_REC_EVT_NOTIFY_ERROR, (void*)ret);
+		rec->stat_flag &= ~REC_STAT_FL_RECORDING;
+		if (rec->rec_fd != -1)
+			close(rec->rec_fd);
+		rec->rec_fd = -1;
+		rec->rec_start_time = 0;
 		if (ret != AM_REC_ERR_BUSY)
 		{
-			if (!(rec->stat_flag & REC_STAT_FL_TIMESHIFTING))
-			{
-				am_rec_db_update_record_status(rec->hdb, rec->rec_db_id, AM_REC_STAT_COMPLETE);
-				am_rec_db_update_record_duration(rec->hdb, rec->rec_db_id, 0);
-				rec->rec_end_check_time = 0;
-				rec->rec_db_id = -1;
-			}
-			AM_EVT_Signal((int)rec, AM_REC_EVT_RECORD_END, (void*)NULL);
+			AM_REC_RecEndPara_t epara;
+			epara.hrec = (int)rec;
+			epara.error_code = ret;
+			epara.total_size = 0;
+			epara.total_time = 0;
+			AM_EVT_Signal((int)rec, AM_REC_EVT_RECORD_END, (void*)&epara);
 		}
 	}
 	
@@ -805,308 +331,9 @@ static int am_rec_stop_record(AM_REC_Recorder_t *rec)
 	pthread_mutex_unlock(&rec->lock);
 	pthread_join(rec->rec_thread, NULL);
 	pthread_mutex_lock(&rec->lock);
-	rec->rec_end_check_time = 0;
-	rec->rec_db_id = -1;
+	rec->rec_start_time = 0;
 	
 	return 0;
-}
-
-/**\brief 检查是否开始Timeshifting播放*/
-static void am_rec_check_timeshift_play(AM_REC_Recorder_t *rec)
-{
-	struct stat st;
-
-	return;
-	if (! (rec->stat_flag & REC_STAT_FL_TIMESHIFTING) ||
-		rec->rec_fd == -1)
-	{
-		AM_DEBUG(1, "Timeshifting status error");
-		rec->tshift_play_check_time = 0;
-		return;
-	}
-
-	if (! fstat(rec->rec_fd, &st) && st.st_size >= REC_TIMESHIFT_PLAY_BUF_SIZE)
-	{
-		AM_DEBUG(1, "Timeshifting ready to play");
-		rec->tshift_play_check_time = 0;
-		AM_EVT_Signal((int)rec, AM_REC_EVT_TIMESHIFTING_READY, NULL);
-	}
-	else
-	{
-		/*设置进行下次检查*/
-		AM_TIME_GetClock(&rec->tshift_play_check_time);
-	}
-}
-
-
-/**\brief 检查是否有定时录像需要开始*/
-static void am_rec_check_records(AM_REC_Recorder_t *rec)
-{
-	int now, row, db_rec_id, start;
-	int expired[32];/*Note: 每轮查询最多处理的过期录像数*/
-	char sql[512];
-
-	AM_EPG_GetUTCTime(&now);
-
-	/*查找是否当前正在进行的录像已被用户删除*/
-	if (rec->stat_flag & REC_STAT_FL_RECORDING && rec->rec_db_id != -1)
-	{
-		snprintf(sql, sizeof(sql), "select start from rec_table where db_id=%d", rec->rec_db_id);
-		row = 1;
-		if (AM_DB_Select(rec->hdb, sql, &row, "%d", &start) == AM_SUCCESS && row <= 0)
-		{
-			AM_DEBUG(0, "***Warning: current recording not found in the database, now will stop the record***");
-			am_rec_stop_record(rec);
-		}
-	}
-
-	/*从rec_table中查找接下来即将开始的录像*/
-	snprintf(sql, sizeof(sql), "select rec_table.db_id from rec_table left join srv_table on srv_table.db_id = rec_table.db_srv_id \
-						where skip=0 and lock=0 and start>%d and start<=%d and status=%d and dvr_no=%d order by start limit 1",
-						now, now+REC_NOTIFY_RECORD_TIME/1000, AM_REC_STAT_NOT_START, rec->dvr_dev);
-	row = 1;
-	if (AM_DB_Select(rec->hdb, sql, &row, "%d", &db_rec_id) == AM_SUCCESS && row > 0)
-	{
-		am_rec_db_update_record_status(rec->hdb, db_rec_id, AM_REC_STAT_WAIT_START);
-		/*通知用户即将开始的录像*/
-		/*由上层控制录像冲突*/
-		/*if (rec->stat_flag & REC_STAT_FL_RECORDING)
-		{
-			AM_EVT_Signal((int)rec, AM_REC_EVT_NEW_RECORD_CONFLICT, (void*)db_rec_id);
-		}
-		else*/
-		{
-			AM_EVT_Signal((int)rec, AM_REC_EVT_NEW_RECORD, (void*)db_rec_id);
-		}
-	}
-
-	/*从rec_table中查找立即开始的录像 )*/
-	snprintf(sql, sizeof(sql), "select rec_table.db_id from rec_table left join srv_table on srv_table.db_id = rec_table.db_srv_id \
-							   where skip=0 and lock=0 and start<=%d and start>=%d and (duration<0 or ((duration>0) and ((start+duration)>%d))) and \
-						status<=%d and dvr_no=%d order by start limit 1", 
-						now,  now-REC_RECORD_CHECK_TIME/1000, now, AM_REC_STAT_WAIT_START, rec->dvr_dev);
-	row = 1;
-	if (AM_DB_Select(rec->hdb, sql, &row, "%d", &db_rec_id) == AM_SUCCESS && row > 0)
-	{
-		am_rec_db_update_record_status(rec->hdb, db_rec_id, AM_REC_STAT_RECORDING);
-
-		if (rec->stat_flag & REC_STAT_FL_RECORDING)
-		{
-			AM_DEBUG(0, "***Warning: A new record start now but now is already recording, start the new one***");
-			am_rec_stop_record(rec);
-		}
-		if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
-		{
-			rec->stat_flag &= ~REC_STAT_FL_TIMESHIFTING;
-			AM_AV_StopTimeshift(rec->av_dev);
-		}
-		
-		/*通知用户录像现在开始*/
-		AM_EVT_Signal((int)rec, AM_REC_EVT_RECORD_START, (void*)db_rec_id);
-		
-		/*立即开始录像*/
-		rec->rec_db_id = db_rec_id;
-		am_rec_start_record(rec);
-		
-	}
-
-	/*从rec_table中查找过期的录像*/
-	snprintf(sql, sizeof(sql), "select db_id from rec_table where (start<%d or ((duration>0) and ((start+duration)<%d))) and \
-						status<=%d and dvr_no=%d", 
-						now-REC_RECORD_CHECK_TIME/1000, now, AM_REC_STAT_WAIT_START, rec->dvr_dev);
-	row = AM_ARRAY_SIZE(expired);
-	if (AM_DB_Select(rec->hdb, sql, &row, "%d", expired) == AM_SUCCESS && row > 0)
-	{
-		int i;
-		for (i=0; i<row; i++)
-		{
-			/*删除该记录*/
-			AM_DEBUG(1, "@@Record %d expired.",  expired[i]);
-			snprintf(sql, sizeof(sql), "delete from rec_table where db_id=%d",expired[i]);
-			sqlite3_exec(rec->hdb, sql, NULL, NULL, NULL);
-		}
-	}
-	
-	/*设置进行下次检查*/
-	AM_TIME_GetClock(&rec->rec_check_time);
-}
-
-/**\brief 计算最近的一次超时时间*/
-static int am_rec_get_next_timeout_ms(AM_REC_Recorder_t *rec)
-{
-	int min = 0, now;
-
-#define CHECK_EVENT(check, dis, func)\
-	AM_MACRO_BEGIN\
-		if (check) {\
-			if ((now- (check+dis)) >= 0){\
-				func(rec);\
-				if (min == 0) \
-					min = dis;\
-				else\
-					min = AM_MIN(min, dis);\
-			} else if (min == 0){\
-				min = (check+dis) - now;\
-			} else {\
-				AM_DEBUG(0, "min %d, check %d, dis %d, now %d, end %d, end-now %d", min, check, dis, now, check+dis, (check+dis) - now);\
-				min = AM_MIN(min, (check+dis) - now);\
-			}\
-		}\
-	AM_MACRO_END
-
-	AM_TIME_GetClock(&now);
-
-	/*定期检查是否有已标志的事件需要开始录像*/
-	CHECK_EVENT(rec->rec_check_time, REC_RECORD_CHECK_TIME, am_rec_check_records);
-
-	/*检查正在录像的事件是否结束时间已到*/
-	CHECK_EVENT(rec->rec_end_check_time, rec->rec_duration, am_rec_stop_record);
-
-	/*检查是否进行Timeshifting播放*/
-	CHECK_EVENT(rec->tshift_play_check_time, REC_TSHIFT_PLAY_CHECK_TIME, am_rec_check_timeshift_play);
-
-	AM_DEBUG(2, "REC next timeout is %d ms", min);
-
-	return min;
-}
-
-/**\brief 录像管理线程*/
-static void *am_rec_thread(void *arg)
-{
-	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)arg;
-	AM_Bool_t go = AM_TRUE;
-	int timeout, ret, evt;
-	struct timespec rt;
-
-	AM_TIME_GetClock(&rec->rec_check_time);
-	
-	pthread_mutex_lock(&rec->lock);
-	
-	/*Singal the waiting operations*/
-	rec->evt = REC_EVT_NONE;
-	pthread_cond_broadcast(&rec->cond);
-	
-	while (go)
-	{
-		timeout = am_rec_get_next_timeout_ms(rec);
-
-		ret = 0;
-		if (! timeout) 
-		{
-			ret = pthread_cond_wait(&rec->cond, &rec->lock);	
-		}
-		else
-		{
-			AM_TIME_GetTimeSpecTimeout(timeout, &rt);
-			ret = pthread_cond_timedwait(&rec->cond, &rec->lock, &rt);
-		}
-
-		if (ret != ETIMEDOUT && rec->evt != REC_EVT_NONE)
-		{
-handle_event:
-			evt = rec->evt;	
-			switch (evt)
-			{
-				case REC_EVT_START_RECORD:
-					am_rec_start_record(rec);
-					break;
-				case REC_EVT_STOP_RECORD:
-					am_rec_stop_record(rec);
-					break;
-				case REC_EVT_START_TIMESHIFTING:
-					if (! (rec->stat_flag & REC_STAT_FL_TIMESHIFTING))
-					{
-						rec->stat_flag |= REC_STAT_FL_TIMESHIFTING;
-						if (am_rec_start_record(rec) != 0)
-						{
-							rec->stat_flag &= ~REC_STAT_FL_TIMESHIFTING;
-							AM_DEBUG(0, "Start timeshifting failed, cannot start record");
-						}
-						else
-						{
-							AM_AV_TimeshiftPara_t tpara;
-
-							tpara.aud_fmt = rec->afmt;
-							tpara.vid_fmt = rec->vfmt;
-							tpara.vid_id = rec->vpid;
-							tpara.aud_id = rec->apid;
-							tpara.duration = rec->timeshift_duration;
-							tpara.file_path = rec->rec_file_name;
-							tpara.playback_only = AM_FALSE;
-							tpara.dmx_id = rec->timeshift_dmx_dev;
-							AM_AV_StartTimeshift(rec->av_dev, &tpara);
-						}
-					}
-					break;
-				case REC_EVT_PLAY_TIMESHIFTING:
-					if ((rec->stat_flag & REC_STAT_FL_TIMESHIFTING))
-					{
-						AM_AV_PlayTimeshift(rec->av_dev);
-					}
-					break;
-				case REC_EVT_STOP_TIMESHIFTING:
-					if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
-					{
-						AM_DEBUG(1, "Stop recording...");
-						am_rec_stop_record(rec);
-						AM_DEBUG(1, "Stop recording OK!");
-						rec->stat_flag &= ~REC_STAT_FL_TIMESHIFTING;
-						AM_AV_StopTimeshift(rec->av_dev);
-					}
-					break;
-				case REC_EVT_PAUSE_TIMESHIFTING:
-					if ((rec->stat_flag & REC_STAT_FL_TIMESHIFTING))
-					{
-						AM_AV_PauseTimeshift(rec->av_dev);
-					}
-					break;
-				case REC_EVT_RESUME_TIMESHIFTING:
-					if ((rec->stat_flag & REC_STAT_FL_TIMESHIFTING))
-					{
-						AM_AV_ResumeTimeshift(rec->av_dev);
-					}
-					break;
-				case REC_EVT_FF_TIMESHIFTING:
-					if ((rec->stat_flag & REC_STAT_FL_TIMESHIFTING))
-					{
-						AM_AV_FastForwardTimeshift(rec->av_dev, rec->speed);
-					}
-					break;
-				case REC_EVT_FB_TIMESHIFTING:
-					if ((rec->stat_flag & REC_STAT_FL_TIMESHIFTING))
-					{
-						AM_AV_FastBackwardTimeshift(rec->av_dev, rec->speed);
-					}
-					break;
-				case REC_EVT_SEEK_TIMESHIFTING:
-					if ((rec->stat_flag & REC_STAT_FL_TIMESHIFTING))
-					{
-						AM_AV_SeekTimeshift(rec->av_dev, rec->seek_pos, rec->seek_start);
-					}
-					break;
-				case REC_EVT_QUIT:
-					AM_DEBUG(0, "Rec thread will eixt...");
-					go = AM_FALSE;
-					break;
-				default:
-					break;
-			}
-			if (evt != rec->evt)
-				goto handle_event;
-				
-			rec->evt = REC_EVT_NONE;
-			pthread_cond_broadcast(&rec->cond);
-		}
-	}
-	am_rec_stop_record(rec);
-	pthread_mutex_unlock(&rec->lock);
-
-	pthread_mutex_destroy(&rec->lock);
-	pthread_cond_destroy(&rec->cond);
-
-	AM_DEBUG(0, "Rec thread exit ok.");
-	
-	return NULL;
 }
 
 /****************************************************************************
@@ -1122,7 +349,6 @@ handle_event:
 AM_ErrorCode_t AM_REC_Create(AM_REC_CreatePara_t *para, int *handle)
 {
 	AM_REC_Recorder_t *rec;
-	int rc;
 	pthread_mutexattr_t mta;
 	
 	assert(para && handle);
@@ -1135,43 +361,21 @@ AM_ErrorCode_t AM_REC_Create(AM_REC_CreatePara_t *para, int *handle)
 		return AM_REC_ERR_NO_MEM;
 	}
 	memset(rec, 0, sizeof(AM_REC_Recorder_t));
-	rec->fend_dev = para->fend_dev;
-	rec->hdb = para->hdb;
-	rec->dvr_dev = para->dvr_dev;
-	rec->fifo_id = para->async_fifo_id;
-	rec->timeshift_duration = 10*60;
-	strncpy(rec->store_dir, para->store_dir, sizeof(rec->store_dir)-1);
+	rec->create_para = *para;
 
-	/*初始化evt*/
-	rec->evt = -1;
-	rec->rec_db_id = -1;
-	
 	/*尝试创建输出文件夹*/
 	if (mkdir(para->store_dir, 0666) && errno != EEXIST)
 	{
 		AM_DEBUG(0, "**Waring:Cannot create store directory '%s'**.", para->store_dir);	
-		/*Just give a warning message, do not return error*/
-		/*free(rec);
-		return AM_REC_ERR_INVALID_PARAM;*/
 	}
 
 	pthread_mutexattr_init(&mta);
 	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE_NP);
 	pthread_mutex_init(&rec->lock, &mta);
-	pthread_cond_init(&rec->cond, NULL);
 	pthread_mutexattr_destroy(&mta);
-	
-	rc = pthread_create(&rec->thread, NULL, am_rec_thread, (void*)rec);
-	if (rc)
-	{
-		AM_DEBUG(0, "%s", strerror(rc));
-		pthread_mutex_destroy(&rec->lock);
-		pthread_cond_destroy(&rec->cond);
-		free(rec);
-		return AM_REC_ERR_CANNOT_CREATE_THREAD;
-	}
 
 	*handle = (int)rec;
+	AM_DEBUG(1, "return handle %x, %p", *handle, rec);
 
 	return AM_SUCCESS;
 }
@@ -1188,53 +392,31 @@ AM_ErrorCode_t AM_REC_Destroy(int handle)
 	pthread_t thread;
 	
 	assert(rec);
-
-	pthread_mutex_lock(&rec->lock);
-	am_rec_wait_events_done(rec);
-	rec->evt = REC_EVT_QUIT;
-	thread = rec->thread;
-	pthread_mutex_unlock(&rec->lock);
-	pthread_cond_signal(&rec->cond);
 	
-	if (thread != pthread_self())
-		pthread_join(thread, NULL);
+	AM_REC_StopRecord(handle);
+	pthread_mutex_destroy(&rec->lock);
+	free(rec);
 
 	return AM_SUCCESS;
 }
 
 /**\brief 开始录像
  * \param handle 录像管理器句柄
- * \param db_rec_id 录像的数据库索引
+ * \param [in] start_para 录像参数
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-AM_ErrorCode_t AM_REC_StartRecord(int handle, int db_rec_id)
+AM_ErrorCode_t AM_REC_StartRecord(int handle, AM_REC_RecPara_t *start_para)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
-	assert(rec);
-	if (db_rec_id < 0)
-	{
-		AM_DEBUG(0,"Invalid db_rec_id %d", db_rec_id);
-		return AM_REC_ERR_INVALID_PARAM;
-	}
+	AM_DEBUG(1, "handle %x, %p", handle, rec);
+	assert(rec && start_para);
 	pthread_mutex_lock(&rec->lock);
-	am_rec_wait_events_done(rec);
-	if (rec->stat_flag & REC_STAT_FL_RECORDING)
-	{
-		AM_DEBUG(0, "Already recording, stop it first for new record");
-		ret = AM_REC_ERR_BUSY;
-	}
-	else
-	{
-		rec->evt = REC_EVT_START_RECORD;
-		rec->rec_db_id = db_rec_id;
-		pthread_cond_signal(&rec->cond);
-	}
+	ret = am_rec_start_record(rec, start_para);
 	pthread_mutex_unlock(&rec->lock);
-	
 
 	return ret;
 }
@@ -1248,316 +430,14 @@ AM_ErrorCode_t AM_REC_StartRecord(int handle, int db_rec_id)
 AM_ErrorCode_t AM_REC_StopRecord(int handle)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
-
-	assert(rec);
-	
-	pthread_mutex_lock(&rec->lock);
-	am_rec_wait_events_done(rec);
-	if (rec->stat_flag & REC_STAT_FL_RECORDING)
-	{
-		rec->evt = REC_EVT_STOP_RECORD;
-		pthread_cond_signal(&rec->cond);
-	}
-	pthread_mutex_unlock(&rec->lock);
-	
-	return AM_SUCCESS;
-}
-
-/**\brief 增加一个定时录像
- * \param handle 录像管理器句柄
- * \param [in] para 定时录像参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
- */
-AM_ErrorCode_t AM_REC_AddTimeRecord(int handle, AM_REC_TimeRecPara_t *para)
-{
-	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
-	int now;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
-	assert(rec && para);
-	if (para->rec_para.type > AM_REC_TYPE_PID)
-	{
-		AM_DEBUG(0,"Invalid record type %d", para->rec_para.type);
-		return AM_REC_ERR_INVALID_PARAM;
-	}
-	AM_EPG_GetUTCTime(&now);
-	if ((para->rec_para.type != AM_REC_TYPE_EVENT) && (
-	((para->duration > 0) && ((para->start_time + para->duration) <= now)) 
-	|| para->duration == 0))
-	{
-		AM_DEBUG(0,"Invalid start_time+duration=%d, now %d", para->start_time + para->duration, now);
-		return AM_REC_ERR_INVALID_PARAM;
-	}
-	if (para->start_time < now)
-		para->start_time = now;
-		
-	pthread_mutex_lock(&rec->lock);
-	am_rec_wait_events_done(rec);
-
-	/*添加一个录像到数据库*/
-	ret = am_rec_db_add_record(rec, para->start_time, para->duration, &para->rec_para);
-	if (ret == AM_SUCCESS)
-	{
-		/*强制进行一次录像检查*/
-		AM_TIME_GetClock(&rec->rec_check_time);
-		rec->rec_check_time -= REC_RECORD_CHECK_TIME;
-		pthread_cond_signal(&rec->cond);
-	}
-	
-	pthread_mutex_unlock(&rec->lock);
-	
-	return ret;
-}
-
-/**\brief 开始TimeShifting
- * \param handle 录像管理器句柄
- * \param [in] para 录像参数, para->type不能为AM_REC_TYPE_EVENT
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
- */
-AM_ErrorCode_t AM_REC_StartTimeShifting(int handle, AM_REC_TimeShiftingPara_t *para)
-{
-	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
-	AM_ErrorCode_t ret = AM_SUCCESS;
-	
-	AM_DEBUG(0,"AM_REC_StartTimeShifting");
-	assert(rec && para);
-	if (para->rec_para.type > AM_REC_TYPE_PID || para->rec_para.type == AM_REC_TYPE_EVENT)
-	{
-		AM_DEBUG(0,"Invalid record type %d", para->rec_para.type);
-		return AM_REC_ERR_INVALID_PARAM;
-	}
-	if (para->duration <= 0)
-	{
-		AM_DEBUG(0,"Invalid Timeshift duration %d", para->duration);
-		return AM_REC_ERR_INVALID_PARAM;
-	}
-
-	pthread_mutex_lock(&rec->lock);
-	am_rec_wait_events_done(rec);
-	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING || rec->stat_flag & REC_STAT_FL_RECORDING)
-	{
-		AM_DEBUG(0, "Already in recording or timeshifting play, stop it first for new play");
-		ret = AM_REC_ERR_BUSY;
-	}
-	else
-	{
-		rec->evt = REC_EVT_START_TIMESHIFTING;
-		rec->av_dev = para->av_dev;
-		rec->timeshift_duration = para->duration;
-		rec->timeshift_dmx_dev = para->playback_dmx_dev;
-		rec->rec_para = para->rec_para;
-		pthread_cond_signal(&rec->cond);
-	}
-	pthread_mutex_unlock(&rec->lock);
-	
-
-	return ret;
-}
-
-/**\brief 播放TimeShifting
- * \param handle 录像管理器句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
- */
-AM_ErrorCode_t AM_REC_PlayTimeShifting(int handle)
-{
-	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
-
 	assert(rec);
 	
 	pthread_mutex_lock(&rec->lock);
-	am_rec_wait_events_done(rec);
-	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
-	{
-		rec->evt = REC_EVT_PLAY_TIMESHIFTING;
-		pthread_cond_signal(&rec->cond);
-	}
+	ret = am_rec_stop_record(rec);
 	pthread_mutex_unlock(&rec->lock);
 	
-	return AM_SUCCESS;
-}
-
-/**\brief 停止TimeShifting
- * \param handle 录像管理器句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
- */
-AM_ErrorCode_t AM_REC_StopTimeShifting(int handle)
-{
-	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
-
-	assert(rec);
-	
-	pthread_mutex_lock(&rec->lock);
-	am_rec_wait_events_done(rec);
-	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
-	{
-		rec->evt = REC_EVT_STOP_TIMESHIFTING;
-		pthread_cond_signal(&rec->cond);
-	}
-	pthread_mutex_unlock(&rec->lock);
-	
-	return AM_SUCCESS;
-}
-
-/**\brief 暂停TimeShifting播放
- * \param handle 录像管理器句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
- */
-AM_ErrorCode_t AM_REC_PauseTimeShifting(int handle)
-{
-	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
-
-	assert(rec);
-	
-	pthread_mutex_lock(&rec->lock);
-	am_rec_wait_events_done(rec);
-	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
-	{
-		rec->evt = REC_EVT_PAUSE_TIMESHIFTING;
-		pthread_cond_signal(&rec->cond);
-	}
-	pthread_mutex_unlock(&rec->lock);
-	
-	return AM_SUCCESS;
-}
-
-/**\brief 恢复TimeShifting播放
- * \param handle 录像管理器句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
- */
-AM_ErrorCode_t AM_REC_ResumeTimeShifting(int handle)
-{
-	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
-
-	assert(rec);
-	
-	pthread_mutex_lock(&rec->lock);
-	am_rec_wait_events_done(rec);
-	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
-	{
-		rec->evt = REC_EVT_RESUME_TIMESHIFTING;
-		pthread_cond_signal(&rec->cond);
-	}
-	pthread_mutex_unlock(&rec->lock);
-	
-	return AM_SUCCESS;
-}
-
-/**\brief TimeShifting快速向前播放
- * \param handle 录像管理器句柄
- * \param speed 播放速度
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
- */
-AM_ErrorCode_t AM_REC_FastForwardTimeShifting(int handle, int speed)
-{
-	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
-
-	assert(rec);
-	
-	pthread_mutex_lock(&rec->lock);
-	am_rec_wait_events_done(rec);
-	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
-	{
-		rec->evt = REC_EVT_FF_TIMESHIFTING;
-		rec->speed = speed;
-		pthread_cond_signal(&rec->cond);
-	}
-	pthread_mutex_unlock(&rec->lock);
-	
-	return AM_SUCCESS;
-}
-
-/**\brief TimeShifting快速向后播放
- * \param handle 录像管理器句柄
-  * \param speed 播放速度
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
- */
-AM_ErrorCode_t AM_REC_FastBackwardTimeShifting(int handle, int speed)
-{
-	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
-
-	assert(rec);
-	
-	pthread_mutex_lock(&rec->lock);
-	am_rec_wait_events_done(rec);
-	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
-	{
-		rec->evt = REC_EVT_FB_TIMESHIFTING;
-		rec->speed = speed;
-		pthread_cond_signal(&rec->cond);
-	}
-	pthread_mutex_unlock(&rec->lock);
-	
-	return AM_SUCCESS;
-}
-
-/**\brief TimeShifting设定当前播放位置
- * \param handle 录像管理器句柄
- * \param pos 播放位置
- * \param start 是否开始播放
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
- */
-AM_ErrorCode_t AM_REC_SeekTimeShifting(int handle, int pos, AM_Bool_t start)
-{
-	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
-
-	assert(rec);
-	
-	pthread_mutex_lock(&rec->lock);
-	am_rec_wait_events_done(rec);
-	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
-	{
-		rec->evt = REC_EVT_SEEK_TIMESHIFTING;
-		rec->seek_pos = pos;
-		rec->seek_start = start;
-		pthread_cond_signal(&rec->cond);
-	}
-	pthread_mutex_unlock(&rec->lock);
-	
-	return AM_SUCCESS;
-}
-
-/**\brief 获取TimeShifting播放信息
- * \param handle 录像管理器句柄
-  * \param [out] info 播放信息
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
- */
-AM_ErrorCode_t AM_REC_GetTimeShiftingInfo(int handle, AM_AV_PlayStatus_t *info)
-{
-	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
-
-	assert(info);
-
-	memset(info, 0, sizeof(AM_AV_PlayStatus_t));
-	if (rec)
-	{
-		pthread_mutex_lock(&rec->lock);
-		if ((rec->stat_flag & REC_STAT_FL_TIMESHIFTING) && ! rec->tshift_play_check_time)
-		{
-			AM_AV_GetPlayStatus(rec->av_dev, info);
-		}
-		pthread_mutex_unlock(&rec->lock);
-	}
-
 	return AM_SUCCESS;
 }
 
@@ -1620,36 +500,39 @@ AM_ErrorCode_t AM_REC_SetRecordPath(int handle, const char *path)
 	
 	pthread_mutex_lock(&rec->lock);
 	AM_DEBUG(1, "Set record store path to: '%s'", path);
-	strncpy(rec->store_dir, path, sizeof(rec->store_dir)-1);
+	strncpy(rec->create_para.store_dir, path, sizeof(rec->create_para.store_dir)-1);
 	pthread_mutex_unlock(&rec->lock);
-
 
 	return AM_SUCCESS;
 }
 
-/**\brief 取当前录像时长
- * \param handle Scan句柄
- * \param [in] duration 秒为单位
+/**\brief 获取当前录像信息
+ * \param handle 录像管理器句柄
+ * \param [out] info 当前录像信息
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-AM_ErrorCode_t AM_REC_GetRecordDuration(int handle, int *duration)
+AM_ErrorCode_t AM_REC_GetRecordInfo(int handle, AM_REC_RecInfo_t *info)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 
-	assert(rec && duration);
+	assert(rec && info);
 
-	*duration = 0;
+	memset(info, 0, sizeof(AM_REC_RecInfo_t));
 	pthread_mutex_lock(&rec->lock);
 	if ((rec->stat_flag & REC_STAT_FL_RECORDING)&&rec->rec_start_time!=0)
 	{
 		int now;
+		
+		strncpy(info->file_path, rec->rec_file_name, sizeof(info->file_path));
+		info->file_size = am_rec_get_file_size(rec);
 		AM_TIME_GetClock(&now);
-		*duration = (now - rec->rec_start_time)/1000;
+		info->cur_rec_time = (now - rec->rec_start_time)/1000;
+		info->create_para = rec->create_para;
+		info->record_para = rec->rec_para;
 	}
 	pthread_mutex_unlock(&rec->lock);
-
 
 	return AM_SUCCESS;
 }

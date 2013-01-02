@@ -369,9 +369,18 @@ typedef struct
 	int              aud_id;      /**< 音频ID, -1表示没有音频*/
 	int              vid_id;      /**< 视频ID, -1表示没有视频*/
 	int              duration;    /**< 时移时长,秒为单位*/
-	const char      *file_path;     /**< 存储文件全路径*/
+	char             file_path[256];     /**< 存储文件全路径*/
 	AM_Bool_t        playback_only;	/**< 仅回放,不做时移，相当于普通的文件播放*/
 } AM_AV_TimeshiftPara_t;
+
+/**\brief Timeshift播放信息*/
+typedef struct
+{
+	int                   current_time; /**< in seconds*/
+	int                   full_time;
+	int                   status;
+	AM_AV_TimeshiftPara_t play_para;
+}AM_AV_TimeshiftInfo_t;
 
 /**\brief 播放器状态信息*/
 typedef struct player_info
@@ -1037,6 +1046,15 @@ extern AM_ErrorCode_t AM_AV_FastBackwardTimeshift(int dev_no, int speed);
  *   - 其他值 错误代码(见am_av.h)
  */
 extern AM_ErrorCode_t AM_AV_SwitchTimeshiftAudio(int dev_no, int apid, int afmt);
+
+/**\brief 获取当前Timeshift播放信息
+ * \param dev_no 音视频设备号
+ * \param [out] info 播放信息
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+extern AM_ErrorCode_t AM_AV_GetTimeshiftInfo(int dev_no, AM_AV_TimeshiftInfo_t *info);
 
 /**\brief 设置视频通道参数
  * \param dev_no 音视频设备号
