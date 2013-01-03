@@ -212,6 +212,8 @@ typedef struct
 	int								stop_freq;	/**< 结束频率*/
 	int								stage;		/**< HL,HH,VL,VH*/
 	AM_SCAN_DTVBlindScanProgress_t		progress;	/**< Blind Scan 进度*/
+	int								get_tp_cnt; 	/**< 已搜索到的所有 TP 个数*/
+	int								get_invalid_tp_cnt; 	/**< 已搜索到的所有无效 TP 个数*/
 	int								searched_tp_cnt;	/**< 已搜索到的 TP 个数*/
 	struct dvb_frontend_parameters	searched_tps[AM_SCAN_MAX_BS_TP_CNT];	/**< 已搜索到的TP*/
 }AM_SCAN_BlindScanCtrl_t;

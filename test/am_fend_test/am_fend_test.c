@@ -66,10 +66,14 @@ static void blindscan_cb(int dev_no, AM_FEND_BlindEvent_t *evt, void *user_data)
 	{
 		printf("++++++blindscan_start %u\n", evt->freq);
 	}
-	else if(evt->status == AM_FEND_BLIND_UPDATE)
+	else if(evt->status == AM_FEND_BLIND_UPDATEPROCESS)
 	{
 		blindscan_process = evt->process;
 		printf("++++++blindscan_process %u\n", blindscan_process);
+	}
+	else if(evt->status == AM_FEND_BLIND_UPDATETP)
+	{
+		printf("++++++blindscan_tp\n");
 	}
 }
 

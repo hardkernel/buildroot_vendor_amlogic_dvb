@@ -56,9 +56,9 @@ static AM_ErrorCode_t dvb_close (AM_FEND_Device_t *dev);
 static AM_ErrorCode_t dvb_set_prop (AM_FEND_Device_t *dev, const struct dtv_properties *prop);
 static AM_ErrorCode_t dvb_get_prop (AM_FEND_Device_t *dev, struct dtv_properties *prop);
 static AM_ErrorCode_t dvbsx_blindscan_scan(AM_FEND_Device_t *dev, struct dvbsx_blindscanpara *pbspara);
-static AM_ErrorCode_t dvbsx_blindscan_getscanstatus(AM_FEND_Device_t *dev, struct dvbsx_blindscaninfo *pbsinfo);
+static AM_ErrorCode_t dvbsx_blindscan_getscanevent(AM_FEND_Device_t *dev, struct dvbsx_blindscanevent *pbsevent);
 static AM_ErrorCode_t dvbsx_blindscan_cancel(AM_FEND_Device_t *dev);
-static AM_ErrorCode_t dvbsx_blindscan_readchannelinfo(AM_FEND_Device_t *dev, struct dvb_frontend_parameters *pchannel);
+static AM_ErrorCode_t dvb_fine_tune(AM_FEND_Device_t *dev, unsigned int freq);
 
 /****************************************************************************
  * Static data
@@ -88,9 +88,9 @@ const AM_FEND_Driver_t linux_dvb_fend_drv =
 .enable_high_lnb_voltage = dvb_enable_high_lnb_voltage,	
 .close = dvb_close,
 .blindscan_scan = dvbsx_blindscan_scan,
-.blindscan_getscanstatus = dvbsx_blindscan_getscanstatus,
+.blindscan_getscanevent = dvbsx_blindscan_getscanevent,
 .blindscan_cancel = dvbsx_blindscan_cancel,
-.blindscan_readchannelinfo = dvbsx_blindscan_readchannelinfo
+.fine_tune = dvb_fine_tune
 };
 
 /****************************************************************************
@@ -426,13 +426,13 @@ static AM_ErrorCode_t dvbsx_blindscan_scan(AM_FEND_Device_t *dev, struct dvbsx_b
 	return AM_SUCCESS;	
 }
 
-static AM_ErrorCode_t dvbsx_blindscan_getscanstatus(AM_FEND_Device_t *dev, struct dvbsx_blindscaninfo *pbsinfo)
+static AM_ErrorCode_t dvbsx_blindscan_getscanevent(AM_FEND_Device_t *dev, struct dvbsx_blindscanevent *pbsevent)
 {
-	int fd = (int)dev->drv_data;
+	int fd = (int)dev->drv_data;	
 	
-	if(ioctl(fd, FE_GET_BLINDSCANSTATUS, pbsinfo)==-1)
+	if(ioctl(fd, FE_GET_BLINDSCANEVENT, pbsevent)!=0)
 	{
-		AM_DEBUG(1, "ioctl FE_GET_BLINDSCANSTATUS failed, error:%s", strerror(errno));
+		AM_DEBUG(1, "ioctl FE_GET_BLINDSCANEVENT failed, error:%s", strerror(errno));
 		return AM_FAILURE;
 	}
 
@@ -452,17 +452,16 @@ static AM_ErrorCode_t dvbsx_blindscan_cancel(AM_FEND_Device_t *dev)
 	return AM_SUCCESS;	
 }
 
-static AM_ErrorCode_t dvbsx_blindscan_readchannelinfo(AM_FEND_Device_t *dev, struct dvb_frontend_parameters *pchannel)
+static AM_ErrorCode_t dvb_fine_tune(AM_FEND_Device_t *dev, unsigned int freq)
 {
 	int fd = (int)dev->drv_data;
-	
-	if(ioctl(fd, FE_READ_BLINDSCANCHANNELINFO, pchannel)==-1)
+
+	if(ioctl(fd, FE_FINE_TUNE, &freq)==-1)
 	{
-		AM_DEBUG(1, "ioctl FE_READ_BLINDSCANCHANNELINFO failed, error:%s", strerror(errno));
+		AM_DEBUG(1, "ioctl FE_FINE_TUNE failed, errno: %s", strerror(errno));
 		return AM_FAILURE;
 	}
 
-	return AM_SUCCESS;	
+	return AM_SUCCESS;
 }
-
 

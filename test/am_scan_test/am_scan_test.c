@@ -16,14 +16,15 @@
 #include <am_debug.h>
 #include <am_scan.h>
 #include <am_dmx.h>
-
+#include <am_epg.h>
 
 sqlite3 *hdb;
 
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
-extern AM_ErrorCode_t AM_EPG_ConvertCode(char *in_code,int in_len,char *out_code,int out_len);
+//extern AM_ErrorCode_t AM_EPG_ConvertCode(char *in_code,int in_len,char *out_code,int out_len);
+extern AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,int out_len);
 
 static int print_result_callback(void *param, int col, char **values, char **names)
 {
@@ -125,7 +126,10 @@ static void progress_evt_callback(int dev_no, int event_type, void *param, void 
 								/*取节目名称*/
 								if (psd->i_service_name_length > 0)
 								{
-									AM_EPG_ConvertCode((char*)psd->i_service_name, psd->i_service_name_length,\
+									//AM_EPG_ConvertCode((char*)psd->i_service_name, psd->i_service_name_length,\
+												name, sizeof(name));
+									
+								        AM_SI_ConvertDVBTextCode((char*)psd->i_service_name, psd->i_service_name_length,\
 												name, sizeof(name));
 									AM_DEBUG(1,"Service [%s]", name);
 								}
@@ -302,8 +306,8 @@ static int start_scan_test()
 			para.atv_para.mode = AM_SCAN_ATVMODE_AUTO;
 			para.atv_para.direction = 1;
 			para.atv_para.afe_dev_id = 0;
-			para.atv_para.default_aud_std = 0;
-			para.atv_para.default_vid_std = 0;
+			//para.atv_para.default_aud_std = 0;
+			//para.atv_para.default_vid_std = 0;
 			para.atv_para.afc_range = 2000000;
 			para.atv_para.afc_unlocked_step = 1000000;
 			para.atv_para.cvbs_unlocked_step = 1500000;
