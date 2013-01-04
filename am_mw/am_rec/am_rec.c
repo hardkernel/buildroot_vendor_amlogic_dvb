@@ -120,6 +120,16 @@ static void *am_rec_record_thread(void* arg)
 	/*从DVR设备读取数据并存入文件*/
 	while (rec->stat_flag & REC_STAT_FL_RECORDING)
 	{
+		if (rec->rec_start_time > 0 && rec->rec_para.total_time > 0)
+		{
+			AM_TIME_GetClock(&check_time);
+			if ((check_time-rec->rec_start_time) >= rec->rec_para.total_time)
+			{
+				AM_DEBUG(1, "Reach record end time, now will stop recording...");
+				break;
+			}
+		}
+			
 		cnt = AM_DVR_Read(rec->create_para.dvr_dev, buf, sizeof(buf), 1000);
 		if (cnt <= 0)
 		{
@@ -146,15 +156,6 @@ static void *am_rec_record_thread(void* arg)
 			{
 				/*已有数据写入文件，记录开始时间*/
 				AM_TIME_GetClock(&rec->rec_start_time);
-			}
-			else if (rec->rec_para.total_time > 0)
-			{
-				AM_TIME_GetClock(&check_time);
-				if ((check_time-rec->rec_start_time) >= rec->rec_para.total_time)
-				{
-					AM_DEBUG(1, "Reach record end time, now will stop recording...");
-					break;
-				}
 			}
 		}
 	}
@@ -185,8 +186,12 @@ close_file:
 		AM_DEBUG(1, "Record end , duration %d:%02d:%02d", duration/3600, (duration%3600)/60, duration%60);
 	}
 
-	/*通知录像结束*/
-	AM_EVT_Signal((int)rec, AM_REC_EVT_RECORD_END, (void*)&epara);
+	if ((rec->stat_flag & REC_STAT_FL_RECORDING))
+	{
+		/*通知录像结束*/
+		AM_EVT_Signal((int)rec, AM_REC_EVT_RECORD_END, (void*)&epara);
+		rec->stat_flag &= ~REC_STAT_FL_RECORDING;
+	}
 	
 	return NULL;
 }
