@@ -87,10 +87,10 @@ static const char *evt_fields[] =
 #include "event.fld"
 };
 
-/**\brief record table 字段定义*/
-static const char *rec_fields[] = 
+/**\brief booking table 字段定义*/
+static const char *booking_fields[] = 
 {
-#include "record.fld"
+#include "booking.fld"
 };
 
 /**\brief group table 字段定义*/
@@ -140,7 +140,7 @@ DEFINE_GET_FIELD_COUNT_FUNC(net_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(ts_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(srv_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(evt_fields)
-DEFINE_GET_FIELD_COUNT_FUNC(rec_fields)
+DEFINE_GET_FIELD_COUNT_FUNC(booking_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(grp_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(grp_map_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(subtitle_fields)
@@ -156,7 +156,7 @@ static AM_DB_Table_t db_tables[] =
 	{"ts_table",  ts_fields,  db_get_ts_fields_cnt},
 	{"srv_table", srv_fields, db_get_srv_fields_cnt},
 	{"evt_table", evt_fields, db_get_evt_fields_cnt},
-	{"rec_table", rec_fields, db_get_rec_fields_cnt},
+	{"booking_table", booking_fields, db_get_booking_fields_cnt},
 	{"grp_table", grp_fields, db_get_grp_fields_cnt},
 	{"grp_map_table", grp_map_fields, db_get_grp_map_fields_cnt},
 	{"subtitle_table", subtitle_fields, db_get_subtitle_fields_cnt},

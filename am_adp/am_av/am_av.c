@@ -2400,7 +2400,6 @@ AM_ErrorCode_t AM_AV_StartTimeshift(int dev_no, const AM_AV_TimeshiftPara_t *par
 	ret = av_start(dev, AV_TIMESHIFT, (void*)para);
 	if(ret==AM_SUCCESS){
 		dev->curr_para.time_shift = *para;
-		dev->curr_para.time_shift.file_path = dev->curr_para.file_name;
 		snprintf(dev->curr_para.file_name, sizeof(dev->curr_para.file_name), "%s", para->file_path);
 		dev->curr_para.start = AM_FALSE;
 		dev->curr_para.speed = 0;
@@ -2739,6 +2738,42 @@ AM_ErrorCode_t AM_AV_SwitchTimeshiftAudio(int dev_no, int apid, int afmt)
 			para.apid   = apid;
 			para.afmt 	= afmt;
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_SWITCH_AUDIO, &para);
+		}
+	}
+	
+	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
+
+/**\brief 获取当前Timeshift播放信息
+ * \param dev_no 音视频设备号
+ * \param [out] info 播放信息
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+AM_ErrorCode_t AM_AV_GetTimeshiftInfo(int dev_no, AM_AV_TimeshiftInfo_t *info)
+{
+	AM_AV_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	AV_TSPlayPara_t para;
+	
+	AM_TRY(av_get_openned_dev(dev_no, &dev));
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	if(!(dev->mode&AV_TIMESHIFT))
+	{
+		AM_DEBUG(1, "do not in the Timeshift play mode");
+		ret = AM_AV_ERR_ILLEGAL_OP;
+	}
+	
+	if(ret==AM_SUCCESS)
+	{
+		if(dev->drv->get_timeshift_info)
+		{
+			ret = dev->drv->get_timeshift_info(dev, info);
 		}
 	}
 	

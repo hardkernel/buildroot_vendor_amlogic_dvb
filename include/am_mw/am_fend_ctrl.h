@@ -55,8 +55,6 @@ enum AM_FENDCTRL_ErrorCode
 enum AM_FENDCTRL_EventType
 {
 	AM_FENDCTRL_EVT_BASE=AM_EVT_TYPE_BASE(AM_MOD_FENDCTRL),
-	AM_FENDCTRL_EVT_ROTOR_MOVING,    /**< Rotor移动*/
-	AM_FENDCTRL_EVT_ROTOR_STOP,    /**< Rotor停止*/
 	AM_FENDCTRL_EVT_END
 };
 
@@ -114,7 +112,7 @@ typedef struct AM_FENDCTRL_DVBFrontendParameters{
 enum { AA=0, AB=1, BA=2, BB=3, SENDNO=4 /* and 0xF0 .. 0xFF*/  };	// DiSEqC Parameter
 
 /**\brief DiSEqC模式*/
-typedef enum { DISEQC_NONE=0, V1_0=1, V1_1=2, V1_2=3, SMATV=4 }AM_SEC_Diseqc_Mode;	// DiSEqC Mode
+typedef enum { DISEQC_NONE=0, V1_0=1, V1_1=2, V1_2=3, V1_3=4, SMATV=5 }AM_SEC_Diseqc_Mode;	// DiSEqC Mode
 
 /**\brief Toneburst参数*/
 typedef enum { NO=0, A=1, B=2 }AM_SEC_Toneburst_Param;
@@ -129,7 +127,7 @@ typedef struct AM_SEC_DVBSatelliteDiseqcParameters
 	unsigned char m_repeats;	// for cascaded switches
 	AM_Bool_t m_use_fast;	// send no DiSEqC on H/V or Lo/Hi change
 	AM_Bool_t m_seq_repeat;	// send the complete DiSEqC Sequence twice...
-	unsigned char m_command_order;
+	unsigned char m_command_order;					/**< low 4 bits for diseqc 1.0, high 4 bits for diseqc > 1.0*/
 	/* 	diseqc 1.0)
 			0) commited, toneburst
 			1) toneburst, committed
@@ -150,9 +148,9 @@ typedef enum {	_14V=0, _18V=1, _0V=2, HV=3, HV_13=4 }AM_SEC_Voltage_Mode; // 14/
 /**\brief 卫星设备（switch）控制参数*/ 
 typedef struct AM_SEC_DVBSatelliteSwitchParameters
 {
-	AM_SEC_Voltage_Mode m_voltage_mode;        /**< 22Khz参数*/ 
-	AM_SEC_22khz_Signal m_22khz_signal;        /**< 电压参数*/ 
-	unsigned char m_rotorPosNum; // 0 is disable.. then use gotoxx
+	AM_SEC_Voltage_Mode m_voltage_mode;		/**< 电压参数*/ 
+	AM_SEC_22khz_Signal m_22khz_signal;		/**< 22Khz参数*/ 
+	unsigned char m_rotorPosNum;			/**< 马达位置索引 0 is disable.. then use gotoxx*/ 
 }AM_SEC_DVBSatelliteSwitchParameters_t;
 
 /**\brief 马达速度属性*/ 
@@ -178,7 +176,8 @@ typedef struct AM_SEC_DVBSatelliteRotorGotoxxParameters
 typedef struct AM_SEC_DVBSatelliteRotorParameters
 {
 	AM_SEC_DVBSatelliteRotorInputpowerParameters_t m_inputpower_parameters; /**< 马达供电参数*/
-	AM_SEC_DVBSatelliteRotorGotoxxParameters_t m_gotoxx_parameters;         /**< 马达定位参数*/ 
+	AM_SEC_DVBSatelliteRotorGotoxxParameters_t m_gotoxx_parameters;         /**< 马达定位参数*/
+	AM_Bool_t m_reset_rotor_status_cache;									/**< 马达缓存参数重置*/
 }AM_SEC_DVBSatelliteRotorParameters_t;
 
 typedef enum { RELAIS_OFF=0, RELAIS_ON }AM_SEC_12V_Relais_State;
@@ -252,7 +251,10 @@ typedef enum{
 /**\brief 异步卫星设备控制信息*/
 typedef struct AM_SEC_AsyncInfo
 {
-	int                dev_no;        /**< 设备号*/
+	int                dev_no;        /**< 设备号*/ 
+	AM_Bool_t          short_circuit; /**< Frontend短路状态*/
+	AM_Bool_t          sec_monitor_enable_thread; /**< 异步卫星设备监控线程是否运行*/
+	pthread_t          sec_monitor_thread;        /**< 异步卫星设备监控线程*/	
 	AM_Bool_t          enable_thread; /**< 异步卫星设备控制线程是否运行*/
 	pthread_t          thread;        /**< 异步卫星设备控制线程*/
 	pthread_mutex_t    lock;          /**< 异步卫星设备控制数据保护互斥体*/
@@ -302,6 +304,14 @@ extern AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEqu
  */
 extern AM_ErrorCode_t AM_SEC_GetSetting(int dev_no, AM_SEC_DVBSatelliteEquipmentControl_t *para);
 
+/**\brief 马达缓存参数重置
+ * \param dev_no 前端设备号
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+extern AM_ErrorCode_t AM_SEC_ResetRotorStatusCache(int dev_no);
+
 /**\brief 准备盲扫卫星设备控制
  * \param dev_no 前端设备号
  * \return
@@ -319,6 +329,15 @@ extern AM_ErrorCode_t AM_SEC_PrepareBlindScan(int dev_no);
  *   - 其他值 错误代码(见am_fend_ctrl.h)
  */
 extern AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned int *tp_freq);
+
+/**\brief 过了无效传输频率
+ * \param dev_no 前端设备号
+ * \param tp_freq unit KHZ
+ * \return
+ *   - AM_TRUE 过滤
+ *   - AM_FALSE 不过滤
+ */
+extern AM_Bool_t AM_SEC_FilterInvalidTp(int dev_no, unsigned int tp_freq);
 
 extern AM_ErrorCode_t AM_SEC_DumpSetting(void);
 

@@ -106,7 +106,8 @@ struct dvb_diseqc_slave_reply {
 typedef enum fe_sec_voltage {
 	SEC_VOLTAGE_13,
 	SEC_VOLTAGE_18,
-	SEC_VOLTAGE_OFF
+	SEC_VOLTAGE_OFF,
+	SEC_VOLTAGE_ON     // for ISDBT antenna control
 } fe_sec_voltage_t;
 
 
@@ -205,6 +206,13 @@ typedef enum fe_hierarchy {
 } fe_hierarchy_t;
 
 
+typedef enum fe_ofdm_mode
+{
+	OFDM_DVBT,
+	OFDM_DVBT2,
+}fe_ofdm_mode_t;
+
+
 struct dvb_qpsk_parameters {
 	__u32		symbol_rate;  /* symbol rate in Symbols per second */
 	fe_code_rate_t	fec_inner;    /* forward error correction (see above) */
@@ -228,6 +236,7 @@ struct dvb_ofdm_parameters {
 	fe_transmit_mode_t  transmission_mode;
 	fe_guard_interval_t guard_interval;
 	fe_hierarchy_t      hierarchy_information;
+	fe_ofdm_mode_t ofdm_mode;
 };
 
 #define ANALOG_FLAG_ENABLE_AFC                 0X00000001
@@ -316,7 +325,10 @@ struct dvb_frontend_event {
 
 #define DTV_ISDBS_TS_ID		42
 
-#define DTV_MAX_COMMAND				DTV_ISDBS_TS_ID
+#define DTV_DVBT2_PLP_ID        43
+#define DTV_DVBT2_DATA_PLPS	44
+
+#define DTV_MAX_COMMAND			DTV_DVBT2_DATA_PLPS	
 
 typedef enum fe_pilot {
 	PILOT_ON,
@@ -384,6 +396,10 @@ struct dtv_properties {
 	__u32 num;
 	struct dtv_property *props;
 };
+
+#define FE_SET_PROPERTY		   _IOW('o', 82, struct dtv_properties)
+#define FE_GET_PROPERTY		   _IOR('o', 83, struct dtv_properties)
+
 //for atv
 typedef struct tuner_status_s {
 	unsigned int frequency;
@@ -426,30 +442,38 @@ typedef struct tuner_param_s {
 	unsigned int 	  resvred;
 }tuner_param_t;
 
-
-/*Stores the blind scan parameters which are passed to the FE_SET_BLINDSCAN ioctl.*/
-struct dvbsx_blindscanpara
-{
-	__u16 m_uifrequency_100khz;
-	__u16 m_uitunerlpf_100khz;
-	__u16 m_uistartfreq_100khz;		/*The start scan frequency in units of 100kHz. The minimum value depends on the tuner specification.*/ 
-	__u16 m_uistopfreq_100khz;		/*The stop scan frequency in units of 100kHz. The maximum value depends on the tuner specification.*/
-	__u16 m_uiminsymrate_khz;		/*The minimum symbol rate to be scanned in units of kHz. The minimum value is 1000 kHz.*/
-	__u16 m_uimaxsymrate_khz;		/*The maximum symbol rate to be scanned in units of kHz. The maximum value is 45000 kHz.*/
+/* Satellite blind scan settings */
+struct dvbsx_blindscanpara {
+	__u32 minfrequency;			/* minimum tuner frequency in kHz */
+	__u32 maxfrequency;			/* maximum tuner frequency in kHz */
+	__u32 minSymbolRate;		/* minimum symbol rate in sym/sec */
+	__u32 maxSymbolRate;		/* maximum symbol rate in sym/sec */
+	__u32 frequencyRange;		/* search range in kHz. freq -/+freqRange will be searched */
+	__u32 frequencyStep;			/* tuner step frequency in kHz */	
+	__s32 timeout;				/* blindscan event timeout*/
 };
 
-/*Stores the blind scan status information.*/
-struct dvbsx_blindscaninfo
-{
-	__u16 m_uiProgress;					/*The percentage completion of the blind scan procedure. A value of 100 indicates that the blind scan is finished.*/ 
-	__u16 m_uiChannelCount;				/*The number of channels detected thus far by the blind scan operation.  The Availink device can store up to 120 detected channels.*/ 
-	__u16 m_uiNextStartFreq_100kHz;	/*The start frequency of the next scan in units of 100kHz.*/ 
-	__u16 m_uiResultCode;				/*The result of the blind scan operation.  Possible values are:  0 - blind scan operation normal; 1 -- more than 120 channels have been detected.*/ 
+/* Satellite blind scan status */
+typedef enum dvbsx_blindscanstatus {
+	BLINDSCAN_NONEDO,
+	BLINDSCAN_UPDATESTARTFREQ,
+	BLINDSCAN_UPDATEPROCESS,
+	BLINDSCAN_UPDATERESULTFREQ
+} dvbsx_blindscanstatus_t;
+
+/* Satellite blind scan event */
+struct dvbsx_blindscanevent {
+	dvbsx_blindscanstatus_t status;
+	union {
+		__u16 m_uiprogress;							/* The percentage completion of the blind scan procedure. A value of 100 indicates that the blind scan is finished. */
+		__u32 m_uistartfreq_khz;					/* The start scan frequency in units of kHz. The minimum value depends on the tuner specification. */
+		struct dvb_frontend_parameters parameters;	/* Blind scan channel info. */
+	} u;	
 };
 
-#define FE_SET_PROPERTY		   _IOW('o', 82, struct dtv_properties)
-#define FE_GET_PROPERTY		   _IOR('o', 83, struct dtv_properties)
-
+#define FE_SET_BLINDSCAN					_IOW('o', 84, struct dvbsx_blindscanpara)
+#define FE_GET_BLINDSCANEVENT		   		_IOR('o', 85, struct dvbsx_blindscanevent)
+#define FE_SET_BLINDSCANCANCEl				_IO('o', 86)
 
 /**
  * When set, this flag will disable any zigzagging or other "normal" tuning
@@ -486,14 +510,6 @@ struct dvbsx_blindscaninfo
 #define FE_DISHNETWORK_SEND_LEGACY_CMD _IO('o', 80) /* unsigned int */
 
 #define FE_SET_DELAY               _IO('o', 100)
-
-#if 1//for avl6211 blind scan
-#define FE_SET_BLINDSCAN	   _IOW('o', 84, struct dvbsx_blindscanpara)
-#define FE_GET_BLINDSCANSTATUS	   _IOR('o', 85, struct dvbsx_blindscaninfo)
-#define FE_SET_BLINDSCANCANCEl	   _IO('o', 86)
-#define FE_READ_BLINDSCANCHANNELINFO  _IOR('o', 87, struct dvb_frontend_parameters)
-#define FE_SET_BLINDSCANRESET	   _IO('o', 88)
-#endif
 
 #define FE_SET_MODE                _IO('o', 90)
 #define FE_READ_AFC                _IOR('o', 91, __u32)

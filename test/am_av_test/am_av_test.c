@@ -398,9 +398,20 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq)
 		AM_FEND_OpenPara_t para;
 		struct dvb_frontend_parameters p;
 		fe_status_t status;
+		int mode;
 		
 		memset(&para, 0, sizeof(para));
+
+		printf("Input fontend mode: (0-DVBC, 1-DVBT, 2-DVBS)\n");
+		printf("mode(0/1/2): ");
+		scanf("%d", &mode);
+		para.mode = (mode==0)?FE_QAM : 
+				(mode==1)? FE_OFDM : FE_QPSK;
+		
 		AM_FEND_Open(FEND_DEV_NO, &para);
+
+		AM_FEND_SetMode(FEND_DEV_NO, para.mode);
+	
 		
 		p.frequency = freq;
 #if 1	

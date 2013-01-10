@@ -3002,36 +3002,61 @@ static void am_scan_blind_scan_callback(int dev_no, AM_FEND_BlindEvent_t *evt, v
 	AM_DEBUG(1, "bs callback wait lock, scanner %p", scanner);
 	pthread_mutex_lock(&scanner->lock);
 	AM_DEBUG(1, "bs callback get lock");
-	if (evt->status == AM_FEND_BLIND_UPDATE)
+	if (evt->status == AM_FEND_BLIND_UPDATETP)
 	{
 		int cnt = AM_SCAN_MAX_BS_TP_CNT;
-		int i;
+		int i = 0;
+		int j = 0;
+		/* in order to filter invalid tp */
+		int invalid_tp_cnt_cur = 0;
 		struct dvb_frontend_parameters tps[AM_SCAN_MAX_BS_TP_CNT];
 		struct dvb_frontend_parameters *new_tp_start;
 
 		AM_FEND_BlindGetTPInfo(scanner->start_para.fend_dev_id, tps, (unsigned int*)&cnt);
 
-		if (cnt > scanner->dtvctl.bs_ctl.searched_tp_cnt)
+		if (cnt > scanner->dtvctl.bs_ctl.get_tp_cnt)
 		{
-			scanner->dtvctl.bs_ctl.progress.new_tp_cnt = cnt - scanner->dtvctl.bs_ctl.searched_tp_cnt;
-			scanner->dtvctl.bs_ctl.progress.new_tps = tps + scanner->dtvctl.bs_ctl.searched_tp_cnt;
+			scanner->dtvctl.bs_ctl.progress.new_tp_cnt = cnt - scanner->dtvctl.bs_ctl.get_tp_cnt;
+			scanner->dtvctl.bs_ctl.progress.new_tps = tps + scanner->dtvctl.bs_ctl.get_tp_cnt;
 			new_tp_start = &scanner->dtvctl.bs_ctl.searched_tps[scanner->dtvctl.bs_ctl.searched_tp_cnt];
 			
 			/* Center freq -> Transponder freq */
 			for (i=0; i<scanner->dtvctl.bs_ctl.progress.new_tp_cnt; i++)
 			{
+				AM_DEBUG(1, "bs callback centre %d", scanner->dtvctl.bs_ctl.progress.new_tps[i].frequency);
+			
 				AM_SEC_FreqConvert(scanner->start_para.fend_dev_id, 
 					scanner->dtvctl.bs_ctl.progress.new_tps[i].frequency, 
 					&scanner->dtvctl.bs_ctl.progress.new_tps[i].frequency);
-				new_tp_start[i] = scanner->dtvctl.bs_ctl.progress.new_tps[i];
+
+				AM_DEBUG(1, "bs callback tp %d", scanner->dtvctl.bs_ctl.progress.new_tps[i].frequency);
+				if(AM_SEC_FilterInvalidTp(scanner->start_para.fend_dev_id, scanner->dtvctl.bs_ctl.progress.new_tps[i].frequency))
+				{
+					AM_DEBUG(1, "AM_SEC_FilterInvalidTp true");
+					invalid_tp_cnt_cur++;
+					scanner->dtvctl.bs_ctl.get_invalid_tp_cnt++;
+					continue;
+				}
+				else
+				{
+					new_tp_start[j] = scanner->dtvctl.bs_ctl.progress.new_tps[i];
+					j++;
+				}
 			}
-			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_BLIND_SCAN, (void*)&scanner->dtvctl.bs_ctl.progress);
+
+			scanner->dtvctl.bs_ctl.progress.new_tp_cnt -= invalid_tp_cnt_cur;
+			scanner->dtvctl.bs_ctl.progress.new_tps = new_tp_start;
 			
-			scanner->dtvctl.bs_ctl.searched_tp_cnt = cnt;
+			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_BLIND_SCAN, (void*)&scanner->dtvctl.bs_ctl.progress);
+
+			scanner->dtvctl.bs_ctl.get_tp_cnt = cnt;
+			scanner->dtvctl.bs_ctl.searched_tp_cnt = cnt - scanner->dtvctl.bs_ctl.get_invalid_tp_cnt;
 			scanner->dtvctl.bs_ctl.progress.new_tp_cnt = 0;
 			scanner->dtvctl.bs_ctl.progress.new_tps = NULL;
 		}
-		
+	}
+	else if (evt->status == AM_FEND_BLIND_UPDATEPROCESS)
+	{
 		scanner->dtvctl.bs_ctl.progress.progress = (scanner->dtvctl.bs_ctl.stage - AM_SCAN_BS_STAGE_HL)*25 + evt->process/4;
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_BLIND_SCAN, (void*)&scanner->dtvctl.bs_ctl.progress);
 	
@@ -3067,7 +3092,7 @@ static AM_ErrorCode_t am_scan_start_blind_scan(AM_SCAN_Scanner_t *scanner)
 	AM_SEC_DVBSatelliteEquipmentControl_t setting;
 	
 	AM_DEBUG(1, "stage %d", scanner->dtvctl.bs_ctl.stage);
-	if (scanner->dtvctl.bs_ctl.stage > AM_SCAN_BS_STAGE_VH)
+	if (scanner->dtvctl.bs_ctl.stage > (AM_SCAN_BS_STAGE_VH + 1))
 	{
 		AM_DEBUG(1, "Currently is not in BlindScan mode");
 		return AM_FAILURE;
@@ -3113,6 +3138,11 @@ static AM_ErrorCode_t am_scan_start_blind_scan(AM_SCAN_Scanner_t *scanner)
 			AM_SEC_PrepareBlindScan(scanner->start_para.fend_dev_id);
 			
 			AM_DEBUG(1, "start blind scan, scanner %p", scanner);
+
+			/* int bs ctl */
+			scanner->dtvctl.bs_ctl.get_tp_cnt = 0;
+			scanner->dtvctl.bs_ctl.get_invalid_tp_cnt = 0;
+			
 			/* start blind scan */
 			ret = AM_FEND_BlindScan(scanner->start_para.fend_dev_id, am_scan_blind_scan_callback, 
 				(void*)scanner, scanner->dtvctl.bs_ctl.start_freq, scanner->dtvctl.bs_ctl.stop_freq);	
@@ -3577,17 +3607,25 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 				scanner->recv_status &= ~AM_SCAN_RECVING_WAIT_FEND;
 				goto try_next;
 			}
-			
-			AM_DEBUG(1, "%d %d %d, max_drift %d, unicable %d", scanner->fe_evt.parameters.frequency, freq, 
-				dvb_fend_para(cur_fe_para)->frequency, cur_fe_para.sat.para.u.qpsk.symbol_rate / 2000,
-				(dtv_start_para.mode&AM_SCAN_DTVMODE_SAT_UNICABLE)?1:0);
+
+			if ((scanner->curr_freq >= 0) && 
+				(scanner->curr_freq < scanner->start_freqs_cnt))
+			{
+				AM_DEBUG(1, "%d %d %d, max_drift %d, unicable %d", scanner->fe_evt.parameters.frequency, freq, 
+					dvb_fend_para(scanner->start_freqs[scanner->curr_freq].dtv_para)->frequency,
+					scanner->start_freqs[scanner->curr_freq].dtv_para.sat.para.u.qpsk.symbol_rate / 2000,
+					(dtv_start_para.mode&AM_SCAN_DTVMODE_SAT_UNICABLE)?1:0);
+			}
 				
 			tmp_drift = dvb_fend_para(cur_fe_para)->frequency - freq;
 			cur_drift = AM_ABS(tmp_drift);
 			/*algorithm from kernel*/
 			max_drift = cur_fe_para.sat.para.u.qpsk.symbol_rate / 2000;
-			
-			if ((cur_drift > max_drift) && !(dtv_start_para.mode&AM_SCAN_DTVMODE_SAT_UNICABLE))
+
+			if ((scanner->curr_freq >= 0) && 
+				(scanner->curr_freq < scanner->start_freqs_cnt) &&
+				(cur_drift > max_drift) && 
+				!(dtv_start_para.mode&AM_SCAN_DTVMODE_SAT_UNICABLE))			
 			{
 				AM_DEBUG(1, "Unexpected fend_evt arrived dvbs %d %d", cur_drift, max_drift);
 				return;

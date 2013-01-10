@@ -15,6 +15,7 @@
 #include "am_sec_internal.h"
 #include "am_fend_ctrl.h"
 
+#include "am_misc.h"
 #include "am_fend.h"
 #include "am_fend_diseqc_cmd.h"
 
@@ -42,7 +43,7 @@
 #define M_DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_MOTOR_CMD (500)
 #define M_DELAY_BEFORE_SEQUENCE_REPEAT (70)
 #define M_MOTOR_COMMAND_RETRIES (1)
-#define M_MOTOR_RUNNING_TIMEOUT (360)
+#define M_MOTOR_RUNNING_TIMEOUT (180)
 #define M_DELAY_AFTER_VOLTAGE_CHANGE_BEFORE_SWITCH_CMDS (50)
 #define M_DELAY_AFTER_DISEQC_RESET_CMD (50)
 #define M_DELAY_AFTER_DISEQC_PERIPHERIAL_POWERON_CMD (150)
@@ -50,11 +51,13 @@
 #define M_CENTRE_START_FREQ (950000)
 #define M_CENTRE_END_FREQ (2150000)
 
-#define M_C_TP_START_FREQ (3700000)
-#define M_C_TP_END_FREQ (4200000)
+#define M_C_TP_START_FREQ (3000000)
+#define M_C_TP_END_FREQ (4800000)
 
-#define M_KU_TP_START_FREQ (10750000)
-#define M_KU_TP_END_FREQ (12750000)
+#define M_KU_TP_START_FREQ (10700000)
+#define M_KU_TP_END_FREQ (13450000)
+
+#define FRONTEND_SHORT_CIRCUIT_FILE   "/sys/class/avl_frontend/short_circuit"
 	
 /****************************************************************************
  * Static data
@@ -503,7 +506,7 @@ static void AM_SEC_Set_RotorMoving(eSecCommand_t *sec_cmd)
 	
 	if(sec_cmd->cmd == SET_ROTOR_MOVING)
 	{
-		AM_EVT_Signal(sec_cmd->val, AM_FENDCTRL_EVT_ROTOR_MOVING, NULL);
+		AM_EVT_Signal(sec_cmd->val, AM_FEND_EVT_ROTOR_MOVING, NULL);
 	}
 
 	return;
@@ -516,7 +519,7 @@ static void AM_SEC_Set_RotorStoped(eSecCommand_t *sec_cmd)
 	
 	if(sec_cmd->cmd == SET_ROTOR_STOPPED)
 	{
-		AM_EVT_Signal(sec_cmd->val, AM_FENDCTRL_EVT_ROTOR_STOP, NULL);
+		AM_EVT_Signal(sec_cmd->val, AM_FEND_EVT_ROTOR_STOP, NULL);
 	}
 
 	return;
@@ -615,8 +618,9 @@ static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, const AM_FENDCTRL_DVBFront
 	pthread_mutex_lock(&p_sec_asyncinfo->lock);
 
 	if(p_sec_asyncinfo->preparerunning)
-	{		
-		if((b_para == NULL) && (status == NULL) && (tunetimeout == 0))/*setpara mode*/
+	{	
+		/*before in setpara mode, need to exit prepare*/
+		if((p_sec_asyncinfo->sat_b_para == NULL) && (p_sec_asyncinfo->sat_status == NULL) && (p_sec_asyncinfo->sat_tunetimeout == 0))
 		{
 			p_sec_asyncinfo->prepareexitnotify = AM_TRUE;
 		}
@@ -668,6 +672,7 @@ static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, const AM_FENDCTRL_DVBFront
 		if(p_sec_asyncinfo->enable_thread)
 			p_sec_asyncinfo->preparerunning = AM_TRUE;
 
+		/*lock and blindscan mode need to wait prepare exit*/
 		if(!((b_para == NULL) && (status == NULL) && (tunetimeout == 0)))
 		{
 			if(p_sec_asyncinfo->enable_thread && (p_sec_asyncinfo->thread!=pthread_self()))
@@ -815,7 +820,7 @@ static int AM_SEC_CanBlindScanOrTune(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 		if (di_param.m_committed_cmd <= SENDNO)
 			csw |= band;
 
-		if ( di_param.m_diseqc_mode == V1_2 )  // ROTOR
+		if ( (di_param.m_diseqc_mode == V1_2) || (di_param.m_diseqc_mode == V1_3))  // ROTOR
 			rotor = AM_TRUE;
 
 		ret = 10000;
@@ -846,8 +851,18 @@ static int AM_SEC_CanBlindScanOrTune(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 		int lof = para->para.frequency > lnb_param.m_lof_threshold ?
 			lnb_param.m_lof_hi : lnb_param.m_lof_lo;
 		int tuner_freq = abs(para->para.frequency - lof);
-		if (tuner_freq < 900000 || tuner_freq > 2200000)
+		if (tuner_freq < M_CENTRE_START_FREQ || tuner_freq > M_CENTRE_END_FREQ)
+		{
 			ret = 0;
+			AM_DEBUG(1, "AM_SEC_CanBlindScanOrTune check %d %d %d %d %d %d\n",
+						para->para.frequency, lnb_param.m_lof_threshold, lnb_param.m_lof_hi, lnb_param.m_lof_lo, lof, tuner_freq);
+			/*lock invalid freq*/
+			struct dvb_frontend_parameters convert_para;
+			
+			memcpy(&convert_para, &(para->para), sizeof(struct dvb_frontend_parameters));
+			convert_para.frequency = tuner_freq;
+			AM_FEND_SetPara(dev_no, &convert_para);
+		}
 	}
 
 	/* rotor */
@@ -882,7 +897,6 @@ static int AM_SEC_CanBlindScanOrTune(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 			{\
 				AM_FEND_SetActionCallback(dev_no, AM_TRUE);\
 				AM_DEBUG(1, "AM_FEND_SetActionCallback enable \n");\
-				AM_FEND_Diseqccmd_SetPositionerHalt(dev_no);\
 				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_ROTOR_STOPPED, dev_no);\
 				AM_SEC_Set_RotorStoped(&sec_cmd);\
 				usleep(15 * 1000);\
@@ -910,12 +924,22 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 
 	//AM_SEC_DumpSetting();
 	
-	if(AM_SEC_CanBlindScanOrTune(dev_no, b_para, para))
+	if(1)//(AM_SEC_CanBlindScanOrTune(dev_no, b_para, para))
 	{
 		M_AM_SEC_ASYNCCHECK();
 
 		pthread_mutex_lock(&(sec_control.m_lnbs.lock));
+		
 		AM_SEC_DVBSatelliteLNBParameters_t lnb_param = sec_control.m_lnbs;
+
+		if(sec_control.m_lnbs.m_rotor_parameters.m_reset_rotor_status_cache)
+		{
+			sec_control.m_lnbs.m_rotor_parameters.m_reset_rotor_status_cache = AM_FALSE;
+
+			AM_SEC_SetSecCommand( &sec_cmd, INVALIDATE_CURRENT_ROTORPARMS );
+			AM_SEC_Set_Invalid_Cur_RotorPara(&sec_cmd);			
+		}
+		
 		pthread_mutex_unlock(&(sec_control.m_lnbs.lock));
 		
 		AM_SEC_DVBSatelliteDiseqcParameters_t di_param = lnb_param.m_diseqc_parameters;
@@ -980,8 +1004,12 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 			}
 			else
 			{
-				if ( para->para.frequency > lnb_param.m_lof_threshold )
+				if ( para->para.frequency > lnb_param.m_lof_threshold ){
+					AM_SEC_SetFendData(CUR_LOCALOSCILLATOR, 1);
 					band |= 1;
+				}else{
+					AM_SEC_SetFendData(CUR_LOCALOSCILLATOR, 0);
+				}
 				if (!(para->polarisation & AM_FEND_POLARISATION_V))
 					band |= 2;
 			}
@@ -1089,10 +1117,20 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 			AM_DEBUG(1, "send_csw:%d changed_csw:%d send_ucsw:%d changed_ucsw:%d send_burst:%d changed_burst:%d\n", 
 							send_csw, changed_csw, send_ucsw, changed_ucsw, send_burst, changed_burst);
 
+			unsigned char convert_m_command_order = 0;
+			if (diseqc_mode == V1_0)
+			{
+				convert_m_command_order = di_param.m_command_order & 0x0f;
+			}
+			else if (diseqc_mode > V1_0)
+			{
+				convert_m_command_order = (di_param.m_command_order >> 4) & 0x0f;
+			}
+
 			/*for reset rotro para judge start*/
 			if (changed_burst)
 			{
-				if (di_param.m_command_order&1)
+				if (convert_m_command_order&1)
 				{
 					send_mask_diseqcswitch |= 4;
 					if ( send_csw )
@@ -1106,9 +1144,9 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 			if (changed_ucsw)
 			{
 				send_mask_diseqcswitch |= 2;
-				if ((di_param.m_command_order&4) && send_csw)
+				if ((convert_m_command_order&4) && send_csw)
 					send_mask_diseqcswitch |= 1;
-				if (di_param.m_command_order==4 && send_burst)
+				if (convert_m_command_order==4 && send_burst)
 					send_mask_diseqcswitch |= 8;
 			}
 			if (changed_csw)
@@ -1118,9 +1156,9 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 					&& ((csw / 4) != (lastcsw / 4)) )
 				{
 					send_mask_diseqcswitch |= 1;
-					if (!(di_param.m_command_order&4) && send_ucsw)
+					if (!(convert_m_command_order&4) && send_ucsw)
 						send_mask_diseqcswitch |= 2;
-					if (!(di_param.m_command_order&1) && send_burst)
+					if (!(convert_m_command_order&1) && send_burst)
 						send_mask_diseqcswitch |= 8;
 				}
 			}
@@ -1142,7 +1180,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 				8 send toneburst at end */
 			if (changed_burst) // toneburst first and toneburst changed
 			{
-				if (di_param.m_command_order&1)
+				if (convert_m_command_order&1)
 				{
 					send_mask |= 4;
 					if ( send_csw )
@@ -1156,9 +1194,9 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 			if (changed_ucsw)
 			{
 				send_mask |= 2;
-				if ((di_param.m_command_order&4) && send_csw)
+				if ((convert_m_command_order&4) && send_csw)
 					send_mask |= 1;
-				if (di_param.m_command_order==4 && send_burst)
+				if (convert_m_command_order==4 && send_burst)
 					send_mask |= 8;
 			}
 			if (changed_csw)
@@ -1171,9 +1209,9 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 				else
 				{
 					send_mask |= 1;
-					if (!(di_param.m_command_order&4) && send_ucsw)
+					if (!(convert_m_command_order&4) && send_ucsw)
 						send_mask |= 2;
-					if (!(di_param.m_command_order&1) && send_burst)
+					if (!(convert_m_command_order&1) && send_burst)
 						send_mask |= 8;
 				}
 			}
@@ -1189,25 +1227,33 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 			AM_DEBUG(1, "\n");
 #endif
 
-			if ( diseqc_mode == V1_2 )
+			if ( (diseqc_mode == V1_2) || (diseqc_mode == V1_3))
 			{
-				if (sw_param.m_rotorPosNum) // we have stored rotor pos?
-					RotorCmd=sw_param.m_rotorPosNum;
-				else  // we must calc gotoxx cmd
+				if(diseqc_mode == V1_2)
 				{
-					AM_DEBUG(1, "useGotoXX\n");
-					useGotoXX = AM_TRUE;
-					
-					/*as flag, judge rotor cmd status*/
-					double	SatLon = abs(rotor_param.m_gotoxx_parameters.m_sat_longitude)/10.00,
-							SiteLat = rotor_param.m_gotoxx_parameters.m_latitude,
-							SiteLon = rotor_param.m_gotoxx_parameters.m_longitude;
+					if (sw_param.m_rotorPosNum) // we have stored rotor pos?
+						RotorCmd=sw_param.m_rotorPosNum;				
+				}
+				else
+				{
+					if (sw_param.m_rotorPosNum) // we have stored rotor pos?
+						RotorCmd=sw_param.m_rotorPosNum;
+					else  // we must calc gotoxx cmd
+					{
+						AM_DEBUG(1, "useGotoXX\n");
+						useGotoXX = AM_TRUE;
+						
+						/*as flag, judge rotor cmd status*/
+						double	SatLon = abs(rotor_param.m_gotoxx_parameters.m_sat_longitude)/10.00,
+								SiteLat = rotor_param.m_gotoxx_parameters.m_latitude,
+								SiteLon = rotor_param.m_gotoxx_parameters.m_longitude;
 
-					if(rotor_param.m_gotoxx_parameters.m_sat_longitude < 0)
-						SatLon = -SatLon;	
+						if(rotor_param.m_gotoxx_parameters.m_sat_longitude < 0)
+							SatLon = -SatLon;	
 
 
-					RotorCmd = AM_ProduceAngularPositioner(dev_no, SiteLon, SiteLat, SatLon);
+						RotorCmd = AM_ProduceAngularPositioner(dev_no, SiteLon, SiteLat, SatLon);
+					}
 				}
 			}
 
@@ -1308,7 +1354,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 						diseqc.len = 4;
 						diseqc.data[0] = i ? 0xE1 : 0xE0;
 						diseqc.data[1] = 0x10;
-						if ( (send_mask & 2) && (di_param.m_command_order & 4) )
+						if ( (send_mask & 2) && (convert_m_command_order & 4) )
 						{
 							diseqc.data[2] = 0x39;
 							diseqc.data[3] = ucsw;
@@ -1424,7 +1470,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 
 
 		AM_DEBUG(1, "RotorCmd %02x, lastRotorCmd %02lx\n", RotorCmd, lastRotorCmd);
-		if ( RotorCmd != -1 && RotorCmd != lastRotorCmd )
+		if ((b_para == NULL) && (para != NULL) && (RotorCmd != -1) && (RotorCmd != lastRotorCmd) )
 		{
 			AM_Bool_t no_need_sendrotorstop_and_recheck_vol = AM_FALSE;
 			int mrt = sec_control.m_params[MOTOR_RUNNING_TIMEOUT]; // in seconds!
@@ -1468,14 +1514,16 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 
 			M_AM_SEC_ASYNCCHECK();
 
-			AM_SEC_SetSecCommandByVal( &sec_cmd, IF_ROTORPOS_VALID_GOTO, +5 );
+			AM_SEC_SetSecCommandByVal( &sec_cmd, IF_ROTORPOS_VALID_GOTO, +3 );
 			if(AM_SEC_If_Rotorpos_Valid_Goto(&sec_cmd))
 			{
-				AM_FEND_Diseqccmd_SetPositionerHalt(dev_no);
-				usleep(50 * 1000);
+				//AM_FEND_Diseqccmd_SetPositionerHalt(dev_no);
+				//usleep(50 * 1000);
 				AM_FEND_Diseqccmd_SetPositionerHalt(dev_no);
 				// wait 150msec after send rotor stop cmd
 				usleep(sec_control.m_params[DELAY_AFTER_MOTOR_STOP_CMD] * 1000);
+
+				AM_DEBUG(1, "AM_FEND_Diseqccmd_SetPositionerHalt\n");
 
 				M_AM_SEC_ASYNCCHECK();
 			}
@@ -1505,7 +1553,8 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 						mrt = 3600 - mrt;
 					if (mrt % 10)
 						mrt += 10; // round a little bit
-					mrt *= 2000;  // (we assume a very slow rotor with just 0.5 degree per second here)
+					//mrt *= 2000;  // (we assume a very slow rotor with just 0.5 degree per second here)
+					mrt *= 1000;  // (we assume a very slow rotor with just 1.0 degree per second here)
 					mrt /= 10000;
 					mrt += 3; // a little bit overhead
 				}
@@ -1549,6 +1598,13 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 				{
 					AM_FEND_Diseqccmd_GotoPositioner(dev_no, RotorCmd); // goto stored sat position
 				}
+
+				AM_SEC_SetFendData(NEW_ROTOR_CMD, RotorCmd);
+				AM_SEC_SetFendData(NEW_ROTOR_POS, rotor_param.m_gotoxx_parameters.m_sat_longitude);		
+
+				AM_SEC_SetSecCommand( &sec_cmd, UPDATE_CURRENT_ROTORPARAMS); 
+				AM_SEC_Set_Update_Cur_RotorPara(&sec_cmd);
+				
 				usleep( 1000 * 1000 ); // sleep one second before change voltage or tone
 
 				compare.voltage = voltage;
@@ -1639,8 +1695,8 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 					}					
 				}
 
-				AM_SEC_SetSecCommand( &sec_cmd, UPDATE_CURRENT_ROTORPARAMS); 
-				AM_SEC_Set_Update_Cur_RotorPara(&sec_cmd);
+				//AM_SEC_SetSecCommand( &sec_cmd, UPDATE_CURRENT_ROTORPARAMS); 
+				//AM_SEC_Set_Update_Cur_RotorPara(&sec_cmd);
 				AM_SEC_SetSecCommandByVal( &sec_cmd, SET_ROTOR_STOPPED, dev_no); 
 				AM_SEC_Set_RotorStoped(&sec_cmd);
 
@@ -1711,6 +1767,46 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 	return AM_FENDCTRL_ERR_END;
 }
 
+/**\brief 卫星设备监控线程*/
+static void* AM_Sec_MonitorThread(void *arg)
+{	
+	AM_SEC_AsyncInfo_t *p_sec_asyncinfo = (AM_SEC_AsyncInfo_t *)arg;
+	char buf[32];
+	int v;
+	AM_Bool_t cur_short_circuit = AM_FALSE;
+
+	p_sec_asyncinfo->short_circuit = AM_FALSE;
+    
+	while(p_sec_asyncinfo->enable_thread)
+	{
+		usleep(5 * 1000 * 1000);
+
+		if(AM_FileRead(FRONTEND_SHORT_CIRCUIT_FILE, buf, sizeof(buf))==AM_SUCCESS)
+		{
+			if(sscanf(buf, "%d", &v)==1)
+			{
+				cur_short_circuit = v?AM_TRUE:AM_FALSE;
+			}
+		}
+
+		if(cur_short_circuit != p_sec_asyncinfo->short_circuit)
+		{
+            if(cur_short_circuit)
+            {
+            	AM_EVT_Signal(p_sec_asyncinfo->dev_no, AM_FEND_EVT_SHORT_CIRCUIT, NULL);
+            }
+			else
+			{
+				AM_EVT_Signal(p_sec_asyncinfo->dev_no, AM_FEND_EVT_SHORT_CIRCUIT_REPAIR, NULL);
+			}
+
+			p_sec_asyncinfo->short_circuit = cur_short_circuit;
+		}
+	}
+	
+	return NULL;
+}
+
 /**\brief 卫星设备控制初始化*/
 static AM_ErrorCode_t AM_SEC_Init(void)
 {
@@ -1762,13 +1858,19 @@ static AM_ErrorCode_t AM_SEC_Init(void)
 	rc = pthread_create(&p_sec_asyncinfo->thread, NULL, AM_Sec_AsyncThread, p_sec_asyncinfo);
 	if(rc)
 	{
-		AM_DEBUG(1, "%s", strerror(rc));
+		AM_DEBUG(1, "control thread %s", strerror(rc));
 		
 		pthread_mutex_destroy(&p_sec_asyncinfo->lock);
 		pthread_cond_destroy(&p_sec_asyncinfo->cond);
 		
 		ret = AM_FENDCTRL_ERR_CANNOT_CREATE_THREAD;
 	}	
+
+	rc = pthread_create(&p_sec_asyncinfo->sec_monitor_thread, NULL, AM_Sec_MonitorThread, p_sec_asyncinfo);
+	if(rc)
+	{
+		AM_DEBUG(1, "monitor thread %s", strerror(rc));
+	}
 	
 	return ret;
 }
@@ -1863,6 +1965,10 @@ AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEquipmentC
 	sec_control.m_lnbs.m_cursat_parameters.m_22khz_signal = para->m_lnbs.m_cursat_parameters.m_22khz_signal;
 	sec_control.m_lnbs.m_cursat_parameters.m_rotorPosNum = para->m_lnbs.m_cursat_parameters.m_rotorPosNum;
 
+	/* Blind Scan Parameters*/
+	sec_control.m_lnbs.b_para.polarisation = para->m_lnbs.b_para.polarisation;
+	sec_control.m_lnbs.b_para.ocaloscollatorfreq = para->m_lnbs.b_para.ocaloscollatorfreq;
+
 	pthread_mutex_unlock(&(sec_control.m_lnbs.lock));
 
 	//AM_SEC_DumpSetting();
@@ -1892,6 +1998,28 @@ AM_ErrorCode_t AM_SEC_GetSetting(int dev_no, AM_SEC_DVBSatelliteEquipmentControl
 	return ret;
 }
 
+/**\brief 马达缓存参数重置
+ * \param dev_no 前端设备号
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+AM_ErrorCode_t AM_SEC_ResetRotorStatusCache(int dev_no)
+{
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	pthread_mutex_lock(&(sec_control.m_lnbs.lock));
+
+	if(!(sec_control.m_lnbs.m_rotor_parameters.m_reset_rotor_status_cache))
+	{
+		sec_control.m_lnbs.m_rotor_parameters.m_reset_rotor_status_cache = AM_TRUE;
+	}
+
+	pthread_mutex_unlock(&(sec_control.m_lnbs.lock));
+
+	return ret;
+}
+
 /**\brief 准备盲扫卫星设备控制
  * \param dev_no 前端设备号
  * \return
@@ -1901,6 +2029,13 @@ AM_ErrorCode_t AM_SEC_GetSetting(int dev_no, AM_SEC_DVBSatelliteEquipmentControl
 AM_ErrorCode_t AM_SEC_PrepareBlindScan(int dev_no)
 {	
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	if(AM_SEC_CanBlindScanOrTune(dev_no, &(g_b_para), NULL) == 0)
+	{
+		AM_DEBUG(1, "%s", "AM_SEC_PrepareBlindScan call AM_SEC_CanBlindScanOrTune\n");
+		ret = AM_FENDCTRL_ERROR_BASE;
+		return ret;	
+	}	
 
 	pthread_mutex_lock(&(sec_control.m_lnbs.lock));
 
@@ -1919,6 +2054,7 @@ AM_ErrorCode_t AM_SEC_PrepareBlindScan(int dev_no)
 }
 
 /**\brief 中频转换传输频率
+ * \param dev_no 前端设备号
  * \param centre_freq unit KHZ
  * \param[out] tp_freq unit KHZ
  * \return
@@ -1938,12 +2074,12 @@ AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned
 	{
 		long data = -1;
 	
-		AM_SEC_GetFendData(CUR_TONE, &data);
-		if(data == SEC_TONE_ON)
+		AM_SEC_GetFendData(CUR_LOCALOSCILLATOR, &data);
+		if(data == 1)
 		{
 			cur_ocaloscollatorfreq = AM_FEND_LOCALOSCILLATORFREQ_H;
 		}
-		else if(data == SEC_TONE_OFF)
+		else if(data == 0)
 		{
 			cur_ocaloscollatorfreq = AM_FEND_LOCALOSCILLATORFREQ_L;
 		}
@@ -1952,6 +2088,8 @@ AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned
 	{
 		cur_ocaloscollatorfreq = sec_control.m_lnbs.b_para.ocaloscollatorfreq;
 	}
+
+	AM_DEBUG(1, "cur_ocaloscollatorfreq:%d h:%d l:%d\n", cur_ocaloscollatorfreq, sec_control.m_lnbs.m_lof_hi, sec_control.m_lnbs.m_lof_lo);
 
 	if(cur_ocaloscollatorfreq == AM_FEND_LOCALOSCILLATORFREQ_H)
 	{
@@ -1989,6 +2127,48 @@ AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned
 	return ret;
 }
 
+/**\brief 过了无效传输频率
+ * \param dev_no 前端设备号
+ * \param tp_freq unit KHZ
+ * \return
+ *   - AM_TRUE 过滤
+ *   - AM_FALSE 不过滤
+ */
+AM_Bool_t AM_SEC_FilterInvalidTp(int dev_no, unsigned int tp_freq)
+{
+	AM_Bool_t ret = AM_FALSE;
+	AM_FEND_Localoscollatorfreq_t cur_ocaloscollatorfreq = AM_FEND_LOCALOSCILLATORFREQ_H;
+
+	pthread_mutex_lock(&(sec_control.m_lnbs.lock));
+
+	cur_ocaloscollatorfreq = sec_control.m_lnbs.b_para.ocaloscollatorfreq;
+
+	AM_DEBUG(1, "cur_ocaloscollatorfreq:%d m_lof_threshold:%d\n", cur_ocaloscollatorfreq, sec_control.m_lnbs.m_lof_threshold);
+
+	if(sec_control.m_lnbs.m_lof_hi == sec_control.m_lnbs.m_lof_lo)
+	{
+		ret = AM_FALSE;
+	}
+	else if(cur_ocaloscollatorfreq == AM_FEND_LOCALOSCILLATORFREQ_H)
+	{
+		if(tp_freq <= sec_control.m_lnbs.m_lof_threshold)
+		{
+			ret = AM_TRUE;
+		}
+	}
+	else if(cur_ocaloscollatorfreq == AM_FEND_LOCALOSCILLATORFREQ_L)
+	{
+		if(tp_freq > sec_control.m_lnbs.m_lof_threshold)
+		{
+			ret = AM_TRUE;
+		}	
+	}
+
+	pthread_mutex_unlock(&(sec_control.m_lnbs.lock));
+	
+	return ret;
+}
+
 /**\brief 准备锁频卫星设备控制
  * \param dev_no 前端设备号
  * \param para 前端设备参数
@@ -2003,6 +2183,22 @@ AM_ErrorCode_t AM_SEC_PrepareTune(int dev_no, const AM_FENDCTRL_DVBFrontendParam
 	assert(para);
 	
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	if(!((para->para.frequency >= M_C_TP_START_FREQ && para->para.frequency <= M_C_TP_END_FREQ) 
+		|| (para->para.frequency >= M_KU_TP_START_FREQ && para->para.frequency <= M_KU_TP_END_FREQ)))
+	{
+		AM_DEBUG(1, "%s", "AM_SEC_PrepareTune freq range out\n");
+		ret = AM_FENDCTRL_ERROR_BASE;
+		return ret;
+	}
+
+	if(AM_SEC_CanBlindScanOrTune(dev_no, NULL, para) == 0)
+	{
+		AM_DEBUG(1, "%s", "AM_SEC_PrepareTune call AM_SEC_CanBlindScanOrTune\n");
+		ret = AM_FENDCTRL_ERROR_BASE;
+		return ret;	
+	}
+	
 
 	pthread_mutex_lock(&(sec_control.m_lnbs.lock));
 
