@@ -26,6 +26,8 @@
 #include <am_epg.h>
 
 #include "am_caman.h"
+#include "am_ci.h"
+#include "ca_ci.h"
 
 /****************************************************************************
  * Macro definitions
@@ -484,6 +486,311 @@ static void progress_evt_callback(int dev_no, int event_type, void *param, void 
 
 }
 
+#ifdef TEST_CA_CI
+
+#define MMI_STATE_CLOSED 0
+#define MMI_STATE_OPEN 1
+#define MMI_STATE_ENQ 2
+#define MMI_STATE_MENU 3
+
+static int mmi_state = MMI_STATE_CLOSED;
+static void hex_dump(void *data, int size)
+{
+    /* dumps size bytes of *data to stdout. Looks like:
+     * [0000] 75 6E 6B 6E 6F 77 6E 20
+     *                  30 FF 00 00 00 00 39 00 unknown 0.....9.
+     * (in a single line of course)
+     */
+
+    unsigned char *p = data;
+    unsigned char c;
+    int n;
+    char bytestr[4] = {0};
+    char addrstr[10] = {0};
+    char hexstr[ 16*3 + 5] = {0};
+    char charstr[16*1 + 5] = {0};
+    for(n=1;n<=size;n++) {
+        if (n%16 == 1) {
+            /* store address for this line */
+            snprintf(addrstr, sizeof(addrstr), "%.4x",
+               ((unsigned int)p-(unsigned int)data) );
+        }
+            
+        c = *p;
+        if (isalnum(c) == 0) {
+            c = '.';
+        }
+
+        /* store hex str (for left side) */
+        snprintf(bytestr, sizeof(bytestr), "%02X ", *p);
+        strncat(hexstr, bytestr, sizeof(hexstr)-strlen(hexstr)-1);
+
+        /* store char str (for right side) */
+        snprintf(bytestr, sizeof(bytestr), "%c", c);
+        strncat(charstr, bytestr, sizeof(charstr)-strlen(charstr)-1);
+
+        if(n%16 == 0) { 
+            /* line completed */
+            printf("[%4.4s]   %-50.50s  %s\n", addrstr, hexstr, charstr);
+            hexstr[0] = 0;
+            charstr[0] = 0;
+        } else if(n%8 == 0) {
+            /* half line: add whitespaces */
+            strncat(hexstr, "  ", sizeof(hexstr)-strlen(hexstr)-1);
+            strncat(charstr, " ", sizeof(charstr)-strlen(charstr)-1);
+        }
+        p++; /* next byte */
+    }
+
+    if (strlen(hexstr) > 0) {
+        /* print rest of buffer if not empty */
+        printf("[%4.4s]   %-50.50s  %s\n", addrstr, hexstr, charstr);
+    }
+}
+
+static int caman_cb(char *name, AM_CA_Msg_t *msg)
+{
+	AM_ErrorCode_t err;
+
+	if(!msg)
+	{
+		AM_DEBUG(1, "\t\t-->|APP ??? msg (NULL) ???");
+		return -1;
+	}
+
+	if(msg->dst != AM_CA_MSG_DST_APP)
+	{
+		AM_DEBUG(1, "\t\t-->|APP ??? msg dst is not app(%d) ???", msg->dst);
+		return -1;
+	}
+
+	if(0 == strcmp("ci0", name))
+	{
+		ca_ci_msg_t *cimsg = (ca_ci_msg_t *)msg->data;
+		//hex_dump(msg->data, msg->len);
+		switch(cimsg->type)
+		{
+			#define PIN(i, x) AM_DEBUG(1, "\t\t-->|"# i"("# x"):\t0x%x", x)
+			#define PIS(i, x, l) AM_DEBUG(1, "\t\t-->|"# i"("# x"):\t%.*s", l, x) 
+			#define PInS(i, n, x, l) AM_DEBUG(1, "\t\t-->|"# i":\t(%d):%.*s", n, l, x)
+			#define PI_S(i, x, l) AM_DEBUG(1, "\t\t-->|"# i":\t%.*s", l, x)
+
+			case ca_ci_msg_type_appinfo:
+				{
+					ca_ci_appinfo_t *appinfo = (ca_ci_appinfo_t*)cimsg->msg;
+
+					#define PN(x) PIN(APPINFO, x)
+					#define PS(x, n) PIS(APPINFO, x, n)
+
+					PN(appinfo->application_type);
+					PN(appinfo->application_manufacturer);
+					PN(appinfo->manufacturer_code);
+					PS(appinfo->menu_string, appinfo->menu_string_length);
+
+					#undef PN
+					#undef PS
+				}
+				break;
+			case ca_ci_msg_type_cainfo:
+				{
+					int i;
+					ca_ci_cainfo_t *cainfo = (ca_ci_cainfo_t*)cimsg->msg;
+			
+					for(i=0; i<cainfo->ca_id_count; i++) {
+						PIN(CAINFO, i);
+						PIN(CAINFO, cainfo->ca_ids[i]);
+					}
+				}
+				break;
+
+			case ca_ci_msg_type_mmi_close:
+				mmi_state = MMI_STATE_CLOSED;
+				break;
+
+			case ca_ci_msg_type_mmi_display_control:
+				mmi_state = MMI_STATE_OPEN;
+				break;
+
+			case ca_ci_msg_type_mmi_enq:
+				{
+					ca_ci_mmi_enq_t *enq = (ca_ci_mmi_enq_t*)cimsg->msg;
+
+					PIN(ENQ, enq->blind_answer);
+					PIN(ENQ, enq->expected_answer_length);
+					PIS(ENQ, enq->text, enq->text_size);
+					
+					mmi_state = MMI_STATE_ENQ;
+				}
+				break;
+
+			case ca_ci_msg_type_mmi_menu:
+			case ca_ci_msg_type_mmi_list:
+				{
+					unsigned char *p = cimsg->msg;
+					int l; int i, s;
+					#define _getint(p) (p[0] | (p[1]<<8) | (p[2]<<16) | (p[3]<<24))
+					l=_getint(p);
+					PI_S(MENU:titile, &p[4], l); p+=(l+4);
+					l=_getint(p);
+					PI_S(MENU:subtitile, &p[4], l); p+=(l+4);
+					l=_getint(p);
+					PI_S(MENU:bottom, &p[4], l); p+=(l+4);
+					s=_getint(p); p+=4;
+					for(i=0; i<s; i++)
+					{
+						l=_getint(p);
+						PInS(MENU:item, i+1, &p[4], l); p+=(l+4);
+					}
+					mmi_state = MMI_STATE_MENU;
+				}
+				break;
+
+			default:
+				AM_DEBUG(1, "\t\t-->|APP ??? unkown ci msg type(%d) ??? ", cimsg->type);
+				break;
+
+			#undef PIN
+			#undef PIS
+		}
+
+		if((err = AM_CAMAN_freeMsg(msg)) != AM_SUCCESS)
+		{
+			AM_DEBUG(1, "\t\t-->|APP ??? free msg fail[%x]", err);
+		}
+	}
+	else
+	{
+		AM_DEBUG(1, "\t\t-->|??? ca(%s) ???", name);
+		return -1;
+	}
+
+	return 0;
+}
+
+static void run_ci(void)
+{
+	AM_CA_Msg_t msg;
+	ca_ci_msg_t cimsg;
+
+	cimsg.type = ca_ci_msg_type_enter_menu;
+	msg.type=0;
+	msg.dst = AM_CA_MSG_DST_CA;
+	msg.data = (unsigned char*)&cimsg;
+	msg.len = sizeof(cimsg);
+	AM_CAMAN_putMsg("ci0", &msg);
+}
+
+static void leave_ci(void)
+{
+	AM_CA_Msg_t msg;
+	int lmsg = sizeof(ca_ci_msg_t)+sizeof(ca_ci_close_mmi_t);
+	ca_ci_msg_t *cimsg = malloc(lmsg);
+	assert(cimsg);
+
+	ca_ci_close_mmi_t *close_mmi = (ca_ci_close_mmi_t *)cimsg->msg;
+
+	close_mmi->cmd_id = AM_CI_MMI_CLOSE_MMI_CMD_ID_IMMEDIATE;
+	close_mmi->delay = 0;
+	cimsg->type = ca_ci_msg_type_close_mmi;
+	msg.type=0;
+	msg.dst = AM_CA_MSG_DST_CA;
+	msg.data = (unsigned char*)cimsg;
+	msg.len = lmsg;
+	AM_CAMAN_putMsg("ci0", &msg);
+	
+	free(cimsg);
+}
+
+static void ci_input(const char *cmd)
+{
+	AM_CA_Msg_t msg;
+	ca_ci_msg_t *cimsg;
+	int lmsg;
+
+	if(0==strcmp(cmd, "u"))
+	{	
+		lmsg = sizeof(ca_ci_msg_t)+sizeof(ca_ci_answer_enq_t);
+		cimsg = malloc(lmsg);
+		assert(cimsg);
+		
+		ca_ci_answer_enq_t *aenq = (ca_ci_answer_enq_t *)cimsg->msg;
+
+		aenq->answer_id = AM_CI_MMI_ANSW_CANCEL;
+		aenq->size = 0;
+		cimsg->type = ca_ci_msg_type_answer;
+		msg.type=0;
+		msg.dst = AM_CA_MSG_DST_CA;
+		msg.data = (unsigned char*)cimsg;
+		msg.len = lmsg;
+		AM_CAMAN_putMsg("ci0", &msg);
+
+		free(cimsg);
+
+		return;
+	}
+	
+	switch(mmi_state) {
+		case MMI_STATE_CLOSED:
+		case MMI_STATE_OPEN:
+			break;
+
+		case MMI_STATE_ENQ:
+			{
+				int len = strlen(cmd);
+				lmsg = sizeof(ca_ci_msg_t)+sizeof(ca_ci_answer_enq_t)+len;
+				cimsg = malloc(lmsg);
+				assert(cimsg);
+				
+				ca_ci_answer_enq_t *aenq = (ca_ci_answer_enq_t *)cimsg->msg;
+
+				if(!len){
+					aenq->answer_id = AM_CI_MMI_ANSW_CANCEL;
+					aenq->size = 0;
+				}else{
+					aenq->answer_id = AM_CI_MMI_ANSW_ANSWER;
+					aenq->size = len;
+					memcpy(aenq->answer, cmd, len);
+				}
+				cimsg->type = ca_ci_msg_type_answer;
+				msg.type=0;
+				msg.dst = AM_CA_MSG_DST_CA;
+				msg.data = (unsigned char*)cimsg;
+				msg.len = lmsg;
+				AM_CAMAN_putMsg("ci0", &msg);
+
+				free(cimsg);
+			}
+
+			mmi_state = MMI_STATE_OPEN;
+			break;
+
+		case MMI_STATE_MENU:
+			{
+				lmsg = sizeof(ca_ci_msg_t)+sizeof(ca_ci_answer_menu_t);
+				cimsg = malloc(lmsg);
+				assert(cimsg);
+				
+				ca_ci_answer_menu_t *amenu = (ca_ci_answer_menu_t *)cimsg->msg;
+
+				amenu->select = atoi(cmd);
+				
+				cimsg->type = ca_ci_msg_type_answer_menu;
+				msg.type=0;
+				msg.dst = AM_CA_MSG_DST_CA;
+				msg.data = (unsigned char*)cimsg;
+				msg.len = lmsg;
+				AM_CAMAN_putMsg("ci0", &msg);
+
+				free(cimsg);
+			}
+		
+			mmi_state = MMI_STATE_OPEN;
+			break;
+	}
+	
+}
+#endif
+
 static void run_quit(void)
 {
 	go = AM_FALSE;
@@ -696,7 +1003,12 @@ static CommandMenu menus[]=
 	{5, 0, "5. Freq Setting", 	"5",	MENU_TYPE_APP,	run_freq_setting,	NULL,		freq_input},
 	{6, 0, "6. Restore",		"6",	MENU_TYPE_APP, 	run_restore,		NULL,		restore_input},
 	{7, 0, "7. Quit",			"7",	MENU_TYPE_APP,	run_quit,			NULL,		NULL},
+#ifdef TEST_CA_CI
+	{8, 0, "8. CI",			"8",	MENU_TYPE_APP,	run_ci,			leave_ci,		ci_input},
+	{9, 3, NULL,				"e",	MENU_TYPE_APP,	run_epg,			NULL,		epg_input},
+#else
 	{8, 3, NULL,				"e",	MENU_TYPE_APP,	run_epg,			NULL,		epg_input},
+#endif
 };
 
 static void display_menu(void)
@@ -772,6 +1084,9 @@ static int menu_input(const char *cmd)
 	return -1;
 }
 
+//#define TEST_CA_DUMMY
+//#define TEST_CA_CI
+
 static int start_tv_test()
 {
 	char buf[256];
@@ -779,21 +1094,45 @@ static int start_tv_test()
 	sqlite3 *db;
 
 
+#if defined(TEST_CA_DUMMY) || defined(TEST_CA_CI)
 	AM_CAMAN_OpenParam_t caman_para;
 	AM_CA_Opt_t ca_opt;
-	
 	memset(&caman_para, 0, sizeof(caman_para));
 	
 	caman_para.ts.dmx_fd = DMX_DEV_NO;
 	caman_para.ts.fend_fd = FEND_DEV_NO;
 	AM_TRY(AM_CAMAN_Open(&caman_para));
 
+#endif
+
+#ifdef TEST_CA_DUMMY
+	/*register the dummy*/
 	memset(&ca_opt, 0, sizeof(ca_opt));
 	ca_opt.auto_disable = 0;
-	/*register the dummy*/
 	AM_CAMAN_registerCA("dummy",  NULL, &ca_opt);
 
 	AM_CAMAN_openCA("dummy");
+#endif
+
+
+#ifdef TEST_CA_CI
+	AM_CI_OpenPara_t  ci_para;
+	static int ci;
+	AM_CA_t *ca;
+
+	memset(&ci_para, 0, sizeof(ci_para));
+	AM_CI_Open(0, 0, &ci_para, &ci);
+//	AM_TRY(AM_CI_Start(ci));
+
+	/*register the ci*/
+	AM_CI_CAMAN_getCA(ci, &ca);
+	memset(&ca_opt, 0, sizeof(ca_opt));
+	ca_opt.auto_disable = 0;
+	AM_CAMAN_registerCA("ci0", ca, &ca_opt);
+	AM_CAMAN_setCallback("ci0", caman_cb);
+	AM_CAMAN_openCA("ci0");
+#endif
+
 
 	if(NULL==opendir("/system"))
 	{
@@ -862,8 +1201,18 @@ static int start_tv_test()
 	
 	AM_TRY(AM_DB_UnSetup());
 
+#ifdef TEST_CA_DUMMY
 	AM_CAMAN_unregisterCA("dummy");
+#endif
+
+#ifdef TEST_CA_CI
+	AM_CAMAN_unregisterCA("ci0");
+	AM_CI_Close(ci);
+#endif
+
+#if defined(TEST_CA_DUMMY) || defined(TEST_CA_CI)
 	AM_CAMAN_Close();
+#endif
 
 	return 0;
 }
@@ -874,7 +1223,7 @@ int main(int argc, char **argv)
 	AM_AV_OpenPara_t apara;
 	
 	memset(&fpara, 0, sizeof(fpara));
-	fpara.mode = -1;
+	fpara.mode = FE_OFDM;
 	AM_TRY(AM_FEND_Open(FEND_DEV_NO, &fpara));
 	
 	memset(&para, 0, sizeof(para));

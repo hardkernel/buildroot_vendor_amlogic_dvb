@@ -20,6 +20,7 @@
 #include "am_tv_internal.h"
 
 #include "am_caman.h"
+#include "am_ci.h"
 
 /****************************************************************************
  * Macro definitions
@@ -100,7 +101,9 @@ static AM_ErrorCode_t am_tv_play(AM_TV_Data_t *tv)
 				tv->chan_num, vid, str_apids, aid, vfmt, str_afmts, afmt ,tv->av_dev);
 	AM_TRY(AM_AV_StartTS(tv->av_dev, vid, aid, vfmt, afmt));
 
-	AM_TRY(AM_CAMAN_startService(sid, "dummy"));
+	AM_CAMAN_startService(sid, "dummy");
+
+	AM_CAMAN_startService(sid, "ci0");
 
 	tv->status |= AM_TV_ST_PLAYING;
 	
