@@ -1,5 +1,5 @@
 
-#define AM_DEBUG_LEVEL 1
+#define AM_DEBUG_LEVEL 2
 
 #include <errno.h>
 #include <assert.h>
@@ -303,7 +303,7 @@ static int table_open(table_t *table)
 		return 0;
 
 	pthread_mutexattr_init(&mta);
-	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE_NP);
+//	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE_NP);
 	pthread_mutex_init(&table->lock, &mta);
 	pthread_mutexattr_destroy(&mta);
 
@@ -492,6 +492,9 @@ struct _ca_s{
 	char *name;
 	AM_CA_Type_t type;
 	AM_CA_Ops_t ops;
+	void *arg;
+	void (*arg_destroy)(void *arg);
+
 	int status;
 	int auto_disable;
 
@@ -536,22 +539,22 @@ static void free_ca_msg( _ca_msg_t *msgi)
 
 static _ca_msg_t *get_ca_msg(_ca_t *cai, int pick)
 {
-	_ca_msg_t *msg = NULL;
+	_ca_msg_t *msgi = NULL;
 	if(!list_empty(&cai->msglist)) {
-		msg = list_first_entry(&cai->msglist, _ca_msg_t, head);
+		msgi = list_first_entry(&cai->msglist, _ca_msg_t, head);
 		if(!pick)
-			list_del(&msg->head);
+			list_del(&msgi->head);
 	}
-	return msg;
+	return msgi;
 }
 
-static _ca_msg_t *add_ca_msg(_ca_t *cai, _ca_msg_t *msg) 
+static _ca_msg_t *add_ca_msg(_ca_t *cai, _ca_msg_t *msgi) 
 {
-	list_add(&msg->head, &cai->msglist);
-	return msg;
+	list_add_tail(&msgi->head, &cai->msglist);
+	return msgi;
 }
 
-static void rm_ca_msgs(_ca_t *cai, void (*free_msg)( _ca_msg_t *msg))
+static void rm_ca_msgs(_ca_t *cai, void (*free_msg)( _ca_msg_t *msgi))
 {
 	struct list_head *pos = NULL, *n = NULL;
 	list_for_each_safe(pos, n, &cai->msglist)
@@ -581,7 +584,7 @@ static _ca_t *get_ca(char *name)
 
 static _ca_t *add_ca(_ca_t *ca, struct list_head *list)
 {
-	list_add(&ca->head, list);
+	list_add_tail(&ca->head, list);
 	return ca;
 }
 
@@ -617,7 +620,7 @@ static int do_rm_ca(char *name, void (*free_ca)(_ca_t *cai))
 			list_del(&cai->head); \
 			 \
 			if(cai->status && cai->ops.enable) \
-				cai->ops.enable(0); \
+				cai->ops.enable(cai->arg, 0); \
 			 \
 			if(cai->ts && (cai->ts->ca_force==cai)) \
 				cai->ts->ca_force = NULL; \
@@ -625,6 +628,9 @@ static int do_rm_ca(char *name, void (*free_ca)(_ca_t *cai))
 			rm_ca_msgs(cai, free_ca_msg); \
 			 \
  			ca_close(cai); \
+			 \
+			if(cai->arg_destroy) \
+				cai->arg_destroy(cai->arg); \
 			 \
 			if(free_ca) \
 				free_ca(cai); \
@@ -681,11 +687,11 @@ static int match_ca_auto(_caman_t *caman, _ts_t *ts, dvbpsi_ca_dr_t *cadesr)
 	list_for_each_entry_safe(cai, n, &ts->calist, head)
 	{
 		if(cai->ops.camatch)
-			if(!cai->ops.camatch(cadesr->i_ca_system_id))
+			if(!cai->ops.camatch(cai->arg, cadesr->i_ca_system_id))
 			{
 				list_move(&cai->head, &tmp);
 				if(cai->ops.stop_pmt)
-					cai->ops.stop_pmt(-1);
+					cai->ops.stop_pmt(cai->arg, -1);
 				cai->ts = NULL;
 			}
 	}
@@ -695,13 +701,13 @@ static int match_ca_auto(_caman_t *caman, _ts_t *ts, dvbpsi_ca_dr_t *cadesr)
 	{
 		if(!cai->auto_disable/*not dis-auto*/ 
 			&& cai->ops.camatch)
-			if(cai->ops.camatch(cadesr->i_ca_system_id))
+			if(cai->ops.camatch(cai->arg, cadesr->i_ca_system_id))
 			{
 				list_move(&cai->head, &ts->calist);
 				if(cai->ops.open)
 				{
 					AM_CAMAN_Ts_t ts_ca = {.fend_fd = ts->fend_fd, .dmx_fd = ts->dmx_fd};
-					cai->ops.open(&ts_ca);
+					cai->ops.open(cai->arg, &ts_ca);
 					cai->ts = ts;
 				}
 			}
@@ -1066,14 +1072,14 @@ static int on_new_ts(_ts_t *ts)
 	if(cai)
 	{
 		if(cai->ops.ts_changed)
-			cai->ops.ts_changed();
+			cai->ops.ts_changed(cai->arg);
 	}
 	else
 	{
 		list_for_each_entry(cai, &ts->calist, head)
 		{
 			if(cai->ops.ts_changed)
-				cai->ops.ts_changed();
+				cai->ops.ts_changed(cai->arg);
 		}
 	}
 
@@ -1124,7 +1130,7 @@ static int on_new_pmt(_ts_t *ts)
 			{
 				table_secbuf_t *secbuf;
 				secbuf = list_first_entry(&ts->pmt.secbufs, table_secbuf_t, head);
-				cai->ops.start_pmt(ts->service_id, secbuf->buf, secbuf->len);
+				cai->ops.start_pmt(cai->arg, ts->service_id, secbuf->buf, secbuf->len);
 			}
 		}
 		else
@@ -1157,7 +1163,7 @@ static int on_new_pmt(_ts_t *ts)
 					{
 						table_secbuf_t *secbuf;
 						secbuf = list_first_entry(&ts->pmt.secbufs, table_secbuf_t, head);
-						cai->ops.start_pmt(ts->service_id, secbuf->buf, secbuf->len);
+						cai->ops.start_pmt(cai->arg, ts->service_id, secbuf->buf, secbuf->len);
 					}
 				}
 			}
@@ -1208,7 +1214,7 @@ static int on_new_cat(_ts_t *ts)
 			{
 				table_secbuf_t *secbuf;
 				secbuf = list_first_entry(&ts->cat.secbufs, table_secbuf_t, head);
-				cai->ops.new_cat(secbuf->buf, secbuf->len);
+				cai->ops.new_cat(cai->arg, secbuf->buf, secbuf->len);
 			}
 		}
 		else
@@ -1238,7 +1244,7 @@ static int on_new_cat(_ts_t *ts)
 				{
 					table_secbuf_t *secbuf;
 					secbuf = list_first_entry(&ts->cat.secbufs, table_secbuf_t, head);
-					cai->ops.new_cat(secbuf->buf, secbuf->len);
+					cai->ops.new_cat(cai->arg, secbuf->buf, secbuf->len);
 				}
 			}
 		}
@@ -1307,41 +1313,27 @@ end:
 static int on_process_msgs(_caman_t *man)
 {
 	_ca_t *cai;
-	_ca_msg_t *msgi;
+
+#define ca_process_msg(cai) \
+		do { \
+			_ca_msg_t *msgi, *n; \
+			list_for_each_entry_safe(msgi, n, &cai->msglist, head) \
+			{ \
+				if(cai->msgcb) { \
+					list_del(&msgi->head); \
+					cai->msgcb(cai->name, &msgi->msg); \
+				} \
+			} \
+		}while(0)
 
 	list_for_each_entry(cai, &man->calist, head)
 	{
-		_ca_msg_t *n;
-		list_for_each_entry_safe(msgi, n, &cai->msglist, head)
-		{
-			if(cai->msgcb) {
-				cai->msgcb(cai->name, &msgi->msg);
-				list_del(&msgi->head);
-			}
-		}
+		ca_process_msg(cai);
 	}
-	
-	cai = man->ts.ca_force;
-	if(cai)
+
+	list_for_each_entry(cai, &man->ts.calist, head)
 	{
-		if(cai->msgcb) {
-			cai->msgcb(cai->name, &msgi->msg);
-			list_del(&msgi->head);
-		}
-	}
-	else
-	{
-		list_for_each_entry(cai, &man->ts.calist, head)
-		{
-			_ca_msg_t *n;
-			list_for_each_entry_safe(msgi, n, &cai->msglist, head)
-			{
-				if(cai->msgcb) {
-					cai->msgcb(cai->name, &msgi->msg);
-					list_del(&msgi->head);
-				}
-			}
-		}
+		ca_process_msg(cai);
 	}
 	return 0;
 }
@@ -1562,7 +1554,14 @@ static int _ca_send_msg(char *name, AM_CA_Msg_t *msg)
 	msgi->magic = _CA_MSG_MAGIC;
 	msgi->msg = *msg;
 
-	add_ca_msg(cai, msgi);
+	if(msg->dst == AM_CA_MSG_DST_APP)
+	{
+		add_ca_msg(cai, msgi);
+	}
+	else if(msg->dst == AM_CA_MSG_DST_CAMAN)
+	{
+		/*msg from ca to caman, handle it.*/
+	}
 
 	pthread_mutex_unlock(&man->lock);
 
@@ -1577,7 +1576,7 @@ static int ca_open(_ca_t *cai, _ts_t *ts)
 	if(cai->ops.open)
 	{
 		AM_CAMAN_Ts_t ts_ca = {.fend_fd = ts->fend_fd, .dmx_fd = ts->dmx_fd};
-		if(0!= cai->ops.open(&ts_ca))
+		if(0!= cai->ops.open(cai->arg, &ts_ca))
 			return -1;
 	}
 
@@ -1585,15 +1584,15 @@ static int ca_open(_ca_t *cai, _ts_t *ts)
 	cai->ts = ts;
 
 	if(cai->ops.register_msg_send)
-		if(0!= cai->ops.register_msg_send(_ca_send_msg))
+		if(0!= cai->ops.register_msg_send(cai->arg, cai->name, _ca_send_msg))
 			return -1;
 
 	if(cai->ops.enable)
-		if(0!= cai->ops.enable(1))
+		if(0!= cai->ops.enable(cai->arg, 1))
 			return -1;
 
 	if(cai->ops.ts_changed)
-		if(0!= cai->ops.ts_changed())
+		if(0!= cai->ops.ts_changed(cai->arg))
 			return -1;
 
 	return 0;
@@ -1605,11 +1604,11 @@ static int ca_close(_ca_t *cai)
 		return 0;
 
 	if(cai->ops.enable)
-		if(0!= cai->ops.enable(0))
+		if(0!= cai->ops.enable(cai->arg, 0))
 			return -1;
 
 	if(cai->ops.close)
-		if(0!= cai->ops.close())
+		if(0!= cai->ops.close(cai->arg))
 			return -1;
 
 	cai->status = 0;
@@ -1687,7 +1686,7 @@ AM_ErrorCode_t AM_CAMAN_Open(AM_CAMAN_OpenParam_t *para)
 	INIT_LIST_HEAD(&man->ts.calist);
 	
 	pthread_mutexattr_init(&mta);
-	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE_NP);
+//	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE_NP);
 	pthread_mutex_init(&man->lock, &mta);
 	pthread_cond_init(&man->cond, NULL);
 	pthread_mutexattr_destroy(&mta);
@@ -1872,7 +1871,7 @@ AM_ErrorCode_t AM_CAMAN_startService(int service_id, char *caname)
 		if(fcai && (fcai != cai))
 		{
 			if(fcai->ops.stop_pmt)
-				fcai->ops.stop_pmt(-1);
+				fcai->ops.stop_pmt(fcai->arg, -1);
 			fcai->ts = NULL;
 		}
 		cai->ts = ts;
@@ -1883,7 +1882,7 @@ AM_ErrorCode_t AM_CAMAN_startService(int service_id, char *caname)
 		if(fcai)
 		{
 			if(fcai->ops.stop_pmt)
-				fcai->ops.stop_pmt(-1);
+				fcai->ops.stop_pmt(fcai->arg, -1);
 			fcai->ts = NULL;
 			ts->ca_force = NULL;
 		}
@@ -1920,7 +1919,7 @@ AM_ErrorCode_t AM_CAMAN_stopService(int service_id)
 		if(fcai)
 		{
 			if(fcai->ops.stop_pmt)
-				fcai->ops.stop_pmt(service_id);
+				fcai->ops.stop_pmt(fcai->arg, service_id);
 			fcai->ts = NULL;
 			ts->ca_force = NULL;
 		}
@@ -1929,7 +1928,7 @@ AM_ErrorCode_t AM_CAMAN_stopService(int service_id)
 			list_for_each_entry(cai, &ts->calist, head)
 			{
 				if(cai->ops.stop_pmt)
-					cai->ops.stop_pmt(service_id);
+					cai->ops.stop_pmt(cai->arg, service_id);
 			}
 		}
 	}
@@ -1964,7 +1963,7 @@ AM_ErrorCode_t AM_CAMAN_stopCA(char *name)
 	}
 
 	if(cai->ops.stop_pmt)
-		if(0 != cai->ops.stop_pmt(-1))
+		if(0 != cai->ops.stop_pmt(cai->arg, -1))
 		{
 			pthread_mutex_unlock(&man->lock);
 			return AM_CAMAN_ERROR_CA_ERROR;
@@ -2038,7 +2037,7 @@ AM_ErrorCode_t AM_CAMAN_putMsg(char *name, AM_CA_Msg_t *msg)
 		_ca_t *cai = get_ca(name);
 		if(cai)
 		{
-			cai->ops.msg_receive(msg);
+			cai->ops.msg_receive(cai->arg, msg);
 		}
 		else
 		{
@@ -2048,7 +2047,7 @@ AM_ErrorCode_t AM_CAMAN_putMsg(char *name, AM_CA_Msg_t *msg)
 	}
 	else if(msg->dst == AM_CA_MSG_DST_CAMAN)
 	{
-		/*msg to caman, handle it.*/
+		/*msg from app to caman, handle it.*/
 	}
 
 	pthread_mutex_unlock(&man->lock);
@@ -2128,6 +2127,8 @@ AM_ErrorCode_t AM_CAMAN_registerCA(char *name, AM_CA_t *ca, AM_CA_Opt_t *opt)
 	cai->name = strdup(name);
 	cai->type =  ca->type;
 	cai->ops = ca->ops;
+	cai->arg = ca->arg;
+	cai->arg_destroy = ca->arg_destroy;
 	cai->caman = caman;
 	if(opt)
 	{
@@ -2157,7 +2158,7 @@ AM_ErrorCode_t AM_CAMAN_unregisterCA(char *name)
 	pthread_mutex_lock(&man->lock);
 
 	if(do_rm_ca(name, free_ca)==0)
-		caman->canum++;
+		caman->canum--;
 
 	pthread_mutex_unlock(&man->lock);
 

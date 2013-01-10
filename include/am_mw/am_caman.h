@@ -87,85 +87,113 @@ typedef struct {
 
 	AM_Ca_t	ca			man register	<--	registerCA
 												|
-	open,enable(1) <--	call			<--	CA_open()
+											setCallback
 												|
-						get CAT		<--	FEND_EVT_STATUS_CHANGE
-						get PAT				startService(sid, caname) force-mode
-							|
-						match PMT
-							|
-						get PMT
-					
-						
-	camatch()	<--		(camatch) 				|
-	/ts_changed()  					 			|
+	open,enable(1) <--	call			<--	openCA()
+	
+		---------------service-loop-------------------
 												|
-	startpmt()	<--		PMT(s)		<--	
-	stoppmt()	<--		call			<-- CA_Stop(name)
-				.......................................
-				
-	msg_send	-->		in the pool      <-- CA_getMsg(display/notify)
-	msg_receive  <--		call			<-- CA_putMsg(trigger/reply)									
+	ts_changed()		new ts event	<--	FEND_EVT_STATUS_CHANGE
+						get CAT			startService(sid, caname) force-mode
+						get PAT
+							|
+						match/get PMT
+							|
+	camatch()	<--	(automatch ca/force ca)
+				 			|
+							|
+	startpmt()	<--		PMT(s)		
 
-	close,enable(0) <--	call			<-- CA_Close
+				.......................................
+					monitor tables (service related)
+					notify/resetup ca if changed
+				.......................................
+					
+		
+	stoppmt()	<--		stop			<-- stopCA(name)/stopService
+	
+		------------service-loop-------------------
+
+
+		------------msg-loop-----------------------
+												poll or callback
+	msg_send	-->		in the pool      <-- getMsg(display)[poll]
+										--> msg_callback()[callback]
+
+	msg_receive  <--		call		<-- putMsg(trigger/reply)									
+		------------msg-loop-----------------------
+	
+
+	close,enable(0) <--	call			<-- close_CA
 						man unregister<-- unregisterCA
 						  
 */
+
+typedef struct AM_CA_s AM_CA_t;
+
+typedef struct AM_CA_Ops_s AM_CA_Ops_t;
+
+typedef struct AM_CA_Opt_s AM_CA_Opt_t;
 
 /**\brief CA结构体
 	每个要注册到CA管理模块的CA需要生成如下适配结构体。
 	CA管理模块同过该结构体来操作管理CA
 */
-typedef struct {
+struct AM_CA_Ops_s{
 	/*init/term the ca*/
-	int (*open)(AM_CAMAN_Ts_t *ts);/**< 打开CA*/
-	int (*close)(void);/**< 关闭CA*/
+	int (*open)(void *arg, AM_CAMAN_Ts_t *ts);/**< 打开CA*/
+	int (*close)(void *arg);/**< 关闭CA*/
 
 	/*check if the ca can work with the ca system marked as the caid*/
-	int (*camatch)(unsigned int caid);/**< 判定CA是否匹配*/
+	int (*camatch)(void *arg, unsigned int caid);/**< 判定CA是否匹配*/
 
 	/*caman triggers the ca when there is a ts-change event*/
-	int (*ts_changed)(void);/**< 通知CA TS发生变化*/
+	int (*ts_changed)(void *arg);/**< 通知CA TS发生变化*/
 
 	/*notify the new cat*/
-	int (*new_cat)(unsigned char *cat, unsigned int size);/**< 通知CA新的CAT表*/
+	int (*new_cat)(void *arg, unsigned char *cat, unsigned int size);/**< 通知CA新的CAT表*/
 	
 	/*caman ask the ca to start/stop working on a pmt*/
-	int (*start_pmt)(int service_id, unsigned char *pmt, unsigned int size);/**< 通知CA开始Service*/
-	int (*stop_pmt)(int service_id);/**< 通知CA停止service*/
+	int (*start_pmt)(void *arg, int service_id, unsigned char *pmt, unsigned int size);/**< 通知CA开始Service*/
+	int (*stop_pmt)(void *arg, int service_id);/**< 通知CA停止service*/
 
 	/*ca can exchange messages with caman only if enable() is called with a non-zero argument.
 	    ca must stop exchanging msgs with msg funcs after enable(0) is called*/
-	int (*enable)(int enable);/**< CA使能，非使能调用后，CA应停止与上层的msg交换*/
+	int (*enable)(void *arg, int enable);/**< CA使能，非使能调用后，CA应停止与上层的msg交换*/
 
-	/*the ca will use the func_msg registered to send msgs with the upper layer through caman
+	/*the ca will use the func_msg registered to send msgs to the upper layer through caman
 		send_msg()'s return value:
 			  0 - success
 			-1 - wrong name
 			-2 - mem fail
 	*/
 	/**\brief 注册消息发送函数到CA
-		CA使用注册的send_msg函数指针发送消息到APP或CA管理模块本身
+		CA使用注册的send_msg函数指针发送消息到APP或CA管理模块本身.
+		send_msg第二个参数Msg结构体中的data数据区需为连续内存块，函数调用完成后需保留，上层使用完毕会通过free()释放空间.
 	*/
-	int (*register_msg_send)(int (*send_msg)(char *name, AM_CA_Msg_t *msg));
+	int (*register_msg_send)(void *arg, char *name, int (*send_msg)(char *name, AM_CA_Msg_t *msg));
 	/*with which the caman can free the space occupied by the msg*/
-	void (*free_msg)(AM_CA_Msg_t *msg);/**< 回收消息空间*/
+	void (*free_msg)(void *arg, AM_CA_Msg_t *msg);/**< 回收消息空间*/
 	/*msg replys will come within the arg of this callback*/
-	int (*msg_receive)(AM_CA_Msg_t *msg);/**< 推动消息到CA*/
-}AM_CA_Ops_t;
+	int (*msg_receive)(void *arg, AM_CA_Msg_t *msg);/**< 推送消息到CA, 第二参数Msg结构及data数据空间在函数调用结束后无保证*/
+};
 
-typedef struct {
+struct AM_CA_s{
 	/*ca type in AM_CA_Type_t*/
 	AM_CA_Type_t type;
 	
 	/*ca ops*/
 	AM_CA_Ops_t ops;
-}AM_CA_t;
 
-typedef struct {
+	/*ca private args*/
+	void *arg;
+	void (*arg_destroy)(void *arg);
+};
+
+struct AM_CA_Opt_s{
 	/*if the ca will be checked for the auto-match*/
 	int auto_disable;
-}AM_CA_Opt_t;
+};
 
 /*CAMAN open/close*/
 
