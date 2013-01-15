@@ -834,6 +834,7 @@ AM_ErrorCode_t AM_DB_Setup(char *path, sqlite3 *defhandle)
 	pthread_mutexattr_init(&mta);
 	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE_NP);
 	pthread_mutex_init(&dblock, &mta);
+	pthread_mutexattr_destroy(&mta);
 
 	if(path)
 		dbpath = strdup(path);

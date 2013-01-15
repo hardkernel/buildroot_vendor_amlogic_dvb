@@ -70,10 +70,35 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_fend_ctrl/am_fend_ctrl.c\
 		   am_pes/am_pes.c \
 		   am_caman/am_caman.c \
-		   am_caman/ca_dummy.c
+		   am_caman/ca_dummy.c \
+		   am_ci/libdvben50221/asn_1.c \
+           am_ci/libdvben50221/en50221_app_ai.c        \
+           am_ci/libdvben50221/en50221_app_auth.c      \
+           am_ci/libdvben50221/en50221_app_ca.c        \
+           am_ci/libdvben50221/en50221_app_datetime.c  \
+           am_ci/libdvben50221/en50221_app_dvb.c       \
+           am_ci/libdvben50221/en50221_app_epg.c       \
+           am_ci/libdvben50221/en50221_app_lowspeed.c  \
+           am_ci/libdvben50221/en50221_app_mmi.c       \
+           am_ci/libdvben50221/en50221_app_rm.c        \
+           am_ci/libdvben50221/en50221_app_smartcard.c \
+           am_ci/libdvben50221/en50221_app_teletext.c  \
+           am_ci/libdvben50221/en50221_app_utils.c     \
+           am_ci/libdvben50221/en50221_session.c       \
+           am_ci/libdvben50221/en50221_stdcam.c        \
+           am_ci/libdvben50221/en50221_stdcam_hlci.c   \
+           am_ci/libdvben50221/en50221_stdcam_llci.c   \
+           am_ci/libdvben50221/en50221_transport.c \
+		   am_ci/libucsi/dvb/types.c \
+		   am_ci/libdvbapi/dvbca.c \
+		   am_ci/libucsi/mpeg/pmt_section.c \
+		   am_ci/am_ci.c \
+		   am_ci/ca_ci.c
 
 
-LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M
+
+
+LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1 #
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw\
@@ -88,8 +113,8 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    packages/amlogic/LibPlayer/amplayer\
 		    external/libzvbi/src\
 		    external/sqlite/dist\
-		    external/icu4c/common
-		    
+		    external/icu4c/common\
+			$(LOCAL_PATH)/am_ci
 
 LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc 
 
@@ -167,10 +192,33 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_fend_ctrl/am_fend_ctrl.c\
 		   am_pes/am_pes.c \
 		   am_caman/am_caman.c \
-		   am_caman/ca_dummy.c
+		   am_caman/ca_dummy.c \
+		   am_ci/libdvben50221/asn_1.c \
+           am_ci/libdvben50221/en50221_app_ai.c        \
+           am_ci/libdvben50221/en50221_app_auth.c      \
+           am_ci/libdvben50221/en50221_app_ca.c        \
+           am_ci/libdvben50221/en50221_app_datetime.c  \
+           am_ci/libdvben50221/en50221_app_dvb.c       \
+           am_ci/libdvben50221/en50221_app_epg.c       \
+           am_ci/libdvben50221/en50221_app_lowspeed.c  \
+           am_ci/libdvben50221/en50221_app_mmi.c       \
+           am_ci/libdvben50221/en50221_app_rm.c        \
+           am_ci/libdvben50221/en50221_app_smartcard.c \
+           am_ci/libdvben50221/en50221_app_teletext.c  \
+           am_ci/libdvben50221/en50221_app_utils.c     \
+           am_ci/libdvben50221/en50221_session.c       \
+           am_ci/libdvben50221/en50221_stdcam.c        \
+           am_ci/libdvben50221/en50221_stdcam_hlci.c   \
+           am_ci/libdvben50221/en50221_stdcam_llci.c   \
+           am_ci/libdvben50221/en50221_transport.c \
+		   am_ci/libucsi/dvb/types.c \
+		   am_ci/libdvbapi/dvbca.c \
+		   am_ci/libucsi/mpeg/pmt_section.c \
+		   am_ci/am_ci.c \
+		   am_ci/ca_ci.c
 
 
-LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M
+LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1 #
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw\
@@ -185,8 +233,9 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    packages/amlogic/LibPlayer/amplayer\
 		    external/libzvbi/src\
 		    external/sqlite/dist\
-		    external/icu4c/common
-		    
+		    external/icu4c/common\
+		    $(LOCAL_PATH)/am_ci
+
 
 LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc 
 
