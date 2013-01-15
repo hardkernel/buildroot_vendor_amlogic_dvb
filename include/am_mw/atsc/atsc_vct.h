@@ -1,6 +1,6 @@
 
-#ifndef _ATSC_CVCT_H
-#define _ATSC_CVCT_H
+#ifndef _ATSC_VCT_H
+#define _ATSC_VCT_H
 
 #include "atsc_types.h"
 
@@ -13,7 +13,8 @@ extern "C"
  * Macro definitions
  ***************************************************************************/
 
-#define CVCT_SECTION_HEADER_LEN          (10)
+#define VCT_SECTION_HEADER_LEN          (10)
+#define AM_SI_IS_CVCT(_vct) ((_vct)->i_table_id == ATSC_PSIP_CVCT_TID)
 
 /****************************************************************************
  * Type definitions
@@ -21,7 +22,7 @@ extern "C"
 
 #pragma pack(1)
 
-typedef struct cvct_section_header
+typedef struct vct_section_header
 {
 	INT8U table_id                      	:8;
 #if BYTE_ORDER == BIG_ENDIAN
@@ -52,9 +53,9 @@ typedef struct cvct_section_header
     INT8U protocol_version                :8;
     INT8U num_channels_in_section	:8;
 
-}cvct_section_header_t;
+}vct_section_header_t;
 
-typedef struct cvct_sect_chan_info
+typedef struct vct_sect_chan_info
 {
     INT8U short_name[14];
 #if BYTE_ORDER == BIG_ENDIAN
@@ -85,8 +86,8 @@ typedef struct cvct_sect_chan_info
    INT8U  ETM_location		:2;
    INT8U  access_controlled	:1;
    INT8U  hidden			:1;
-   INT8U  	path_select			:1;
-   INT8U  	out_of_band			:1;
+   INT8U  	path_select			:1; /**< reserved for tvct*/
+   INT8U  	out_of_band			:1; /**< reserved for tvct*/
    INT8U  hide_guide		:1;
    INT8U  					:1;
 #else
@@ -115,49 +116,51 @@ typedef struct cvct_sect_chan_info
     INT8U 			:6;
 #endif
     INT8U descriptors_length_lo 	:8;
-}cvct_sect_chan_info_t;
+}vct_sect_chan_info_t;
 
 #pragma pack()
 
-typedef struct cvct_channel_info
+typedef struct vct_channel_info
 {
     INT8U short_name[14];
-    INT16U major_channel_number;
-    INT16U minor_channel_number;
     INT8U modulation_mode;
-    INT32U carrier_frequency;
-    INT16U channel_TSID;
-    INT16U program_number;
     INT8U access_controlled;
     INT8U service_type;
-    INT16U source_id;
     INT8U hidden;
     INT8U hide_guide;
+    INT8U path_select; /**< reserved for tvct*/
+    INT8U out_of_band; /**< reserved for tvct*/
+    INT16U major_channel_number;
+    INT16U minor_channel_number;
+    INT16U source_id;
+    INT16U channel_TSID;
+    INT16U program_number;
+    INT32U carrier_frequency;
     atsc_descriptor_t *desc;                // --
-    struct cvct_channel_info *p_next;
-}cvct_channel_info_t;
+    struct vct_channel_info *p_next;
+}vct_channel_info_t;
 
-typedef struct cvct_section_info
+typedef struct vct_section_info
 {
-	struct cvct_section_info *p_next;
+	struct vct_section_info *p_next;
 	INT8U i_table_id;
     INT16U transport_stream_id;
     INT8U  version_number;
     INT8U  num_channels_in_section;
-    struct cvct_channel_info  *vct_chan_info;
-}cvct_section_info_t;
+    struct vct_channel_info  *vct_chan_info;
+}vct_section_info_t;
 
 /*****************************************************************************
  * Function prototypes	
  *****************************************************************************/
 
-INT32S atsc_psip_parse_cvct(INT8U* data, INT32U length, cvct_section_info_t *info);
-void   atsc_psip_clear_cvct_info(cvct_section_info_t *info);
+INT32S atsc_psip_parse_vct(INT8U* data, INT32U length, vct_section_info_t *info);
+void   atsc_psip_clear_vct_info(vct_section_info_t *info);
 
-cvct_section_info_t *atsc_psip_new_cvct_info(void);
-void   atsc_psip_free_cvct_info(cvct_section_info_t *info);
+vct_section_info_t *atsc_psip_new_vct_info(void);
+void   atsc_psip_free_vct_info(vct_section_info_t *info);
 
-void   atsc_psip_dump_cvct_info(cvct_section_info_t *info);
+void   atsc_psip_dump_vct_info(vct_section_info_t *info);
 
 #ifdef __cplusplus
 }

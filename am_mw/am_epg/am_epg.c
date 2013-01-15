@@ -1500,7 +1500,7 @@ static void am_epg_check_pmt_update(AM_EPG_Monitor_t *mon)
 	AM_SI_LIST_BEGIN(mon->pmts, pmt)
 		/*取ES流信息*/
 		AM_SI_LIST_BEGIN(pmt->p_first_es, es)
-			AM_SI_ExtractAVFromDVBES(es, &vid, &vfmt, &aud_info);
+			AM_SI_ExtractAVFromES(es, &vid, &vfmt, &aud_info);
 		AM_SI_LIST_END()
 	AM_SI_LIST_END()
 	

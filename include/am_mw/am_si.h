@@ -27,8 +27,7 @@
 #include "libdvbsi/descriptors/dr.h"
 #include "atsc/atsc_descriptor.h"
 #include "atsc/atsc_mgt.h"
-#include "atsc/atsc_tvct.h"
-#include "atsc/atsc_cvct.h"
+#include "atsc/atsc_vct.h"
 #include "atsc/atsc_rrt.h"
 #include "atsc/atsc_stt.h"
 #include "atsc/atsc_eit.h"
@@ -282,7 +281,7 @@ extern AM_ErrorCode_t AM_SI_GetSectionHeader(int handle, uint8_t *buf, uint16_t 
  */
 extern AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,int out_len);
 
-/**\brief 按DVB标准从一个ES流中提取音视频
+/**\brief 从一个ES流中提取音视频
  * \param [in] es ES流
  * \param [out] vid 提取出的视频PID
  * \param [out] vfmt 提取出的视频压缩格式
@@ -291,9 +290,9 @@ extern AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *ou
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-extern AM_ErrorCode_t AM_SI_ExtractAVFromDVBES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info);
+extern AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info);
 
-/**\brief 按ATSC标准从一个ES流中提取音视频
+/**\brief 按ATSC标准从一个ATSC visual channel中提取音视频
  * \param [in] es ES流
  * \param [out] vid 提取出的视频PID
  * \param [out] vfmt 提取出的视频压缩格式
@@ -302,7 +301,8 @@ extern AM_ErrorCode_t AM_SI_ExtractAVFromDVBES(dvbpsi_pmt_es_t *es, int *vid, in
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-extern AM_ErrorCode_t AM_SI_ExtractAVFromATSCES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info);
+extern AM_ErrorCode_t AM_SI_ExtractAVFromATSCVC(vct_channel_info_t *vcinfo, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info);
+
 
 #ifdef __cplusplus
 }

@@ -955,7 +955,7 @@ AM_ErrorCode_t AM_SI_Destroy(int handle)
 /**\brief 解析一个section,并返回解析数据
  * 支持的表(相应返回结构):CAT(dvbpsi_cat_t) PAT(dvbpsi_pat_t) PMT(dvbpsi_pmt_t) 
  * SDT(dvbpsi_sdt_t) EIT(dvbpsi_eit_t) TOT(dvbpsi_tot_t) NIT(dvbpsi_nit_t).
- * CVCT(cvct_section_info_t) TVCT(tvct_section_info_t) MGT(mgt_section_info_t)
+ * VCT(vct_section_info_t) MGT(mgt_section_info_t)
  * RRT(rrt_section_info_t) STT(stt_section_info_t)
  * e.g.解析一个PAT section:
  * 	dvbpsi_pat_t *pat_sec;
@@ -1051,16 +1051,11 @@ AM_ErrorCode_t AM_SI_DecodeSection(int handle, uint16_t pid, uint8_t *buf, uint1
 				si_decode_psip_table(*sec, mgt, mgt_section_info_t, buf, len);
 			break;
 		case AM_SI_TID_PSIP_TVCT:
-			if (pid != AM_SI_ATSC_BASE_PID)
-				ret = AM_SI_ERR_NOT_SUPPORTED;
-			else
-				si_decode_psip_table(*sec, tvct, tvct_section_info_t, buf, len);
-			break;
 		case AM_SI_TID_PSIP_CVCT:
 			if (pid != AM_SI_ATSC_BASE_PID)
 				ret = AM_SI_ERR_NOT_SUPPORTED;
 			else
-				si_decode_psip_table(*sec, cvct, cvct_section_info_t, buf, len);
+				si_decode_psip_table(*sec, vct, vct_section_info_t, buf, len);
 			break;
 		case AM_SI_TID_PSIP_RRT:
 			if (pid != AM_SI_ATSC_BASE_PID)
@@ -1141,10 +1136,8 @@ AM_ErrorCode_t AM_SI_ReleaseSection(int handle, uint8_t table_id, void *sec)
 			atsc_psip_free_mgt_info((mgt_section_info_t*)sec);
 			break;
 		case AM_SI_TID_PSIP_TVCT:
-			atsc_psip_free_tvct_info((tvct_section_info_t*)sec);
-			break;
 		case AM_SI_TID_PSIP_CVCT:
-			atsc_psip_free_cvct_info((cvct_section_info_t*)sec);
+			atsc_psip_free_vct_info((vct_section_info_t*)sec);
 			break;
 		case AM_SI_TID_PSIP_RRT:
 			atsc_psip_free_rrt_info((rrt_section_info_t*)sec);
@@ -1292,7 +1285,7 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 	}
 }
 
-/**\brief 按DVB标准从一个ES流中提取音视频
+/**\brief 从一个ES流中提取音视频
  * \param [in] es ES流
  * \param [out] vid 提取出的视频PID
  * \param [out] vfmt 提取出的视频压缩格式
@@ -1301,7 +1294,7 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-AM_ErrorCode_t AM_SI_ExtractAVFromDVBES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info)
+AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info)
 {
 	char lang_tmp[3];
 	int afmt_tmp, vfmt_tmp;
@@ -1400,7 +1393,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromDVBES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt
 	return AM_SUCCESS;
 }
 
-/**\brief 按ATSC标准从一个ES流中提取音视频
+/**\brief 按ATSC标准从一个ATSC visual channel中提取音视频
  * \param [in] es ES流
  * \param [out] vid 提取出的视频PID
  * \param [out] vfmt 提取出的视频压缩格式
@@ -1409,50 +1402,50 @@ AM_ErrorCode_t AM_SI_ExtractAVFromDVBES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-AM_ErrorCode_t AM_SI_ExtractAVFromATSCES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info)
+AM_ErrorCode_t AM_SI_ExtractAVFromATSCVC(vct_channel_info_t *vcinfo, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info)
 {
 	char lang_tmp[3];
-	int afmt_tmp, vfmt_tmp;
-	dvbpsi_descriptor_t *descr;
+	int afmt_tmp, vfmt_tmp, i;
+	atsc_descriptor_t *descr;
 	
 	afmt_tmp = -1;
 	vfmt_tmp = -1;
 	memset(lang_tmp, 0, sizeof(lang_tmp));
 
-	switch (es->i_type)
-	{
-		/*video pid and video format*/
-		case 0x02:
-			vfmt_tmp = VFORMAT_MPEG12;
-			break;
-		/*audio pid and audio format*/
-		case 0x81:
-			afmt_tmp = AFORMAT_AC3;
-			break;
-		default:
-			break;
-	}
-	if (vfmt_tmp != -1)
-	{
-		*vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
-		*vfmt = vfmt_tmp;
-	}
-	if (afmt_tmp != -1)
-	{
-		AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
-			if (descr->i_tag == AM_SI_DESCR_ISO639 && descr->p_decoded != NULL)
+	AM_SI_LIST_BEGIN(vcinfo->desc, descr)			
+		if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE_LOCATION)
+		{
+			atsc_service_location_dr_t *asld = (atsc_service_location_dr_t*)descr->p_decoded;
+			for (i=0; i<asld->i_elem_count; i++)
 			{
-				dvbpsi_iso639_dr_t *pisod = (dvbpsi_iso639_dr_t*)descr->p_decoded;
-				if (pisod->i_code_count > 0) 
+				afmt_tmp = -1;
+				vfmt_tmp = -1;
+				memset(lang_tmp, 0, sizeof(lang_tmp));
+				switch (asld->elem[i].i_stream_type)
 				{
-					memcpy(lang_tmp, pisod->code[0].iso_639_code, sizeof(lang_tmp));
-					break;
+					/*video pid and video format*/
+					case 0x02:
+						vfmt_tmp = VFORMAT_MPEG12;
+						break;
+					/*audio pid and audio format*/
+					case 0x81:
+						afmt_tmp = AFORMAT_AC3;
+						break;
+					default:
+						break;
+				}
+				if (vfmt_tmp != -1)
+				{
+					*vid = (asld->elem[i].i_pid >= 0x1fff) ? 0x1fff : asld->elem[i].i_pid;
+					*vfmt = vfmt_tmp;
+				}
+				if (afmt_tmp != -1)
+				{
+					si_add_audio(aud_info, asld->elem[i].i_pid, afmt_tmp, lang_tmp);
 				}
 			}
-		AM_SI_LIST_END()
-		/* Add a audio */
-		si_add_audio(aud_info, es->i_pid, afmt_tmp, lang_tmp);
-	}
+		}
+	AM_SI_LIST_END()
 
 	return AM_SUCCESS;
 }

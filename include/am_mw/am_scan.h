@@ -62,8 +62,7 @@ enum AM_SCAN_ProgressEvt
 	AM_SCAN_PROGRESS_CAT_DONE,		/**< 当前TS的CAT表搜索完毕，参数为dvbpsi_cat_t*/
 	AM_SCAN_PROGRESS_SDT_DONE,		/**< 当前TS的SDT表搜索完毕，参数为dvbpsi_sdt_t*/
 	AM_SCAN_PROGRESS_MGT_DONE,		/**< 当前TS的MGT表搜索完毕，参数为mgt_section_info_t*/
-	AM_SCAN_PROGRESS_TVCT_DONE,		/**< 当前TS的TVCT表搜索完毕，参数为tvct_section_info_t*/
-	AM_SCAN_PROGRESS_CVCT_DONE,		/**< 当前TS的CVCT表搜索完毕，参数为cvct_section_info_t*/
+	AM_SCAN_PROGRESS_VCT_DONE,		/**< 当前TS的VCT表搜索完毕，参数为vct_section_info_t*/
 	AM_SCAN_PROGRESS_STORE_BEGIN,	/**< 开始存储*/
 	AM_SCAN_PROGRESS_STORE_END,		/**< 存储完毕*/
 	AM_SCAN_PROGRESS_BLIND_SCAN,	/**< 卫星盲扫搜索进度，参数为AM_SCAN_BlindScanProgress_t给出的进度信息*/
@@ -212,8 +211,7 @@ typedef struct AM_SCAN_TS_s
 			dvbpsi_pmt_t *pmts;		/**< 搜索到的PMT表*/
 			dvbpsi_sdt_t *sdts;		/**< 搜索到的SDT表*/
 			mgt_section_info_t *mgts;		/**< 搜索到的MGT表*/
-			cvct_section_info_t *cvcts;		/**< 搜索到的CVCT表*/
-			tvct_section_info_t *tvcts;		/**< 搜索到的TVCT表*/
+			vct_section_info_t *vcts;		/**< 搜索到的VCT表*/
 		}digital;
 		
 		struct
@@ -265,8 +263,7 @@ typedef struct
 	struct AM_SCAN_CreatePara_s *start_para;/**< AM_SCAN_Create()传入的参数*/
 	dvbpsi_nit_t *nits;				/**< 搜索到的NIT表*/
 	dvbpsi_bat_t *bats;				/**< 搜索到的BAT表*/
-	cvct_channel_info_t	*cvcs;		/**<ATSC C virtual channels*/
-	tvct_channel_info_t	*tvcs;		/**<ATSC T virtual channels*/
+	vct_channel_info_t	*vcs;		/**<ATSC C virtual channels*/
 	AM_SCAN_TS_t *tses;				/**< 所有TS列表*/
 }AM_SCAN_Result_t;
 

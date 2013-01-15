@@ -59,8 +59,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/libdvbsi/psi.c\
 		   am_si/libdvbsi/dvbpsi.c\
 		   am_si/libdvbsi/descriptor.c\
-		   am_si/atsc/atsc_cvct.c\
-		   am_si/atsc/atsc_tvct.c\
+		   am_si/atsc/atsc_vct.c\
 		   am_si/atsc/atsc_mgt.c\
 		   am_si/atsc/atsc_rrt.c\
 		   am_si/atsc/atsc_stt.c\
@@ -157,8 +156,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/libdvbsi/psi.c\
 		   am_si/libdvbsi/dvbpsi.c\
 		   am_si/libdvbsi/descriptor.c\
-		   am_si/atsc/atsc_cvct.c\
-		   am_si/atsc/atsc_tvct.c\
+		   am_si/atsc/atsc_vct.c\
 		   am_si/atsc/atsc_mgt.c\
 		   am_si/atsc/atsc_rrt.c\
 		   am_si/atsc/atsc_stt.c\

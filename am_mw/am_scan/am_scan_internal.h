@@ -151,12 +151,11 @@ enum
 	DEFAULT_CVBS_LOCK_STEP = ATV_6MHZ,
 };
 
-/**\brief 频点搜索状态*/
+/**\brief 频点搜索标志*/
 enum
 {
-	AM_SCAN_FE_DONE,/**< ATV/DTV均搜索完毕*/
-	AM_SCAN_FE_ATV,	/**< ATV正在搜索*/
-	AM_SCAN_FE_DTV,	/**< DTV正在搜索*/
+	AM_SCAN_FE_FL_ATV = 1,	/**< 需进行ATV搜索*/
+	AM_SCAN_FE_FL_DTV = 2,	/**< 需进行DTV搜索*/
 };
 
 /**\brief ATV频率范围检查类型*/
@@ -199,10 +198,8 @@ typedef struct
 /**\brief 搜索频点数据*/
 typedef struct
 {
-	int					status;		/**< 搜索状态, AM_SCAN_FE_ATV等*/
-	AM_Bool_t			dtv_locked;	/**< 数字是否以锁住频点，用于ATSC，避免重复设置数字和模拟频率*/
-	int					atv_freq;	/**< 模拟频率*/
-	AM_FENDCTRL_DVBFrontendParameters_t	dtv_para 	/**< 数字参数*/;
+	int flag; /**< 搜索标志*/
+	AM_FENDCTRL_DVBFrontendParameters_t	fe_para; /**< 数字参数*/
 }AM_SCAN_FrontEndPara_t;
 
 /**\brief 卫星盲扫控制数据*/
