@@ -4677,11 +4677,17 @@ aml_set_vpath(AM_AV_Device_t *dev)
 	}
 
 	if(dev->vpath_ppmgr!=AM_AV_PPMGR_DISABLE){
-		AM_FileEcho("/sys/class/vfm/map", "add default decoder ppmgr amvideo");
-		if (dev->vpath_ppmgr!=AM_AV_PPMGR_ENABLE) {
-			/*Set 3D mode*/
-			AM_TRY(aml_set_ppmgr_3dcmd(dev->vpath_ppmgr));
+		if (dev->vpath_ppmgr == AM_AV_PPMGR_MODE3D_2D_TO_3D){
+			AM_FileEcho("/sys/class/vfm/map", "add default decoder deinterlace d2d3 amvideo");
+			AM_FileEcho("/sys/class/d2d3/d2d3/debug", "enable");
+		}else{
+			AM_FileEcho("/sys/class/vfm/map", "add default decoder ppmgr amvideo");
+			if (dev->vpath_ppmgr!=AM_AV_PPMGR_ENABLE) {
+				/*Set 3D mode*/
+				AM_TRY(aml_set_ppmgr_3dcmd(dev->vpath_ppmgr));
+			}
 		}
+		
 	}else if(dev->vpath_di==AM_AV_DEINTERLACE_ENABLE){
 		AM_FileEcho("/sys/class/vfm/map", "add default decoder deinterlace amvideo");
 		AM_FileEcho("/sys/class/deinterlace/di0/config", "enable");
