@@ -43,6 +43,7 @@ typedef struct
 	AM_ErrorCode_t (*set_param) (AM_SMC_Device_t *dev, const AM_SMC_Param_t *para);
 	AM_ErrorCode_t (*active) (AM_SMC_Device_t *dev);
 	AM_ErrorCode_t (*deactive) (AM_SMC_Device_t *dev);
+	AM_ErrorCode_t (*parse_atr)(AM_SMC_Device_t *dev, uint8_t *atr, int len);
 
 } AM_SMC_Driver_t;
 
