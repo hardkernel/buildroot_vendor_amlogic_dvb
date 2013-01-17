@@ -48,6 +48,89 @@ static AM_SMC_Device_t smc_devices[] =
 
 /**\brief 智能卡设备数*/
 #define SMC_DEV_COUNT    AM_ARRAY_SIZE(smc_devices)
+#define SMC_BUF_SIZE      (255)
+
+struct ringbuffer {
+	uint8_t         *data;
+	int              size;
+	int              pread;
+	int              pwrite;
+	int              error;
+};
+static uint8_t smc_txbuf[SMC_BUF_SIZE] = {
+ 0
+};
+static uint8_t smc_rxbuf[SMC_BUF_SIZE] = {
+ 0
+};
+static struct ringbuffer txbuf;
+static struct ringbuffer rxbuf;
+
+static void ringbuffer_init(struct ringbuffer *rbuf,uint8_t* buff)
+{                                                                                        
+	rbuf->pread=rbuf->pwrite=0;                                                             
+	rbuf->data=buff;                                                                        
+	rbuf->size=SMC_BUF_SIZE;                                                                         
+	rbuf->error=0;                                                                          
+} 
+
+static void ringbuffer_read(struct ringbuffer *rbuf, uint8_t *buf, int len)
+{                                                                                        
+	int todo = len;                                                                      
+	int split;                                                                           
+                                                                                         
+	split = (rbuf->pread + len > rbuf->size) ? rbuf->size - rbuf->pread : 0;                
+	if (split > 0) {                                                                        
+		memcpy(buf, rbuf->data+rbuf->pread, split);                                            
+		buf += split;                                                                          
+		todo -= split;                                                                         
+		rbuf->pread = 0;                                                                       
+	}                                                                                       
+	memcpy(buf, rbuf->data+rbuf->pread, todo);                                              
+                                                                                         
+	rbuf->pread = (rbuf->pread + todo) % rbuf->size;                                        
+}                                                                                        
+                                                                                         
+                                                                                         
+static int ringbuffer_write(struct ringbuffer *rbuf, const uint8_t *buf, int len)
+{                                                                                        
+	int todo = len;                                                                      
+	int split;                                                                           
+                                                                                         
+	split = (rbuf->pwrite + len > rbuf->size) ? rbuf->size - rbuf->pwrite : 0;              
+                                                                                         
+	if (split > 0) {                                                                        
+		memcpy(rbuf->data+rbuf->pwrite, buf, split);                                           
+		buf += split;                                                                          
+		todo -= split;                                                                         
+		rbuf->pwrite = 0;                                                                      
+	}                                                                                       
+	memcpy(rbuf->data+rbuf->pwrite, buf, todo);                                             
+	rbuf->pwrite = (rbuf->pwrite + todo) % rbuf->size;                                      
+	return len;                                                                             
+}
+                                                        
+int ringbuffer_avail(struct ringbuffer *rbuf)
+{
+	int avail;
+
+	avail = rbuf->pwrite - rbuf->pread;
+	if (avail < 0)
+		avail += rbuf->size;
+	return avail;
+}
+
+void ringbuffer_flush(struct ringbuffer *rbuf)
+{
+	rbuf->pread = rbuf->pwrite;
+	rbuf->error = 0;
+}
+void ringbuffer_reset(struct ringbuffer *rbuf)
+{	
+	rbuf->pread = rbuf->pwrite = 0;	
+	rbuf->error = 0;
+}
+
 
 /****************************************************************************
  * Static functions
@@ -119,19 +202,22 @@ static AM_ErrorCode_t smc_read(AM_SMC_Device_t *dev, uint8_t *buf, int len, int 
 		left -= tlen;
 		cnt  += tlen;
 		
-		AM_TIME_GetClock(&now);
-		diff = now-end;
-		if(diff>=0)
+		if(timeout>=0)
 		{
-			AM_DEBUG(1, "read %d bytes timeout", len);
-			ret = AM_SMC_ERR_TIMEOUT;
-			break;
+			AM_TIME_GetClock(&now);
+			diff = now-end;
+			if(left && diff>=0)
+			{
+				AM_DEBUG(1, "read %d bytes timeout", len);
+				ret = AM_SMC_ERR_TIMEOUT;
+				break;
+			}
 		}
 	}
 	
 	if(act_len)
 		*act_len = cnt;
-
+     AM_DEBUG(1, "smc_read ret is:%d", ret);
 	return ret;
 }
 
@@ -174,13 +260,16 @@ static AM_ErrorCode_t smc_write(AM_SMC_Device_t *dev, const uint8_t *buf, int le
 		left -= tlen;
 		cnt  += tlen;
 		
-		AM_TIME_GetClock(&now);
-		diff = now-end;
-		if(diff>=0)
+		if(timeout>=0)
 		{
-			AM_DEBUG(1, "write %d bytes timeout", len);
-			ret = AM_SMC_ERR_TIMEOUT;
-			break;
+			AM_TIME_GetClock(&now);
+			diff = now-end;
+			if(left && diff>=0)
+			{
+				AM_DEBUG(1, "write %d bytes timeout", len);
+				ret = AM_SMC_ERR_TIMEOUT;
+				break;
+			}
 		}
 	}
 	
@@ -195,7 +284,7 @@ static void*
 smc_status_thread(void *arg)
 {
 	AM_SMC_Device_t *dev = (AM_SMC_Device_t*)arg;
-	AM_SMC_CardStatus_t old_status = AM_SMC_CARD_OUT;
+	AM_SMC_CardStatus_t old_status = -1; //to enable force run while AC on ignore card inserted or not AM_SMC_CARD_OUT;
 	
 	while(dev->enable_thread)
 	{
@@ -226,7 +315,7 @@ smc_status_thread(void *arg)
 			pthread_mutex_lock(&dev->lock);
 			dev->flags &= ~SMC_FL_RUN_CB;
 			pthread_mutex_unlock(&dev->lock);
-			pthread_cond_broadcast(&dev->cond);
+			pthread_cond_broadcast(&dev->cond);		
 		}
 
 		usleep(SMC_STATUS_SLEEP_TIME*1000);
@@ -297,6 +386,8 @@ AM_ErrorCode_t AM_SMC_Open(int dev_no, const AM_SMC_OpenPara_t *para)
 	{
 		dev->status_thread = (pthread_t)-1;
 	}
+	ringbuffer_init(&rxbuf,smc_rxbuf);
+	ringbuffer_init(&txbuf,smc_txbuf);
 final:
 	pthread_mutex_unlock(&am_gAdpLock);
 	
@@ -486,11 +577,11 @@ AM_ErrorCode_t AM_SMC_Write(int dev_no, const uint8_t *data, int len, int timeou
  *   - 其他值 错误代码(见am_smc.h)
  */
 AM_ErrorCode_t
-AM_SMC_ReadEx(int dev_no, uint8_t *data, int len, int timeout)
+AM_SMC_ReadEx(int dev_no, uint8_t *data, int *act_len, int len, int timeout)
 {
 	AM_SMC_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	int act_len;
+	//int act_len;
 	
 	assert(data);
 	
@@ -498,12 +589,12 @@ AM_SMC_ReadEx(int dev_no, uint8_t *data, int len, int timeout)
 	
 	pthread_mutex_lock(&dev->lock);
 	
-	ret = smc_read(dev, data, len, &act_len, timeout);
+	ret = smc_read(dev, data, len, act_len, timeout);
 	
 	pthread_mutex_unlock(&dev->lock);
 
-	if((ret >= 0) || (ret == AM_SMC_ERR_TIMEOUT))
-		return act_len;
+	//if((ret >= 0) || (ret == AM_SMC_ERR_TIMEOUT))
+		//return act_len;
 	
 	return ret;
 
@@ -520,11 +611,11 @@ AM_SMC_ReadEx(int dev_no, uint8_t *data, int len, int timeout)
  *   - 其他值 错误代码(见am_smc.h)
  */
 AM_ErrorCode_t
-AM_SMC_WriteEx(int dev_no, const uint8_t *data, int len, int timeout)
+AM_SMC_WriteEx(int dev_no, const uint8_t *data, int *act_len, int len, int timeout)
 {
 	AM_SMC_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	int act_len;
+	//int act_len;
 	
 	assert(data);
 	
@@ -532,15 +623,17 @@ AM_SMC_WriteEx(int dev_no, const uint8_t *data, int len, int timeout)
 	
 	pthread_mutex_lock(&dev->lock);
 	
-	ret = smc_write(dev, data, len, &act_len, timeout);
+	ret = smc_write(dev, data, len, act_len, timeout);
 	
 	pthread_mutex_unlock(&dev->lock);
 
-	if((ret >= 0) || (ret == AM_SMC_ERR_TIMEOUT))
-		return act_len;
+	//if((ret >= 0) || (ret == AM_SMC_ERR_TIMEOUT))
+		//return act_len;
 	
 	return ret;
 }
+
+#define DELAY_MUL 2
 
 /**\brief 按T0协议传输数据
  * \param dev_no 智能卡设备号
@@ -560,85 +653,94 @@ AM_ErrorCode_t AM_SMC_TransferT0(int dev_no, const uint8_t *send, int slen, uint
 	uint8_t *dst;
 	int left;
 	AM_Bool_t sent = AM_FALSE;
+	int getsw = 0;
+	int next = 0;
+	uint8_t buf[255] = {0};
+	uint8_t INS_BYTE = send[1];
+	uint8_t rxlen = send[4];
+	uint8_t regs[100];
 	
-	assert(send && recv && rlen && (slen>=5));
+	if(slen == 5)
+	{
+		rxlen = send[4];
+	}
+	else
+	{
+	  rxlen = 0;
+	}
+	assert(send && recv && rlen);
 	
 	dst  = recv;
-	left = *rlen;
-	
+	ringbuffer_reset(&txbuf);  
+	ringbuffer_reset(&rxbuf);
+	ringbuffer_write(&txbuf,send,slen);
+	//ringbuffer_flush(&rxbuf);
 	AM_TRY(smc_get_openned_dev(dev_no, &dev));
 	
 	pthread_mutex_lock(&dev->lock);
-	
-	AM_TRY_FINAL(smc_write(dev, send, 5, NULL, 1000));
-	
+	ringbuffer_read(&txbuf,buf,5);
+	AM_TRY_FINAL(smc_write(dev, buf, 5, NULL, 1000*DELAY_MUL));
 	while(1)
 	{
-		AM_TRY_FINAL(smc_read(dev, &byte, 1, NULL, 1000));
-		if(byte==0x60)
+		AM_TRY_FINAL(smc_read(dev, &byte, 1, NULL, 1000*DELAY_MUL));
+		AM_DEBUG(1, "...INS byte is 0x%x, rxlen is:%d.\n", byte, rxlen);
+		if(byte ==0x60)
 		{
 			continue;
 		}
-		else if(((byte&0xF0)==0x60) || ((byte&0xF0)==0x90))
+		else if((byte & 0xF0) == 0x60)
 		{
-			if(left<2)
-			{
-				AM_DEBUG(1, "receive buffer must >= %d", 2);
-				ret = AM_SMC_ERR_BUF_TOO_SMALL;
-				goto final;
-			}
-			dst[0] = byte;
-			AM_TRY_FINAL(smc_read(dev, &dst[1], 1, NULL, 1000));
-			dst += 2;
-			left -= 2;
-			break;
+			ringbuffer_write(&rxbuf,&byte,1);
+			AM_TRY_FINAL(smc_read(dev, dst, 1, NULL, 1000*DELAY_MUL));
+        		AM_DEBUG(1, "case1--dst is: 0x%x \n", *dst);
+			ringbuffer_write(&rxbuf,dst,1);
+			goto final;
 		}
-		else if(byte==send[1])
+		else if((byte & 0xF0) == 0x90)
 		{
-			if(!sent)
+			ringbuffer_write(&rxbuf,&byte,1);
+			AM_TRY_FINAL(smc_read(dev, dst, 1, NULL, 1000*DELAY_MUL));
+        		AM_DEBUG(1, "case2--dst is: 0x%x \n", *dst);
+			ringbuffer_write(&rxbuf,dst,1);
+			goto final;
+		}
+		else if((byte==INS_BYTE)||(byte==INS_BYTE^0x01)) //0xfe 0xff
+		{
+			int cnt = ringbuffer_avail(&txbuf);
+        		AM_DEBUG(1, "case3--cnt is: 0x%x \n", cnt);
+			if(cnt > 0)
 			{
-				int cnt = slen - 5;
-			
-				if(cnt)
-				{
-					AM_TRY_FINAL(smc_write(dev, send+5, cnt, NULL, 5000));
-				}
-				else
-				{
-					cnt = send[4];
-					if(!cnt) cnt = 256;
-					
-					if(left<cnt+2)
-					{
-						AM_DEBUG(1, "receive buffer must >= %d", cnt+2);
-						ret = AM_SMC_ERR_BUF_TOO_SMALL;
-						goto final;
-					}
-					
-					AM_TRY_FINAL(smc_read(dev, dst, cnt, NULL, 5000));
-					dst  += cnt;
-					left -= cnt;
-				}
-				
-				sent = AM_TRUE;
+			  ringbuffer_read(&txbuf,buf,cnt);
+			  AM_TRY_FINAL(smc_write(dev, buf, cnt, NULL, 5000*DELAY_MUL));
 			}
 			else
 			{
-				ret = AM_SMC_ERR_IO;
-				break;
+				AM_TRY_FINAL(smc_read(dev, buf, rxlen, NULL, 5000*DELAY_MUL));
+				ringbuffer_write(&rxbuf,buf,rxlen);
 			}
+                }
+		else if((byte==(INS_BYTE^0xff))||(byte==(INS_BYTE^0xfe))) //0x01 0x00
+		{
+			AM_TRY_FINAL(smc_read(dev, buf, 1, NULL, 5000*DELAY_MUL));
+        		AM_DEBUG(1, "case4--buf is: 0x%x \n", *buf);
+			ringbuffer_write(&rxbuf,buf,1);
+			rxlen--;		
 		}
 		else
 		{
-			ret = AM_SMC_ERR_IO;
-			break;
+				AM_DEBUG(1, "%s %d ======================= smc error IO......\n", __FUNCTION__, __LINE__);
+				ret = AM_SMC_ERR_IO;
+				AM_FileRead("/sys/class/smc-class/smc_reg", &regs,100);
+				AM_DEBUG(1, "line %d smc_regs:  %s\n", __LINE__,regs);
+				break;
 		}
 	}
 final:
+	*rlen = ringbuffer_avail(&rxbuf);
+	ringbuffer_read(&rxbuf,dst,*rlen);
+	
 	pthread_mutex_unlock(&dev->lock);
-	
-	*rlen = dst-recv;
-	
+
 	return ret;
 }
 
@@ -733,6 +835,37 @@ AM_ErrorCode_t AM_SMC_Active(int dev_no)
 	return ret;
 }
 
+/**\brief 激活智能卡设备
+ * \param dev_no 智能卡设备号
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_smc.h)
+ */
+AM_ErrorCode_t AM_SMC_PraseATR(int dev_no,unsigned char* atr,int len)
+{
+	AM_SMC_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	
+	AM_TRY(smc_get_openned_dev(dev_no, &dev));
+	
+	if(!dev->drv->parse_atr)
+	{
+		AM_DEBUG(1, "driver do not support active");
+		ret = AM_SMC_ERR_NOT_SUPPORTED;
+	}
+	
+	if(ret==0)
+	{
+		pthread_mutex_lock(&dev->lock);
+		ret = dev->drv->parse_atr(dev,atr,len);
+		pthread_mutex_unlock(&dev->lock);
+	}
+	
+	return ret;
+}
+
+
+
 /**\brief 取消激活智能卡设备
  * \param dev_no 智能卡设备号
  * \return
@@ -822,7 +955,7 @@ AM_ErrorCode_t AM_SMC_SetParam(int dev_no, const AM_SMC_Param_t *para)
 		ret = dev->drv->set_param(dev, para);
 		pthread_mutex_unlock(&dev->lock);
 	}
-	
+  	
 	return ret;
 }
 
