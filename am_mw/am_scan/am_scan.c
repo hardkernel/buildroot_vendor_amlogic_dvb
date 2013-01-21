@@ -732,7 +732,7 @@ static int am_scan_get_ts_network(sqlite3_stmt **stmts, int src, dvbpsi_nit_t *n
 	dvbpsi_nit_t *nit;
 	dvbpsi_descriptor_t *descr;
 		
-	if (ts->type == FE_ANALOG)
+	if (ts->type == AM_SCAN_TS_ANALOG)
 		return net_dbid;
 	
 	/*获取所在网络*/
@@ -3070,12 +3070,12 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 				/* start from min freq */
 				dvb_fend_para(cur_fe_para)->frequency = scanner->atvctl.start_freq;
 			}
-			tp.index = scanner->curr_freq;
-			tp.total = scanner->start_freqs_cnt;
-			tp.fend_para = cur_fe_para;
-			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_BEGIN, (void*)&tp);
 		}
 		
+		tp.index = scanner->curr_freq;
+		tp.total = scanner->start_freqs_cnt;
+		tp.fend_para = cur_fe_para;
+		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_BEGIN, (void*)&tp);
 		
 		AM_DEBUG(1, "Start scanning %s frequency %u ...", 
 			(cur_fe_para.m_type==FE_ANALOG)?"atv":"dtv", 
@@ -3088,9 +3088,14 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 		/* try set frontend */
 		ret = AM_FENDCTRL_SetPara(scanner->start_para.fend_dev_id, &cur_fe_para);
 		if (ret == AM_SUCCESS)
+		{
 			scanner->recv_status |= AM_SCAN_RECVING_WAIT_FEND;
+		}
 		else
+		{
+			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_END, scanner->curr_ts);
 			AM_DEBUG(1, "Set frontend failed, try next ts...");
+		}
 
 	}while(ret != AM_SUCCESS);
 
@@ -3472,7 +3477,7 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 		scanner->atvctl.min_freq = 0;
 		scanner->atvctl.max_freq = 0;
 		scanner->atvctl.start_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx].fe_para)->frequency;
-		scanner->curr_freq = scanner->atvctl.start_idx - 1;
+		scanner->curr_freq = scanner->atvctl.start_idx;
 	}
 	else if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL)
 	{
@@ -3483,7 +3488,7 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 		scanner->atvctl.max_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+1].fe_para)->frequency;
 		scanner->atvctl.start_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency;
 		/* start from start freq */
-		scanner->curr_freq = scanner->atvctl.start_idx - 1 + 2; 
+		scanner->curr_freq = scanner->atvctl.start_idx + 2; 
 	}
 	else
 	{
@@ -3495,7 +3500,7 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 		scanner->atvctl.start_freq = scanner->atvctl.min_freq;
 		dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency = scanner->atvctl.min_freq;
 		/* start from start freq */
-		scanner->curr_freq = scanner->atvctl.start_idx - 1 + 2; 
+		scanner->curr_freq = scanner->atvctl.start_idx + 2; 
 	}
 	
 	scanner->atvctl.start = 1;
