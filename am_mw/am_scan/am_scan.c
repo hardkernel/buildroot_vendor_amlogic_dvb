@@ -3990,11 +3990,10 @@ handle_events:
 	
 	am_scan_stop_atv(scanner);
 	am_scan_stop_dtv(scanner);
-				
+			
+	pthread_mutex_unlock(&scanner->lock);
 	/*反注册前端事件*/
 	AM_EVT_Unsubscribe(scanner->start_para.fend_dev_id, AM_FEND_EVT_STATUS_CHANGED, am_scan_fend_callback, (void*)scanner);
-
-	pthread_mutex_unlock(&scanner->lock);
 	pthread_mutex_destroy(&scanner->lock);
 	pthread_cond_destroy(&scanner->cond);
 	free(scanner);		
