@@ -830,26 +830,29 @@ static void am_epg_proc_rrt_section(AM_EPG_Monitor_t *mon, void *rrt_section)
 		rrt->rating_region_name.string[0].iso_639_code[2],
 		rrt->rating_region_name.string[0].string);
 		
+	if (rrt->rating_region < 0x5)
+	{
+		AM_DEBUG(1, "Got RRT%d, not downloadable RRT, not used", rrt->rating_region);
+		return;
+	}
 	/*check the RRT version*/
 	snprintf(sql, sizeof(sql), "select version from dimension_table where rating_region=%d", rrt->rating_region);
 	row = 1;
 	if (AM_DB_Select(hdb, sql, &row, "%d", &version) == AM_SUCCESS && row > 0)
 	{
-		if (version == rrt->version_number)
+		if ((version < rrt->version_number && version != 31) || (version == 31 && rrt->version_number == 0))
 		{
-			AM_DEBUG(1, "RRT for region %d version not changed, version = %d", rrt->rating_region, version);
-		}
-		else
-		{
-			AM_DEBUG(1, "RRT for region %d version changed, %d->%d", rrt->rating_region, version, rrt->version_number);
+			AM_DEBUG(1, "RRT for region %d version increased, %d->%d", rrt->rating_region, version, rrt->version_number);
 			/* Delete the previous data */
 			snprintf(sql, sizeof(sql), "delete from dimension_table where rating_region=%d", rrt->rating_region);
 			sqlite3_exec(hdb, sql, NULL, NULL, NULL);
 		}
-	}
-	else
-	{
-		AM_DEBUG(1, "row = %d", row);
+		else
+		{
+			AM_DEBUG(1, "RRT for region %d version not changed, version(old/new) = %d/%d", 
+				rrt->rating_region, version, rrt->version_number);
+			return;
+		}
 	}
 		
 	AM_SI_LIST_BEGIN(rrt->dimensions_info, dimension)
@@ -2054,16 +2057,13 @@ static void am_epg_tablectl_data_init(AM_EPG_Monitor_t *mon)
 	am_epg_tablectl_init(&mon->mgtctl, AM_EPG_EVT_MGT_DONE, AM_SI_ATSC_BASE_PID, AM_SI_TID_PSIP_MGT,
 							 0xff, "MGT", 1, am_epg_mgt_done, 0, NULL);
 	am_epg_tablectl_init(&mon->rrtctl, AM_EPG_EVT_RRT_DONE, AM_SI_ATSC_BASE_PID, AM_SI_TID_PSIP_RRT,
-							 0xff, "RRT", 1, am_epg_rrt_done, 0, am_epg_proc_rrt_section);
-	/*Set for USA
-	if (mon->rrtctl.subctl != NULL)
-		mon->rrtctl.subctl[0].ext = 0x1;*/
+							 0xff, "RRT", 255, am_epg_rrt_done, 0, am_epg_proc_rrt_section);
 		
 	for (i=0; i<(int)AM_ARRAY_SIZE(mon->psip_eitctl); i++)
 	{
 		snprintf(name, sizeof(name), "ATSC EIT%d", i);
 		am_epg_tablectl_init(&mon->psip_eitctl[i], AM_EPG_EVT_PSIP_EIT_DONE, 0x1fff, AM_SI_TID_PSIP_EIT,
-							 0xff, name, MAX_EIT_SUBTABLE_CNT, am_epg_psip_eit_done, 5000, am_epg_proc_psip_eit_section);
+							 0xff, name, MAX_EIT_SUBTABLE_CNT, am_epg_psip_eit_done, 0, am_epg_proc_psip_eit_section);
 	}
 }
 
@@ -2435,7 +2435,7 @@ AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, int *handle)
 	mon->eitsche_check_time = EITSCHE_CHECK_DISTANCE;
 	mon->mon_service = -1;
 	mon->curr_ts = -1;
-	mon->psip_eit_count = 2;
+	mon->psip_eit_count = 8;//(int)AM_ARRAY_SIZE(mon->psip_eitctl);
 	AM_TIME_GetClock(&mon->new_eit_check_time);
 	mon->eit_has_data = AM_FALSE;
 

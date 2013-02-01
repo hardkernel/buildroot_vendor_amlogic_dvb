@@ -96,7 +96,7 @@ void atsc_decode_multiple_string_structure(INT8U *buffer_data, atsc_multiple_str
 		out->string[i].iso_639_code[1] = p[1];
 		out->string[i].iso_639_code[2] = p[2];
 		
-		AM_TRACE("multiple_string_structure-->lang '%c%c%c'", p[0], p[1], p[2]);
+		/*AM_TRACE("multiple_string_structure-->lang '%c%c%c'", p[0], p[1], p[2]);*/
 		
 		number_segments = p[3];
 		
@@ -127,7 +127,7 @@ void atsc_decode_multiple_string_structure(INT8U *buffer_data, atsc_multiple_str
 				break;
 			}
 			p+=3;
-			AM_TRACE("mode %d, ct %d", mode, compression_type);
+			/*AM_TRACE("mode %d, ct %d", mode, compression_type);*/
 			if ((mode == 0) && ((compression_type == 1) | (compression_type == 2)))
 			{
 				/* tmp_buff may overflow here, as we cannot get the out length,
