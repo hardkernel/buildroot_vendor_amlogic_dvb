@@ -143,7 +143,6 @@ INT32S atsc_psip_parse_eit(INT8U* data, INT32U length, eit_section_info_t *info)
 			num_events_in_section = sect_head->num_events_in_section;
 			sect_info->num_events_in_section= num_events_in_section;
 			ptr = sect_data+EIT_SECTION_HEADER_LEN;
-			AM_TRACE("num_events_in_section %d", num_events_in_section);
 			while (num_events_in_section)
 			{
 				eit_sect_evt = (event_sect_info_t *)ptr;

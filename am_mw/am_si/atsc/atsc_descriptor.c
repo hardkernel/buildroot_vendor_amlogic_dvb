@@ -308,13 +308,13 @@ static atsc_content_advisory_dr_t* atsc_DecodeContentAdvisoryDr(atsc_descriptor_
 	p_decoded->i_region_count = p_descriptor->p_data[0] & 0x3f;
 	i = 0;
 	ptr = p_descriptor->p_data + 1;
-	AM_TRACE("region count %d", p_decoded->i_region_count);
+	/*AM_TRACE("region count %d", p_decoded->i_region_count);*/
 	while( i < p_decoded->i_region_count) 
 	{
 		/* to this region */
 		p_decoded->region[i].i_rating_region = ptr[0];
 		p_decoded->region[i].i_dimension_count = ptr[1];
-		AM_TRACE("dimension count %d", p_decoded->region[i].i_dimension_count);
+		/*AM_TRACE("dimension count %d", p_decoded->region[i].i_dimension_count);*/
 		ptr += 2;
 		
 		if (p_decoded->region[i].i_dimension_count > (int)AM_ARRAY_SIZE(p_decoded->region[i].dimension))
@@ -326,9 +326,9 @@ static atsc_content_advisory_dr_t* atsc_DecodeContentAdvisoryDr(atsc_descriptor_
 			p_decoded->region[i].dimension[j].i_dimension_j = ptr[0];
 			p_decoded->region[i].dimension[j].i_rating_value = ptr[1]&0x0f;
 			
-			AM_TRACE("dimension_j/value: %d/%d",
+			/*AM_TRACE("dimension_j/value: %d/%d",
 				p_decoded->region[i].dimension[j].i_dimension_j,
-				p_decoded->region[i].dimension[j].i_rating_value);
+				p_decoded->region[i].dimension[j].i_rating_value);*/
 			ptr += 2;
 			j++;
 		}
@@ -339,12 +339,12 @@ static atsc_content_advisory_dr_t* atsc_DecodeContentAdvisoryDr(atsc_descriptor_
 		else
 			memset(&p_decoded->region[i].rating_description, 0, sizeof(p_decoded->region[i].rating_description));
 			
-		AM_TRACE("ContentAdvisoryDesc: region %d, description(lang0 '%c%c%c':%s)", 
+		/*AM_TRACE("ContentAdvisoryDesc: region %d, description(lang0 '%c%c%c':%s)", 
 			p_decoded->region[i].i_rating_region,
 			p_decoded->region[i].rating_description.string[0].iso_639_code[0],
 			p_decoded->region[i].rating_description.string[0].iso_639_code[1],
 			p_decoded->region[i].rating_description.string[0].iso_639_code[2],
-			p_decoded->region[i].rating_description.string[0].string);
+			p_decoded->region[i].rating_description.string[0].string);*/
 		ptr += ptr[0] + 1;
 		i++;
 	}

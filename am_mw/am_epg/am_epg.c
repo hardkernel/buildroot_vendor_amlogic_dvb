@@ -936,7 +936,6 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 		return;
 	}
 	AM_SI_LIST_BEGIN(eit->eit_event_info, event)
-		AM_DEBUG(1, "got a event, id 0x%x", event->event_id);
 		row = 1;
 		/*查找是否有span EIT time interval的相同event_id的事件*/
 		snprintf(sql, sizeof(sql), "select start,end,db_id from evt_table where source_id=%d \
@@ -968,7 +967,6 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 		values[0] = 0;
 		/*取级别控制信息*/
 		AM_SI_LIST_BEGIN(event->desc, descr)
-			AM_DEBUG(1, "descr tag 0x%x", descr->i_tag);
 			if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_CONTENT_ADVISORY)
 			{
 				int i, j, dmn_dbid; 
@@ -1008,7 +1006,7 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 			
 			for (ii=0; ii<event->title.i_string_count; ii++)
 			{
-				AM_DEBUG(1, "lang:'%c%c%c': '%s'", 
+				AM_DEBUG(2, "lang:'%c%c%c': '%s'", 
 					event->title.string[ii].iso_639_code[0],
 					event->title.string[ii].iso_639_code[1],
 					event->title.string[ii].iso_639_code[2],
@@ -1181,11 +1179,11 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 				COLLECT_SECTION(dvbpsi_mgt_t, mon->mgts);
 				break;
 			case AM_SI_TID_PSIP_RRT:
-				AM_DEBUG(1, "RRT received! sec %x, last %x", header.sec_num, header.last_sec_num);
+				AM_DEBUG(1, "RRT received(%x/%x)", header.sec_num, header.last_sec_num);
 				COLLECT_SECTION(dvbpsi_rrt_t, mon->rrts);
 				break;
 			case AM_SI_TID_PSIP_EIT:
-				AM_DEBUG(1, "%s: tid 0x%x, source_id 0x%x, sec %x, last %x", sec_ctrl->tname, header.table_id,
+				AM_DEBUG(2, "%s: tid 0x%x, source_id 0x%x received(%x/%x)", sec_ctrl->tname, header.table_id,
 								header.extension, header.sec_num, header.last_sec_num);
 				COLLECT_SECTION(eit_section_info_t, mon->psip_eits);
 				break;
@@ -1921,18 +1919,10 @@ static void am_epg_stt_done(AM_EPG_Monitor_t *mon)
 /**\brief RRT搜索完毕处理*/
 static void am_epg_rrt_done(AM_EPG_Monitor_t *mon)
 {
-	am_epg_free_filter(mon, &mon->rrtctl.fid);
-
 	/*触发通知事件*/
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_RRT, (void*)mon->rrts);
 	/* release for updating new tables */
 	RELEASE_TABLE_FROM_LIST(dvbpsi_rrt_t, mon->rrts);
-	
-	/*监控下一版本*/
-	if (mon->rrtctl.subctl)
-	{
-		am_epg_request_section(mon, &mon->rrtctl);
-	}
 }
 
 /**\brief MGT搜索完毕处理*/
@@ -2075,10 +2065,6 @@ static void am_epg_set_mode(AM_EPG_Monitor_t *mon, AM_Bool_t reset)
 	SET_MODE(stt, sttctl, AM_EPG_SCAN_STT, reset);
 	SET_MODE(mgt, mgtctl, AM_EPG_SCAN_MGT, reset);
 	SET_MODE(rrt, rrtctl, AM_EPG_SCAN_RRT, reset);
-	for (i=0; i<mon->psip_eit_count; i++)
-	{
-		SET_MODE(psip_eit, psip_eitctl[i], AM_EPG_SCAN_PSIP_EIT, reset);
-	}
 }
 
 /**\brief 按照当前模式重置所有表监控*/
