@@ -544,8 +544,8 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 	sqlite3_stmt *stmt;
 	const char *insert_evt_sql = "insert into evt_table(src,db_net_id, db_ts_id, \
 		db_srv_id, event_id, name, start, end, descr, items, ext_descr,nibble_level,\
-		sub_flag,sub_status,parental_rating,source_id,db_dimension_ids,rating_values) \
-		values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+		sub_flag,sub_status,parental_rating,source_id,rrt_ratings) \
+		values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 	const char *insert_evt_sql_name = "insert epg events";
 
 	AM_DB_HANDLE_PREPARE(hdb);
@@ -782,7 +782,6 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 		sqlite3_bind_int(stmt, 15, parental_rating);
 		sqlite3_bind_int(stmt, 16, -1);
 		sqlite3_bind_text(stmt, 17, "", -1, SQLITE_STATIC);
-		sqlite3_bind_text(stmt, 18, "", -1, SQLITE_STATIC);
 		STEP_STMT(stmt, insert_evt_sql_name, insert_evt_sql);
 		
 		/*设置更新通知标志*/
@@ -907,8 +906,8 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 	sqlite3_stmt *stmt, *update_startend_stmt;
 	const char *insert_evt_sql = "insert into evt_table(src,db_net_id, db_ts_id, \
 		db_srv_id, event_id, name, start, end, descr, items, ext_descr,nibble_level,\
-		sub_flag,sub_status,parental_rating,source_id,db_dimension_ids,rating_values) \
-		values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+		sub_flag,sub_status,parental_rating,source_id,rrt_ratings) \
+		values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 	const char *insert_evt_sql_name = "insert epg events";
 	const char *update_startend_sql = "update evt_table set start=?, end=? where db_id=?";
 	const char *update_startend_sql_name = "update startend";
@@ -966,7 +965,6 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 			continue;
 		}
 		
-		dimension_dbids[0] = 0;
 		values[0] = 0;
 		/*取级别控制信息*/
 		AM_SI_LIST_BEGIN(event->desc, descr)
@@ -979,28 +977,17 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 				for (i=0; i<pcad->i_region_count; i++)
 				{
 					for (j=0; j<pcad->region[i].i_dimension_count; j++)
-					{
-						/*从dimension table中查找该dimension*/
-						row = 1;
-						snprintf(sql, sizeof(sql), "select db_id from dimension_table where rating_region=%d and index_j=%d limit 1", 
-							pcad->region[i].i_rating_region, pcad->region[i].dimension[j].i_dimension_j);
-						if (AM_DB_Select(hdb, sql, &row, "%d", &dmn_dbid) != AM_SUCCESS || row == 0)
-						{
-							/*No such dimension*/
-							AM_DEBUG(1, "Cannot find dimension%d from region %d", pcad->region[i].dimension[j].i_dimension_j,
-								pcad->region[i].i_rating_region);
-							continue;
-						}
-						
-						if (dimension_dbids[0] == 0)
-							snprintf(dimension_dbids, sizeof(dimension_dbids), "%d", dmn_dbid);
-						else
-							snprintf(dimension_dbids, sizeof(dimension_dbids), "%s %d", dimension_dbids, dmn_dbid);
-							
+					{						
 						if (values[0] == 0)
-							snprintf(values, sizeof(values), "%d", pcad->region[i].dimension[j].i_rating_value);
+							snprintf(values, sizeof(values), "%d %d %d", 
+								pcad->region[i].i_rating_region,
+								pcad->region[i].dimension[j].i_dimension_j,
+								pcad->region[i].dimension[j].i_rating_value);
 						else
-							snprintf(values, sizeof(values), "%s %d", values, pcad->region[i].dimension[j].i_rating_value);
+							snprintf(values, sizeof(values), "%s,%d %d %d", values, 
+								pcad->region[i].i_rating_region,
+								pcad->region[i].dimension[j].i_dimension_j,
+								pcad->region[i].dimension[j].i_rating_value);
 					}
 				}
 			}
@@ -1037,8 +1024,7 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 		sqlite3_bind_int(stmt, 14, 0);
 		sqlite3_bind_int(stmt, 15, 0);
 		sqlite3_bind_int(stmt, 16, eit->source_id);
-		sqlite3_bind_text(stmt, 17, (const char*)dimension_dbids, -1, SQLITE_STATIC);
-		sqlite3_bind_text(stmt, 18, (const char*)values, -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 17, (const char*)values, -1, SQLITE_STATIC);
 		STEP_STMT(stmt, insert_evt_sql_name, insert_evt_sql);
 	AM_SI_LIST_END()
 }
