@@ -57,9 +57,9 @@ struct AM_DVR_Device
 	int					dmx_no;	 /**< DMX设备号*/
 	const AM_DVR_Driver_t *drv;  /**< 设备驱动*/
 	void               *drv_data;/**< 驱动私有数据*/
+	int                 open_cnt;   /**< 设备打开计数*/
 	int					stream_cnt;	/**< 流个数*/
 	AM_DVR_Stream_t		streams[AM_DVR_MAX_PID_COUNT]; /**< Streams*/
-	AM_Bool_t			openned; /**< 设备已经打开*/
 	AM_Bool_t	   		record;/**< 是否正在录像标志*/
 	pthread_mutex_t     	lock;    /**< 设备保护互斥体*/
 	AM_DVR_StartRecPara_t	start_para;	/**< 启动参数*/
