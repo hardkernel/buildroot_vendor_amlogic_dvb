@@ -104,7 +104,7 @@ static AM_INLINE AM_ErrorCode_t dvr_get_openned_dev(int dev_no, AM_DVR_Device_t 
 {
 	AM_TRY(dvr_get_dev(dev_no, dev));
 	
-	if(!(*dev)->openned)
+	if(!(*dev)->open_cnt)
 	{
 		AM_DEBUG(1, "dvr device %d has not been openned", dev_no);
 		return AM_DVR_ERR_INVALID_DEV_NO;
@@ -211,10 +211,10 @@ AM_ErrorCode_t AM_DVR_Open(int dev_no, const AM_DVR_OpenPara_t *para)
 	
 	pthread_mutex_lock(&am_gAdpLock);
 	
-	if(dev->openned)
+	if(dev->open_cnt)
 	{
 		AM_DEBUG(1, "dvr device %d has already been openned", dev_no);
-		ret = AM_DVR_ERR_BUSY;
+		dev->open_cnt++;
 		goto final;
 	}
 
@@ -235,7 +235,7 @@ AM_ErrorCode_t AM_DVR_Open(int dev_no, const AM_DVR_OpenPara_t *para)
 	if(ret==AM_SUCCESS)
 	{
 		pthread_mutex_init(&dev->lock, NULL);
-		dev->openned = AM_TRUE;
+		dev->open_cnt++;
 		dev->record = AM_FALSE;
 		dev->stream_cnt = 0;
 	}
@@ -257,21 +257,24 @@ AM_ErrorCode_t AM_DVR_Close(int dev_no)
 	AM_DVR_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
-	AM_TRY(dvr_get_openned_dev(dev_no, &dev));
+	AM_TRY(dvr_get_dev(dev_no, &dev));
 	
 	pthread_mutex_lock(&am_gAdpLock);
 
-	/*停止数据源*/
-	dvr_stop_all_streams(dev);
-		
-	if(dev->drv->close)
-	{
-		dev->drv->close(dev);
-	}
+	if(dev->open_cnt > 0){
+		/*停止数据源*/
+		dvr_stop_all_streams(dev);
+			
+		if(dev->drv->close)
+		{
+			dev->drv->close(dev);
+		}
 
-	pthread_mutex_destroy(&dev->lock);
-	dev->openned = AM_FALSE;
-	dev->record = AM_FALSE;
+		pthread_mutex_destroy(&dev->lock);
+		dev->record = AM_FALSE;
+
+		dev->open_cnt--;
+	}
 	
 	pthread_mutex_unlock(&am_gAdpLock);
 	

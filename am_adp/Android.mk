@@ -8,6 +8,7 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_fend/am_fend.c am_fend/am_fend_diseqc_cmd.c am_fend/am_rotor_calc.c am_fend/linux_dvb/linux_dvb.c\
 		   am_av/am_av.c am_av/aml/aml.c\
 		   am_dvr/am_dvr.c am_dvr/linux_dvb/linux_dvb.c\
+		   am_dmx/dvr/dvr.c\
 		   am_aout/am_aout.c\
 		   am_vout/am_vout.c\
 		   am_vout/aml/aml.c\
@@ -43,6 +44,7 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_fend/am_fend.c am_fend/am_fend_diseqc_cmd.c am_fend/am_rotor_calc.c am_fend/linux_dvb/linux_dvb.c\
            am_av/am_av.c am_av/aml/aml.c\
            am_dvr/am_dvr.c am_dvr/linux_dvb/linux_dvb.c\
+           am_dmx/dvr/dvr.c\
            am_aout/am_aout.c\
            am_vout/am_vout.c\
            am_vout/aml/aml.c\

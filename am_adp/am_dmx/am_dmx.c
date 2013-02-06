@@ -46,9 +46,13 @@
 
 #ifdef EMU_DEMUX
 extern const AM_DMX_Driver_t emu_dmx_drv;
+#define HW_DMX_DRV emu_dmx_drv
 #else
 extern const AM_DMX_Driver_t linux_dvb_dmx_drv;
+#define HW_DMX_DRV linux_dvb_dmx_drv
 #endif
+extern const AM_DMX_Driver_t dvr_dmx_drv;
+#define SW_DMX_DRV dvr_dmx_drv
 
 static AM_DMX_Device_t dmx_devices[DMX_DEV_COUNT] =
 {
@@ -335,6 +339,12 @@ AM_ErrorCode_t AM_DMX_Open(int dev_no, const AM_DMX_OpenPara_t *para)
 	}
 	
 	dev->dev_no = dev_no;
+
+	if(para->use_sw_filter){
+		dev->drv = &SW_DMX_DRV;
+	}else{
+		dev->drv = &HW_DMX_DRV;
+	}
 	
 	if(dev->drv->open)
 	{
