@@ -124,6 +124,7 @@ struct AM_EPG_Monitor_s
 	int					new_eit_check_time; /**< EIT数据更新检查时间*/
 	int					sub_check_time;	/**< 预约播放检查时间*/
 	int					psip_eit_count;	/**<ATSC EIT 最大个数*/
+	int					psip_eit_done_flag;	/**< ATSC EIT 接收完成标志*/
 	AM_Bool_t			eit_has_data;		/**< 是否有需要通知更新的EIT数据*/
 	
 	dvbpsi_pat_t		*pats;
