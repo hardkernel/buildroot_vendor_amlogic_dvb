@@ -1046,8 +1046,14 @@ static void add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang
 	
 	for (i=0; i<ai->audio_count; i++)
 	{
-		if (ai->audios[i].pid == aud_pid)
+		if (ai->audios[i].pid == aud_pid &&
+			ai->audios[i].fmt == aud_fmt &&
+			! memcmp(ai->audios[i].lang, lang, 3))
+		{
+			AM_DEBUG(1, "Skipping a exist audio: pid %d, fmt %d, lang %c%c%c",
+				aud_pid, aud_fmt, lang[0], lang[1], lang[2]);
 			return;
+		}
 	}
 	if (ai->audio_count >= AM_SI_MAX_AUD_CNT)
 	{
@@ -1068,7 +1074,7 @@ static void add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang
 		sprintf(ai->audios[ai->audio_count].lang, "Audio%d", ai->audio_count+1);
 	}
 	
-	AM_DEBUG(1, "Add a audio: pid %d, language: %s", aud_pid, ai->audios[ai->audio_count].lang);
+	AM_DEBUG(1, "Add a audio: pid %d, fmt %d, language: %s", aud_pid, aud_fmt, ai->audios[ai->audio_count].lang);
 
 	ai->audio_count++;
 }
@@ -1162,65 +1168,6 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	
 	/* 更新TS数据 */
 	am_scan_update_ts_info(stmts, net_dbid, dbid, ts);
-
-	/*NOTE: 有两种存储ATSC节目的方法：
-	 *1.直接从VCT里查找service_location_des来获取音视频流；
-	 *2.普通PAT/PMT方式获取音视频流;
-	 *默认先尝试第一种方法*/
-	 
-	if (ts->digital.vcts)
-	{
-		/*service location*/
-		AM_SI_LIST_BEGIN(ts->digital.vcts, vct)
-		AM_SI_LIST_BEGIN(vct->vct_chan_info, vcinfo)
-			/*Skip inactive program*/
-			if (vcinfo->program_number == 0  || vcinfo->program_number == 0xffff)
-				continue;
-			
-			/*从VCT表中查找该service并获取信息*/
-			if (vcinfo->channel_TSID == vct->transport_stream_id)
-			{	
-				am_scan_init_service_info(&srv_info);
-				srv_info.satpara_dbid = satpara_dbid;
-				srv_info.srv_id = vcinfo->program_number;
-				srv_info.src = src;
-				
-				/*添加新业务到数据库*/
-				srv_info.srv_dbid = insert_srv(stmts, net_dbid, dbid, srv_info.srv_id);
-				if (srv_info.srv_dbid == -1)
-				{
-					AM_DEBUG(1, "insert new srv error");
-					continue;
-				}
-				
-				/*获取音视频流*/
-				AM_SI_ExtractAVFromATSCVC(vcinfo, &srv_info.vid, &srv_info.vfmt, &srv_info.aud_info);
-				if (srv_info.vid < 0x1fff || srv_info.aud_info.audio_count > 0)
-				{
-					AM_DEBUG(1, "Program(%d)'s AV streams found in VCT.", vcinfo->program_number);
-					stream_found_in_vct = AM_TRUE;
-				}
-				/*格式化音频数据字符串*/
-				format_audio_strings(&srv_info.aud_info, srv_info.str_apids, srv_info.str_afmts, srv_info.str_alangs);
-				
-				am_scan_extract_srv_info_from_vc(vcinfo, &srv_info);
-
-				/*Store this service*/
-				am_scan_update_service_info(stmts, std, &srv_info);
-			}
-			else
-			{
-				AM_DEBUG(1, "Program(%d) in other TSID(%d) found!", 
-						vcinfo->program_number, vcinfo->channel_TSID);
-				continue;
-			}
-		AM_SI_LIST_END()
-		AM_SI_LIST_END()
-	}
-	
-	/*已从VCT中分析到基础流，无需查找PAT/PMT*/
-	if (stream_found_in_vct)
-		return;
 	
 	/*遍历PMT表*/
 	AM_SI_LIST_BEGIN(ts->digital.pmts, pmt)
@@ -1259,9 +1206,6 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 				am_scan_extract_ca_scrambled_flag(es, &srv_info.scrambled_flag);
 		AM_SI_LIST_END()
 		
-		/*格式化音频数据字符串*/
-		format_audio_strings(&srv_info.aud_info, srv_info.str_apids, srv_info.str_afmts, srv_info.str_alangs);
-		
 		program_found_in_vct = AM_FALSE;
 		AM_SI_LIST_BEGIN(ts->digital.vcts, vct)
 		AM_SI_LIST_BEGIN(vct->vct_chan_info, vcinfo)
@@ -1275,6 +1219,9 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 			{	
 				if (vcinfo->program_number == pmt->i_program_number)
 				{
+					/*从VCT中尝试添加音视频流*/
+					AM_SI_ExtractAVFromATSCVC(vcinfo, &srv_info.vid, &srv_info.vfmt, &srv_info.aud_info);
+		
 					am_scan_extract_srv_info_from_vc(vcinfo, &srv_info);
 					
 					program_found_in_vct = AM_TRUE;
@@ -1291,6 +1238,9 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 		AM_SI_LIST_END()
 		AM_SI_LIST_END()
 VCT_END:
+		/*格式化音频数据字符串*/
+		format_audio_strings(&srv_info.aud_info, srv_info.str_apids, srv_info.str_afmts, srv_info.str_alangs);
+		
 		/*Store this service*/
 		am_scan_update_service_info(stmts, std, &srv_info);
 	AM_SI_LIST_END()
@@ -2429,11 +2379,13 @@ static void am_scan_mgt_done(AM_SCAN_Scanner_t *scanner)
 			scanner->dtvctl.vctctl.tid = AM_SI_TID_PSIP_CVCT;
 		am_scan_request_section(scanner, &scanner->dtvctl.vctctl);
 	}
+#if 0
 	else
 	{
 		/*没有MGT, 尝试搜索PAT/PMT*/
 		am_scan_request_section(scanner, &scanner->dtvctl.patctl);
 	}
+#endif
 }
 
 /**\brief VCT搜索完毕(包括超时)处理*/
@@ -2450,38 +2402,6 @@ static void am_scan_vct_done(AM_SCAN_Scanner_t *scanner)
 	scanner->recv_status &= ~scanner->dtvctl.vctctl.recv_flag;
 
 	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_VCT_DONE, (void*)scanner->curr_ts->digital.vcts);
-		
-	/*是否需要搜索PAT/PMT*/
-	AM_DEBUG(1, "vct %p", scanner->curr_ts->digital.vcts);
-	if (scanner->curr_ts->digital.vcts)
-	{
-		/*find service location desc first*/
-		AM_SI_LIST_BEGIN(scanner->curr_ts->digital.vcts, vct)
-		AM_DEBUG(1, "vct_chan_info %p", vct->vct_chan_info);
-		AM_SI_LIST_BEGIN(vct->vct_chan_info, chan);
-		AM_DEBUG(1, "vchan %pi, tsid %d, vct tsid %d", chan, chan->channel_TSID, vct->transport_stream_id);
-		if (chan->channel_TSID == vct->transport_stream_id)
-		{
-			AM_SI_LIST_BEGIN(chan->desc, descr)			
-				if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE_LOCATION)
-				{
-					atsc_service_location_dr_t *asld = (atsc_service_location_dr_t*)descr->p_decoded;
-					
-					if (asld->i_elem_count > 0)
-					{
-						AM_DEBUG(1, "Found ServiceLocationDescr in %s, will not scan PAT/PMT",
-							AM_SI_IS_CVCT(vct) ? "CVCT" : "TVCT");
-						return;
-					}
-				}
-			}
-			AM_SI_LIST_END()
-		AM_SI_LIST_END()
-		AM_SI_LIST_END()
-	}
-		
-	/*VCT中未发现有效service location descr, 尝试搜索PAT/PMT*/
-	am_scan_request_section(scanner, &scanner->dtvctl.patctl);
 }
 
 /**\brief 根据过滤器号取得相应控制数据*/
@@ -3641,7 +3561,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 				am_scan_tablectl_clear(&scanner->dtvctl.mgtctl);
 			
 				/*请求数据*/
-				/*am_scan_request_section(scanner, &scanner->dtvctl.patctl);*/
+				am_scan_request_section(scanner, &scanner->dtvctl.patctl);
 				/*am_scan_request_section(scanner, &scanner->dtvctl.catctl);*/
 				am_scan_request_section(scanner, &scanner->dtvctl.mgtctl);
 			}
