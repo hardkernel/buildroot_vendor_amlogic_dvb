@@ -876,8 +876,14 @@ static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char l
 	
 	for (i=0; i<ai->audio_count; i++)
 	{
-		if (ai->audios[i].pid == aud_pid)
+		if (ai->audios[i].pid == aud_pid &&
+			ai->audios[i].fmt == aud_fmt &&
+			! memcmp(ai->audios[i].lang, lang, 3))
+		{
+			AM_DEBUG(0, "Skipping a exist audio: pid %d, fmt %d, lang %c%c%c",
+				aud_pid, aud_fmt, lang[0], lang[1], lang[2]);
 			return;
+		}
 	}
 	if (ai->audio_count >= AM_SI_MAX_AUD_CNT)
 	{
@@ -898,7 +904,7 @@ static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char l
 		sprintf(ai->audios[ai->audio_count].lang, "Audio%d", ai->audio_count+1);
 	}
 	
-	AM_DEBUG(1, "Add a audio: pid %d, language: %s", aud_pid, ai->audios[ai->audio_count].lang);
+	AM_DEBUG(0, "Add a audio: pid %d, fmt %d, language: %s", aud_pid, aud_fmt, ai->audios[ai->audio_count].lang);
 
 	ai->audio_count++;
 }
@@ -1441,6 +1447,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromATSCVC(vct_channel_info_t *vcinfo, int *vid, i
 				}
 				if (afmt_tmp != -1)
 				{
+					memcpy(lang_tmp, asld->elem[i].iso_639_code, sizeof(lang_tmp));
 					si_add_audio(aud_info, asld->elem[i].i_pid, afmt_tmp, lang_tmp);
 				}
 			}

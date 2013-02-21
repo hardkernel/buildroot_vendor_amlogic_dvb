@@ -19,7 +19,7 @@
 // *** TVIN general definition/enum/struct ***********************************
 // ***************************************************************************
 
-/* tvin input port select */
+//tvin port table
 typedef enum tvin_port_e {
     TVIN_PORT_NULL    = 0x00000000,
     TVIN_PORT_MPEG0   = 0x00000100,
@@ -71,263 +71,267 @@ typedef enum tvin_port_e {
     TVIN_PORT_MAX     = 0x80000000,
 } tvin_port_t;
 
-const char * tvin_port_str(enum tvin_port_e port);
-
-
 /* tvin signal format table */
 typedef enum tvin_sig_fmt_e {
-    TVIN_SIG_FMT_NULL = 0,
-    //VGA Formats
-    TVIN_SIG_FMT_VGA_512X384P_60HZ_D147,  // 1
-    TVIN_SIG_FMT_VGA_560X384P_60HZ_D147,
-    TVIN_SIG_FMT_VGA_640X200P_59HZ_D924,
-    TVIN_SIG_FMT_VGA_640X350P_85HZ_D080,
-    TVIN_SIG_FMT_VGA_640X400P_59HZ_D940,
-    TVIN_SIG_FMT_VGA_640X400P_85HZ_D080,
-    TVIN_SIG_FMT_VGA_640X400P_59HZ_D638,
-    TVIN_SIG_FMT_VGA_640X400P_56HZ_D416,
-    TVIN_SIG_FMT_VGA_640X480P_66HZ_D619,
-    TVIN_SIG_FMT_VGA_640X480P_66HZ_D667,  // 10
-    TVIN_SIG_FMT_VGA_640X480P_59HZ_D940,
-    TVIN_SIG_FMT_VGA_640X480P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_640X480P_72HZ_D809,
-    TVIN_SIG_FMT_VGA_640X480P_75HZ_D000_A,
-    TVIN_SIG_FMT_VGA_640X480P_85HZ_D008,
-    TVIN_SIG_FMT_VGA_640X480P_59HZ_D638,
-    TVIN_SIG_FMT_VGA_640X480P_75HZ_D000_B,
-    TVIN_SIG_FMT_VGA_640X870P_75HZ_D000,
-    TVIN_SIG_FMT_VGA_720X350P_70HZ_D086,
-    TVIN_SIG_FMT_VGA_720X400P_85HZ_D039,  // 20
-    TVIN_SIG_FMT_VGA_720X400P_70HZ_D086,
-    TVIN_SIG_FMT_VGA_720X400P_87HZ_D849,
-    TVIN_SIG_FMT_VGA_720X400P_59HZ_D940,
-    TVIN_SIG_FMT_VGA_720X480P_59HZ_D940,
-    TVIN_SIG_FMT_VGA_768X480P_59HZ_D896,
-    TVIN_SIG_FMT_VGA_800X600P_56HZ_D250,
-    TVIN_SIG_FMT_VGA_800X600P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_800X600P_60HZ_D000_A,
-    TVIN_SIG_FMT_VGA_800X600P_60HZ_D317,
-    TVIN_SIG_FMT_VGA_800X600P_72HZ_D188, // 30
-    TVIN_SIG_FMT_VGA_800X600P_75HZ_D000,
-    TVIN_SIG_FMT_VGA_800X600P_85HZ_D061,
-    TVIN_SIG_FMT_VGA_832X624P_75HZ_D087,
-    TVIN_SIG_FMT_VGA_848X480P_84HZ_D751,
-    TVIN_SIG_FMT_VGA_960X600P_59HZ_D635,
-    TVIN_SIG_FMT_VGA_1024X768P_59HZ_D278,
-    TVIN_SIG_FMT_VGA_1024X768P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1024X768P_60HZ_D000_A,
-    TVIN_SIG_FMT_VGA_1024X768P_60HZ_D000_B,
-    TVIN_SIG_FMT_VGA_1024X768P_74HZ_D927, // 40
-    TVIN_SIG_FMT_VGA_1024X768P_60HZ_D004,
-    TVIN_SIG_FMT_VGA_1024X768P_70HZ_D069,
-    TVIN_SIG_FMT_VGA_1024X768P_75HZ_D029,
-    TVIN_SIG_FMT_VGA_1024X768P_84HZ_D997,
-    TVIN_SIG_FMT_VGA_1024X768P_74HZ_D925,
-    TVIN_SIG_FMT_VGA_1024X768P_75HZ_D020,
-    TVIN_SIG_FMT_VGA_1024X768P_70HZ_D008,
-    TVIN_SIG_FMT_VGA_1024X768P_75HZ_D782,
-    TVIN_SIG_FMT_VGA_1024X768P_77HZ_D069,
-    TVIN_SIG_FMT_VGA_1024X768P_71HZ_D799,  // 50
-    TVIN_SIG_FMT_VGA_1024X1024P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1152X864P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1152X864P_70HZ_D012,
-    TVIN_SIG_FMT_VGA_1152X864P_75HZ_D000,
-    TVIN_SIG_FMT_VGA_1152X864P_84HZ_D999,
-    TVIN_SIG_FMT_VGA_1152X870P_75HZ_D062,
-    TVIN_SIG_FMT_VGA_1152X900P_65HZ_D950,
-    TVIN_SIG_FMT_VGA_1152X900P_66HZ_D004,
-    TVIN_SIG_FMT_VGA_1152X900P_76HZ_D047,
-    TVIN_SIG_FMT_VGA_1152X900P_76HZ_D149,  // 60
-    TVIN_SIG_FMT_VGA_1280X720P_59HZ_D855,
-    TVIN_SIG_FMT_VGA_1280X720P_60HZ_D000_A,
-    TVIN_SIG_FMT_VGA_1280X720P_60HZ_D000_B,
-    TVIN_SIG_FMT_VGA_1280X720P_60HZ_D000_C,
-    TVIN_SIG_FMT_VGA_1280X720P_60HZ_D000_D,
-    TVIN_SIG_FMT_VGA_1280X768P_59HZ_D870,
-    TVIN_SIG_FMT_VGA_1280X768P_59HZ_D995,
-    TVIN_SIG_FMT_VGA_1280X768P_60HZ_D100,
-    TVIN_SIG_FMT_VGA_1280X768P_60HZ_D100_A,
-    TVIN_SIG_FMT_VGA_1280X768P_74HZ_D893,  // 70
-    TVIN_SIG_FMT_VGA_1280X768P_84HZ_D837,
-    TVIN_SIG_FMT_VGA_1280X800P_59HZ_D810,
-    TVIN_SIG_FMT_VGA_1280X800P_59HZ_D810_A,
-    TVIN_SIG_FMT_VGA_1280X800P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1280X800P_60HZ_D000_A,
-    TVIN_SIG_FMT_VGA_1280X960P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1280X960P_60HZ_D000_A,
-    TVIN_SIG_FMT_VGA_1280X960P_75HZ_D000,
-    TVIN_SIG_FMT_VGA_1280X960P_85HZ_D002,
-    TVIN_SIG_FMT_VGA_1280X1024P_60HZ_D020,  // 80
-    TVIN_SIG_FMT_VGA_1280X1024P_60HZ_D020_A,
-    TVIN_SIG_FMT_VGA_1280X1024P_75HZ_D025,
-    TVIN_SIG_FMT_VGA_1280X1024P_85HZ_D024,
-    TVIN_SIG_FMT_VGA_1280X1024P_59HZ_D979,
-    TVIN_SIG_FMT_VGA_1280X1024P_72HZ_D005,
-    TVIN_SIG_FMT_VGA_1280X1024P_60HZ_D002,
-    TVIN_SIG_FMT_VGA_1280X1024P_67HZ_D003,
-    TVIN_SIG_FMT_VGA_1280X1024P_74HZ_D112,
-    TVIN_SIG_FMT_VGA_1280X1024P_76HZ_D179,
-    TVIN_SIG_FMT_VGA_1280X1024P_66HZ_D718,  // 90
-    TVIN_SIG_FMT_VGA_1280X1024P_66HZ_D677,
-    TVIN_SIG_FMT_VGA_1280X1024P_76HZ_D107,
-    TVIN_SIG_FMT_VGA_1280X1024P_59HZ_D996,
-    TVIN_SIG_FMT_VGA_1280X1024P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1360X768P_59HZ_D799,
-    TVIN_SIG_FMT_VGA_1360X768P_60HZ_D015,
-    TVIN_SIG_FMT_VGA_1360X768P_60HZ_D015_A,
-    TVIN_SIG_FMT_VGA_1360X850P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1360X1024P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1366X768P_59HZ_D790,  // 100
-    TVIN_SIG_FMT_VGA_1366X768P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1400X1050P_59HZ_D978,
-    TVIN_SIG_FMT_VGA_1440X900P_59HZ_D887,
-    TVIN_SIG_FMT_VGA_1440X1080P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1600X900P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1600X1024P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1600X1200P_59HZ_D869,
-    TVIN_SIG_FMT_VGA_1600X1200P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1600X1200P_65HZ_D000,
-    TVIN_SIG_FMT_VGA_1600X1200P_70HZ_D000, 
-    TVIN_SIG_FMT_VGA_1680X1050P_59HZ_D954,  // 110
-    TVIN_SIG_FMT_VGA_1680X1080P_60HZ_D000, 
-    TVIN_SIG_FMT_VGA_1920X1080P_49HZ_D929,
-    TVIN_SIG_FMT_VGA_1920X1080P_59HZ_D963_A,
-    TVIN_SIG_FMT_VGA_1920X1080P_59HZ_D963,
-    TVIN_SIG_FMT_VGA_1920X1080P_60HZ_D000,
-    TVIN_SIG_FMT_VGA_1920X1200P_59HZ_D950,  
-    TVIN_SIG_FMT_VGA_1024X768P_60HZ_D000_C,
-    TVIN_SIG_FMT_VGA_1024X768P_60HZ_D000_D,
-    TVIN_SIG_FMT_VGA_RESERVE3,
-    TVIN_SIG_FMT_VGA_RESERVE4,
-    TVIN_SIG_FMT_VGA_RESERVE5,
-    TVIN_SIG_FMT_VGA_RESERVE6,  // 120
-    TVIN_SIG_FMT_VGA_RESERVE7,
-    TVIN_SIG_FMT_VGA_RESERVE8,
-    TVIN_SIG_FMT_VGA_RESERVE9,
-    TVIN_SIG_FMT_VGA_RESERVE10,
-    TVIN_SIG_FMT_VGA_RESERVE11,
-    TVIN_SIG_FMT_VGA_RESERVE12, //126
-    TVIN_SIG_FMT_VGA_MAX,
-    //Component Formats
-    TVIN_SIG_FMT_COMP_480P_60HZ_D000,  // 128
-    TVIN_SIG_FMT_COMP_480I_59HZ_D940,
-    TVIN_SIG_FMT_COMP_576P_50HZ_D000, //130
-    TVIN_SIG_FMT_COMP_576I_50HZ_D000,
-    TVIN_SIG_FMT_COMP_720P_59HZ_D940,
-    TVIN_SIG_FMT_COMP_720P_50HZ_D000,  
-    TVIN_SIG_FMT_COMP_1080P_23HZ_D976,
-    TVIN_SIG_FMT_COMP_1080P_24HZ_D000,
-    TVIN_SIG_FMT_COMP_1080P_25HZ_D000,
-    TVIN_SIG_FMT_COMP_1080P_30HZ_D000,
-    TVIN_SIG_FMT_COMP_1080P_50HZ_D000,
-    TVIN_SIG_FMT_COMP_1080P_60HZ_D000,
-    TVIN_SIG_FMT_COMP_1080I_47HZ_D952, //140
-    TVIN_SIG_FMT_COMP_1080I_48HZ_D000,
-    TVIN_SIG_FMT_COMP_1080I_50HZ_D000_A,
-    TVIN_SIG_FMT_COMP_1080I_50HZ_D000_B,  
-    TVIN_SIG_FMT_COMP_1080I_50HZ_D000_C,
-    TVIN_SIG_FMT_COMP_1080I_60HZ_D000,  // 145
-    TVIN_SIG_FMT_COMP_MAX,
-    //HDMI Formats
-    TVIN_SIG_FMT_HDMI_640X480P_60HZ,  // 147
-    TVIN_SIG_FMT_HDMI_720X480P_60HZ,
-    TVIN_SIG_FMT_HDMI_1280X720P_60HZ,
-    TVIN_SIG_FMT_HDMI_1920X1080I_60HZ, //150
-    TVIN_SIG_FMT_HDMI_1440X480I_60HZ,
-    TVIN_SIG_FMT_HDMI_1440X240P_60HZ,
-    TVIN_SIG_FMT_HDMI_2880X480I_60HZ,  // 153
-    TVIN_SIG_FMT_HDMI_2880X240P_60HZ,
-    TVIN_SIG_FMT_HDMI_1440X480P_60HZ,
-    TVIN_SIG_FMT_HDMI_1920X1080P_60HZ,
-    TVIN_SIG_FMT_HDMI_720X576P_50HZ,
-    TVIN_SIG_FMT_HDMI_1280X720P_50HZ,
-    TVIN_SIG_FMT_HDMI_1920X1080I_50HZ_A,
-    TVIN_SIG_FMT_HDMI_1440X576I_50HZ,  //160
-    TVIN_SIG_FMT_HDMI_1440X288P_50HZ,
-    TVIN_SIG_FMT_HDMI_2880X576I_50HZ,
-    TVIN_SIG_FMT_HDMI_2880X288P_50HZ,  
-    TVIN_SIG_FMT_HDMI_1440X576P_50HZ,
-    TVIN_SIG_FMT_HDMI_1920X1080P_50HZ,
-    TVIN_SIG_FMT_HDMI_1920X1080P_24HZ,
-    TVIN_SIG_FMT_HDMI_1920X1080P_25HZ,
-    TVIN_SIG_FMT_HDMI_1920X1080P_30HZ,
-    TVIN_SIG_FMT_HDMI_2880X480P_60HZ,
-    TVIN_SIG_FMT_HDMI_2880X576P_60HZ, //170
-    TVIN_SIG_FMT_HDMI_1920X1080I_50HZ_B,
-    TVIN_SIG_FMT_HDMI_1920X1080I_100HZ,
-    TVIN_SIG_FMT_HDMI_1280X720P_100HZ, 
-    TVIN_SIG_FMT_HDMI_720X576P_100HZ,
-    TVIN_SIG_FMT_HDMI_1440X576I_100HZ,
-    TVIN_SIG_FMT_HDMI_1920X1080I_120HZ,
-    TVIN_SIG_FMT_HDMI_1280X720P_120HZ,
-    TVIN_SIG_FMT_HDMI_720X480P_120HZ,
-    TVIN_SIG_FMT_HDMI_1440X480I_120HZ,
-    TVIN_SIG_FMT_HDMI_720X576P_200HZ, //180
-    TVIN_SIG_FMT_HDMI_1440X576I_200HZ,
-    TVIN_SIG_FMT_HDMI_720X480P_240HZ,
-    TVIN_SIG_FMT_HDMI_1440X480I_240HZ,  
-    TVIN_SIG_FMT_HDMI_1280X720P_24HZ,
-    TVIN_SIG_FMT_HDMI_1280X720P_25HZ,
-    TVIN_SIG_FMT_HDMI_1280X720P_30HZ,
-    TVIN_SIG_FMT_HDMI_1920X1080P_120HZ,
-    TVIN_SIG_FMT_HDMI_1920X1080P_100HZ,
-    TVIN_SIG_FMT_HDMI_1280X720P_60HZ_FRAME_PACKING,
-    TVIN_SIG_FMT_HDMI_1280X720P_50HZ_FRAME_PACKING, //190
-    TVIN_SIG_FMT_HDMI_1280X720P_24HZ_FRAME_PACKING,
-    TVIN_SIG_FMT_HDMI_1280X720P_30HZ_FRAME_PACKING,
-    TVIN_SIG_FMT_HDMI_1920X1080I_60HZ_FRAME_PACKING, 
-    TVIN_SIG_FMT_HDMI_1920X1080I_50HZ_FRAME_PACKING,
-    TVIN_SIG_FMT_HDMI_1920X1080P_24HZ_FRAME_PACKING,
-    TVIN_SIG_FMT_HDMI_1920X1080P_30HZ_FRAME_PACKING,
-    TVIN_SIG_FMT_HDMI_800X600_00HZ,
-    TVIN_SIG_FMT_HDMI_1024X768_00HZ,
-    TVIN_SIG_FMT_HDMI_720X400_00HZ,
-    TVIN_SIG_FMT_HDMI_1280X768_00HZ, //200
-    TVIN_SIG_FMT_HDMI_1280X800_00HZ,
-    TVIN_SIG_FMT_HDMI_1280X960_00HZ,
-    TVIN_SIG_FMT_HDMI_1280X1024_00HZ, 
-    TVIN_SIG_FMT_HDMI_1360X768_00HZ,
-    TVIN_SIG_FMT_HDMI_1366X768_00HZ,
-    TVIN_SIG_FMT_HDMI_1600X1200_00HZ,
-    TVIN_SIG_FMT_HDMI_1920X1200_00HZ,
-    TVIN_SIG_FMT_HDMI_1440X900_00HZ,
-    TVIN_SIG_FMT_HDMI_1400X1050_00HZ,
-    TVIN_SIG_FMT_HDMI_1680X1050_00HZ,
-    TVIN_SIG_FMT_HDMI_RESERVE1,
-    TVIN_SIG_FMT_HDMI_RESERVE2,
-    TVIN_SIG_FMT_HDMI_RESERVE3,
-    TVIN_SIG_FMT_HDMI_RESERVE4,
-    TVIN_SIG_FMT_HDMI_RESERVE5,
-    TVIN_SIG_FMT_HDMI_RESERVE6,  
-    TVIN_SIG_FMT_HDMI_RESERVE7,
-    TVIN_SIG_FMT_HDMI_RESERVE8,
-    TVIN_SIG_FMT_HDMI_RESERVE9,
-    TVIN_SIG_FMT_HDMI_RESERVE10,
-    TVIN_SIG_FMT_HDMI_RESERVE11,
-    TVIN_SIG_FMT_HDMI_720X480P_60HZ_FRAME_PACKING,
-    TVIN_SIG_FMT_HDMI_720X576P_50HZ_FRAME_PACKING,  // 223
-    TVIN_SIG_FMT_HDMI_MAX,
-    //Video Formats
-    TVIN_SIG_FMT_CVBS_NTSC_M,  // 225
-    TVIN_SIG_FMT_CVBS_NTSC_443,
-    TVIN_SIG_FMT_CVBS_PAL_I,
-    TVIN_SIG_FMT_CVBS_PAL_M,
-    TVIN_SIG_FMT_CVBS_PAL_60,
-    TVIN_SIG_FMT_CVBS_PAL_CN, //230
-    TVIN_SIG_FMT_CVBS_SECAM,  
-    //656 Formats
-    TVIN_SIG_FMT_BT656IN_576I_50HZ,  // 232
-    TVIN_SIG_FMT_BT656IN_480I_60HZ,
-    //601 Formats
-    TVIN_SIG_FMT_BT601IN_576I_50HZ,  // 234
-    TVIN_SIG_FMT_BT601IN_480I_60HZ,
-    //Camera Formats
-    TVIN_SIG_FMT_CAMERA_640X480P_30HZ,  // 236
-    TVIN_SIG_FMT_CAMERA_800X600P_30HZ,
-    TVIN_SIG_FMT_CAMERA_1024X768P_30HZ,
-    TVIN_SIG_FMT_CAMERA_1920X1080P_30HZ,
-    TVIN_SIG_FMT_CAMERA_1280X720P_30HZ,  //240
-    TVIN_SIG_FMT_MAX,  // 241
+        TVIN_SIG_FMT_NULL = 0,
+        //VGA Formats
+        TVIN_SIG_FMT_VGA_512X384P_60HZ_D147             = 0x001,
+        TVIN_SIG_FMT_VGA_560X384P_60HZ_D147             = 0x002,
+        TVIN_SIG_FMT_VGA_640X200P_59HZ_D924             = 0x003,
+        TVIN_SIG_FMT_VGA_640X350P_85HZ_D080             = 0x004,
+        TVIN_SIG_FMT_VGA_640X400P_59HZ_D940             = 0x005,
+        TVIN_SIG_FMT_VGA_640X400P_85HZ_D080             = 0x006,
+        TVIN_SIG_FMT_VGA_640X400P_59HZ_D638             = 0x007,
+        TVIN_SIG_FMT_VGA_640X400P_56HZ_D416             = 0x008,
+        TVIN_SIG_FMT_VGA_640X480P_66HZ_D619             = 0x009,
+        TVIN_SIG_FMT_VGA_640X480P_66HZ_D667             = 0x00a,
+        TVIN_SIG_FMT_VGA_640X480P_59HZ_D940             = 0x00b,
+        TVIN_SIG_FMT_VGA_640X480P_60HZ_D000             = 0x00c,
+        TVIN_SIG_FMT_VGA_640X480P_72HZ_D809             = 0x00d,
+        TVIN_SIG_FMT_VGA_640X480P_75HZ_D000_A           = 0x00e,
+        TVIN_SIG_FMT_VGA_640X480P_85HZ_D008             = 0x00f,
+        TVIN_SIG_FMT_VGA_640X480P_59HZ_D638             = 0x010,
+        TVIN_SIG_FMT_VGA_640X480P_75HZ_D000_B           = 0x011,
+        TVIN_SIG_FMT_VGA_640X870P_75HZ_D000             = 0x012,
+        TVIN_SIG_FMT_VGA_720X350P_70HZ_D086             = 0x013,
+        TVIN_SIG_FMT_VGA_720X400P_85HZ_D039             = 0x014,
+        TVIN_SIG_FMT_VGA_720X400P_70HZ_D086             = 0x015,
+        TVIN_SIG_FMT_VGA_720X400P_87HZ_D849             = 0x016,
+        TVIN_SIG_FMT_VGA_720X400P_59HZ_D940             = 0x017,
+        TVIN_SIG_FMT_VGA_720X480P_59HZ_D940             = 0x018,
+        TVIN_SIG_FMT_VGA_768X480P_59HZ_D896             = 0x019,
+        TVIN_SIG_FMT_VGA_800X600P_56HZ_D250             = 0x01a,
+        TVIN_SIG_FMT_VGA_800X600P_60HZ_D000             = 0x01b,
+        TVIN_SIG_FMT_VGA_800X600P_60HZ_D000_A           = 0x01c,
+        TVIN_SIG_FMT_VGA_800X600P_60HZ_D317             = 0x01d,
+        TVIN_SIG_FMT_VGA_800X600P_72HZ_D188             = 0x01e,
+        TVIN_SIG_FMT_VGA_800X600P_75HZ_D000             = 0x01f,
+        TVIN_SIG_FMT_VGA_800X600P_85HZ_D061             = 0x020,
+        TVIN_SIG_FMT_VGA_832X624P_75HZ_D087             = 0x021,
+        TVIN_SIG_FMT_VGA_848X480P_84HZ_D751             = 0x022,
+        TVIN_SIG_FMT_VGA_960X600P_59HZ_D635             = 0x023,
+        TVIN_SIG_FMT_VGA_1024X768P_59HZ_D278            = 0x024,
+        TVIN_SIG_FMT_VGA_1024X768P_60HZ_D000            = 0x025,
+        TVIN_SIG_FMT_VGA_1024X768P_60HZ_D000_A          = 0x026,
+        TVIN_SIG_FMT_VGA_1024X768P_60HZ_D000_B          = 0x027,
+        TVIN_SIG_FMT_VGA_1024X768P_74HZ_D927            = 0x028,
+        TVIN_SIG_FMT_VGA_1024X768P_60HZ_D004            = 0x029,
+        TVIN_SIG_FMT_VGA_1024X768P_70HZ_D069            = 0x02a,
+        TVIN_SIG_FMT_VGA_1024X768P_75HZ_D029            = 0x02b,
+        TVIN_SIG_FMT_VGA_1024X768P_84HZ_D997            = 0x02c,
+        TVIN_SIG_FMT_VGA_1024X768P_74HZ_D925            = 0x02d,
+        TVIN_SIG_FMT_VGA_1024X768P_75HZ_D020            = 0x02e,
+        TVIN_SIG_FMT_VGA_1024X768P_70HZ_D008            = 0x02f,
+        TVIN_SIG_FMT_VGA_1024X768P_75HZ_D782            = 0x030,
+        TVIN_SIG_FMT_VGA_1024X768P_77HZ_D069            = 0x031,
+        TVIN_SIG_FMT_VGA_1024X768P_71HZ_D799            = 0x032,
+        TVIN_SIG_FMT_VGA_1024X1024P_60HZ_D000           = 0x033,
+        TVIN_SIG_FMT_VGA_1152X864P_60HZ_D000            = 0x034,
+        TVIN_SIG_FMT_VGA_1152X864P_70HZ_D012            = 0x035,
+        TVIN_SIG_FMT_VGA_1152X864P_75HZ_D000            = 0x036,
+        TVIN_SIG_FMT_VGA_1152X864P_84HZ_D999            = 0x037,
+        TVIN_SIG_FMT_VGA_1152X870P_75HZ_D062            = 0x038,
+        TVIN_SIG_FMT_VGA_1152X900P_65HZ_D950            = 0x039,
+        TVIN_SIG_FMT_VGA_1152X900P_66HZ_D004            = 0x03a,
+        TVIN_SIG_FMT_VGA_1152X900P_76HZ_D047            = 0x03b,
+        TVIN_SIG_FMT_VGA_1152X900P_76HZ_D149            = 0x03c,
+        TVIN_SIG_FMT_VGA_1280X720P_59HZ_D855            = 0x03d,
+        TVIN_SIG_FMT_VGA_1280X720P_60HZ_D000_A          = 0x03e,
+        TVIN_SIG_FMT_VGA_1280X720P_60HZ_D000_B          = 0x03f,
+        TVIN_SIG_FMT_VGA_1280X720P_60HZ_D000_C          = 0x040,
+        TVIN_SIG_FMT_VGA_1280X720P_60HZ_D000_D          = 0x041,
+        TVIN_SIG_FMT_VGA_1280X768P_59HZ_D870            = 0x042,
+        TVIN_SIG_FMT_VGA_1280X768P_59HZ_D995            = 0x043,
+        TVIN_SIG_FMT_VGA_1280X768P_60HZ_D100            = 0x044,
+        TVIN_SIG_FMT_VGA_1280X768P_60HZ_D100_A          = 0x045,
+        TVIN_SIG_FMT_VGA_1280X768P_74HZ_D893            = 0x046,
+        TVIN_SIG_FMT_VGA_1280X768P_84HZ_D837            = 0x047,
+        TVIN_SIG_FMT_VGA_1280X800P_59HZ_D810            = 0x048,
+        TVIN_SIG_FMT_VGA_1280X800P_59HZ_D810_A          = 0x049,
+        TVIN_SIG_FMT_VGA_1280X800P_60HZ_D000            = 0x04a,
+        TVIN_SIG_FMT_VGA_1280X800P_60HZ_D000_A          = 0x04b,
+        TVIN_SIG_FMT_VGA_1280X960P_60HZ_D000            = 0x04c,
+        TVIN_SIG_FMT_VGA_1280X960P_60HZ_D000_A          = 0x04d,
+        TVIN_SIG_FMT_VGA_1280X960P_75HZ_D000            = 0x04e,
+        TVIN_SIG_FMT_VGA_1280X960P_85HZ_D002            = 0x04f,
+        TVIN_SIG_FMT_VGA_1280X1024P_60HZ_D020           = 0x050,
+        TVIN_SIG_FMT_VGA_1280X1024P_60HZ_D020_A         = 0x051,
+        TVIN_SIG_FMT_VGA_1280X1024P_75HZ_D025           = 0x052,
+        TVIN_SIG_FMT_VGA_1280X1024P_85HZ_D024           = 0x053,
+        TVIN_SIG_FMT_VGA_1280X1024P_59HZ_D979           = 0x054,
+        TVIN_SIG_FMT_VGA_1280X1024P_72HZ_D005           = 0x055,
+        TVIN_SIG_FMT_VGA_1280X1024P_60HZ_D002           = 0x056,
+        TVIN_SIG_FMT_VGA_1280X1024P_67HZ_D003           = 0x057,
+        TVIN_SIG_FMT_VGA_1280X1024P_74HZ_D112           = 0x058,
+        TVIN_SIG_FMT_VGA_1280X1024P_76HZ_D179           = 0x059,
+        TVIN_SIG_FMT_VGA_1280X1024P_66HZ_D718           = 0x05a,
+        TVIN_SIG_FMT_VGA_1280X1024P_66HZ_D677           = 0x05b,
+        TVIN_SIG_FMT_VGA_1280X1024P_76HZ_D107           = 0x05c,
+        TVIN_SIG_FMT_VGA_1280X1024P_59HZ_D996           = 0x05d,
+        TVIN_SIG_FMT_VGA_1280X1024P_60HZ_D000           = 0x05e,
+        TVIN_SIG_FMT_VGA_1360X768P_59HZ_D799            = 0x05f,
+        TVIN_SIG_FMT_VGA_1360X768P_60HZ_D015            = 0x060,
+        TVIN_SIG_FMT_VGA_1360X768P_60HZ_D015_A          = 0x061,
+        TVIN_SIG_FMT_VGA_1360X850P_60HZ_D000            = 0x062,
+        TVIN_SIG_FMT_VGA_1360X1024P_60HZ_D000           = 0x063,
+        TVIN_SIG_FMT_VGA_1366X768P_59HZ_D790            = 0x064,
+        TVIN_SIG_FMT_VGA_1366X768P_60HZ_D000            = 0x065,
+        TVIN_SIG_FMT_VGA_1400X1050P_59HZ_D978           = 0x066,
+        TVIN_SIG_FMT_VGA_1440X900P_59HZ_D887            = 0x067,
+        TVIN_SIG_FMT_VGA_1440X1080P_60HZ_D000           = 0x068,
+        TVIN_SIG_FMT_VGA_1600X900P_60HZ_D000            = 0x069,
+        TVIN_SIG_FMT_VGA_1600X1024P_60HZ_D000           = 0x06a,
+        TVIN_SIG_FMT_VGA_1600X1200P_59HZ_D869           = 0x06b,
+        TVIN_SIG_FMT_VGA_1600X1200P_60HZ_D000           = 0x06c,
+        TVIN_SIG_FMT_VGA_1600X1200P_65HZ_D000           = 0x06d,
+        TVIN_SIG_FMT_VGA_1600X1200P_70HZ_D000           = 0x06e,
+        TVIN_SIG_FMT_VGA_1680X1050P_59HZ_D954           = 0x06f,
+        TVIN_SIG_FMT_VGA_1680X1080P_60HZ_D000           = 0x070,
+        TVIN_SIG_FMT_VGA_1920X1080P_49HZ_D929           = 0x071,
+        TVIN_SIG_FMT_VGA_1920X1080P_59HZ_D963_A         = 0x072,
+        TVIN_SIG_FMT_VGA_1920X1080P_59HZ_D963           = 0x073,
+        TVIN_SIG_FMT_VGA_1920X1080P_60HZ_D000           = 0x074,
+        TVIN_SIG_FMT_VGA_1920X1200P_59HZ_D950           = 0x075,
+        TVIN_SIG_FMT_VGA_1024X768P_60HZ_D000_C          = 0x076,
+        TVIN_SIG_FMT_VGA_1024X768P_60HZ_D000_D          = 0x077,
+        TVIN_SIG_FMT_VGA_RESERVE3                       = 0x078,
+        TVIN_SIG_FMT_VGA_RESERVE4                       = 0x079,
+        TVIN_SIG_FMT_VGA_RESERVE5                       = 0x07a,
+        TVIN_SIG_FMT_VGA_RESERVE6                       = 0x07b,
+        TVIN_SIG_FMT_VGA_RESERVE7                       = 0x07c,
+        TVIN_SIG_FMT_VGA_RESERVE8                       = 0x07d,
+        TVIN_SIG_FMT_VGA_RESERVE9                       = 0x07e,
+        TVIN_SIG_FMT_VGA_RESERVE10                      = 0x07f,
+        TVIN_SIG_FMT_VGA_RESERVE11                      = 0x080,
+        TVIN_SIG_FMT_VGA_RESERVE12                      = 0x081,
+        TVIN_SIG_FMT_VGA_MAX                            = 0x082,
+        TVIN_SIG_FMT_VGA_THRESHOLD                      = 0x200,
+        //Component Formats
+        TVIN_SIG_FMT_COMP_480P_60HZ_D000                = 0x201,
+        TVIN_SIG_FMT_COMP_480I_59HZ_D940                = 0x202,
+        TVIN_SIG_FMT_COMP_576P_50HZ_D000                = 0x203,
+        TVIN_SIG_FMT_COMP_576I_50HZ_D000                = 0x204,
+        TVIN_SIG_FMT_COMP_720P_59HZ_D940                = 0x205,
+        TVIN_SIG_FMT_COMP_720P_50HZ_D000                = 0x206,
+        TVIN_SIG_FMT_COMP_1080P_23HZ_D976               = 0x207,
+        TVIN_SIG_FMT_COMP_1080P_24HZ_D000               = 0x208,
+        TVIN_SIG_FMT_COMP_1080P_25HZ_D000               = 0x209,
+        TVIN_SIG_FMT_COMP_1080P_30HZ_D000               = 0x20a,
+        TVIN_SIG_FMT_COMP_1080P_50HZ_D000               = 0x20b,
+        TVIN_SIG_FMT_COMP_1080P_60HZ_D000               = 0x20c,
+        TVIN_SIG_FMT_COMP_1080I_47HZ_D952               = 0x20d,
+        TVIN_SIG_FMT_COMP_1080I_48HZ_D000               = 0x20e,
+        TVIN_SIG_FMT_COMP_1080I_50HZ_D000_A             = 0x20f,
+        TVIN_SIG_FMT_COMP_1080I_50HZ_D000_B             = 0x210,
+        TVIN_SIG_FMT_COMP_1080I_50HZ_D000_C             = 0x211,
+        TVIN_SIG_FMT_COMP_1080I_60HZ_D000               = 0x212,
+        TVIN_SIG_FMT_COMP_MAX                           = 0x213,
+        TVIN_SIG_FMT_COMP_THRESHOLD                     = 0x400,
+        //HDMI Formats
+        TVIN_SIG_FMT_HDMI_640X480P_60HZ                 = 0x401,
+        TVIN_SIG_FMT_HDMI_720X480P_60HZ                 = 0x402,
+        TVIN_SIG_FMT_HDMI_1280X720P_60HZ                = 0x403,
+        TVIN_SIG_FMT_HDMI_1920X1080I_60HZ               = 0x404,
+        TVIN_SIG_FMT_HDMI_1440X480I_60HZ                = 0x405,
+        TVIN_SIG_FMT_HDMI_1440X240P_60HZ                = 0x406,
+        TVIN_SIG_FMT_HDMI_2880X480I_60HZ                = 0x407,
+        TVIN_SIG_FMT_HDMI_2880X240P_60HZ                = 0x408,
+        TVIN_SIG_FMT_HDMI_1440X480P_60HZ                = 0x409,
+        TVIN_SIG_FMT_HDMI_1920X1080P_60HZ               = 0x40a,
+        TVIN_SIG_FMT_HDMI_720X576P_50HZ                 = 0x40b,
+        TVIN_SIG_FMT_HDMI_1280X720P_50HZ                = 0x40c,
+        TVIN_SIG_FMT_HDMI_1920X1080I_50HZ_A             = 0x40d,
+        TVIN_SIG_FMT_HDMI_1440X576I_50HZ                = 0x40e,
+        TVIN_SIG_FMT_HDMI_1440X288P_50HZ                = 0x40f,
+        TVIN_SIG_FMT_HDMI_2880X576I_50HZ                = 0x410,
+        TVIN_SIG_FMT_HDMI_2880X288P_50HZ                = 0x411,
+        TVIN_SIG_FMT_HDMI_1440X576P_50HZ                = 0x412,
+        TVIN_SIG_FMT_HDMI_1920X1080P_50HZ               = 0x413,
+        TVIN_SIG_FMT_HDMI_1920X1080P_24HZ               = 0x414,
+        TVIN_SIG_FMT_HDMI_1920X1080P_25HZ               = 0x415,
+        TVIN_SIG_FMT_HDMI_1920X1080P_30HZ               = 0x416,
+        TVIN_SIG_FMT_HDMI_2880X480P_60HZ                = 0x417,
+        TVIN_SIG_FMT_HDMI_2880X576P_60HZ                = 0x418,
+        TVIN_SIG_FMT_HDMI_1920X1080I_50HZ_B             = 0x419,
+        TVIN_SIG_FMT_HDMI_1920X1080I_100HZ              = 0x41a,
+        TVIN_SIG_FMT_HDMI_1280X720P_100HZ               = 0x41b,
+        TVIN_SIG_FMT_HDMI_720X576P_100HZ                = 0x41c,
+        TVIN_SIG_FMT_HDMI_1440X576I_100HZ               = 0x41d,
+        TVIN_SIG_FMT_HDMI_1920X1080I_120HZ              = 0x41e,
+        TVIN_SIG_FMT_HDMI_1280X720P_120HZ               = 0x41f,
+        TVIN_SIG_FMT_HDMI_720X480P_120HZ                = 0x420,
+        TVIN_SIG_FMT_HDMI_1440X480I_120HZ               = 0x421,
+        TVIN_SIG_FMT_HDMI_720X576P_200HZ                = 0x422,
+        TVIN_SIG_FMT_HDMI_1440X576I_200HZ               = 0x423,
+        TVIN_SIG_FMT_HDMI_720X480P_240HZ                = 0x424,
+        TVIN_SIG_FMT_HDMI_1440X480I_240HZ               = 0x425,
+        TVIN_SIG_FMT_HDMI_1280X720P_24HZ                = 0x426,
+        TVIN_SIG_FMT_HDMI_1280X720P_25HZ                = 0x427,
+        TVIN_SIG_FMT_HDMI_1280X720P_30HZ                = 0x428,
+        TVIN_SIG_FMT_HDMI_1920X1080P_120HZ              = 0x429,
+        TVIN_SIG_FMT_HDMI_1920X1080P_100HZ              = 0x42a,
+        TVIN_SIG_FMT_HDMI_1280X720P_60HZ_FRAME_PACKING  = 0x42b,
+        TVIN_SIG_FMT_HDMI_1280X720P_50HZ_FRAME_PACKING  = 0x42c,
+        TVIN_SIG_FMT_HDMI_1280X720P_24HZ_FRAME_PACKING  = 0x42d,
+        TVIN_SIG_FMT_HDMI_1280X720P_30HZ_FRAME_PACKING  = 0x42e,
+        TVIN_SIG_FMT_HDMI_1920X1080I_60HZ_FRAME_PACKING = 0x42f,
+        TVIN_SIG_FMT_HDMI_1920X1080I_50HZ_FRAME_PACKING = 0x430,
+        TVIN_SIG_FMT_HDMI_1920X1080P_24HZ_FRAME_PACKING = 0x431,
+        TVIN_SIG_FMT_HDMI_1920X1080P_30HZ_FRAME_PACKING = 0x432,
+        TVIN_SIG_FMT_HDMI_800X600_00HZ                  = 0x433,
+        TVIN_SIG_FMT_HDMI_1024X768_00HZ                 = 0x434,
+        TVIN_SIG_FMT_HDMI_720X400_00HZ                  = 0x435,
+        TVIN_SIG_FMT_HDMI_1280X768_00HZ                 = 0x436,
+        TVIN_SIG_FMT_HDMI_1280X800_00HZ                 = 0x437,
+        TVIN_SIG_FMT_HDMI_1280X960_00HZ                 = 0x438,
+        TVIN_SIG_FMT_HDMI_1280X1024_00HZ                = 0x439,
+        TVIN_SIG_FMT_HDMI_1360X768_00HZ                 = 0x43a,
+        TVIN_SIG_FMT_HDMI_1366X768_00HZ                 = 0x43b,
+        TVIN_SIG_FMT_HDMI_1600X1200_00HZ                = 0x43c,
+        TVIN_SIG_FMT_HDMI_1920X1200_00HZ                = 0x43d,
+        TVIN_SIG_FMT_HDMI_1440X900_00HZ                 = 0x43e,
+        TVIN_SIG_FMT_HDMI_1400X1050_00HZ                = 0x43f,
+        TVIN_SIG_FMT_HDMI_1680X1050_00HZ                = 0x440,
+        TVIN_SIG_FMT_HDMI_RESERVE1                      = 0x441,
+        TVIN_SIG_FMT_HDMI_RESERVE2                      = 0x442,
+        TVIN_SIG_FMT_HDMI_RESERVE3                      = 0x443,
+        TVIN_SIG_FMT_HDMI_RESERVE4                      = 0x444,
+        TVIN_SIG_FMT_HDMI_RESERVE5                      = 0x445,
+        TVIN_SIG_FMT_HDMI_RESERVE6                      = 0x446,
+        TVIN_SIG_FMT_HDMI_RESERVE7                      = 0x447,
+        TVIN_SIG_FMT_HDMI_RESERVE8                      = 0x448,
+        TVIN_SIG_FMT_HDMI_RESERVE9                      = 0x449,
+        TVIN_SIG_FMT_HDMI_RESERVE10                     = 0x44a,
+        TVIN_SIG_FMT_HDMI_RESERVE11                     = 0x44b,
+        TVIN_SIG_FMT_HDMI_720X480P_60HZ_FRAME_PACKING   = 0x44c,
+        TVIN_SIG_FMT_HDMI_720X576P_50HZ_FRAME_PACKING   = 0x44d,
+        TVIN_SIG_FMT_HDMI_MAX                           = 0x44e,
+        TVIN_SIG_FMT_HDMI_THRESHOLD                     = 0x600,
+        //Video Formats
+        TVIN_SIG_FMT_CVBS_NTSC_M                        = 0x601,
+        TVIN_SIG_FMT_CVBS_NTSC_443                      = 0x602,
+        TVIN_SIG_FMT_CVBS_PAL_I                         = 0x603,
+        TVIN_SIG_FMT_CVBS_PAL_M                         = 0x604,
+        TVIN_SIG_FMT_CVBS_PAL_60                        = 0x605,
+        TVIN_SIG_FMT_CVBS_PAL_CN                        = 0x606,
+        TVIN_SIG_FMT_CVBS_SECAM                         = 0x607,
+        TVIN_SIG_FMT_CVBS_MAX                           = 0x608,
+        TVIN_SIG_FMT_CVBS_THRESHOLD                     = 0x800,
+        //656 Formats
+        TVIN_SIG_FMT_BT656IN_576I_50HZ                  = 0x801,
+        TVIN_SIG_FMT_BT656IN_480I_60HZ                  = 0x802,
+        //601 Formats
+        TVIN_SIG_FMT_BT601IN_576I_50HZ                  = 0x803,
+        TVIN_SIG_FMT_BT601IN_480I_60HZ                  = 0x804,
+        //Camera Formats
+        TVIN_SIG_FMT_CAMERA_640X480P_30HZ               = 0x805,
+        TVIN_SIG_FMT_CAMERA_800X600P_30HZ               = 0x806,
+        TVIN_SIG_FMT_CAMERA_1024X768P_30HZ              = 0x807,
+        TVIN_SIG_FMT_CAMERA_1920X1080P_30HZ             = 0x808,
+        TVIN_SIG_FMT_CAMERA_1280X720P_30HZ              = 0x809,
+        TVIN_SIG_FMT_BT601_MAX                          = 0x80a,
+        TVIN_SIG_FMT_BT601_THRESHOLD                    = 0xa00,
+        TVIN_SIG_FMT_MAX,
 } tvin_sig_fmt_t;
 
 //tvin signal status
@@ -338,8 +342,6 @@ typedef enum tvin_sig_status_e {
     TVIN_SIG_STATUS_NOTSUP,   // not supported - physically good signal & not supported
     TVIN_SIG_STATUS_STABLE,   // stable - physically good signal & supported
 } tvin_sig_status_t;
-
-const char *tvin_sig_status_str(enum tvin_sig_status_e status);
 
 // tvin parameters
 #define TVIN_PARM_FLAG_CAP      0x00000001 //tvin_parm_t.flag[ 0]: 1/enable or 0/disable frame capture function
@@ -359,30 +361,23 @@ typedef enum tvin_trans_fmt {
     TVIN_TFMT_3D_LRF,  // Secondary: Side-by-Side(Full)
     TVIN_TFMT_3D_LD,   // Secondary: L+depth
     TVIN_TFMT_3D_LDGD, // Secondary: L+depth+Graphics+Graphics-depth
+    TVIN_TFMT_3D_MAX,
 } tvin_trans_fmt_t;
 
-const char *tvin_trans_fmt_str(enum tvin_trans_fmt trans_fmt);
+typedef enum tvin_color_system_e {
+    COLOR_SYSTEM_AUTO,
+    COLOR_SYSTEM_PAL,
+    COLOR_SYSTEM_NTSC,
+    COLOR_SYSTEM_SECAM,
+    COLOR_SYSTEM_MAX,
+} tvin_color_system_t;
 
 typedef struct tvin_info_s {
     enum tvin_trans_fmt    trans_fmt;
     enum tvin_sig_fmt_e    fmt;
     enum tvin_sig_status_e status;
     unsigned int           reserved;
-}tvin_info_t;
-
-typedef struct tvin_buf_info_s {
-    unsigned int vf_size;
-    unsigned int buf_count;
-    unsigned int buf_width;
-    unsigned int buf_height;
-    unsigned int buf_size;
-    unsigned int wr_list_size;
-} tvin_buf_info_t;
-
-typedef struct tvin_video_buf_s {
-    unsigned int index;
-    unsigned int reserved;
-} tvin_video_buf_t;
+} tvin_info_t;
 
 // hs=he=vs=ve=0 is to disable Cut Window
 typedef struct tvin_cutwin_s {
@@ -426,27 +421,26 @@ typedef struct tvafe_comp_wss_s {
 } tvafe_comp_wss_t;
 
 typedef struct tvafe_vga_parm_s {
-      signed short clk_step;  // clock < 0, tune down clock freq
-                              // clock > 0, tune up clock freq
+    signed short clk_step;  // clock < 0, tune down clock freq
+    // clock > 0, tune up clock freq
     unsigned short phase;     // phase is 0~31, it is absolute value
-      signed short hpos_step; // hpos_step < 0, shift display to left
-                              // hpos_step > 0, shift display to right
-      signed short vpos_step; // vpos_step < 0, shift display to top
-                              // vpos_step > 0, shift display to bottom
+    signed short hpos_step; // hpos_step < 0, shift display to left
+    // hpos_step > 0, shift display to right
+    signed short vpos_step; // vpos_step < 0, shift display to top
+    // vpos_step > 0, shift display to bottom
     unsigned int   vga_in_clean;  // flage for vga clean screen
 } tvafe_vga_parm_t;
 
-#define TVAFE_ADC_CAL_VALID 0x00000001
 typedef struct tvafe_adc_cal_s {
     // ADC A
     unsigned short a_analog_clamp;    // 0x00~0x7f
     unsigned short a_analog_gain;     // 0x00~0xff, means 0dB~6dB
     unsigned short a_digital_offset1; // offset for fine-tuning
-                                      // s11.0:   signed value, 11 integer bits,  0 fraction bits
+    // s11.0:   signed value, 11 integer bits,  0 fraction bits
     unsigned short a_digital_gain;    // 0~3.999
-                                      // u2.10: unsigned value,  2 integer bits, 10 fraction bits
+    // u2.10: unsigned value,  2 integer bits, 10 fraction bits
     unsigned short a_digital_offset2; // offset for format
-                                      // s11.0:   signed value, 11 integer bits,  0 fraction bits
+    // s11.0:   signed value, 11 integer bits,  0 fraction bits
     // ADC B
     unsigned short b_analog_clamp;    // ditto to ADC A
     unsigned short b_analog_gain;
@@ -507,17 +501,21 @@ typedef unsigned long long tuner_std_id;
 #define TUNER_STD_SECAM_L   ((tuner_std_id)0x00400000)
 #define TUNER_STD_SECAM_LC  ((tuner_std_id)0x00800000)
 
-#define TUNER_COLOR_PAL     ((tuner_std_id)0x01000000)
-#define TUNER_COLOR_NTSC    ((tuner_std_id)0x02000000)
-#define TUNER_COLOR_SECAM   ((tuner_std_id)0x04000000)
+#define TUNER_COLOR_PAL     ((tuner_std_id)0x04000000)
+#define TUNER_COLOR_NTSC    ((tuner_std_id)0x08000000)
+#define TUNER_COLOR_SECAM   ((tuner_std_id)0x10000000)
+//virtual define 
+#define TUNER_COLOR_AUTO    ((tuner_std_id)0x00000001)
 
-#define TUNER_DEMO_STAUS_PONR_BIT				0x01
-#define TUNER_DEMO_STAUS_AFC_BIT				0x1e    // Fc-Fo in the unit of Hz
-                                                        // Fc is the current freq
-                                                        // Fo is the target freq
-#define TUNER_DEMO_STAUS_FMIFL_BIT				0x20
-#define TUNER_DEMO_STAUS_VIFL_BIT				0x40
-#define TUNER_DEMO_STAUS_AFCWIN_BIT			    0x80
+
+
+#define TUNER_DEMO_STAUS_PONR_BIT               0x01
+#define TUNER_DEMO_STAUS_AFC_BIT                0x1e    // Fc-Fo in the unit of Hz
+// Fc is the current freq
+// Fo is the target freq
+#define TUNER_DEMO_STAUS_FMIFL_BIT              0x20
+#define TUNER_DEMO_STAUS_VIFL_BIT               0x40
+#define TUNER_DEMO_STAUS_AFCWIN_BIT             0x80
 
 /* some merged standards */
 #define TUNER_STD_MN       (TUNER_STD_PAL_M    |\
@@ -568,113 +566,68 @@ typedef unsigned long long tuner_std_id;
 #define TUNER_STD_UNKNOWN   0
 #define TUNER_STD_ALL      (TUNER_STD_525_60    |\
                             TUNER_STD_625_50)
-#if 0
+
 typedef enum tuner_signal_status_e {
     TUNER_SIGNAL_STATUS_WEAK = 0, // RF PLL unlocked
     TUNER_SIGNAL_STATUS_STRONG,   // RF PLL   locked
-}tuner_signal_status_t;
+} tuner_signal_status_t;
 
 typedef struct tuner_parm_s {
     unsigned int               rangelow;  // tuner frequency is in the unit of Hz
     unsigned int               rangehigh; // tuner frequency is in the unit of Hz
     enum tuner_signal_status_e signal;
-                    int              if_status;
+    int                        if_status;
     unsigned int               reserved;  // reserved
 } tuner_parm_t;
 
 /*cmd TVIN_IOC_G_TUNER_STATUS reply struct */
-typedef struct si2176_tuner_status_struct_s{
-      unsigned char   tcint;
-      unsigned char   rssilint;
-      unsigned char   rssihint;
-                        int    vco_code;
-      unsigned char   tc;
-      unsigned char   rssil;
-      unsigned char   rssih;
-                      char   rssi;
-      unsigned   int    freq;
-      unsigned char   mode;
-      unsigned char   resrved;
-   }  si2176_tuner_status_struct_t;
+typedef struct si2176_tuner_status_struct_s {
+    unsigned char tcint;
+    unsigned char rssilint;
+    unsigned char rssihint;
+    int vco_code;
+    unsigned char tc;
+    unsigned char rssil;
+    unsigned char rssih;
+    char rssi;
+    unsigned int freq;
+    unsigned char mode;
+    unsigned char   resrved;
+} si2176_tuner_status_struct_t;
 
-  typedef struct si2176_atv_status_struct_s{
-      unsigned char   chlint;
-      unsigned char   pclint;
-      unsigned char   dlint;
-      unsigned char   snrlint;
-      unsigned char   snrhint;
-      unsigned char   audio_chan_bw;
-      unsigned char   chl;
-      unsigned char   pcl;
-      unsigned char   dl;
-      unsigned char   snrl;
-      unsigned char   snrh;
-      unsigned char   video_snr;
-                        int    afc_freq;
-                        int    video_sc_spacing;
-      unsigned char   video_sys;
-      unsigned char   color;
-      unsigned char   trans;
-      unsigned char   audio_sys;
-      unsigned char   audio_demod_mode;
-      unsigned char   sound_level;
-      unsigned char   resrved;
-   }  si2176_atv_status_struct_t;
-typedef struct si2176_tuner_status_s{
+typedef struct si2176_atv_status_struct_s {
+    unsigned char chlint;
+    unsigned char pclint;
+    unsigned char dlint;
+    unsigned char snrlint;
+    unsigned char snrhint;
+    unsigned char audio_chan_bw;
+    unsigned char chl;
+    unsigned char pcl;
+    unsigned char dl;
+    unsigned char snrl;
+    unsigned char snrh;
+    unsigned char video_snr;
+    int afc_freq;
+    int video_sc_spacing;
+    unsigned char video_sys;
+    unsigned char color;
+    unsigned char trans;
+    unsigned char audio_sys;
+    unsigned char audio_demod_mode;
+    unsigned char sound_level;
+    unsigned char resrved;
+} si2176_atv_status_struct_t;
+typedef struct si2176_tuner_status_s {
     struct si2176_tuner_status_struct_s si2176_tuner_s;
-    struct si2176_atv_status_struct_s   si2176_atv_s;
-    }si2176_tuner_status_t;
+    struct si2176_atv_status_struct_s si2176_atv_s;
+} si2176_tuner_status_t;
 
 typedef struct tuner_freq_s {
     unsigned int freq;     // tuner frequency is in the unit of Hz
     unsigned int reserved; // reserved
 } tuner_freq_s;
-#endif
- 
-typedef struct tvin_tuner_status_s {
-    unsigned int frequency;
-    unsigned int rssi;
-    unsigned char mode;//dtv:0 or atv:1
-    unsigned char tuner_locked;//notlocked:0 or locked:1
-    unsigned int reserved;
-}tvin_tuner_status_t;
-typedef enum audio_system_e{
-    TVIN_TUNER_AUDIO_MONO,
-    TVIN_TUNER_AUDIO_NICAM,
-    TVIN_TUNER_AUDIO_A2,
-    TVIN_TUNER_AUDIO_BTSC,
-    TVIN_TUNER_AUDIO_EIAJ,
-    TVIN_TUNER_AUDIO_NULL,
-}audio_system_t;
 
-typedef struct tvin_atv_status_s{
-    unsigned char atv_lock;//notlocked:0 or locked:1
-    unsigned long long std; 
-    audio_system_t audio_mode;
-                    int    snr;
-                    int    afc;    
-    unsigned int reserved;
-}tvin_atv_status_t;
-
-typedef enum stereo_system_e{
-    TVIN_TUNER_SOUND_A2_BG,
-    TVIN_TUNER_SOUND_A2_DK_625,
-    TVIN_TUNER_SOUND_A2_DK_674,
-    TVIN_TUNER_SOUND_A2_DK_574,
-    TVIN_TUNER_SOUND_A2_M,
-    TVIN_TUNER_SOUND_NICAM_BG,
-    TVIN_TUNER_SOUND_NICAM_I,
-    TVIN_TUNER_SOUND_NICAM_DK,
-    TVIN_TUNER_SOUND_NICAM_L,
-    TVIN_TUNER_SOUND_EIAJ,
-    TVIN_TUNER_SOUND_BTSC,
-    TVIN_TUNER_SOUND_FM_RADIO,
-    TVIN_TUNER_SOUND_NULL,     
-}stereo_system_t;
-typedef struct tvin_sd_status{
-   stereo_system_t sound_mode;
-   unsigned int reserved;
-}tvin_sd_status_t;
 // for pin selection
 typedef enum tvafe_adc_pin_e {
     TVAFE_ADC_PIN_NULL = 0,
@@ -870,8 +823,15 @@ typedef enum tvafe_src_sig_e {
 } tvafe_src_sig_t;
 
 typedef struct tvafe_pin_mux_s {
-	enum tvafe_adc_pin_e pin[TVAFE_SRC_SIG_MAX_NUM];
+    enum tvafe_adc_pin_e pin[TVAFE_SRC_SIG_MAX_NUM];
 } tvafe_pin_mux_t;
+
+enum {
+    MEMP_VDIN_WITHOUT_3D = 0,
+    MEMP_VDIN_WITH_3D,
+    MEMP_DCDR_WITHOUT_3D,
+    MEMP_DCDR_WITH_3D,
+};
 
 // ***************************************************************************
 // *** IOCTL command definition **********************************************
@@ -895,7 +855,6 @@ typedef struct tvafe_pin_mux_s {
 #define TVIN_IOC_VF_REG             _IO(TVIN_IOC_MAGIC, 0x43)
 #define TVIN_IOC_VF_UNREG           _IO(TVIN_IOC_MAGIC, 0x44)
 
-
 //TVAFE
 #define TVIN_IOC_S_AFE_ADC_CAL      _IOW(TVIN_IOC_MAGIC, 0x11, struct tvafe_adc_cal_s)
 #define TVIN_IOC_G_AFE_ADC_CAL      _IOR(TVIN_IOC_MAGIC, 0x12, struct tvafe_adc_cal_s)
@@ -915,7 +874,6 @@ typedef struct tvafe_pin_mux_s {
 #define TVIN_IOC_G_TUNER_FREQ       _IOR(TVIN_IOC_MAGIC, 0x23, struct tuner_freq_s)
 #define TVIN_IOC_S_TUNER_FREQ       _IOW(TVIN_IOC_MAGIC, 0x24, struct tuner_freq_s)
 #define TVIN_IOC_G_TUNER_PARM       _IOR(TVIN_IOC_MAGIC, 0x25, struct tuner_parm_s)
-
 #define TVIN_IOC_G_TUNER_STATUS     _IOR(TVIN_IOC_MAGIC, 0x26, struct si2176_tuner_status_s)
 #define TVIN_IOC_S_FINE_TUNE        _IOR(TVIN_IOC_MAGIC, 0x27, int)
 
@@ -930,7 +888,7 @@ typedef enum camera_light_mode_e {
     MANUAL_A,
     MANUAL_CWF,
     MANUAL_CLOUDY,
-}camera_light_mode_t;
+} camera_light_mode_t;
 
 typedef enum camera_saturation_e {
     SATURATION_N4_STEP = 0,
@@ -942,7 +900,7 @@ typedef enum camera_saturation_e {
     SATURATION_P2_STEP,
     SATURATION_P3_STEP,
     SATURATION_P4_STEP,
-}camera_saturation_t;
+} camera_saturation_t;
 
 
 typedef enum camera_brightness_e {
@@ -955,7 +913,7 @@ typedef enum camera_brightness_e {
     BRIGHTNESS_P2_STEP,
     BRIGHTNESS_P3_STEP,
     BRIGHTNESS_P4_STEP,
-}camera_brightness_t;
+} camera_brightness_t;
 
 typedef enum camera_contrast_e {
     CONTRAST_N4_STEP = 0,
@@ -967,7 +925,7 @@ typedef enum camera_contrast_e {
     CONTRAST_P2_STEP,
     CONTRAST_P3_STEP,
     CONTRAST_P4_STEP,
-}camera_contrast_t;
+} camera_contrast_t;
 
 typedef enum camera_hue_e {
     HUE_N180_DEGREE = 0,
@@ -982,7 +940,7 @@ typedef enum camera_hue_e {
     HUE_P90_DEGREE,
     HUE_P120_DEGREE,
     HUE_P150_DEGREE,
-}camera_hue_t;
+} camera_hue_t;
 
 typedef enum camera_special_effect_e {
     SPECIAL_EFFECT_NORMAL = 0,
@@ -992,7 +950,7 @@ typedef enum camera_special_effect_e {
     SPECIAL_EFFECT_REDDISH,
     SPECIAL_EFFECT_GREENISH,
     SPECIAL_EFFECT_NEGATIVE,
-}camera_special_effect_t;
+} camera_special_effect_t;
 
 typedef enum camera_exposure_e {
     EXPOSURE_N4_STEP = 0,
@@ -1004,7 +962,7 @@ typedef enum camera_exposure_e {
     EXPOSURE_P2_STEP,
     EXPOSURE_P3_STEP,
     EXPOSURE_P4_STEP,
-}camera_exposure_t;
+} camera_exposure_t;
 
 
 typedef enum camera_sharpness_e {
@@ -1017,44 +975,19 @@ typedef enum camera_sharpness_e {
     SHARPNESS_7_STEP,
     SHARPNESS_8_STEP,
     SHARPNESS_AUTO_STEP,
-}camera_sharpness_t;
+} camera_sharpness_t;
 
 typedef enum camera_mirror_flip_e {
     MF_NORMAL = 0,
     MF_MIRROR,
     MF_FLIP,
     MF_MIRROR_FLIP,
-}camera_mirror_flip_t;
-
-
-typedef enum camera_wb_flip_e {
-    CAM_WB_AUTO = 0,
-    CAM_WB_CLOUD,
-    CAM_WB_DAYLIGHT,
-    CAM_WB_INCANDESCENCE,
-    CAM_WB_TUNGSTEN,
-    CAM_WB_FLUORESCENT,
-    CAM_WB_MANUAL,
-}camera_wb_flip_t;
-typedef enum camera_night_mode_flip_e {
-    CAM_NM_AUTO = 0,
-	CAM_NM_ENABLE,
-}camera_night_mode_flip_t;
-typedef enum camera_effect_flip_e {
-    CAM_EFFECT_ENC_NORMAL = 0,
-	CAM_EFFECT_ENC_GRAYSCALE,
-	CAM_EFFECT_ENC_SEPIA,
-	CAM_EFFECT_ENC_SEPIAGREEN,
-	CAM_EFFECT_ENC_SEPIABLUE,
-	CAM_EFFECT_ENC_COLORINV,
-}camera_effect_flip_t;
-
+} camera_mirror_flip_t;
 
 
 typedef struct camera_info_s {
-	#define AMLOGIC_CAMERA_OV5640_NAME     			"camera_ov5640"
-	#define AMLOGIC_CAMERA_GT2005_NAME     			"camera_gt2005"
-	const char * camera_name;
+#define AMLOGIC_CAMERA_OV5640_NAME              "camera_ov5640"
+    const char * camera_name;
     enum camera_saturation_e saturation;
     enum camera_brightness_e brighrness;
     enum camera_contrast_e contrast;
@@ -1064,29 +997,38 @@ typedef struct camera_info_s {
     enum camera_sharpness_e sharpness;
     enum camera_mirror_flip_e mirro_flip;
     enum tvin_sig_fmt_e resolution;
-	enum camera_wb_flip_e white_balance;
-	enum camera_night_mode_flip_e night_mode;
-	enum camera_effect_flip_e effect;
-	int qulity;
-	;
-}camera_info_t;
+} camera_info_t;
 
+typedef enum  cc_atv_audio_standard_e{
+    CC_ATV_AUDIO_STD_START = 0,
+    CC_ATV_AUDIO_STD_DK = 0,
+    CC_ATV_AUDIO_STD_I,
+    CC_ATV_AUDIO_STD_BG,
+    CC_ATV_AUDIO_STD_M,
+    CC_ATV_AUDIO_STD_L,
+    CC_ATV_AUDIO_STD_AUTO,
+    CC_ATV_AUDIO_STD_END = CC_ATV_AUDIO_STD_AUTO,
+    CC_ATV_AUDIO_STD_MUTE,
+}cc_atv_audio_standard_t;
 
+typedef enum cc_atv_video_standard_e{
+    CC_ATV_VIDEO_STD_START = 0,
+    CC_ATV_VIDEO_STD_AUTO = 0,
+    CC_ATV_VIDEO_STD_PAL,
+    CC_ATV_VIDEO_STD_NTSC,
+    CC_ATV_VIDEO_STD_SECAM,
+    CC_ATV_VIDEO_STD_END = CC_ATV_VIDEO_STD_SECAM,
+}cc_atv_video_standard_t;
 
-    // ***************************************************************************
-    // *** IOCTL command definitions *****************************************
-    // ***************************************************************************
 
 #define CAMERA_IOC_MAGIC 'C'
-
-
 #define CAMERA_IOC_START        _IOW(CAMERA_IOC_MAGIC, 0x01, struct camera_info_s)
 #define CAMERA_IOC_STOP         _IO(CAMERA_IOC_MAGIC, 0x02)
 #define CAMERA_IOC_SET_PARA     _IOW(CAMERA_IOC_MAGIC, 0x03, struct camera_info_s)
 #define CAMERA_IOC_GET_PARA     _IOR(CAMERA_IOC_MAGIC, 0x04, struct camera_info_s)
-#define CAMERA_IOC_START_CAPTURE_PARA     _IOR(CAMERA_IOC_MAGIC, 0x05, struct camera_info_s)
-#define CAMERA_IOC_STOP_CAPTURE_PARA     _IOR(CAMERA_IOC_MAGIC, 0x06, struct camera_info_s)
 
+
+#define CC_HIST_GRAM_BUF_SIZE   (64)
 
 
 /*

@@ -58,6 +58,9 @@
 /*预约播放提前通知时间*/
 #define EPG_PRE_NOTIFY_TIME (60*1000)
 
+/*并行接收ATSC EIT的个数*/
+#define PARALLEL_PSIP_EIT_CNT 2
+
  /*位操作*/
 #define BIT_MASK(b) (1 << ((b) % 8))
 #define BIT_SLOT(b) ((b) / 8)
@@ -168,6 +171,9 @@
 		{\
 			AM_DEBUG(1, "%s Done!", sec_ctrl->tname);\
 			mon->evt_flag |= sec_ctrl->evt_flag;\
+			if (sec_ctrl->tid == AM_SI_TID_PSIP_EIT){\
+				mon->psip_eit_done_flag |= (1<<(sec_ctrl-mon->psip_eitctl));\
+			}\
 			pthread_cond_signal(&mon->cond);\
 		}\
 	AM_MACRO_END
@@ -300,7 +306,7 @@ static void am_epg_free_filter(AM_EPG_Monitor_t *mon,  int *fid)
 {
 	if (*fid == -1)
 		return;
-		
+	
 	AM_DMX_FreeFilter(mon->dmx_dev, *fid);
 	*fid = -1;
 	pthread_mutex_unlock(&mon->lock);
@@ -936,7 +942,6 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 		return;
 	}
 	AM_SI_LIST_BEGIN(eit->eit_event_info, event)
-		AM_DEBUG(1, "got a event, id 0x%x", event->event_id);
 		row = 1;
 		/*查找是否有span EIT time interval的相同event_id的事件*/
 		snprintf(sql, sizeof(sql), "select start,end,db_id from evt_table where source_id=%d \
@@ -968,7 +973,6 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 		values[0] = 0;
 		/*取级别控制信息*/
 		AM_SI_LIST_BEGIN(event->desc, descr)
-			AM_DEBUG(1, "descr tag 0x%x", descr->i_tag);
 			if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_CONTENT_ADVISORY)
 			{
 				int i, j, dmn_dbid; 
@@ -1008,7 +1012,7 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 			
 			for (ii=0; ii<event->title.i_string_count; ii++)
 			{
-				AM_DEBUG(1, "lang:'%c%c%c': '%s'", 
+				AM_DEBUG(2, "lang:'%c%c%c': '%s'", 
 					event->title.string[ii].iso_639_code[0],
 					event->title.string[ii].iso_639_code[1],
 					event->title.string[ii].iso_639_code[2],
@@ -1181,11 +1185,11 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 				COLLECT_SECTION(dvbpsi_mgt_t, mon->mgts);
 				break;
 			case AM_SI_TID_PSIP_RRT:
-				AM_DEBUG(1, "RRT received! sec %x, last %x", header.sec_num, header.last_sec_num);
+				AM_DEBUG(1, "RRT received(%x/%x)", header.sec_num, header.last_sec_num);
 				COLLECT_SECTION(dvbpsi_rrt_t, mon->rrts);
 				break;
 			case AM_SI_TID_PSIP_EIT:
-				AM_DEBUG(1, "%s: tid 0x%x, source_id 0x%x, sec %x, last %x", sec_ctrl->tname, header.table_id,
+				AM_DEBUG(2, "%s: tid 0x%x, source_id 0x%x received(%x/%x)", sec_ctrl->tname, header.table_id,
 								header.extension, header.sec_num, header.last_sec_num);
 				COLLECT_SECTION(eit_section_info_t, mon->psip_eits);
 				break;
@@ -1921,30 +1925,21 @@ static void am_epg_stt_done(AM_EPG_Monitor_t *mon)
 /**\brief RRT搜索完毕处理*/
 static void am_epg_rrt_done(AM_EPG_Monitor_t *mon)
 {
-	am_epg_free_filter(mon, &mon->rrtctl.fid);
-
 	/*触发通知事件*/
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_RRT, (void*)mon->rrts);
 	/* release for updating new tables */
 	RELEASE_TABLE_FROM_LIST(dvbpsi_rrt_t, mon->rrts);
-	
-	/*监控下一版本*/
-	if (mon->rrtctl.subctl)
-	{
-		am_epg_request_section(mon, &mon->rrtctl);
-	}
 }
 
 /**\brief MGT搜索完毕处理*/
 static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 {
-	int eit;
+	int eit, parallel_cnt = 0;
 	mgt_section_info_t *mgt;
 	com_table_info_t *table;
 	
 	am_epg_free_filter(mon, &mon->mgtctl.fid);
 
-	AM_DEBUG(1, "am_epg_mgt_done");
 	/*触发通知事件*/
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_MGT, (void*)mon->mgts);
 	
@@ -1967,7 +1962,11 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 					table->table_type_pid, table->table_type_version);
 				mon->psip_eitctl[eit].pid = table->table_type_pid;
 				mon->psip_eitctl[eit].subctl->ver = table->table_type_version;
-				am_epg_request_section(mon, &mon->psip_eitctl[eit]);
+				if (parallel_cnt < PARALLEL_PSIP_EIT_CNT)
+				{
+					parallel_cnt++;
+					am_epg_request_section(mon, &mon->psip_eitctl[eit]);
+				}
 			}
 			else
 			{
@@ -1992,19 +1991,34 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 /**\brief PSIP EIT搜索完毕处理*/
 static void am_epg_psip_eit_done(AM_EPG_Monitor_t *mon)
 {
-	int i;
-	int now;
+	int i, j;
 	
-	AM_TIME_GetClock(&now);
 	for (i=0; i<mon->psip_eit_count; i++)
 	{
-		if (mon->psip_eitctl[i].fid != -1 && am_epg_tablectl_test_complete(&mon->psip_eitctl[i])
-			&& (now - mon->psip_eitctl[i].data_arrive_time) > mon->psip_eitctl[i].repeat_distance)
+		if (mon->psip_eit_done_flag & (1<<i))
 		{
-			AM_DEBUG(1, "Stop filter for PSIP EIT%d", i);
 			am_epg_free_filter(mon, &mon->psip_eitctl[i].fid);
+	
+			/* Start the next pending EIT */
+			for (j=0; j<mon->psip_eit_count; j++)
+			{
+				if (mon->psip_eitctl[j].pid < 0x1fff &&
+					mon->psip_eitctl[j].fid == -1 && 
+					mon->psip_eitctl[j].data_arrive_time == 0)
+				{
+					am_epg_request_section(mon, &mon->psip_eitctl[j]);
+					break;
+				}
+			}
 		}
 	}
+	mon->psip_eit_done_flag = 0;
+	
+	/*触发通知事件*/
+	SIGNAL_EVENT(AM_EPG_EVT_NEW_PSIP_EIT, (void*)mon->psip_eits);
+
+	/* release for updating new tables */
+	RELEASE_TABLE_FROM_LIST(dvbpsi_psip_eit_t, mon->psip_eits);
 }
 
 
@@ -2061,6 +2075,10 @@ static void am_epg_set_mode(AM_EPG_Monitor_t *mon, AM_Bool_t reset)
 	AM_DEBUG(1, "EPG Setmode 0x%x", mon->mode);
 
 	SET_MODE(pat, patctl, AM_EPG_SCAN_PAT, reset);
+	if (mon->pmtctl.fid != -1)
+	{
+		SET_MODE(pmt, pmtctl, AM_EPG_SCAN_PMT, reset);
+	}
 	SET_MODE(cat, catctl, AM_EPG_SCAN_CAT, reset);
 	SET_MODE(sdt, sdtctl, AM_EPG_SCAN_SDT, reset);
 	SET_MODE(nit, nitctl, AM_EPG_SCAN_NIT, reset);
@@ -2077,7 +2095,8 @@ static void am_epg_set_mode(AM_EPG_Monitor_t *mon, AM_Bool_t reset)
 	SET_MODE(rrt, rrtctl, AM_EPG_SCAN_RRT, reset);
 	for (i=0; i<mon->psip_eit_count; i++)
 	{
-		SET_MODE(psip_eit, psip_eitctl[i], AM_EPG_SCAN_PSIP_EIT, reset);
+		if (mon->psip_eitctl[i].fid != -1)
+			SET_MODE(psip_eit, psip_eitctl[i], AM_EPG_SCAN_PSIP_EIT, reset);
 	}
 }
 
@@ -2344,9 +2363,6 @@ handle_events:
 	}
 	
 	/*线程退出，释放资源*/
-
-	/*取消前端事件*/
-	AM_EVT_Unsubscribe(mon->fend_dev, AM_FEND_EVT_STATUS_CHANGED, am_epg_fend_callback, (void*)mon);
 	mon->mode = 0;
 	am_epg_set_mode(mon, AM_FALSE);
 	pthread_mutex_unlock(&mon->lock);
@@ -2378,7 +2394,8 @@ handle_events:
 	}
 	
 	pthread_mutex_unlock(&mon->lock);
-
+	/*取消前端事件*/
+	AM_EVT_Unsubscribe(mon->fend_dev, AM_FEND_EVT_STATUS_CHANGED, am_epg_fend_callback, (void*)mon);
 	pthread_mutex_destroy(&mon->lock);
 	pthread_cond_destroy(&mon->cond);
 
@@ -2421,7 +2438,7 @@ AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, int *handle)
 	mon->eitsche_check_time = EITSCHE_CHECK_DISTANCE;
 	mon->mon_service = -1;
 	mon->curr_ts = -1;
-	mon->psip_eit_count = 8;//(int)AM_ARRAY_SIZE(mon->psip_eitctl);
+	mon->psip_eit_count = (int)AM_ARRAY_SIZE(mon->psip_eitctl);
 	AM_TIME_GetClock(&mon->new_eit_check_time);
 	mon->eit_has_data = AM_FALSE;
 
