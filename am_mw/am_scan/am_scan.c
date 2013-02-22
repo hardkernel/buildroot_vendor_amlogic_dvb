@@ -255,6 +255,113 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner);
 
 extern AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,int out_len);
 
+
+
+static int  am_set_atv_tuner_cvbs_std(AM_SCAN_Scanner_t *scanner,int std) {
+	    AM_DEBUG(1,"%s std= %d", __FUNCTION__,std);
+	    int audio_std = am_audiostd_to_enmu(std);
+	    int video_std = am_videostd_to_enmu(std);
+        tvin_sig_fmt_t cvbs_fmt = TVIN_SIG_FMT_NULL;
+        // if (video_std >= 0) {
+           // if (video_std < CC_ATV_VIDEO_STD_START || video_std > CC_ATV_VIDEO_STD_END) {
+               // video_std = ATVGetVideoStdDefaultCfg();
+           // }
+        // }
+           if (video_std == CC_ATV_VIDEO_STD_AUTO) {
+               cvbs_fmt = TVIN_SIG_FMT_NULL;
+           } else if (video_std == CC_ATV_VIDEO_STD_PAL) {
+               if (audio_std == CC_ATV_AUDIO_STD_DK) {
+                   cvbs_fmt = TVIN_SIG_FMT_CVBS_PAL_I;
+               } else if (audio_std == CC_ATV_AUDIO_STD_I) {
+                   cvbs_fmt = TVIN_SIG_FMT_CVBS_PAL_I;
+               } else if (audio_std == CC_ATV_AUDIO_STD_BG) {
+                   cvbs_fmt = TVIN_SIG_FMT_CVBS_PAL_I;
+               } else if (audio_std == CC_ATV_AUDIO_STD_M) {
+                   cvbs_fmt = TVIN_SIG_FMT_CVBS_PAL_M;
+               }
+           } else if (video_std == CC_ATV_VIDEO_STD_NTSC) {
+               if (audio_std == CC_ATV_AUDIO_STD_DK) {
+                   cvbs_fmt = TVIN_SIG_FMT_CVBS_NTSC_M;
+               } else if (audio_std == CC_ATV_AUDIO_STD_I) {
+                   cvbs_fmt = TVIN_SIG_FMT_CVBS_NTSC_M;
+               } else if (audio_std == CC_ATV_AUDIO_STD_BG) {
+                   cvbs_fmt = TVIN_SIG_FMT_CVBS_NTSC_M;
+               } else if (audio_std == CC_ATV_AUDIO_STD_M) {
+                   cvbs_fmt = TVIN_SIG_FMT_CVBS_NTSC_M;
+               }
+           } else if (video_std == CC_ATV_VIDEO_STD_SECAM) {
+               if (audio_std == CC_ATV_AUDIO_STD_DK) {
+                   cvbs_fmt = TVIN_SIG_FMT_CVBS_SECAM;
+               } else if (audio_std == CC_ATV_AUDIO_STD_I) {
+                   cvbs_fmt = TVIN_SIG_FMT_CVBS_SECAM;
+               } else if (audio_std == CC_ATV_AUDIO_STD_BG) {
+                   cvbs_fmt = TVIN_SIG_FMT_CVBS_SECAM;
+               } else if (audio_std == CC_ATV_AUDIO_STD_M) {
+                   cvbs_fmt = TVIN_SIG_FMT_CVBS_SECAM;
+               } else if (audio_std == CC_ATV_AUDIO_STD_L) {
+                   cvbs_fmt = TVIN_SIG_FMT_CVBS_SECAM;
+               }
+           }
+   
+       AM_DEBUG(1,"%s, cvbs fmt = %d\n", __FUNCTION__, cvbs_fmt);
+      
+       int ret = ioctl(scanner->atvctl.afe_fd, TVIN_IOC_S_AFE_CVBS_STD,  &cvbs_fmt);
+       if (ret < 0){
+           AM_DEBUG(1,"%s, error(%s)!\n", __FUNCTION__, strerror(errno));
+           return -1;
+       }
+       return 0;
+    }	
+    
+    
+   
+
+    int  am_audiostd_to_enmu(int data){
+		AM_DEBUG(1,"%s data = %d", __FUNCTION__,data);
+	    cc_atv_audio_standard_t std = CC_ATV_AUDIO_STD_DK;
+	    if( ((data & TUNER_STD_PAL_DK) == TUNER_STD_PAL_DK) ||
+	        ((data & TUNER_STD_SECAM_DK) == TUNER_STD_SECAM_DK))
+	        std =  CC_ATV_AUDIO_STD_DK;
+	    else
+        if((data & TUNER_STD_PAL_I) == TUNER_STD_PAL_I)
+            std =  CC_ATV_AUDIO_STD_I;
+        else
+        if( ((data & TUNER_STD_PAL_BG) == TUNER_STD_PAL_BG) ||
+            ((data & TUNER_STD_SECAM_B) == TUNER_STD_SECAM_B)|| 
+            ((data & TUNER_STD_SECAM_G) == TUNER_STD_SECAM_G ))
+            std = CC_ATV_AUDIO_STD_BG;
+    	else
+	    if( ((data & TUNER_STD_PAL_M) == TUNER_STD_PAL_M) ||
+            ((data & TUNER_STD_NTSC_M) == TUNER_STD_NTSC_M))
+	        std = CC_ATV_AUDIO_STD_M;
+	    else
+	    if( (data & TUNER_STD_SECAM_L) == TUNER_STD_SECAM_L)            
+	        std = CC_ATV_AUDIO_STD_L;   
+		AM_DEBUG(1,"%s audio standard = %d", __FUNCTION__,std);
+	    return  std ;
+	}
+	
+	int  am_videostd_to_enmu(int data){
+	    AM_DEBUG(1,"%s", __FUNCTION__);
+	    cc_atv_video_standard_t  video_standard = CC_ATV_VIDEO_STD_PAL;
+        if((data & TUNER_COLOR_AUTO) == TUNER_COLOR_AUTO){
+             video_standard = CC_ATV_VIDEO_STD_AUTO;
+        }else
+        if((data & TUNER_COLOR_PAL) == TUNER_COLOR_PAL){
+             video_standard = CC_ATV_VIDEO_STD_PAL;
+        }else
+        if((data & TUNER_COLOR_NTSC) == TUNER_COLOR_NTSC){
+            video_standard = CC_ATV_VIDEO_STD_NTSC;
+        }else
+        if((data & TUNER_COLOR_SECAM) == TUNER_COLOR_SECAM){
+            video_standard = CC_ATV_VIDEO_STD_SECAM;
+        }
+	    AM_DEBUG(1,"%s video standard = %d", __FUNCTION__,video_standard);
+        return video_standard;
+        
+    }
+
+
 static void am_scan_rec_tab_init(AM_SCAN_RecTab_t *tab)
 {
 	memset(tab, 0, sizeof(AM_SCAN_RecTab_t));
@@ -2967,10 +3074,16 @@ static AM_ErrorCode_t am_scan_atv_step_tune(AM_SCAN_Scanner_t *scanner)
 
 			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_ATV_TUNING, (void*)(dvb_fend_para(cur_fe_para)->frequency));
 		
-			/* Set frontend */
+		
 			AM_DEBUG(1, "Trying to tune atv frequency %uHz (range:%d ~ %d)...", 
 				dvb_fend_para(cur_fe_para)->frequency,
 				scanner->atvctl.min_freq, scanner->atvctl.max_freq);
+            
+            /*set atv cvbs*/
+            int oldstd = scanner->start_para.atv_para.default_std;
+            am_set_atv_tuner_cvbs_std(scanner,oldstd);
+                
+            /* Set frontend */
 			ret = AM_FENDCTRL_SetPara(scanner->start_para.fend_dev_id, &cur_fe_para);
 			if (ret == AM_SUCCESS)
 			{
@@ -3583,7 +3696,9 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			/* Analog processing */
 			scanner->curr_ts->type = AM_SCAN_TS_ANALOG;
 			scanner->curr_ts->analog.freq = am_scan_format_atv_freq(scanner->atvctl.afc_locked_freq);
-			scanner->curr_ts->analog.std = dvb_fend_para(cur_fe_para)->u.analog.std;
+            
+            scanner->curr_ts->analog.std = scanner->start_para.atv_para.default_std;
+			//scanner->curr_ts->analog.std = dvb_fend_para(cur_fe_para)->u.analog.std;
 			/*添加到搜索结果列表*/
 			APPEND_TO_LIST(AM_SCAN_TS_t, scanner->curr_ts, scanner->result.tses);
 			if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL)

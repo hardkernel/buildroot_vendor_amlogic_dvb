@@ -3226,7 +3226,7 @@ static void* aml_av_monitor_thread(void *arg)
 					vf = 0;
 				}
 
-				if(af > 1 || vf > 1){
+				if(af > 0 || vf > 0){
 					resample = 1;
 				}else if(af < 0 && vf < 0){
 					resample = 2;
