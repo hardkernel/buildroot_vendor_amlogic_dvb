@@ -3121,9 +3121,14 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 			if (scanner->start_freqs[scanner->curr_freq].flag == AM_SCAN_FE_FL_ATV &&
 				cur_fe_para.m_type != FE_ANALOG)
 			{
+                
+                if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL)
+                    dvb_fend_para(cur_fe_para)->u.analog.flag |= ANALOG_FLAG_MANUL_SCAN;
+                else
+                    dvb_fend_para(cur_fe_para)->u.analog.flag |= ANALOG_FLAG_ENABLE_AFC;
+                    
 				cur_fe_para.m_type = FE_ANALOG;
 				dvb_fend_para(cur_fe_para)->u.analog.std = atv_start_para.default_std;
-				dvb_fend_para(cur_fe_para)->u.analog.flag |= ANALOG_FLAG_ENABLE_AFC;
 				if (atv_start_para.afc_range <= 0)
 					atv_start_para.afc_range = ATV_2MHZ;
 				dvb_fend_para(cur_fe_para)->u.analog.afc_range = atv_start_para.afc_range;
@@ -3577,7 +3582,12 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 		scanner->atvctl.step = 0;
 		scanner->atvctl.min_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx].fe_para)->frequency;
 		scanner->atvctl.max_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+1].fe_para)->frequency;
-		scanner->atvctl.start_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency;
+		scanner->atvctl.start_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency ;
+        if(scanner->atvctl.direction == 1)
+            dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency+=ATV_3MHZ;
+        else
+            dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency-=ATV_3MHZ;
+        AM_DEBUG(1,"%s zk scanner->atvctl.start_freq = %d", __FUNCTION__,scanner->atvctl.start_freq);
 		/* start from start freq */
 		scanner->curr_freq = scanner->atvctl.start_idx + 2; 
 	}
@@ -4148,9 +4158,9 @@ static void am_scan_copy_dtv_feparas(AM_SCAN_DTVCreatePara_t *para, AM_Bool_t us
 /**\brief 拷贝数字前端参数*/
 static void am_scan_copy_atv_feparas(AM_SCAN_ATVCreatePara_t *para, AM_SCAN_FrontEndPara_t *fe_start)
 {
-	int i;
-	
-	for (i=0; i<para->fe_cnt; i++,fe_start++)
+	int i;	
+    
+    for (i=0; i<para->fe_cnt; i++,fe_start++)
 	{
 		fe_start->fe_para = para->fe_paras[i];
 		AM_DEBUG(1, "ATV fe_para mode %d, freq %u", fe_start->fe_para.m_type, dvb_fend_para(fe_start->fe_para)->frequency);
@@ -4158,13 +4168,21 @@ static void am_scan_copy_atv_feparas(AM_SCAN_ATVCreatePara_t *para, AM_SCAN_Fron
 		{
 			dvb_fend_para(fe_start->fe_para)->u.analog.std = para->default_std;
 		}
-		dvb_fend_para(fe_start->fe_para)->u.analog.flag |= ANALOG_FLAG_ENABLE_AFC;
-		if (para->afc_range <= 0)
-			para->afc_range = ATV_2MHZ;
+
+        if (para->mode == AM_SCAN_ATVMODE_MANUAL)
+        {
+             dvb_fend_para(fe_start->fe_para)->u.analog.flag  |= ANALOG_FLAG_MANUL_SCAN;
+        }
+        else
+        {
+         
+             dvb_fend_para(fe_start->fe_para)->u.analog.flag |= ANALOG_FLAG_ENABLE_AFC;
+        }
+	    if (para->afc_range <= 0)
+			        para->afc_range = ATV_2MHZ;
 		dvb_fend_para(fe_start->fe_para)->u.analog.afc_range = para->afc_range;
 		fe_start->flag = AM_SCAN_FE_FL_ATV;
 	}
-	
 	AM_DEBUG(1, "ATV fe_paras count %d", para->fe_cnt);
 }
 
