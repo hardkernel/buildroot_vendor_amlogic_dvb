@@ -240,6 +240,7 @@ struct dvb_ofdm_parameters {
 };
 
 #define ANALOG_FLAG_ENABLE_AFC                 0X00000001
+#define  ANALOG_FLAG_MANUL_SCAN                0x00000011   
 struct dvb_analog_parameters {
 	unsigned int         audmode; /*V4L2_TUNER_MODE_MONO,V4L2_TUNER_MODE_STEREO,V4L2_TUNER_MODE_LANG2,V4L2_TUNER_MODE_SAP,V4L2_TUNER_MODE_LANG1,V4L2_TUNER_MODE_LANG1_LANG2*/
 	unsigned int         soundsys;/*A2,BTSC,EIAJ,NICAM*/

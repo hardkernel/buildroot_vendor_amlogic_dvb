@@ -220,7 +220,8 @@ typedef struct AM_SCAN_TS_s
 			int std;		/**< tuner std*/
 		}analog;
 	};
-
+	
+	int tp_index; /**< 位于频率表中的位置*/
 	struct AM_SCAN_TS_s *p_next;	/**< 指向下一个TS*/
 }AM_SCAN_TS_t;
 

@@ -239,6 +239,7 @@ const char *sql_stmts[MAX_STMT] =
 	"select db_id,hd_lcn from srv_table where src=? and sd_lcn=?",
 	"select db_id,service_type from srv_table where src=? order by default_chan_num",
 	"select db_id,service_type from srv_table where src=? order by lcn",
+	"update ts_table set freq=?,std=?,aud_mode=? where db_id=?",
 };
 
 /****************************************************************************
@@ -1193,18 +1194,61 @@ static void store_analog_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_S
 	AM_SCAN_ServiceInfo_t srv_info;
 	int std = result->start_para->dtv_para.standard;
 	
+	if (ts->type != AM_SCAN_TS_ANALOG)
+		return;
+		
 	AM_DEBUG(1, "@@ Storing a analog ts @@");
 		
-	/*检查该TS是否已经添加*/
+	dbid = -1;
+	/*手动搜索时，如果已存储有任何频道则替换当前频道，否则新添加1频道*/
+	if (result->start_para->atv_para.mode == AM_SCAN_ATVMODE_MANUAL)
+	{
+		int r;
+		/*当前是否已经保存有ATV频道*/
+		sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, FE_ANALOG);
+		r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+		sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
+		if (r == SQLITE_ROW)
+		{
+			/*已保存有频道，则替换起始频率所在的频道，且保持频道号不变*/
+			sqlite3_bind_int(stmts[QUERY_TS], 1, FE_ANALOG);
+			sqlite3_bind_int(stmts[QUERY_TS], 2, dvb_fend_para(result->start_para->atv_para.fe_paras[2])->frequency);
+			sqlite3_bind_int(stmts[QUERY_TS], 3, -1);
+			sqlite3_bind_int(stmts[QUERY_TS], 4, -1);
+			if (sqlite3_step(stmts[QUERY_TS]) == SQLITE_ROW)
+			{
+				dbid = sqlite3_column_int(stmts[QUERY_TS], 0);
+			}
+			sqlite3_reset(stmts[QUERY_TS]);
+			if (dbid == -1)
+			{
+				AM_DEBUG(1, "Cannot get ts record for this ATV manual freq, will not store.");
+			}
+			else
+			{
+				AM_DEBUG(1, "ATV manual scan replace current channel.");
+				/* 仅更新TS数据 */
+				sqlite3_bind_int(stmts[UPDATE_ANALOG_TS], 1, ts->analog.freq);
+				sqlite3_bind_int(stmts[UPDATE_ANALOG_TS], 2, ts->analog.std);
+				sqlite3_bind_int(stmts[UPDATE_ANALOG_TS], 3, 1/*Stereo*/);
+				sqlite3_bind_int(stmts[UPDATE_ANALOG_TS], 4, dbid);
+				sqlite3_step(stmts[UPDATE_ANALOG_TS]);
+				sqlite3_reset(stmts[UPDATE_ANALOG_TS]);
+			}
+			return;
+		}
+	}
+	
 	dbid = insert_ts(stmts, FE_ANALOG, ts->analog.freq, -1, -1);
 	if (dbid == -1)
 	{
 		AM_DEBUG(1, "insert new ts error");
 		return;
 	}
-	
+
 	/* 更新TS数据 */
 	am_scan_update_ts_info(stmts,  -1, dbid, ts);
+	
 	
 	/* 存储ATV频道 */
 	if (ts->type == AM_SCAN_TS_ANALOG)
@@ -1229,6 +1273,16 @@ static void store_analog_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_S
 		srv_info.chan_num = 0;
 		srv_info.srv_type = AM_SCAN_SRV_ATV; 
 		strcpy(srv_info.name, "ATV Program");
+		if (result->start_para->atv_para.mode == AM_SCAN_ATVMODE_MANUAL)
+		{
+			srv_info.chan_num = 1;
+		}
+		else if (result->start_para->dtv_para.standard == AM_SCAN_DTV_STD_ATSC)
+		{
+			srv_info.major_chan_num = ts->tp_index + 1;
+			srv_info.minor_chan_num = 0;
+			srv_info.chan_num = (srv_info.major_chan_num<<16) | (srv_info.minor_chan_num&0xffff);
+		}
 		/* 更新service数据 */
 		am_scan_update_service_info(stmts, std, &srv_info);
 		
@@ -1953,34 +2007,38 @@ static void am_scan_atv_default_sort_by_freq(AM_SCAN_Result_t *result, sqlite3_s
 	int row = AM_DB_MAX_SRV_CNT_PER_SRC, i;
 	int r, db_ts_id, db_id, rr, srv_type;
 
-	i=1;
-
-	sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, FE_ANALOG);
-	r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
-
-	while (r == SQLITE_ROW)
+	if (result->start_para->dtv_para.standard != AM_SCAN_DTV_STD_ATSC &&
+		result->start_para->atv_para.mode != AM_SCAN_ATVMODE_MANUAL)
 	{
-		db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
-		sqlite3_bind_int(stmts[QUERY_SRV_BY_TYPE], 1, db_ts_id);
-		rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
-		while (rr == SQLITE_ROW)
-		{
-			db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 0);
-			srv_type = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 1);
-			if (srv_type == AM_SCAN_SRV_ATV)
-			{
-				sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, i);
-				sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
-				sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
-				sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
-				i++;
-			}
-			rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
-		}
-		sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
+		i=1;
+
+		sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, FE_ANALOG);
 		r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+
+		while (r == SQLITE_ROW)
+		{
+			db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
+			sqlite3_bind_int(stmts[QUERY_SRV_BY_TYPE], 1, db_ts_id);
+			rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
+			while (rr == SQLITE_ROW)
+			{
+				db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 0);
+				srv_type = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 1);
+				if (srv_type == AM_SCAN_SRV_ATV)
+				{
+					sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, i);
+					sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
+					sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+					sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+					i++;
+				}
+				rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
+			}
+			sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
+			r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+		}
+		sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
 	}
-	sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
 } 
 
 /**\brief 默认搜索完毕存储函数*/
@@ -3063,9 +3121,14 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 			if (scanner->start_freqs[scanner->curr_freq].flag == AM_SCAN_FE_FL_ATV &&
 				cur_fe_para.m_type != FE_ANALOG)
 			{
+                
+                if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL)
+                    dvb_fend_para(cur_fe_para)->u.analog.flag |= ANALOG_FLAG_MANUL_SCAN;
+                else
+                    dvb_fend_para(cur_fe_para)->u.analog.flag |= ANALOG_FLAG_ENABLE_AFC;
+                    
 				cur_fe_para.m_type = FE_ANALOG;
 				dvb_fend_para(cur_fe_para)->u.analog.std = atv_start_para.default_std;
-				dvb_fend_para(cur_fe_para)->u.analog.flag |= ANALOG_FLAG_ENABLE_AFC;
 				if (atv_start_para.afc_range <= 0)
 					atv_start_para.afc_range = ATV_2MHZ;
 				dvb_fend_para(cur_fe_para)->u.analog.afc_range = atv_start_para.afc_range;
@@ -3519,7 +3582,12 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 		scanner->atvctl.step = 0;
 		scanner->atvctl.min_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx].fe_para)->frequency;
 		scanner->atvctl.max_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+1].fe_para)->frequency;
-		scanner->atvctl.start_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency;
+		scanner->atvctl.start_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency ;
+        if(scanner->atvctl.direction == 1)
+            dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency+=ATV_3MHZ;
+        else
+            dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency-=ATV_3MHZ;
+        AM_DEBUG(1,"%s zk scanner->atvctl.start_freq = %d", __FUNCTION__,scanner->atvctl.start_freq);
 		/* start from start freq */
 		scanner->curr_freq = scanner->atvctl.start_idx + 2; 
 	}
@@ -3623,6 +3691,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			return -1;
 		}
 		memset(scanner->curr_ts, 0, sizeof(AM_SCAN_TS_t));
+		scanner->curr_ts->tp_index = scanner->curr_freq;
 		
 		if (cur_fe_para.m_type == FE_ANALOG)
 		{
@@ -4031,6 +4100,8 @@ handle_events:
 	AM_EVT_Unsubscribe(scanner->start_para.fend_dev_id, AM_FEND_EVT_STATUS_CHANGED, am_scan_fend_callback, (void*)scanner);
 	pthread_mutex_destroy(&scanner->lock);
 	pthread_cond_destroy(&scanner->cond);
+	if (atv_start_para.fe_paras != NULL)
+		free(atv_start_para.fe_paras);
 	free(scanner);		
 	
 	return NULL;
@@ -4087,9 +4158,9 @@ static void am_scan_copy_dtv_feparas(AM_SCAN_DTVCreatePara_t *para, AM_Bool_t us
 /**\brief 拷贝数字前端参数*/
 static void am_scan_copy_atv_feparas(AM_SCAN_ATVCreatePara_t *para, AM_SCAN_FrontEndPara_t *fe_start)
 {
-	int i;
-	
-	for (i=0; i<para->fe_cnt; i++,fe_start++)
+	int i;	
+    
+    for (i=0; i<para->fe_cnt; i++,fe_start++)
 	{
 		fe_start->fe_para = para->fe_paras[i];
 		AM_DEBUG(1, "ATV fe_para mode %d, freq %u", fe_start->fe_para.m_type, dvb_fend_para(fe_start->fe_para)->frequency);
@@ -4097,13 +4168,21 @@ static void am_scan_copy_atv_feparas(AM_SCAN_ATVCreatePara_t *para, AM_SCAN_Fron
 		{
 			dvb_fend_para(fe_start->fe_para)->u.analog.std = para->default_std;
 		}
-		dvb_fend_para(fe_start->fe_para)->u.analog.flag |= ANALOG_FLAG_ENABLE_AFC;
-		if (para->afc_range <= 0)
-			para->afc_range = ATV_2MHZ;
+
+        if (para->mode == AM_SCAN_ATVMODE_MANUAL)
+        {
+             dvb_fend_para(fe_start->fe_para)->u.analog.flag  |= ANALOG_FLAG_MANUL_SCAN;
+        }
+        else
+        {
+         
+             dvb_fend_para(fe_start->fe_para)->u.analog.flag |= ANALOG_FLAG_ENABLE_AFC;
+        }
+	    if (para->afc_range <= 0)
+			        para->afc_range = ATV_2MHZ;
 		dvb_fend_para(fe_start->fe_para)->u.analog.afc_range = para->afc_range;
 		fe_start->flag = AM_SCAN_FE_FL_ATV;
 	}
-	
 	AM_DEBUG(1, "ATV fe_paras count %d", para->fe_cnt);
 }
 
@@ -4261,7 +4340,16 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	
 	scanner->start_para = *para;
 	dtv_start_para.fe_paras = NULL;
-	atv_start_para.fe_paras = NULL;
+	if (para->atv_para.fe_cnt >= 3)
+	{
+		/* To store min, max, start freq */
+		atv_start_para.fe_paras = (AM_FENDCTRL_DVBFrontendParameters_t*)malloc(sizeof(AM_FENDCTRL_DVBFrontendParameters_t)*3);
+		memcpy(atv_start_para.fe_paras, para->atv_para.fe_paras, sizeof(AM_FENDCTRL_DVBFrontendParameters_t)*3);
+	}
+	else
+	{
+		atv_start_para.fe_paras = NULL;
+	}
 	if (atv_start_para.afc_unlocked_step <= 0)
 		atv_start_para.afc_unlocked_step = DEFAULT_AFC_UNLOCK_STEP;
 	if (atv_start_para.cvbs_unlocked_step <= 0)

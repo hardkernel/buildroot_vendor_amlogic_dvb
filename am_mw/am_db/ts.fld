@@ -14,4 +14,4 @@
 "polar integer",									/**< 极化方式,0-V, 1-H*/
 "std integer",										/**< ATV 声音,视频制式*/
 "aud_mode",											/**< ATV 声道*/
-"flags integer",									/**< ATV 预留*/
+"flags integer",									/**< ATV AFC的值*/
