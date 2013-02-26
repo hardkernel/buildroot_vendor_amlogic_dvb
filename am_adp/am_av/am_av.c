@@ -1718,7 +1718,7 @@ AM_ErrorCode_t AM_AV_SetVideoWindow(int dev_no, int x, int y, int w, int h)
 	
 	pthread_mutex_lock(&dev->lock);
 	
-	if((dev->video_x!=x) || (dev->video_y!=y) || (dev->video_w!=w) || (dev->video_h!=h))
+	//if((dev->video_x!=x) || (dev->video_y!=y) || (dev->video_w!=w) || (dev->video_h!=h))
 	{
 		if(dev->drv->set_video_para)
 		{
