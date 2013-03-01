@@ -379,10 +379,15 @@ static AM_ErrorCode_t si_gen_dvbpsi_section(uint8_t *buf, uint16_t len, dvbpsi_p
 	p_section->i_last_number = header.last_sec_num;
 	p_section->p_data = buf;
 	if (header.table_id == AM_SI_TID_TDT || header.table_id == AM_SI_TID_TOT)
+	{
 		p_section->p_payload_start = buf + 3;
+		p_section->p_payload_end = buf + len;
+	}
 	else
+	{
 		p_section->p_payload_start = buf + 8;
-	p_section->p_payload_end = buf + len;
+		p_section->p_payload_end = buf + len - 4;
+	}
  	p_section->p_next = NULL;
 
  	*psi_sec = p_section;
