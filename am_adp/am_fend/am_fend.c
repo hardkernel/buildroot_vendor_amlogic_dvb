@@ -1711,3 +1711,34 @@ AM_ErrorCode_t AM_FEND_FineTune(int dev_no, unsigned int freq)
 	return ret;
 }
 
+/**\brief 模拟CVBS AMP OUT
+ *\param dev_no 前端设备号
+ *\param amp ，单位为int
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+AM_ErrorCode_t AM_FEND_SetCvbsAmpOut(int dev_no, unsigned int amp)
+{
+	AM_FEND_Device_t *dev = NULL;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+
+	if(!dev->drv->set_cvbs_amp_out)
+	{
+		AM_DEBUG(1, "fronend %d no not support cvbs amp out", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+
+	pthread_mutex_lock(&dev->lock);
+    tuner_param_t tuner_para;
+    tuner_para.cmd = TUNER_CMD_SET_CVBS_AMP_OUT ;
+    tuner_para.parm = amp;
+	ret = dev->drv->set_cvbs_amp_out(dev, &tuner_para);
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+

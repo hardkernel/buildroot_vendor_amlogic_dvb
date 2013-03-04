@@ -380,6 +380,15 @@ extern AM_ErrorCode_t AM_FEND_BlindGetTPInfo(int dev_no, struct dvb_frontend_par
  */
 extern AM_ErrorCode_t AM_FEND_FineTune(int dev_no, unsigned int freq);
 
+/**\brief 模拟CVBS AMP OUT
+ *\param dev_no 前端设备号
+ *\param amp ，单位为int
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+extern AM_ErrorCode_t AM_FEND_SetCvbsAmpOut(int dev_no, unsigned int amp);
+
 #ifdef __cplusplus
 }
 #endif
