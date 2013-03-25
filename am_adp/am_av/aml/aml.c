@@ -3004,7 +3004,7 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 
 	if(tp->apid && (tp->apid<0x1fff)){
 		if((tp->afmt==AFORMAT_AC3) || (tp->afmt==AFORMAT_DTS)){
-			set_arc_freq(1);
+			//set_arc_freq(1);
 		}
 
 		val = tp->afmt;
@@ -3077,7 +3077,7 @@ static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 	
 	dev->ts_player.drv_data = (void*)-1;
 
-	set_arc_freq(0);
+	//set_arc_freq(0);
 	
 	return 0;
 }

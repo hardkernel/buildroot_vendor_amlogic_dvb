@@ -504,9 +504,6 @@ typedef unsigned long long tuner_std_id;
 #define TUNER_COLOR_PAL     ((tuner_std_id)0x04000000)
 #define TUNER_COLOR_NTSC    ((tuner_std_id)0x08000000)
 #define TUNER_COLOR_SECAM   ((tuner_std_id)0x10000000)
-//virtual define 
-#define TUNER_COLOR_AUTO    ((tuner_std_id)0x00000001)
-
 
 
 #define TUNER_DEMO_STAUS_PONR_BIT               0x01

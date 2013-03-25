@@ -3078,11 +3078,7 @@ static AM_ErrorCode_t am_scan_atv_step_tune(AM_SCAN_Scanner_t *scanner)
 			AM_DEBUG(1, "Trying to tune atv frequency %uHz (range:%d ~ %d)...", 
 				dvb_fend_para(cur_fe_para)->frequency,
 				scanner->atvctl.min_freq, scanner->atvctl.max_freq);
-            
-            /*set atv cvbs*/
-            int oldstd = scanner->start_para.atv_para.default_std;
-            am_set_atv_tuner_cvbs_std(scanner,oldstd);
-                
+ 
             /* Set frontend */
 			ret = AM_FENDCTRL_SetPara(scanner->start_para.fend_dev_id, &cur_fe_para);
 			if (ret == AM_SUCCESS)
@@ -3607,6 +3603,10 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 	scanner->atvctl.start = 1;
 	am_scan_open_vdin(scanner);
 	am_scan_open_afe(scanner);
+    
+    /*set atv cvbs*/
+    int std = scanner->start_para.atv_para.default_std;
+     am_set_atv_tuner_cvbs_std(scanner,std);
 	
 	return am_scan_start_next_ts(scanner);
 }

@@ -59,6 +59,7 @@ static AM_ErrorCode_t dvbsx_blindscan_scan(AM_FEND_Device_t *dev, struct dvbsx_b
 static AM_ErrorCode_t dvbsx_blindscan_getscanevent(AM_FEND_Device_t *dev, struct dvbsx_blindscanevent *pbsevent);
 static AM_ErrorCode_t dvbsx_blindscan_cancel(AM_FEND_Device_t *dev);
 static AM_ErrorCode_t dvb_fine_tune(AM_FEND_Device_t *dev, unsigned int freq);
+static AM_ErrorCode_t dvb_set_cvbs_amp_out(AM_FEND_Device_t *dev, tuner_param_t *tuner_para);
 
 /****************************************************************************
  * Static data
@@ -90,7 +91,8 @@ const AM_FEND_Driver_t linux_dvb_fend_drv =
 .blindscan_scan = dvbsx_blindscan_scan,
 .blindscan_getscanevent = dvbsx_blindscan_getscanevent,
 .blindscan_cancel = dvbsx_blindscan_cancel,
-.fine_tune = dvb_fine_tune
+.fine_tune = dvb_fine_tune,
+.set_cvbs_amp_out = dvb_set_cvbs_amp_out
 };
 
 /****************************************************************************
@@ -464,4 +466,17 @@ static AM_ErrorCode_t dvb_fine_tune(AM_FEND_Device_t *dev, unsigned int freq)
 
 	return AM_SUCCESS;
 }
+
+static AM_ErrorCode_t dvb_set_cvbs_amp_out(AM_FEND_Device_t *dev, tuner_param_t *tuner_para)
+{
+	int fd = (int)dev->drv_data;
+	if(ioctl(fd, FE_SET_PARAM_BOX, tuner_para)==-1)
+	{
+		AM_DEBUG(1, "ioctl FE_FINE_TUNE failed, errno: %s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	return AM_SUCCESS;
+}
+
 

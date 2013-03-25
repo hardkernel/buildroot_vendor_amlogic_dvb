@@ -434,7 +434,9 @@ typedef enum tuner_param_cmd_e{
 	TUNER_CMD_GET_MONO_MODE,
 	TUNER_CMD_SET_BEST_LOCK_RANGE,
 	TUNER_CMD_GET_BEST_LOCK_RANGE,
-    TUNER_CMD_NULL,
+	TUNER_CMD_SET_CVBS_AMP_OUT,
+	TUNER_CMD_GET_CVBS_AMP_OUT,
+	TUNER_CMD_NULL,
 }tuner_param_cmd_t;
 /*parameter for set param box*/
 typedef struct tuner_param_s {
