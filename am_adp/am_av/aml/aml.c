@@ -3116,6 +3116,7 @@ static void* aml_av_monitor_thread(void *arg)
 	struct timespec rt;
 	int curr_resample = 2;
 	AM_Bool_t avStatus[2];
+	int resample_change_ms = 0;
 	
 	last_apts = last_vpts = 0;
 	last_dec_vpts = dec_vpts = 0;
@@ -3257,15 +3258,31 @@ static void* aml_av_monitor_thread(void *arg)
 					ab_size, a_size, vb_size, v_size, dmx_apts-apts, dmx_vpts-vpts, resample);
 
 				if(resample != curr_resample){
-					const char *cmd;
-					curr_resample = resample;
-					switch(resample){
-						case 1: cmd = "1"; break;
-						case 2: cmd = "2"; break;
-						default: cmd = "0"; break;
+					int set = 1;
+					
+					if(curr_resample){
+						resample = 0;
+						AM_TIME_GetClock(&resample_change_ms);
+					}else{
+						int now;
+
+						AM_TIME_GetClock(&now);
+						if((now - resample_change_ms) < 500){
+							set = 0;
+						}
 					}
-					AM_FileEcho(ENABLE_RESAMPLE_FILE, resample?"1":"0");
-					AM_FileEcho(RESAMPLE_TYPE_FILE, cmd);
+
+					if(set){
+						const char *cmd;
+						curr_resample = resample;
+						switch(resample){
+							case 1: cmd = "1"; break;
+							case 2: cmd = "2"; break;
+							default: cmd = "0"; break;
+						}
+						AM_FileEcho(ENABLE_RESAMPLE_FILE, resample?"1":"0");
+						AM_FileEcho(RESAMPLE_TYPE_FILE, cmd);
+					}
 				}
 			}
 #endif /*ENABLE_AUDIO_RESAMPLE*/
