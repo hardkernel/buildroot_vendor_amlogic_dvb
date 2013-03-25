@@ -3696,16 +3696,18 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 		if (cur_fe_para.m_type == FE_ANALOG)
 		{
 			AM_SCAN_DTVSignalInfo_t si;
+			int formatted_freq;
 			
 			AM_DEBUG(1, "cvbs lock !");
+			formatted_freq = am_scan_format_atv_freq(scanner->atvctl.afc_locked_freq);
 			memset(&si, 0, sizeof(si));
-			si.frequency = dvb_fend_para(cur_fe_para)->frequency;
+			si.frequency = formatted_freq;
 			si.locked = AM_TRUE;
 			SIGNAL_EVENT(AM_SCAN_EVT_SIGNAL, (void*)&si);
 			
 			/* Analog processing */
 			scanner->curr_ts->type = AM_SCAN_TS_ANALOG;
-			scanner->curr_ts->analog.freq = am_scan_format_atv_freq(scanner->atvctl.afc_locked_freq);
+			scanner->curr_ts->analog.freq = formatted_freq;
             
             scanner->curr_ts->analog.std = scanner->start_para.atv_para.default_std;
 			//scanner->curr_ts->analog.std = dvb_fend_para(cur_fe_para)->u.analog.std;
