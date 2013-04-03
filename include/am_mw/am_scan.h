@@ -232,6 +232,7 @@ typedef struct AM_SCAN_TS_s
 typedef struct
 {
 	int mode;		/**< ATV搜索模式,见AM_SCAN_ATVMode*/
+	int channel_id;	/**< Used for manual scan*/
 	int direction;	/**< Manual模式时设置*/
 	int afe_dev_id;			/**< AFE设备号*/
 	int default_std;		/**< tuner std*/	

@@ -1210,23 +1210,31 @@ static void store_analog_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_S
 		sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
 		if (r == SQLITE_ROW)
 		{
-			/*已保存有频道，则替换起始频率所在的频道，且保持频道号不变*/
-			sqlite3_bind_int(stmts[QUERY_TS], 1, FE_ANALOG);
-			sqlite3_bind_int(stmts[QUERY_TS], 2, dvb_fend_para(result->start_para->atv_para.fe_paras[2])->frequency);
-			sqlite3_bind_int(stmts[QUERY_TS], 3, -1);
-			sqlite3_bind_int(stmts[QUERY_TS], 4, -1);
-			if (sqlite3_step(stmts[QUERY_TS]) == SQLITE_ROW)
+			if (result->start_para->atv_para.channel_id < 0)
 			{
-				dbid = sqlite3_column_int(stmts[QUERY_TS], 0);
+				/*已保存有频道，则替换起始频率所在的频道，且保持频道号不变*/
+				sqlite3_bind_int(stmts[QUERY_TS], 1, FE_ANALOG);
+				sqlite3_bind_int(stmts[QUERY_TS], 2, dvb_fend_para(result->start_para->atv_para.fe_paras[2])->frequency);
+				sqlite3_bind_int(stmts[QUERY_TS], 3, -1);
+				sqlite3_bind_int(stmts[QUERY_TS], 4, -1);
+				if (sqlite3_step(stmts[QUERY_TS]) == SQLITE_ROW)
+				{
+					dbid = sqlite3_column_int(stmts[QUERY_TS], 0);
+				}
+				sqlite3_reset(stmts[QUERY_TS]);
 			}
-			sqlite3_reset(stmts[QUERY_TS]);
+			else
+			{
+				dbid = result->start_para->atv_para.channel_id;
+			}
+			
 			if (dbid == -1)
 			{
 				AM_DEBUG(1, "Cannot get ts record for this ATV manual freq, will not store.");
 			}
 			else
 			{
-				AM_DEBUG(1, "ATV manual scan replace current channel.");
+				AM_DEBUG(1, "ATV manual scan replace current channel, channel id = %d", dbid);
 				/* 仅更新TS数据 */
 				sqlite3_bind_int(stmts[UPDATE_ANALOG_TS], 1, ts->analog.freq);
 				sqlite3_bind_int(stmts[UPDATE_ANALOG_TS], 2, ts->analog.std);
