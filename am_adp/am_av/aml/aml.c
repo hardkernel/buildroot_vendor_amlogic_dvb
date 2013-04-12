@@ -128,6 +128,7 @@ void *adec_handle;
 #define AUDIO_START_LEN (0*1024)
 #define AUDIO_LOW_LEN (1*1024)
 #define AV_SYNC_THRESHOLD	300
+#define AV_SMOOTH_SYNC_VAL "300"
 
 #ifdef ANDROID
 #define audio_decode_start(h)\
@@ -4688,7 +4689,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","0");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");
 			AM_FileEcho("/sys/class/video/axis", "0 0 0 0");
-			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", "1");
+			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", AV_SMOOTH_SYNC_VAL);
 		}
 #endif
 	}
