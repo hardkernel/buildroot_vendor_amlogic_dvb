@@ -270,7 +270,7 @@ static void sec(int dev_no)
 			case 17:
 				{
 					int lnbport, polarisation, local_oscillator_freq;
-					printf("lnbport-1-4\n");
+					printf("lnbport-1-4:AA=0, AB=1, BA=2, BB=3, SENDNO=4\n");
 					scanf("%d", &lnbport);
 					printf("polarisation:H-0/V-1/NO-2\n");
 					scanf("%d", &polarisation);
@@ -283,7 +283,7 @@ static void sec(int dev_no)
 			case 18:
 				{
 					int lnbport, polarisation, local_oscillator_freq;
-					printf("lnbport-1-16\n");
+					printf("lnbport-1-16:0xF0 .. 0xFF\n");
 					scanf("%d", &lnbport);
 					printf("polarisation:H-0/V-1/NO-2\n");
 					scanf("%d", &polarisation);

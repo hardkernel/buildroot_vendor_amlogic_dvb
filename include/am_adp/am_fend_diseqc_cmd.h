@@ -73,6 +73,12 @@ typedef enum AM_FEND_LOCALOSCILLATORFREQ
 	AM_FEND_LOCALOSCILLATORFREQ_NOSET
 }AM_FEND_Localoscollatorfreq_t;
 
+/**\brief 22Khz参数,match AM_SEC_22khz_Signal*/ 
+typedef enum {	AM_FEND_ON=0, AM_FEND_OFF=1 }AM_FEND_22khz_Signal; // 22 Khz
+
+/**\brief 电压参数,match AM_SEC_Voltage_Mode*/ 
+typedef enum {	AM_FEND_13V=0, AM_FEND_18V=1 }AM_FEND_Voltage_Mode; // 13/18 V
+
 /**\brief DVB-S/S2前端本振频率表LOCAL OSCILLATOR FREQ TABLE*/
 typedef enum AM_FEND_LOT
 {
@@ -207,7 +213,7 @@ extern AM_ErrorCode_t AM_FEND_Diseqccmd_SetSwitchInput(int dev_no, AM_FEND_Switc
 
 /**\brief 选择LNB1-LNB4\极性\本振频率 (Diseqc1.0 M) 
  * \param dev_no 前端设备号
- * \param lnbport LNB1-LNB4对应LNBPort取值1-4
+ * \param lnbport LNB1-LNB4对应LNBPort取值AA=0, AB=1, BA=2, BB=3, SENDNO=4
  * \param polarisation 垂直水平极性 
  * \param local_oscillator_freq 高低本振频率   
  * \return
@@ -220,7 +226,7 @@ extern AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort4(int dev_no, int lnbport,
                                                                  
 /**\brief 选择LNB1-LNB16 (Diseqc1.1 M) 
  * \param dev_no 前端设备号
- * \param lnbport LNB1-LNB16对应LNBPort取值1-16
+ * \param lnbport LNB1-LNB16对应LNBPort取值0xF0 .. 0xFF
  * \param polarisation 垂直水平极性 
  * \param local_oscillator_freq 高低本振频率 
  * \return

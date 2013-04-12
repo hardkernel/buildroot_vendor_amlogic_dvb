@@ -399,7 +399,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetSwitchInput(int dev_no, AM_FEND_Switchinput_
 
 /**\brief 选择LNB1-LNB4\极性\本振频率 (Diseqc1.0 M) 
  * \param dev_no 前端设备号
- * \param lnbport LNB1-LNB4对应LNBPort取值1-4
+ * \param lnbport LNB1-LNB4对应LNBPort取值AA=0, AB=1, BA=2, BB=3, SENDNO=4
  * \param polarisation 垂直水平极性 
  * \param local_oscillator_freq 高低本振频率   
  * \return
@@ -412,8 +412,13 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort4(int dev_no, int lnbport,
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
-	if((lnbport < 1) || (lnbport > 4)){
+	if((lnbport < 0) || (lnbport > 4)){
 		ret = AM_FEND_DISEQCCMD_ERROR_BASE;
+		return ret;
+	}
+
+	if(lnbport == 4)
+	{
 		return ret;
 	}
 	
@@ -424,16 +429,17 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort4(int dev_no, int lnbport,
 	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_LNBSWITCHSMATV;
 	cmd.msg[2] = 0x38;
 
+#if 0
 	switch(lnbport)
 	{
 		case 1:
-			if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xF0;
-			}else if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xF1;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xF2;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xF3;
 			}else{
 				cmd.msg[3] = 0xF0;
@@ -441,13 +447,13 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort4(int dev_no, int lnbport,
 			break;
 			
 		case 2:
-			if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xF4;
-			}else if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xF5;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xF6;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xF7;
 			}else{
 				cmd.msg[3] = 0xF4;
@@ -455,13 +461,13 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort4(int dev_no, int lnbport,
 			break;
 			
 		case 3:
-			if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xF8;
-			}else if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xF9;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xFA;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xFB;
 			}else{
 				cmd.msg[3] = 0xF8;
@@ -469,13 +475,13 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort4(int dev_no, int lnbport,
 			break;
 			
 		case 4:
-			if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xFC;
-			}else if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xFD;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xFE;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xFF;
 			}else{
 				cmd.msg[3] = 0xFC;
@@ -486,6 +492,40 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort4(int dev_no, int lnbport,
 			cmd.msg[3] = 0xF0;
 			break;
 	}
+#else
+	/*above code is correct, but complex*/
+	int band = 0;
+	int csw = lnbport; 
+
+	if(local_oscillator_freq != AM_FEND_LOCALOSCILLATORFREQ_NOSET){
+		if ( local_oscillator_freq & AM_FEND_LOCALOSCILLATORFREQ_H)
+			band |= 1;
+	}
+
+	if(polarisation != AM_FEND_POLARISATION_NOSET){
+		if (!(polarisation & AM_FEND_POLARISATION_V))
+			band |= 2;
+	}
+
+	if ( lnbport < 4 )
+		csw = 0xF0 | (csw << 2);
+
+	if (lnbport <= 4)
+		csw |= band;	
+
+
+	if(local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_NOSET){
+		csw &= 0xEF;
+	}
+
+	if(polarisation == AM_FEND_POLARISATION_NOSET){
+		csw &= 0xDF;
+	}
+
+	cmd.msg[3]  = csw;
+#endif
+
+	AM_DEBUG(1, "AM_FEND_Diseqccmd_SetLNBPort4 %x\n", cmd.msg[3] );
 
 	cmd.msg_len = 4;
 	
@@ -498,7 +538,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort4(int dev_no, int lnbport,
                                                                  
 /**\brief 选择LNB1-LNB16 (Diseqc1.1 M) 
  * \param dev_no 前端设备号
- * \param lnbport LNB1-LNB16对应LNBPort取值1-16
+ * \param lnbport LNB1-LNB16对应LNBPort取值0xF0 .. 0xFF
  * \param polarisation 垂直水平极性 
  * \param local_oscillator_freq 高低本振频率 
  * \return
@@ -511,7 +551,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort16(int dev_no, int lnbport,
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
-	if((lnbport < 1) || (lnbport > 16)){
+	if((lnbport < 0xF0) || (lnbport > 0xFF)){
 		ret = AM_FEND_DISEQCCMD_ERROR_BASE;
 		return ret;
 	}	
@@ -522,6 +562,7 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort16(int dev_no, int lnbport,
 	cmd.msg[0] = FEND_DISEQC_CMD_FRAMING_CMDNOREPLYFIRSTTRANS;
 	cmd.msg[1] = FEND_DISEQC_CMD_ADDR_LNBSWITCHSMATV;
 
+#if 0 /*polarisation and local_oscillator_freq set in AM_FEND_Diseqccmd_SetLNBPort4, we are not need complex*/
 	cmd.msg[2] = 0x38;
 
 	switch(lnbport)
@@ -530,13 +571,13 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort16(int dev_no, int lnbport,
 		case 5:
 		case 9:
 		case 13:
-			if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xF0;
-			}else if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xF1;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xF2;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xF3;
 			}else{
 				cmd.msg[3] = 0xF2;
@@ -548,13 +589,13 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort16(int dev_no, int lnbport,
 		case 6:
 		case 10:
 		case 14:
-			if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xF4;
-			}else if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xF5;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xF6;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xF7;
 			}else{
 				cmd.msg[3] = 0xF6;
@@ -566,13 +607,13 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort16(int dev_no, int lnbport,
 		case 7:
 		case 11:
 		case 15:
-			if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xF8;
-			}else if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xF9;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xFA;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xFB;
 			}else{
 				cmd.msg[3] = 0xFA;
@@ -583,13 +624,13 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort16(int dev_no, int lnbport,
 		case 8:
 		case 12:
 		case 16:
-			if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xFC;
-			}else if((polarisation == AM_FEND_POLARISATION_V) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_V) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xFD;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_L)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_L)){
 				cmd.msg[3] = 0xFE;
-			}else if((polarisation == AM_FEND_POLARISATION_H) && (polarisation == AM_FEND_LOCALOSCILLATORFREQ_H)){
+			}else if((polarisation == AM_FEND_POLARISATION_H) && (local_oscillator_freq == AM_FEND_LOCALOSCILLATORFREQ_H)){
 				cmd.msg[3] = 0xFF;
 			}else{
 				cmd.msg[3] = 0xFE;
@@ -602,14 +643,17 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort16(int dev_no, int lnbport,
 	}
 	
 	cmd.msg_len = 4;
+
 	
 	if(AM_FEND_DiseqcSendMasterCmd(dev_no, &cmd) != AM_SUCCESS){
 		ret = AM_FEND_DISEQCCMD_ERROR_BASE;
 		return ret;
 	}
-	
+#endif
+
 	cmd.msg[2] = 0x39;
 
+#if 0
 	switch(lnbport)
 	{
 		case 1:
@@ -680,8 +724,13 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort16(int dev_no, int lnbport,
 			cmd.msg[3] = 0xF0;
 			break;
 	}
+#endif
+
+	cmd.msg[3] = lnbport;
 
 	cmd.msg_len = 4;
+
+	AM_DEBUG(1, "AM_FEND_Diseqccmd_SetLNBPort16 %x\n", cmd.msg[3] );	
 	
 	if(AM_FEND_DiseqcSendMasterCmd(dev_no, &cmd) != AM_SUCCESS){
 		ret = AM_FEND_DISEQCCMD_ERROR_BASE;
