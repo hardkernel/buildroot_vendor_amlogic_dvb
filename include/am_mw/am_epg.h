@@ -95,6 +95,7 @@ enum AM_EPG_EventType
 	AM_EPG_EVT_NEW_STT,		/**< 发新新版本STT， 参数为stt_section_info_t*/
 	AM_EPG_EVT_NEW_RRT,		/**< 发新新版本RRT， 参数为rrt_section_info_t*/
 	AM_EPG_EVT_NEW_MGT,		/**< 发新新版本MGT， 参数为mgt_section_info_t*/
+	AM_EPG_EVT_NEW_VCT,		/**< 发新新版本VCT， 参数为vct_section_info_t*/
 	AM_EPG_EVT_NEW_PSIP_EIT,/**< 发新新版本ATSC EIT， 参数为eit_section_info_t*/
 	AM_EPG_EVT_EIT_DONE,   /**< 所有EIT接收完毕*/
 	AM_EPG_EVT_UPDATE_EVENTS,	/**< 通知接收到新的EIT events 数据，用于上层实现更新*/

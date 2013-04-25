@@ -17,7 +17,12 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_evt/am_evt.c\
 		   am_dsc/am_dsc.c am_dsc/aml/aml.c\
 		   am_smc/am_smc.c\
-		   am_smc/aml/aml.c
+		   am_smc/aml/aml.c\
+		   am_userdata/am_userdata.c\
+		   am_userdata/aml/aml.c\
+		   am_userdata/emu/emu.c
+
+
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND
 LOCAL_ARM_MODE := arm
@@ -53,7 +58,10 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
            am_evt/am_evt.c\
            am_dsc/am_dsc.c am_dsc/aml/aml.c\
            am_smc/am_smc.c\
-           am_smc/aml/aml.c
+           am_smc/aml/aml.c\
+	   am_userdata/am_userdata.c\
+	   am_userdata/aml/aml.c\
+	   am_userdata/emu/emu.c
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND
 LOCAL_ARM_MODE := arm 

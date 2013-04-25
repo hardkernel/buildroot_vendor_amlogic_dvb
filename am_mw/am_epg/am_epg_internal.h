@@ -56,6 +56,7 @@ enum
 	AM_EPG_EVT_MGT_DONE		= 0x80000,	/**< MGT接收完毕*/
 	AM_EPG_EVT_RRT_DONE		= 0x100000,	/**< RRT接收完毕*/
 	AM_EPG_EVT_PSIP_EIT_DONE	= 0x200000, /**< ATSC 某个 EIT 接收完毕*/
+	AM_EPG_EVT_VCT_DONE		= 0x400000,	/**< VCT接收完毕*/
 };
 
 typedef struct AM_EPG_Monitor_s AM_EPG_Monitor_t ;
@@ -108,6 +109,7 @@ struct AM_EPG_Monitor_s
 	AM_EPG_TableCtl_t	sttctl;
 	AM_EPG_TableCtl_t	mgtctl;
 	AM_EPG_TableCtl_t	rrtctl;
+	AM_EPG_TableCtl_t	vctctl;
 	AM_EPG_TableCtl_t	psip_eitctl[128]; /**< ATSC PSIP supports up to 128 EITs*/
 
 	int					src;			/**< 源标识*/
@@ -137,6 +139,7 @@ struct AM_EPG_Monitor_s
 	stt_section_info_t	*stts;
 	mgt_section_info_t	*mgts;
 	rrt_section_info_t	*rrts;
+	vct_section_info_t	*vcts;
 	eit_section_info_t	*psip_eits;
 
 	struct dvb_frontend_event 		fe_evt;			/**< 前端事件*/

@@ -3158,18 +3158,6 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 			{
 				return am_scan_start_atv(scanner);
 			}
-		
-			/* now start a new freq*/
-			if (atv_start_para.mode == AM_SCAN_ATVMODE_FREQ)
-			{
-				/* adjust the min, max, start freq */
-				scanner->atvctl.min_freq = dvb_fend_para(cur_fe_para)->frequency - ATV_1_5MHZ;
-				scanner->atvctl.max_freq = dvb_fend_para(cur_fe_para)->frequency + ATV_1_5MHZ;
-				scanner->atvctl.start_freq = scanner->atvctl.min_freq;
-			
-				/* start from min freq */
-				dvb_fend_para(cur_fe_para)->frequency = scanner->atvctl.start_freq;
-			}
 		}
 		
 		tp.index = scanner->curr_freq;
@@ -3918,7 +3906,7 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 
 try_next:
 	/*尝试下一频点*/	
-	if (cur_fe_para.m_type == FE_ANALOG)
+	if (cur_fe_para.m_type == FE_ANALOG && atv_start_para.mode != AM_SCAN_ATVMODE_FREQ)
 	{
 		scanner->atvctl.step = atv_start_para.afc_unlocked_step;
 		am_scan_atv_step_tune(scanner);
@@ -4349,6 +4337,11 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	AM_DEBUG(1, "Total fe_paras count %d", scanner->start_freqs_cnt);
 	
 	scanner->start_para = *para;
+	if (para->mode == AM_SCAN_MODE_ADTV)
+	{
+		atv_start_para.mode = AM_SCAN_ATVMODE_FREQ;
+		dtv_start_para.mode = AM_SCAN_DTVMODE_ALLBAND;
+	}
 	dtv_start_para.fe_paras = NULL;
 	if (para->atv_para.fe_cnt >= 3)
 	{

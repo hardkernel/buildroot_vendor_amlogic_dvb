@@ -75,6 +75,7 @@
 #define dvbpsi_mgt_t mgt_section_info_t
 #define dvbpsi_psip_eit_t eit_section_info_t
 #define dvbpsi_rrt_t rrt_section_info_t
+#define dvbpsi_vct_t vct_section_info_t
 
 /*清除一个subtable控制数据*/
 #define SUBCTL_CLEAR(sc)\
@@ -486,6 +487,144 @@ static AM_ErrorCode_t am_epg_tablectl_mark_section_eit(AM_EPG_TableCtl_t	 * mcl,
 static AM_ErrorCode_t am_epg_tablectl_mark_section(AM_EPG_TableCtl_t * mcl, AM_SI_SectionHeader_t *header)
 {
 	return am_epg_tablectl_mark_section_eit(mcl, header, -1);
+}
+
+
+static int am_epg_get_current_db_ts_id(AM_EPG_Monitor_t *mon)
+{
+	int row = 1;
+	int db_ts_id = -1;
+	char sql[256];
+	sqlite3 *hdb;
+
+	AM_DB_HANDLE_PREPARE(hdb);
+	
+	snprintf(sql, sizeof(sql), "select db_ts_id from srv_table where db_id=%d", mon->mon_service);
+	AM_DB_Select(hdb, sql, &row, "%d", &db_ts_id);
+	return db_ts_id;
+}
+
+static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, char *langs)
+{
+	int i;
+	
+	if (ai->audio_count < 0)
+		ai->audio_count = 0;
+		
+	pids[0] = 0;
+	fmts[0] = 0;
+	langs[0] = 0;
+	for (i=0; i<ai->audio_count; i++)
+	{
+		if (i == 0)
+		{
+			sprintf(pids, "%d", ai->audios[i].pid);
+			sprintf(fmts, "%d", ai->audios[i].fmt);
+			sprintf(langs, "%s", ai->audios[i].lang);
+		}
+		else
+		{
+			sprintf(pids, "%s %d", pids, ai->audios[i].pid);
+			sprintf(fmts, "%s %d", fmts, ai->audios[i].fmt);
+			sprintf(langs, "%s %s", langs, ai->audios[i].lang);
+		}
+	}
+}
+
+
+static AM_Bool_t am_epg_check_program_av(sqlite3 * hdb, int db_srv_id, int vid, int vfmt, AM_SI_AudioInfo_t *aud_info)
+{
+	int row = 1;
+	int prev_vid = 0x1fff, prev_vfmt = -1;
+	char sql[1024];
+	char str_prev_apids[256];
+	char str_prev_afmts[256];
+	char str_prev_alangs[256];
+	AM_Bool_t ret = AM_FALSE;
+	
+	/* is video/audio changed ? */
+	snprintf(sql, sizeof(sql), "select vid_pid,vid_fmt,aud_pids,aud_fmts,aud_langs \
+		from srv_table where db_id=%d", db_srv_id);
+	if (AM_DB_Select(hdb, sql, &row, "%d,%d,%s:256,%s:256,%s:256", &prev_vid, 
+		&prev_vfmt, str_prev_apids, str_prev_afmts, str_prev_alangs) == AM_SUCCESS && row > 0)
+	{
+		int i;
+		char *str_tok;
+		char str_apids[256];
+		char str_afmts[256];
+		char str_alangs[256];
+		AM_SI_AudioInfo_t cur_aud_info;
+		
+		memset(&cur_aud_info, 0, sizeof(cur_aud_info));
+		i = 0;
+		AM_TOKEN_PARSE_BEGIN(str_prev_apids, " ", str_tok)
+			if (i < (int)AM_ARRAY_SIZE(cur_aud_info.audios))
+				cur_aud_info.audios[i].pid = atoi(str_tok);
+			else
+				break;
+			i++;
+		AM_TOKEN_PARSE_END(str_prev_apids, " ", str_tok)
+		i = 0;
+		AM_TOKEN_PARSE_BEGIN(str_prev_afmts, " ", str_tok)
+			if (i < (int)AM_ARRAY_SIZE(cur_aud_info.audios))
+				cur_aud_info.audios[i].fmt = atoi(str_tok);
+			else
+				break;
+			i++;
+		AM_TOKEN_PARSE_END(str_prev_afmts, " ", str_tok)
+		i = 0;
+		AM_TOKEN_PARSE_BEGIN(str_prev_alangs, " ", str_tok)
+			if (i < (int)AM_ARRAY_SIZE(cur_aud_info.audios))
+				memcpy(&cur_aud_info.audios[i].lang, str_tok, 3);
+			else
+				break;
+			i++;
+		AM_TOKEN_PARSE_END(str_prev_alangs, " ", str_tok)
+		
+		if (vid != prev_vid || vfmt != prev_vfmt)
+		{
+			ret = AM_TRUE;
+		}
+		else
+		{
+			int j;
+			for (i=0; i<cur_aud_info.audio_count; i++)
+			{
+				for (j=0; j<aud_info->audio_count; j++)
+				{
+					if (cur_aud_info.audios[i].pid == aud_info->audios[j].pid &&
+						cur_aud_info.audios[i].fmt == aud_info->audios[j].fmt &&
+						!strncmp(cur_aud_info.audios[i].lang, aud_info->audios[j].lang, 3))
+						break;
+				}
+				if (j >= aud_info->audio_count)
+				{
+					ret = AM_TRUE;
+					break;
+				}
+			}
+		}
+		
+		if (ret)
+		{
+			format_audio_strings(&cur_aud_info, str_apids, str_afmts, str_alangs);
+			AM_DEBUG(1, "@@ Video/Audio changed @@");
+			AM_DEBUG(1, "Video pid/fmt: (%d/%d) -> (%d/%d)", prev_vid, prev_vfmt, vid, vfmt);
+			AM_DEBUG(1, "Audio pid/fmt/lang: ('%s'/'%s'/'%s') -> ('%s'/'%s'/'%s')",
+				str_prev_apids, str_prev_afmts, str_prev_alangs, str_apids, str_afmts, str_alangs);
+			/* update to database */
+			snprintf(sql, sizeof(sql), "update srv_table set vid_pid=%d,vid_fmt=%d,\
+				aud_pids='%s',aud_fmts='%s',aud_langs='%s', current_aud=-1 where db_id=%d", 
+				vid, vfmt, str_apids, str_afmts, str_alangs, db_srv_id);
+			sqlite3_exec(hdb, sql, NULL, NULL, NULL);
+		}
+		else
+		{
+			AM_DEBUG(1, "@ Video & Audio not changed ! @");
+		}
+	}
+	
+	return ret;
 }
 
 static void am_epg_proc_tot_section(AM_EPG_Monitor_t *mon, void *tot_section)
@@ -1033,6 +1172,101 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 	AM_SI_LIST_END()
 }
 
+static void am_epg_proc_vct_section(AM_EPG_Monitor_t *mon, void *vct_section)
+{
+	vct_section_info_t *p_vct = (vct_section_info_t *)vct_section;
+	vct_channel_info_t *vcinfo;
+	AM_SI_AudioInfo_t aud_info;
+	int vid, vfmt, db_ts_id, ts_id, row;
+	int major, minor, srv_type, db_srv_id;
+	char str_apids[256];
+	char str_afmts[256];
+	char str_alangs[256];
+	char sql[1024];
+	sqlite3 *hdb;
+
+	AM_DB_HANDLE_PREPARE(hdb);
+	
+	/* check if ts_id needs update */
+	ts_id = -1;
+	db_ts_id = am_epg_get_current_db_ts_id(mon);
+	if (db_ts_id >= 0)
+	{
+		row = 1;
+		snprintf(sql, sizeof(sql), "select ts_id from ts_table where db_id=%d", db_ts_id);
+		AM_DB_Select(hdb, sql, &row, "%d", &ts_id);
+	}
+	else
+	{
+		AM_DEBUG(1, "VCT proc: cannot get current ts!");
+		return;
+	}
+	
+	if (p_vct->transport_stream_id != ts_id)
+	{
+		AM_DEBUG(1, "TS id not match, current(%d), but got(%d)", ts_id, p_vct->transport_stream_id);
+		SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)db_ts_id);
+		return;
+	}
+	
+	AM_SI_LIST_BEGIN(p_vct->vct_chan_info, vcinfo)
+		if (vcinfo->program_number == 0  || vcinfo->program_number == 0xffff)
+			continue;
+	
+		if (vcinfo->channel_TSID == p_vct->transport_stream_id)
+		{	
+			snprintf(sql, sizeof(sql), "select db_id, major_chan_num, minor_chan_num, service_type \
+				from srv_table where db_ts_id=%d and service_id=%d", db_ts_id, vcinfo->program_number);
+			if (AM_DB_Select(hdb, sql, &row, "%d,%d,%d,%d", &db_srv_id, &major, 
+				&minor, &srv_type) == AM_SUCCESS && row > 0)
+			{
+				/* AV changed ? */
+				vid = 0x1fff;
+				vfmt = -1;
+				memset(&aud_info, 0, sizeof(aud_info));
+				AM_SI_ExtractAVFromATSCVC(vcinfo, &vid, &vfmt, &aud_info);
+
+				if (am_epg_check_program_av(hdb, db_srv_id, vid, vfmt, &aud_info))
+				{
+					if (db_srv_id == mon->mon_service)
+					{
+						/*触发通知事件*/
+						SIGNAL_EVENT(AM_EPG_EVT_UPDATE_PROGRAM_AV, (void*)mon->mon_service);
+					}
+				}
+				/* channel number changed ? */
+				if (major != vcinfo->major_channel_number ||
+					minor != vcinfo->minor_channel_number)
+				{
+					AM_DEBUG(1, "Program(%d) vct update(major-minor): %d-%d -> %d-%d",
+						vcinfo->program_number, major, minor,
+						vcinfo->major_channel_number, vcinfo->minor_channel_number);
+						
+					/* update to database */
+					snprintf(sql, sizeof(sql), "update srv_table set major_chan_num=%d,minor_chan_num=%d where db_id=%d", 
+						vcinfo->major_channel_number, 
+						vcinfo->minor_channel_number,
+						db_srv_id);
+					sqlite3_exec(hdb, sql, NULL, NULL, NULL);
+				}
+			}
+			else
+			{
+				AM_DEBUG(1, "Cannot get program %d, need a re-scan for current ts.", vcinfo->program_number);
+				SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)db_ts_id);
+				return;
+			}
+		}
+		else
+		{
+			AM_DEBUG(1, "Program(%d) of TS(%d) in VCT(%d) found", 
+					vcinfo->program_number, vcinfo->channel_TSID,
+					p_vct->transport_stream_id);
+			continue;
+		}
+	AM_SI_LIST_END()
+}
+
 /**\brief 根据过滤器号取得相应控制数据*/
 static AM_EPG_TableCtl_t *am_epg_get_section_ctrl_by_fid(AM_EPG_Monitor_t *mon, int fid)
 {
@@ -1068,6 +1302,8 @@ static AM_EPG_TableCtl_t *am_epg_get_section_ctrl_by_fid(AM_EPG_Monitor_t *mon, 
 		scl = &mon->mgtctl;
 	else if (mon->rrtctl.fid == fid)
 		scl = &mon->rrtctl;
+	else if (mon->vctctl.fid == fid)
+		scl = &mon->vctctl;
 	else
 	{
 		int i;
@@ -1196,6 +1432,10 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 			case AM_SI_TID_PSIP_STT:
 				COLLECT_SECTION(dvbpsi_stt_t, mon->stts);
 				break;
+			case AM_SI_TID_PSIP_TVCT:
+			case AM_SI_TID_PSIP_CVCT:
+				COLLECT_SECTION(dvbpsi_vct_t, mon->vcts);
+				break;
 			default:
 				AM_DEBUG(1, "EPG: Unkown section data, table_id 0x%x", data[0]);
 				pthread_mutex_unlock(&mon->lock);
@@ -1299,49 +1539,6 @@ static int am_epg_get_current_service_id(AM_EPG_Monitor_t *mon)
 	AM_DB_Select(hdb, sql, &row, "%d", &service_id);
 	return service_id;
 }
-
-static int am_epg_get_current_db_ts_id(AM_EPG_Monitor_t *mon)
-{
-	int row = 1;
-	int db_ts_id = -1;
-	char sql[256];
-	sqlite3 *hdb;
-
-	AM_DB_HANDLE_PREPARE(hdb);
-	
-	snprintf(sql, sizeof(sql), "select db_ts_id from srv_table where db_id=%d", mon->mon_service);
-	AM_DB_Select(hdb, sql, &row, "%d", &db_ts_id);
-	return db_ts_id;
-}
-
-
-static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, char *langs)
-{
-	int i;
-	
-	if (ai->audio_count < 0)
-		ai->audio_count = 0;
-		
-	pids[0] = 0;
-	fmts[0] = 0;
-	langs[0] = 0;
-	for (i=0; i<ai->audio_count; i++)
-	{
-		if (i == 0)
-		{
-			sprintf(pids, "%d", ai->audios[i].pid);
-			sprintf(fmts, "%d", ai->audios[i].fmt);
-			sprintf(langs, "%s", ai->audios[i].lang);
-		}
-		else
-		{
-			sprintf(pids, "%s %d", pids, ai->audios[i].pid);
-			sprintf(fmts, "%s %d", fmts, ai->audios[i].fmt);
-			sprintf(langs, "%s %s", langs, ai->audios[i].lang);
-		}
-	}
-}
-
 
 /**\brief 插入一个Subtitle记录*/
 static int insert_subtitle(sqlite3 * hdb, int db_srv_id, int pid, dvbpsi_subtitle_t *psd)
@@ -1449,7 +1646,7 @@ static void am_epg_check_pmt_update(AM_EPG_Monitor_t *mon)
 	int vid = 0x1fff, prev_vid = 0x1fff;
 	int afmt_tmp, vfmt_tmp, db_ts_id;
 	AM_SI_AudioInfo_t aud_info;
-	char lang_tmp[3];
+	char sql[1024];
 	char str_apids[256];
 	char str_afmts[256];
 	char str_alangs[256];
@@ -1470,7 +1667,7 @@ static void am_epg_check_pmt_update(AM_EPG_Monitor_t *mon)
 	if (db_ts_id >= 0 && mon->pats)
 	{
 		char sql[256];
-		int ts_id;
+		int ts_id = 0xffff;
 		int row = 1;
 		
 		snprintf(sql, sizeof(sql), "select ts_id from ts_table where db_id=%d", db_ts_id);
@@ -1483,8 +1680,13 @@ static void am_epg_check_pmt_update(AM_EPG_Monitor_t *mon)
 				snprintf(sql, sizeof(sql), "update ts_table set ts_id=%d where db_id=%d",
 					mon->pats->i_ts_id, db_ts_id);
 				sqlite3_exec(hdb, sql, NULL, NULL, NULL);
-				SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)db_ts_id);
+				ts_id = mon->pats->i_ts_id;
 			}
+		}
+		if (ts_id != mon->pats->i_ts_id)
+		{
+			AM_DEBUG(1, "PAT ts_id not match, expect(%d), but got(%d)", ts_id, mon->pats->i_ts_id);
+			return;
 		}
 	}
 	
@@ -1497,87 +1699,54 @@ static void am_epg_check_pmt_update(AM_EPG_Monitor_t *mon)
 		AM_SI_LIST_END()
 	AM_SI_LIST_END()
 	
-	format_audio_strings(&aud_info, str_apids, str_afmts, str_alangs);
-	if (vfmt != -1)
+	if (am_epg_check_program_av(hdb, mon->mon_service, vid, vfmt, &aud_info))
 	{
-		int row = 1;
-		char sql[256];
-		char str_prev_apids[256];
-		char str_prev_afmts[256];
-		char str_prev_alangs[256];
-		
-		/* is video/audio changed ? */
-		snprintf(sql, sizeof(sql), "select vid_pid,vid_fmt,aud_pids,aud_fmts,aud_langs \
-			from srv_table where db_id=%d", mon->mon_service);
-		if (AM_DB_Select(hdb, sql, &row, "%d,%d,%s:256,%s:256,%s:256", &prev_vid, 
-			&prev_vfmt, str_prev_apids, str_prev_afmts, str_prev_alangs) == AM_SUCCESS && row > 0)
-		{
-			if (vid == prev_vid && vfmt == prev_vfmt && 
-				!strcmp(str_apids, str_prev_apids) &&
-				!strcmp(str_afmts, str_prev_afmts) &&
-				!strcmp(str_alangs, str_prev_alangs))
-			{
-				AM_DEBUG(1, "@ Video & Audio not changed ! @");
-			}
-			else
-			{
-				AM_DEBUG(1, "@@ Video/Audio changed @@");
-				AM_DEBUG(1, "Video pid/fmt: (%d/%d) -> (%d/%d)", prev_vid, prev_vfmt, vid, vfmt);
-				AM_DEBUG(1, "Audio pid/fmt/lang: ('%s'/'%s'/'%s') -> ('%s'/'%s'/'%s')",
-					str_prev_apids, str_prev_afmts, str_prev_alangs, str_apids, str_afmts, str_alangs);
-				/* update to database */
-				snprintf(sql, sizeof(sql), "update srv_table set vid_pid=%d,vid_fmt=%d,\
-					aud_pids='%s',aud_fmts='%s',aud_langs='%s', current_aud=-1 where db_id=%d", 
-					vid, vfmt, str_apids, str_afmts, str_alangs, mon->mon_service);
-				sqlite3_exec(hdb, sql, NULL, NULL, NULL);
-				/* delete the previous teletext & subtitle */
-				snprintf(sql, sizeof(sql), "delete from subtitle_table where db_srv_id=%d", mon->mon_service);
-				sqlite3_exec(hdb, sql, NULL, NULL, NULL);
-				snprintf(sql, sizeof(sql), "delete from teletext_table where db_srv_id=%d", mon->mon_service);
-				sqlite3_exec(hdb, sql, NULL, NULL, NULL);
-				/*遍历PMT表*/
-				AM_SI_LIST_BEGIN(mon->pmts, pmt)
-					/*取ES流信息*/
-					AM_SI_LIST_BEGIN(pmt->p_first_es, es)
-						/*查找Subtilte和Teletext描述符，并添加相关记录*/
-						AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
-						if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SUBTITLING)
-						{
-							int isub;
-							dvbpsi_subtitling_dr_t *psd = (dvbpsi_subtitling_dr_t*)descr->p_decoded;
+		/* delete the previous teletext & subtitle */
+		snprintf(sql, sizeof(sql), "delete from subtitle_table where db_srv_id=%d", mon->mon_service);
+		sqlite3_exec(hdb, sql, NULL, NULL, NULL);
+		snprintf(sql, sizeof(sql), "delete from teletext_table where db_srv_id=%d", mon->mon_service);
+		sqlite3_exec(hdb, sql, NULL, NULL, NULL);
+		/*遍历PMT表*/
+		AM_SI_LIST_BEGIN(mon->pmts, pmt)
+			/*取ES流信息*/
+			AM_SI_LIST_BEGIN(pmt->p_first_es, es)
+				/*查找Subtilte和Teletext描述符，并添加相关记录*/
+				AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+				if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SUBTITLING)
+				{
+					int isub;
+					dvbpsi_subtitling_dr_t *psd = (dvbpsi_subtitling_dr_t*)descr->p_decoded;
 
-							AM_DEBUG(0, "Find subtitle descriptor, number:%d",psd->i_subtitles_number);
-							for (isub=0; isub<psd->i_subtitles_number; isub++)
-							{
-								insert_subtitle(hdb, mon->mon_service, es->i_pid, &psd->p_subtitle[isub]);
-							}
-						}
-						else if (descr->i_tag == AM_SI_DESCR_TELETEXT)
-						{
-							int itel;
-							dvbpsi_teletext_dr_t *ptd = (dvbpsi_teletext_dr_t*)descr->p_decoded;
+					AM_DEBUG(0, "Find subtitle descriptor, number:%d",psd->i_subtitles_number);
+					for (isub=0; isub<psd->i_subtitles_number; isub++)
+					{
+						insert_subtitle(hdb, mon->mon_service, es->i_pid, &psd->p_subtitle[isub]);
+					}
+				}
+				else if (descr->i_tag == AM_SI_DESCR_TELETEXT)
+				{
+					int itel;
+					dvbpsi_teletext_dr_t *ptd = (dvbpsi_teletext_dr_t*)descr->p_decoded;
 
-							AM_DEBUG(1, "Find teletext descriptor, ptd %p", ptd);
-							if (ptd)
-							{
-								for (itel=0; itel<ptd->i_pages_number; itel++)
-								{
-									insert_teletext(hdb, mon->mon_service, es->i_pid, &ptd->p_pages[itel]);
-								}
-							}
-							else
-							{
-								insert_teletext(hdb, mon->mon_service, es->i_pid, NULL);
-							}
+					AM_DEBUG(1, "Find teletext descriptor, ptd %p", ptd);
+					if (ptd)
+					{
+						for (itel=0; itel<ptd->i_pages_number; itel++)
+						{
+							insert_teletext(hdb, mon->mon_service, es->i_pid, &ptd->p_pages[itel]);
 						}
-						AM_SI_LIST_END()
-					AM_SI_LIST_END()
+					}
+					else
+					{
+						insert_teletext(hdb, mon->mon_service, es->i_pid, NULL);
+					}
+				}
 				AM_SI_LIST_END()
-			
-				/*触发通知事件*/
-				SIGNAL_EVENT(AM_EPG_EVT_UPDATE_PROGRAM_AV, (void*)mon->mon_service);
-			}
-		}
+			AM_SI_LIST_END()
+		AM_SI_LIST_END()
+
+		/*触发通知事件*/
+		SIGNAL_EVENT(AM_EPG_EVT_UPDATE_PROGRAM_AV, (void*)mon->mon_service);
 	}
 }
 
@@ -1645,7 +1814,7 @@ static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 						snprintf(tmpsql, sizeof(tmpsql), "update srv_table set db_net_id=%d where db_ts_id=%d",
 							db_net_id, db_ts_id);
 						sqlite3_exec(hdb, tmpsql, NULL, NULL, NULL);
-						SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)db_ts_id);
+						
 						update = AM_TRUE;
 					}
 				}
@@ -1943,10 +2112,23 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 	/*触发通知事件*/
 	SIGNAL_EVENT(AM_EPG_EVT_NEW_MGT, (void*)mon->mgts);
 	
+	if (mon->mgts != NULL)
+	{ 
+		int vct_tid;
+		if (mon->mgts->is_cable)
+			vct_tid = AM_SI_TID_PSIP_CVCT;
+		else
+			vct_tid = AM_SI_TID_PSIP_TVCT;
+
+		AM_DEBUG(1, "VCT table type: %s", (vct_tid==AM_SI_TID_PSIP_CVCT) ? "CVCT" : "TVCT");
+		mon->vctctl.tid = vct_tid;
+		SET_MODE(vct, vctctl, AM_EPG_SCAN_VCT, AM_TRUE);
+	}
+		
 	/*检查EIT是否需要更新*/
 	AM_SI_LIST_BEGIN(mon->mgts, mgt)
 	AM_SI_LIST_BEGIN(mgt->com_table_info, table)
-	AM_DEBUG(1, "am_epg_mgt_done table_type %d", table->table_type);
+	AM_DEBUG(1, "MGT: table_type %d", table->table_type);
 	if (table->table_type >= AM_SI_ATSC_TT_EIT0 && 
 		table->table_type < (AM_SI_ATSC_TT_EIT0+mon->psip_eit_count))
 	{
@@ -1985,6 +2167,21 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 	if (mon->mgtctl.subctl)
 	{
 		am_epg_request_section(mon, &mon->mgtctl);
+	}
+}
+
+/**\brief VCT搜索完毕处理*/
+static void am_epg_vct_done(AM_EPG_Monitor_t *mon)
+{
+	am_epg_free_filter(mon, &mon->vctctl.fid);
+	/*触发通知事件*/
+	SIGNAL_EVENT(AM_EPG_EVT_NEW_VCT, (void*)mon->vcts);
+	RELEASE_TABLE_FROM_LIST(dvbpsi_vct_t, mon->vcts);
+	
+	/*监控下一版本*/
+	if (mon->vctctl.subctl)
+	{
+		am_epg_request_section(mon, &mon->vctctl);
 	}
 }
 
@@ -2058,7 +2255,8 @@ static void am_epg_tablectl_data_init(AM_EPG_Monitor_t *mon)
 							 0xff, "MGT", 1, am_epg_mgt_done, 0, NULL);
 	am_epg_tablectl_init(&mon->rrtctl, AM_EPG_EVT_RRT_DONE, AM_SI_ATSC_BASE_PID, AM_SI_TID_PSIP_RRT,
 							 0xff, "RRT", 255, am_epg_rrt_done, 0, am_epg_proc_rrt_section);
-		
+	am_epg_tablectl_init(&mon->vctctl, AM_EPG_EVT_VCT_DONE, AM_SI_ATSC_BASE_PID, AM_SI_TID_PSIP_CVCT,
+							 0xff, "VCT", 1, am_epg_vct_done, 0, am_epg_proc_vct_section);	
 	for (i=0; i<(int)AM_ARRAY_SIZE(mon->psip_eitctl); i++)
 	{
 		snprintf(name, sizeof(name), "ATSC EIT%d", i);
@@ -2093,6 +2291,10 @@ static void am_epg_set_mode(AM_EPG_Monitor_t *mon, AM_Bool_t reset)
 	SET_MODE(stt, sttctl, AM_EPG_SCAN_STT, reset);
 	SET_MODE(mgt, mgtctl, AM_EPG_SCAN_MGT, reset);
 	SET_MODE(rrt, rrtctl, AM_EPG_SCAN_RRT, reset);
+	if (mon->vctctl.fid != -1)
+	{
+		SET_MODE(vct, vctctl, AM_EPG_SCAN_VCT, reset);
+	}
 	for (i=0; i<mon->psip_eit_count; i++)
 	{
 		if (mon->psip_eitctl[i].fid != -1)
@@ -2305,6 +2507,9 @@ handle_events:
 			/*MGT表收齐事件*/
 			if (evt_flag & AM_EPG_EVT_MGT_DONE)
 				mon->mgtctl.done(mon);
+			/*VCT表收齐事件*/
+			if (evt_flag & AM_EPG_EVT_VCT_DONE)
+				mon->vctctl.done(mon);
 			/*PSIP EIT表收齐事件*/
 			if (evt_flag & AM_EPG_EVT_PSIP_EIT_DONE)
 				mon->psip_eitctl[0].done(mon);
@@ -2388,6 +2593,7 @@ handle_events:
 	am_epg_tablectl_deinit(&mon->sttctl);
 	am_epg_tablectl_deinit(&mon->mgtctl);
 	am_epg_tablectl_deinit(&mon->rrtctl);
+	am_epg_tablectl_deinit(&mon->vctctl);
 	for (i=0; i<mon->psip_eit_count; i++)
 	{
 		am_epg_tablectl_deinit(&mon->psip_eitctl[i]);
