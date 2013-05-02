@@ -96,9 +96,6 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_ci/ca_ci.c \
 		   am_cc/am_cc.c
 
-
-
-
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1 #
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
@@ -115,9 +112,17 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    external/libzvbi/src\
 		    external/sqlite/dist\
 		    external/icu4c/common\
-			$(LOCAL_PATH)/am_ci
+		    $(LOCAL_PATH)/am_ci
 
 LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc 
+
+ifeq ($(strip $(BOARD_TVAPI_HAVE_TVPLAYER)),true)
+    LOCAL_C_INCLUDES +=  external/tvapi/libsigdetect
+    
+	LOCAL_SHARED_LIBRARIES += libsigdetect
+	
+	LOCAL_CFLAGS += -DCC_BOARD_ATV_SIGDETECT
+endif
 
 LOCAL_PRELINK_MODULE := false
 
@@ -238,8 +243,15 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    external/icu4c/common\
 		    $(LOCAL_PATH)/am_ci
 
+ifeq ($(strip $(BOARD_TVAPI_HAVE_TVPLAYER)),true)
+    LOCAL_C_INCLUDES +=  external/tvapi/libsigdetect
+    
+	LOCAL_SHARED_LIBRARIES += libsigdetect
+	
+	LOCAL_CFLAGS += -DCC_BOARD_ATV_SIGDETECT
+endif
 
-LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc 
+LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc  
 
 LOCAL_PRELINK_MODULE := false
 

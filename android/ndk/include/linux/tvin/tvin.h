@@ -361,6 +361,11 @@ typedef enum tvin_trans_fmt {
     TVIN_TFMT_3D_LRF,  // Secondary: Side-by-Side(Full)
     TVIN_TFMT_3D_LD,   // Secondary: L+depth
     TVIN_TFMT_3D_LDGD, // Secondary: L+depth+Graphics+Graphics-depth
+    /* normal 3D format */
+    TVIN_TFMT_3D_DET_TB,
+    TVIN_TFMT_3D_DET_LR,
+    TVIN_TFMT_3D_DET_INTERLACE,
+    TVIN_TFMT_3D_DET_CHESSBOARD,
     TVIN_TFMT_3D_MAX,
 } tvin_trans_fmt_t;
 
@@ -461,6 +466,10 @@ typedef struct tvafe_adc_cal_s {
     unsigned short d_digital_offset2;
     unsigned int   reserved;          // bit[ 0]: TVAFE_ADC_CAL_VALID
 } tvafe_adc_cal_t;
+
+typedef struct tvafe_adc_comp_cal_s {
+    struct tvafe_adc_cal_s comp_cal_val[3];
+} tvafe_adc_comp_cal_t;
 
 typedef enum tvafe_cvbs_video_e {
     TVAFE_CVBS_VIDEO_HV_UNLOCKED = 0,
@@ -828,6 +837,8 @@ enum {
     MEMP_VDIN_WITH_3D,
     MEMP_DCDR_WITHOUT_3D,
     MEMP_DCDR_WITH_3D,
+    MEMP_ATV_WITHOUT_3D,
+    MEMP_ATV_WITH_3D,
 };
 
 // ***************************************************************************
@@ -864,6 +875,10 @@ enum {
 #define TVIN_IOC_G_AFE_CMD_STATUS   _IOR(TVIN_IOC_MAGIC, 0x19, enum tvafe_cmd_status_e)
 #define TVIN_IOC_G_AFE_CVBS_LOCK    _IOR(TVIN_IOC_MAGIC, 0x1a, enum tvafe_cvbs_video_e)
 #define TVIN_IOC_S_AFE_CVBS_STD     _IOW(TVIN_IOC_MAGIC, 0x1b, enum tvin_sig_fmt_e)
+#define TVIN_IOC_CALLMASTER_SET     _IOW(TVIN_IOC_MAGIC, 0x1c, enum tvin_port_e)
+#define TVIN_IOC_CALLMASTER_GET	    _IO( TVIN_IOC_MAGIC, 0x1d)
+#define TVIN_IOC_S_AFE_ADC_COMP_CAL  _IOW(TVIN_IOC_MAGIC, 0x1e, struct tvafe_adc_comp_cal_s)
+#define TVIN_IOC_G_AFE_ADC_COMP_CAL  _IOR(TVIN_IOC_MAGIC, 0x1f, struct tvafe_adc_comp_cal_s)
 
 //TUNER
 #define TVIN_IOC_G_TUNER_STD        _IOR(TVIN_IOC_MAGIC, 0x21, tuner_std_id)

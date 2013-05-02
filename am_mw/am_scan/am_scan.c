@@ -25,6 +25,12 @@
 #include <linux/types.h>
 #include <linux/tvin/tvin.h>
 
+
+#ifdef CC_BOARD_ATV_SIGDETECT
+#include <sigdetect.h>
+#endif
+
+
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
@@ -544,8 +550,15 @@ static AM_Bool_t am_scan_atv_cvbs_lock(AM_SCAN_Scanner_t *scanner)
 			}
 			
 			if (cvbs_lock_status == TVAFE_CVBS_VIDEO_H_LOCKED || cvbs_lock_status == TVAFE_CVBS_VIDEO_HV_LOCKED)
+			{
+			    if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL)
+                     usleep(2000*1000);
+                else
+				if (atv_start_para.mode == AM_SCAN_ATVMODE_AUTO)
+                     usleep(1000*1000);
+			   
 				return AM_TRUE;
-
+            }
 			usleep(50*1000);
 			i++;
 		}
@@ -3597,9 +3610,13 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 	}
 	
 	scanner->atvctl.start = 1;
-	am_scan_open_vdin(scanner);
+	#ifdef CC_BOARD_ATV_SIGDETECT
+        TvinSigDetect_CreateThread();
+    #endif
+
 	am_scan_open_afe(scanner);
-    
+	//am_scan_open_vdin(scanner);
+
     /*set atv cvbs*/
     int std = scanner->start_para.atv_para.default_std;
      am_set_atv_tuner_cvbs_std(scanner,std);
@@ -3615,8 +3632,11 @@ static AM_ErrorCode_t am_scan_stop_atv(AM_SCAN_Scanner_t *scanner)
 		AM_DEBUG(1, "Stopping atv ...");
 		AM_DEBUG(1, "Closing AFE device ...");
 		am_scan_close_afe(scanner);
-		am_scan_close_vdin(scanner);
-		
+	//am_scan_close_vdin(scanner);	
+		#ifdef CC_BOARD_ATV_SIGDETECT
+        TvinSigDetect_Stop();
+        #endif
+
 		scanner->atvctl.start = 0;
 		AM_DEBUG(1, "atv stopped !");
 	}
