@@ -7,6 +7,8 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_epg/am_epg.c\
 		   am_rec/am_rec.c\
+		   am_scan/libsigdetect/tvin/tvin_api.c \
+		   am_scan/libsigdetect/sigdetect.c \
 		   am_scan/am_scan.c\
 		   am_sub2/am_sub.c am_sub2/dvb_sub.c \
 		   am_tt2/am_tt.c \
@@ -104,6 +106,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/descriptors\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/tables\
 		    $(LOCAL_PATH)/../include/am_mw/atsc\
+		    $(LOCAL_PATH)/am_scan/libsigdetect\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    packages/amlogic/LibPlayer/amadec/include\
 		    packages/amlogic/LibPlayer/amcodec/include\
@@ -115,14 +118,6 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/am_ci
 
 LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc 
-
-ifeq ($(strip $(BOARD_TVAPI_HAVE_TVPLAYER)),true)
-    LOCAL_C_INCLUDES +=  external/tvapi/libsigdetect
-    
-	LOCAL_SHARED_LIBRARIES += libsigdetect
-	
-	LOCAL_CFLAGS += -DCC_BOARD_ATV_SIGDETECT
-endif
 
 LOCAL_PRELINK_MODULE := false
 
@@ -136,6 +131,8 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_epg/am_epg.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
+		   am_scan/libsigdetect/sigdetect.c \
+	           am_scan/libsigdetect/tvin/tvin_api.c \
 		   am_sub2/am_sub.c am_sub2/dvb_sub.c \
 		   am_tt2/am_tt.c \
 		   am_si/am_si.c\
@@ -233,6 +230,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/descriptors\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/tables\
 		    $(LOCAL_PATH)/../include/am_mw/atsc\
+		    $(LOCAL_PATH)/am_scan/libsigdetect\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    packages/amlogic/LibPlayer/amadec/include\
 		    packages/amlogic/LibPlayer/amcodec/include\

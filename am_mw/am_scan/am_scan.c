@@ -24,6 +24,8 @@
 #include <linux/ioctl.h>
 #include <linux/types.h>
 #include <linux/tvin/tvin.h>
+#include <sigdetect.h>
+
 
 
 #ifdef CC_BOARD_ATV_SIGDETECT
@@ -3610,9 +3612,7 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 	}
 	
 	scanner->atvctl.start = 1;
-	#ifdef CC_BOARD_ATV_SIGDETECT
-        TvinSigDetect_CreateThread();
-    #endif
+    TvinSigDetect_CreateThread();
 
 	am_scan_open_afe(scanner);
 	//am_scan_open_vdin(scanner);
@@ -3633,9 +3633,7 @@ static AM_ErrorCode_t am_scan_stop_atv(AM_SCAN_Scanner_t *scanner)
 		AM_DEBUG(1, "Closing AFE device ...");
 		am_scan_close_afe(scanner);
 	//am_scan_close_vdin(scanner);	
-		#ifdef CC_BOARD_ATV_SIGDETECT
         TvinSigDetect_Stop();
-        #endif
 
 		scanner->atvctl.start = 0;
 		AM_DEBUG(1, "atv stopped !");
