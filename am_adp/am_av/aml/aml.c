@@ -3262,25 +3262,29 @@ static void* aml_av_monitor_thread(void *arg)
 						sscanf(buf+2, "%x", &vpts);
 						sscanf(dmx_buf, "%d", &dmx_vpts);
 					}
- #ifdef ENABLE_CORRECR_AV_SYNC                                       
-                                        if(AM_FileRead(DI_BYPASS_FILE, buf, sizeof(buf))==AM_SUCCESS)
-                                        {   
+ #ifdef ENABLE_CORRECR_AV_SYNC   
+                                        if(dev->ts_player.play_para.vpid < 0x1fff) {//gurantee it only effect for video                                    
+                                         if(AM_FileRead(DI_BYPASS_FILE, buf, sizeof(buf))==AM_SUCCESS)
+                                         {     
                                             if(sscanf(buf, "%d", &bypass_hd)==1)
                                             {
                                                 AM_DEBUG(1, " ========= di bypass_hd is :%d",bypass_hd);
                                             }else
                                                bypass_hd = 0; 
-                                        } 
+                                         } 
+                                        }
 #endif
 
 					if(((dmx_apts - apts) > 90000 * 2) || ((dmx_vpts - vpts) > 90000 * 2)){
 						resample = 1;
-#ifdef ENABLE_CORRECR_AV_SYNC                                          
-                                         if( ((dmx_vpts - vpts) > 90000 *4 ) && bypass_hd == 0 ) {
+#ifdef ENABLE_CORRECR_AV_SYNC            
+                                        if(dev->ts_player.play_para.vpid < 0x1fff) {//gurantee it only effect for video                              
+                                          if( ((dmx_vpts - vpts) > 90000 *4 ) && bypass_hd == 0 ) {
                                              AM_DEBUG(1, "HD near to lost AV SYNC=========set di bypass_hd to 1");	
                                              AM_FileEcho(DI_BYPASS_FILE,"1");
                                              need_skip_DI_4_HD = 1;     
                                            }
+                                        }
 #endif
 					}
 #ifdef ENABLE_CORRECR_AV_SYNC
