@@ -3097,6 +3097,12 @@ static AM_ErrorCode_t aml_get_pts(const char *class_file,  uint32_t *pts)
 	return AM_FAILURE;
 }
 
+//
+#define ENABLE_CORRECR_AV_SYNC
+#ifdef ENABLE_CORRECR_AV_SYNC
+#define DI_BYPASS_FILE "/sys/module/di/parameters/bypass_hd"
+#endif
+//
 /**\brief AV buffer 监控线程*/
 static void* aml_av_monitor_thread(void *arg)
 {
@@ -3118,6 +3124,12 @@ static void* aml_av_monitor_thread(void *arg)
 	int curr_resample = 2;
 	AM_Bool_t avStatus[2];
 	int resample_change_ms = 0;
+#ifdef ENABLE_CORRECR_AV_SYNC
+        int need_skip_DI_4_HD;
+        int  bypass_hd;
+
+        need_skip_DI_4_HD = 0;
+#endif
 	
 	last_apts = last_vpts = 0;
 	last_dec_vpts = dec_vpts = 0;
@@ -3250,10 +3262,43 @@ static void* aml_av_monitor_thread(void *arg)
 						sscanf(buf+2, "%x", &vpts);
 						sscanf(dmx_buf, "%d", &dmx_vpts);
 					}
+ #ifdef ENABLE_CORRECR_AV_SYNC   
+                                        if(dev->ts_player.play_para.vpid < 0x1fff) {//gurantee it only effect for video                                    
+                                         if(AM_FileRead(DI_BYPASS_FILE, buf, sizeof(buf))==AM_SUCCESS)
+                                         {     
+                                            if(sscanf(buf, "%d", &bypass_hd)==1)
+                                            {
+                                                AM_DEBUG(1, " Get DI bypass_hd status  ========= di bypass_hd is :%d",bypass_hd);
+                                            }else
+                                               bypass_hd = 0; 
+                                         } 
+                                        }
+#endif
 
 					if(((dmx_apts - apts) > 90000 * 2) || ((dmx_vpts - vpts) > 90000 * 2)){
 						resample = 1;
+#ifdef ENABLE_CORRECR_AV_SYNC            
+                                        if(dev->ts_player.play_para.vpid < 0x1fff) {//gurantee it only effect for video                              
+                                          if( ((dmx_vpts - vpts) > 90000 *4 ) && bypass_hd == 0 && v_size > 0 ) {
+                                             AM_DEBUG(1, "HD near to lost AV SYNC=========set di bypass_hd to 1");	
+                                             need_skip_DI_4_HD = 1;     
+                                             AM_FileEcho(DI_BYPASS_FILE,"1");
+                                           }
+                                        }
+#endif
 					}
+#ifdef ENABLE_CORRECR_AV_SYNC
+                                       if(dev->ts_player.play_para.vpid < 0x1fff) {//gurantee it only effect for video
+                                        if( need_skip_DI_4_HD ==1 && abs((dmx_apts-apts) - (dmx_vpts-vpts)) <=  27000 ){
+			                    if(bypass_hd) //bypass_hd already set as bypass mode and need recover to di enable
+                                            {
+                                                 AM_DEBUG(1, "AV SYNC recover =========set di bypass_hd to 0");
+                                                 AM_FileEcho(DI_BYPASS_FILE,"0");
+                                                 need_skip_DI_4_HD = 0;
+                                           }
+                                        }  
+                                      }
+#endif
 				}
 				AM_DEBUG(1, "asize %d adata %d vsize %d vdata %d apts_diff %d vpts_diff %d resample %d",
 					ab_size, a_size, vb_size, v_size, dmx_apts-apts, dmx_vpts-vpts, resample);
@@ -3437,6 +3482,19 @@ static void* aml_av_monitor_thread(void *arg)
 
 #ifdef ENABLE_AUDIO_RESAMPLE
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "0");
+#endif
+#ifdef ENABLE_CORRECR_AV_SYNC
+       if( need_skip_DI_4_HD)
+       { 
+         // if(bypass_hd) //bypass_hd already set as bypass mode and need recover to di enable
+          {
+                  AM_DEBUG(1, " recover previous setting ========set di bypass_hd to 0");
+                  AM_FileEcho(DI_BYPASS_FILE,"0");
+                  bypass_hd = 0;
+          }
+
+          need_skip_DI_4_HD = 0;
+       }
 #endif
 
 	AM_DEBUG(1, "AV  monitor thread exit now");
