@@ -4632,17 +4632,21 @@ aml_set_vpath(AM_AV_Device_t *dev)
 				get_osd_rect("480i", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "480p", 4)){
 				get_osd_rect("480p", &x, &y, &w, &h);
+			}else if(!strncmp(mode, "480cvbs", 7)){
+				get_osd_rect("480cvbs", &x, &y, &w, &h);				
 			}else if(!strncmp(mode, "576i", 4)){
 				get_osd_rect("576i", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "576p", 4)){
 				get_osd_rect("576p", &x, &y, &w, &h);
+			}else if(!strncmp(mode, "576cvbs", 7)){
+				get_osd_rect("576cvbs", &x, &y, &w, &h);					
 			}else if(!strncmp(mode, "720p", 4)){
 				get_osd_rect("720p", &x, &y, &w, &h);
 				blank = AM_FALSE;
 			}else if(!strncmp(mode, "1080i", 5)){
 				get_osd_rect("1080i", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "1080p", 5)){
-				get_osd_rect("1080p", &x, &y, &w, &h);
+				get_osd_rect("1080p", &x, &y, &w, &h);			
 			}else{
 				get_osd_rect(NULL, &x, &y, &w, &h);
 			}
@@ -4694,11 +4698,11 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			}
 
 			AM_FileRead("/sys/class/graphics/fb0/request2XScale", verstr, sizeof(verstr));
-			if(!strncmp(mode, "480i", 4) || !strncmp(mode, "480p", 4)){
+			if(!strncmp(mode, "480i", 4) || !strncmp(mode, "480p", 4) || !strncmp(mode, "480cvbs", 7)){
 				reqcmd   = "16 720 480";
 				osd1axis = "1280 720 720 480";
 				osd1cmd  = "0x10001";
-			}else if(!strncmp(mode, "576i", 4) || !strncmp(mode, "576p", 4)){
+			}else if(!strncmp(mode, "576i", 4) || !strncmp(mode, "576p", 4) || !strncmp(mode, "576cvbs", 7)){
 				reqcmd   = "16 720 576";
 				osd1axis = "1280 720 720 576";
 				osd1cmd  = "0x10001";
