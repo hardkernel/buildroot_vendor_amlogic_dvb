@@ -307,6 +307,8 @@ AM_ErrorCode_t AM_AOUT_SetOutputMode(int dev_no, AM_AOUT_OutputMode_t mode)
 	{
 		if(dev->drv && dev->drv->set_output_mode)
 			ret = dev->drv->set_output_mode(dev, mode);
+		else
+			ret = AM_FAILURE;
 	
 		if(ret==AM_SUCCESS)
 		{
