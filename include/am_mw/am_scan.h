@@ -70,6 +70,7 @@ enum AM_SCAN_ProgressEvt
 	AM_SCAN_PROGRESS_STORE_END,		/**< 存储完毕*/
 	AM_SCAN_PROGRESS_BLIND_SCAN,	/**< 卫星盲扫搜索进度，参数为AM_SCAN_BlindScanProgress_t给出的进度信息*/
 	AM_SCAN_PROGRESS_ATV_TUNING,	/**< ATV tuning a new frequency*/
+	AM_SCAN_PROGRESS_NEW_PROGRAM,	/**< Searched a new program which will be stored*/
 };
 
 /**\brief 搜索事件类型*/
@@ -118,6 +119,9 @@ enum AM_SCAN_DTVMode
 	/* OR option(s)*/
 	AM_SCAN_DTVMODE_SEARCHBAT		= 0x08, /**< 是否搜索BAT表*/
 	AM_SCAN_DTVMODE_SAT_UNICABLE	= 0x10,	/**< 卫星Unicable模式*/
+	AM_SCAN_DTVMODE_FTA				= 0x20,	/**< Only scan free programs*/
+	AM_SCAN_DTVMODE_NOTV			= 0x40, /**< Donot store tv programs*/
+	AM_SCAN_DTVMODE_NORADIO			= 0x80, /**< Donot store radio programs*/
 };
 
 /**\brief ATV搜索模式定义*/
@@ -149,6 +153,7 @@ typedef enum
 	AM_SCAN_SORT_BY_FREQ_SRV_ID,	/**< 按照频率大小排序,同频率下按service_id排序*/
 	AM_SCAN_SORT_BY_SCAN_ORDER,		/**< 按照搜索先后顺序排序*/
 	AM_SCAN_SORT_BY_LCN,			/**< 按照LCN排序*/
+	AM_SCAN_SORT_BY_HD_SD,
 }AM_SCAN_DTVSortMethod_t;
 
 /**\brief 频点进度数据*/
@@ -176,6 +181,15 @@ typedef struct
 	int new_tp_cnt;	/**< 本次通知搜索到的新TP个数, <=0表示本次无新搜索到的TP*/
 	struct dvb_frontend_parameters	*new_tps;	/**< 本次通知搜索到的新TP信息*/
 }AM_SCAN_DTVBlindScanProgress_t;
+
+/**\breif New program progress data*/
+typedef struct
+{
+	int service_id;
+	int service_type;	/**< See AM_SCAN_ServiceType*/
+	AM_Bool_t scrambled;
+	char name[AM_DB_MAX_SRV_NAME_LEN + 1];
+}AM_SCAN_ProgramProgress_t;
 
 /**\brief 当前搜索的频点信号信息*/
 typedef struct
@@ -270,6 +284,7 @@ typedef struct
 	dvbpsi_bat_t *bats;				/**< 搜索到的BAT表*/
 	vct_channel_info_t	*vcs;		/**<ATSC C virtual channels*/
 	AM_SCAN_TS_t *tses;				/**< 所有TS列表*/
+	void *reserved;                 /**< reserved data*/
 }AM_SCAN_Result_t;
 
 /**\brief 存储回调函数

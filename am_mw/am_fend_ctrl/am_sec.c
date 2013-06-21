@@ -911,6 +911,7 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	eSecCommand_t sec_cmd;
+	AM_Bool_t signal_test = AM_FALSE;
 
 	struct dvb_frontend_parameters convert_para;
 
@@ -923,29 +924,32 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 	}
 
 	//AM_SEC_DumpSetting();
-	
-	if(1)//(AM_SEC_CanBlindScanOrTune(dev_no, b_para, para))
+
+	M_AM_SEC_ASYNCCHECK();
+
+	pthread_mutex_lock(&(sec_control.m_lnbs.lock));
+
+	AM_SEC_Cmd_t sec_cmd_direct = sec_control.sec_cmd;	
+	AM_SEC_DVBSatelliteLNBParameters_t lnb_param = sec_control.m_lnbs;
+
+	if(sec_control.m_lnbs.m_rotor_parameters.m_reset_rotor_status_cache)
 	{
-		M_AM_SEC_ASYNCCHECK();
+		sec_control.m_lnbs.m_rotor_parameters.m_reset_rotor_status_cache = AM_FALSE;
 
-		pthread_mutex_lock(&(sec_control.m_lnbs.lock));
-		
-		AM_SEC_DVBSatelliteLNBParameters_t lnb_param = sec_control.m_lnbs;
+		AM_SEC_SetSecCommand( &sec_cmd, INVALIDATE_CURRENT_ROTORPARMS );
+		AM_SEC_Set_Invalid_Cur_RotorPara(&sec_cmd);			
+	}
+	
+	pthread_mutex_unlock(&(sec_control.m_lnbs.lock));	
 
-		if(sec_control.m_lnbs.m_rotor_parameters.m_reset_rotor_status_cache)
-		{
-			sec_control.m_lnbs.m_rotor_parameters.m_reset_rotor_status_cache = AM_FALSE;
+	AM_SEC_DVBSatelliteDiseqcParameters_t di_param = lnb_param.m_diseqc_parameters;
+	AM_SEC_DVBSatelliteRotorParameters_t rotor_param = lnb_param.m_rotor_parameters;
+	AM_SEC_DVBSatelliteSwitchParameters_t sw_param = lnb_param.m_cursat_parameters;	
 
-			AM_SEC_SetSecCommand( &sec_cmd, INVALIDATE_CURRENT_ROTORPARMS );
-			AM_SEC_Set_Invalid_Cur_RotorPara(&sec_cmd);			
-		}
-		
-		pthread_mutex_unlock(&(sec_control.m_lnbs.lock));
-		
-		AM_SEC_DVBSatelliteDiseqcParameters_t di_param = lnb_param.m_diseqc_parameters;
-		AM_SEC_DVBSatelliteRotorParameters_t rotor_param = lnb_param.m_rotor_parameters;
-		AM_SEC_DVBSatelliteSwitchParameters_t sw_param = lnb_param.m_cursat_parameters;
-		
+	AM_DEBUG(1, "AM_SEC_Prepare sec_cmd_direct %d\n", sec_cmd_direct);
+	
+	if((sec_cmd_direct == TYPE_SEC_PREFORTUNERDEMODDEV) || (sec_cmd_direct == TYPE_SEC_LNBSSWITCHCFGVALID))
+	{		
 		AM_Bool_t doSetFrontend = AM_TRUE;
 		AM_Bool_t doSetVoltageToneFrontend = AM_TRUE;
 		AM_Bool_t forceChanged = AM_FALSE;
@@ -1470,7 +1474,9 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 
 
 		AM_DEBUG(1, "RotorCmd %02x, lastRotorCmd %02lx\n", RotorCmd, lastRotorCmd);
-		if ((b_para == NULL) && (para != NULL) && (RotorCmd != -1) && (RotorCmd != lastRotorCmd) )
+		/*in TYPE_SEC_LNBSSWITCHCFGVALID cmd, not valid rotor*/
+		if ((sec_cmd_direct != TYPE_SEC_LNBSSWITCHCFGVALID) 
+			&& (b_para == NULL) && (para != NULL) && (RotorCmd != -1) && (RotorCmd != lastRotorCmd) )
 		{
 			AM_Bool_t no_need_sendrotorstop_and_recheck_vol = AM_FALSE;
 			int mrt = sec_control.m_params[MOTOR_RUNNING_TIMEOUT]; // in seconds!
@@ -1740,7 +1746,8 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 		AM_SEC_SetSecCommand( &sec_cmd, UPDATE_CURRENT_SWITCHPARMS);
 		AM_SEC_Set_Update_Cur_SwitchPara(&sec_cmd);
 
-		if (doSetFrontend)
+		/*in TYPE_SEC_LNBSSWITCHCFGVALID cmd, not tune*/
+		if ((sec_cmd_direct != TYPE_SEC_LNBSSWITCHCFGVALID) && doSetFrontend)
 		{
 			/*tune timeout?*/			
 			AM_DEBUG(1, "lock centre freq %d\n", convert_para.frequency);
@@ -1759,12 +1766,92 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 				}
 			}
 		}
+	}
+	else if(sec_cmd_direct == TYPE_SEC_POSITIONERSTOP)
+	{
+		AM_FEND_Diseqccmd_SetPositionerHalt(dev_no);
+		usleep(15*1000);	
+	}
+	else if(sec_cmd_direct == TYPE_SEC_POSITIONERDISABLELIMIT)
+	{
+		AM_FEND_Diseqccmd_DisablePositionerLimit(dev_no);
+		usleep(15*1000);	
+	}	
+	else if(sec_cmd_direct == TYPE_SEC_POSITIONEREASTLIMIT)
+	{
+		AM_FEND_Diseqccmd_SetPositionerELimit(dev_no);
+		usleep(15*1000);	
+	}
+	else if(sec_cmd_direct == TYPE_SEC_POSITIONERWESTLIMIT)
+	{
+		AM_FEND_Diseqccmd_SetPositionerWLimit(dev_no);
+		usleep(15*1000);
+	}
+	else if(sec_cmd_direct == TYPE_SEC_POSITIONEREAST)
+	{
+		AM_DEBUG(1, "TYPE_SEC_POSITIONEREAST %d\n", rotor_param.m_rotor_move_unit);
+		AM_FEND_Diseqccmd_PositionerGoE(dev_no, rotor_param.m_rotor_move_unit);
+		AM_SEC_ResetRotorStatusCache(dev_no);
+		usleep(15*1000);
+		signal_test = AM_TRUE;
+	}
+	else if(sec_cmd_direct == TYPE_SEC_POSITIONERWEST)
+	{
+		AM_DEBUG(1, "TYPE_SEC_POSITIONERWEST %d\n", rotor_param.m_rotor_move_unit);
+		AM_FEND_Diseqccmd_PositionerGoW(dev_no, rotor_param.m_rotor_move_unit);
+		AM_SEC_ResetRotorStatusCache(dev_no);
+		usleep(15*1000);
+		signal_test = AM_TRUE;
+	}	
+	else if(sec_cmd_direct == TYPE_SEC_POSITIONERSTORE)
+	{
+		AM_FEND_Diseqccmd_StorePosition(dev_no, sw_param.m_rotorPosNum);
+		usleep(15*1000);	
+	}
+	else if(sec_cmd_direct == TYPE_SEC_POSITIONERGOTO)
+	{
+		AM_FEND_Diseqccmd_GotoPositioner(dev_no, sw_param.m_rotorPosNum);
+		/*because rotor maybe manual stop, we are not save rotor cmd*/
+		AM_SEC_ResetRotorStatusCache(dev_no);
+		usleep(15*1000);
+		signal_test = AM_TRUE;
+	}
+	else if(sec_cmd_direct == TYPE_SEC_POSITIONERGOTOX)
+	{
+		double	SatLon = abs(rotor_param.m_gotoxx_parameters.m_sat_longitude)/10.00,
+				SiteLat = rotor_param.m_gotoxx_parameters.m_latitude,
+				SiteLon = rotor_param.m_gotoxx_parameters.m_longitude;
 
-		return ret;
+		if(rotor_param.m_gotoxx_parameters.m_sat_longitude < 0)
+			SatLon = -SatLon;						
 
+		AM_DEBUG(1, "degrees = %d \n", rotor_param.m_gotoxx_parameters.m_sat_longitude );
+		AM_DEBUG(1, "siteLatitude = %f, siteLongitude = %f, degrees = %f \n", SiteLat, SiteLon, SatLon );
+
+		AM_FEND_Diseqccmd_GotoAngularPositioner(dev_no, SiteLon, SiteLat, SatLon);	
+		/*because rotor maybe manual stop, we are not save rotor cmd*/
+		AM_SEC_ResetRotorStatusCache(dev_no);
+		usleep(15*1000);
+		signal_test = AM_TRUE;
+	}
+
+	if(signal_test)
+	{
+		/*only not unicable calc Frequency; not Dishpro bandstacking HACK*/
+		int lof= 0;
+		if ( para->para.frequency > lnb_param.m_lof_threshold ){
+			lof = lnb_param.m_lof_hi;
+		}else{
+			lof = lnb_param.m_lof_lo;
+		}
+		
+		int local= abs(para->para.frequency - lof);
+		convert_para.frequency = ((((local * 2) / 125) + 1) / 2) * 125;
+
+		AM_FEND_SetPara(dev_no, &(convert_para));
 	}
 	
-	return AM_FENDCTRL_ERR_END;
+	return ret;
 }
 
 /**\brief 卫星设备监控线程*/
@@ -1921,6 +2008,8 @@ AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEquipmentC
 	}	
 
 	pthread_mutex_lock(&(sec_control.m_lnbs.lock));
+
+	sec_control.sec_cmd = para->sec_cmd;
 	
 	/* LNB Specific Parameters */
 	sec_control.m_lnbs.m_lof_lo = para->m_lnbs.m_lof_lo;
@@ -1953,6 +2042,8 @@ AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEquipmentC
 		para->m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_delta;
 	sec_control.m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_turning_speed = 
 		para->m_lnbs.m_rotor_parameters.m_inputpower_parameters.m_turning_speed;
+
+	sec_control.m_lnbs.m_rotor_parameters.m_rotor_move_unit = para->m_lnbs.m_rotor_parameters.m_rotor_move_unit;
 	
 	/* Unicable Specific Parameters */
 	sec_control.m_lnbs.SatCR_idx = para->m_lnbs.SatCR_idx;
@@ -2040,7 +2131,8 @@ AM_ErrorCode_t AM_SEC_PrepareBlindScan(int dev_no)
 	pthread_mutex_lock(&(sec_control.m_lnbs.lock));
 
 	g_b_para = sec_control.m_lnbs.b_para;
-	
+
+	sec_control.sec_cmd = TYPE_SEC_PREFORTUNERDEMODDEV;
 	sec_control.m_lnbs.sec_blind_flag = AM_TRUE;
 
 	pthread_mutex_unlock(&(sec_control.m_lnbs.lock));
@@ -2202,6 +2294,7 @@ AM_ErrorCode_t AM_SEC_PrepareTune(int dev_no, const AM_FENDCTRL_DVBFrontendParam
 
 	pthread_mutex_lock(&(sec_control.m_lnbs.lock));
 
+	sec_control.sec_cmd = TYPE_SEC_PREFORTUNERDEMODDEV;
 	sec_control.m_lnbs.sec_blind_flag = AM_FALSE;
 
 	pthread_mutex_unlock(&(sec_control.m_lnbs.lock));
@@ -2248,6 +2341,36 @@ AM_ErrorCode_t AM_SEC_PrepareTurnOffSatCR(int dev_no, int satcr)
 		AM_SEC_SetSecCommandByVal( &sec_cmd, SET_VOLTAGE, SEC_VOLTAGE_13 );
 		AM_SEC_Set_Voltage(dev_no, &sec_cmd, lnb_param.m_increased_voltage);		
 	}
+
+	return ret;
+}
+
+/**\brief 执行卫星设备控制
+ * \param dev_no 前端设备号
+ * \param para 前端设备参数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+AM_ErrorCode_t AM_SEC_ExecSecCmd(int dev_no, const AM_FENDCTRL_DVBFrontendParameters_t *para)
+{
+	assert(para);
+	
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	/*in order to sync exec sec cmd, not realy use*/
+	fe_status_t status;
+	unsigned int tunetimeout = 5000;
+
+	pthread_mutex_lock(&(sec_control.m_lnbs.lock));
+
+	sec_control.m_lnbs.sec_blind_flag = AM_FALSE;
+
+	pthread_mutex_unlock(&(sec_control.m_lnbs.lock));
+
+	AM_DEBUG(1, "%s", "AM_SEC_ExecSecCmd async\n");
+	ret = AM_Sec_SetAsyncInfo(dev_no, NULL, para, &status, tunetimeout);
+	//AM_Sec_AsyncSet();
+	AM_DEBUG(1, "%s", "AM_SEC_ExecSecCmd async ok\n");
 
 	return ret;
 }

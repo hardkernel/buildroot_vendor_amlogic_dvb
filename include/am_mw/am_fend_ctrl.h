@@ -177,7 +177,8 @@ typedef struct AM_SEC_DVBSatelliteRotorParameters
 {
 	AM_SEC_DVBSatelliteRotorInputpowerParameters_t m_inputpower_parameters; /**< 马达供电参数*/
 	AM_SEC_DVBSatelliteRotorGotoxxParameters_t m_gotoxx_parameters;         /**< 马达定位参数*/
-	AM_Bool_t m_reset_rotor_status_cache;									/**< 马达缓存参数重置*/
+	AM_Bool_t m_reset_rotor_status_cache;								/**< 马达缓存参数重置*/
+	unsigned int m_rotor_move_unit;  										/**< 马达转动调整单位 00 continuously 01-7F(单位second, e.g 01-one second 02-two second) 80-FF (单位step，e.g FF-one step FE-two step)*/
 }AM_SEC_DVBSatelliteRotorParameters_t;
 
 typedef enum { RELAIS_OFF=0, RELAIS_ON }AM_SEC_12V_Relais_State;
@@ -248,6 +249,21 @@ typedef enum{
 	SEC_CMD_MAX_PARAMS
 }AM_SEC_Cmd_Param_t;
 
+/**\brief 卫星设备控制命令*/
+typedef enum{
+	TYPE_SEC_PREFORTUNERDEMODDEV = 0,	/**< 卫星设备控制为Tuner与Demod设备工作准备*/
+	TYPE_SEC_LNBSSWITCHCFGVALID = 31,	/**< 卫星设备LNB与Switch配置生效*/
+	TYPE_SEC_POSITIONERSTOP,				/**< diseqc马达停止转动*/
+	TYPE_SEC_POSITIONERDISABLELIMIT,		/**< diseqc马达禁止限制*/
+	TYPE_SEC_POSITIONEREASTLIMIT,		/**< diseqc马达东向限制设置*/
+	TYPE_SEC_POSITIONERWESTLIMIT,		/**< diseqc马达西向限制设置*/
+	TYPE_SEC_POSITIONEREAST,				/**< diseqc马达东向转动*/
+	TYPE_SEC_POSITIONERWEST,				/**< diseqc马达西向转动*/
+	TYPE_SEC_POSITIONERSTORE,			/**< diseqc马达存储位置*/
+	TYPE_SEC_POSITIONERGOTO,				/**< diseqc马达转动到指定位置*/
+	TYPE_SEC_POSITIONERGOTOX				/**< diseqc马达转动根据本地经纬度以及卫星经度*/
+}AM_SEC_Cmd_t;
+
 /**\brief 异步卫星设备控制信息*/
 typedef struct AM_SEC_AsyncInfo
 {
@@ -275,6 +291,8 @@ typedef struct AM_SEC_DVBSatelliteEquipmentControl
 	AM_SEC_DVBSatelliteLNBParameters_t m_lnbs; /**< LNB参数*/
 	AM_Bool_t m_canMeasureInputPower; /**< 供电状态*/
 	AM_SEC_Cmd_Param_t m_params[SEC_CMD_MAX_PARAMS]; /**< 命令延迟参数*/
+
+	AM_SEC_Cmd_t sec_cmd;								/**< 卫星设备控制命令*/
 
 	AM_SEC_AsyncInfo_t m_sec_asyncinfo; /**< 卫星设备控制异步运行信息*/
 }AM_SEC_DVBSatelliteEquipmentControl_t;
@@ -338,6 +356,15 @@ extern AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, u
  *   - AM_FALSE 不过滤
  */
 extern AM_Bool_t AM_SEC_FilterInvalidTp(int dev_no, unsigned int tp_freq);
+
+/**\brief 执行卫星设备控制
+ * \param dev_no 前端设备号
+ * \param para 前端设备参数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+extern AM_ErrorCode_t AM_SEC_ExecSecCmd(int dev_no, const AM_FENDCTRL_DVBFrontendParameters_t *para); 
 
 extern AM_ErrorCode_t AM_SEC_DumpSetting(void);
 

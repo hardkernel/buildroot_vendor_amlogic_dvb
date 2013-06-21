@@ -37,3 +37,5 @@
 "other_pids text",									/**< 其他的录像PID信息*/
 
 "from_storage text",								/**< 录像所在的存储器路径*/
+"repeat text",								/**< 预约重复类型*/
+

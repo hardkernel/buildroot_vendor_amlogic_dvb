@@ -25,7 +25,7 @@ extern "C"
 #define ITEM_DESCR_LEN 256
 #define ITEM_CHAR_LEN 1024
 #define EVT_TEXT_LEN 1024
-#define EXT_TEXT_LEN 2048
+#define EXT_TEXT_LEN 4096
 
 /****************************************************************************
  * Type definitions

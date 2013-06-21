@@ -32,6 +32,9 @@
 "hd_lcn integer",									/**< HD simulcast logic channel number*/
 "default_chan_num numeric",							/**< 默认频道号，用于多种排序方法时恢复默认排序，搜索完成后chan_num=default_chan_num*/
 "chan_order integer",								/**< 频道显示顺序，用户可在频道编辑里通过MOVE等操作改变该顺序，但显示的chan_num不变*/
+"lcn_order integer",								/**< 按LCN从小到达排序顺序*/
+"service_id_order integer",							/**< 按Service id从小到达排序顺序*/
+"hd_sd_order integer",								/**< 按高清在前，标清在后排序顺序*/
 
 "db_sat_para_id integer",							/**< 卫星信号下，保存的sat_para_table中的数据库唯一索引，非卫星信号下无效*/
 

@@ -123,6 +123,13 @@ enum
 	QUERY_SRV_BY_DEF_CHAN_NUM_ORDER,
 	QUERY_SRV_BY_LCN_ORDER,
 	UPDATE_ANALOG_TS,
+	UPDATE_SAT_PARA,
+	QUERY_SAT_TP_BY_POLAR,
+	UPDATE_TS_FREQ_SYMB,
+	QUERY_DVBS_SAT_BY_SAT_ORDER,
+	QUERY_DVBS_TP_BY_FREQ_ORDER,
+	QUERY_EXIST_SRV_BY_CHAN_ORDER,
+	QUERY_NONEXIST_SRV_BY_SRV_ID_ORDER,
 	MAX_STMT
 };
 
@@ -268,7 +275,7 @@ struct AM_SCAN_Scanner_s
 		int								start_idx;		/**< 起始频点参数在start_freqs中的索引*/
 		int								hsi;			/**< SI解析句柄*/
 		AM_SCAN_TableCtl_t				patctl;			/**< PAT接收控制*/
-		AM_SCAN_TableCtl_t				pmtctl[20];		/**< PMT接收控制*/
+		AM_SCAN_TableCtl_t				pmtctl[5];		/**< PMT接收控制*/
 		AM_SCAN_TableCtl_t				catctl;			/**< CAT接收控制*/
 		AM_SCAN_TableCtl_t				sdtctl;			/**< SDT接收控制*/
 		AM_SCAN_TableCtl_t				nitctl;			/**< NIT接收控制*/

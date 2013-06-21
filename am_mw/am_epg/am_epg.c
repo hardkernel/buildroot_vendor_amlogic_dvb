@@ -830,6 +830,7 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 							AM_DEBUG(1, "Cannot alloc memory for new item");
 							continue;
 						}
+
 						memset(item, 0, sizeof(ExtendedEventItem));
 						if (items == NULL)
 							items = item;
@@ -852,11 +853,10 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 				}
 
 				/*融合详细描述文本*/
-				if (ext_descr_len < (int)(sizeof(ext_descr)-1) && AM_SI_ConvertDVBTextCode(\
-								(char*)pee->i_text, pee->i_text_length,\
-								ext_descr+ext_descr_len, \
-								sizeof(ext_descr)-ext_descr_len) == AM_SUCCESS)
+				if (ext_descr_len < (int)(sizeof(ext_descr)-1))
 				{
+					AM_SI_ConvertDVBTextCode((char*)pee->i_text, pee->i_text_length,
+								ext_descr+ext_descr_len, sizeof(ext_descr)-ext_descr_len);
 					ext_descr[EXT_TEXT_LEN] = 0;
 					ext_descr_len = strlen(ext_descr);
 				}			

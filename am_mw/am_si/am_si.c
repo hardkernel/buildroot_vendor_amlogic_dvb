@@ -8,7 +8,7 @@
  * \date 2010-10-15: create the document
  ***************************************************************************/
 
-#define AM_DEBUG_LEVEL 0
+#define AM_DEBUG_LEVEL 1
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1322,9 +1322,12 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 				switch (descr->i_tag)
 				{
 					case AM_SI_DESCR_AC3:
-					case AM_SI_DESCR_ENHANCED_AC3:
 						AM_DEBUG(1, "!!Found AC3 Descriptor!!!");
 						afmt_tmp = AFORMAT_AC3;
+						break;
+					case AM_SI_DESCR_ENHANCED_AC3:
+						AM_DEBUG(1, "!!Found Enhanced AC3 Descriptor!!!");
+						afmt_tmp = AFORMAT_EAC3;
 						break;
 					case AM_SI_DESCR_AAC:
 						AM_DEBUG(1, "!!Found AAC Descriptor!!!");
