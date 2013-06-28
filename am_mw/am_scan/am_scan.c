@@ -1055,71 +1055,74 @@ static void am_scan_init_service_info(AM_SCAN_ServiceInfo_t *srv_info)
 /**\brief 更新一个service数据到数据库*/
 static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_ServiceInfo_t *srv_info)
 {	
-	int standard = result->start_para->dtv_para.standard;
-	int mode = result->start_para->dtv_para.mode;
-    
-	/* Transform service types for different dtv standards */
-	if (standard != AM_SCAN_DTV_STD_ATSC)
-	{
-		if (srv_info->srv_type == 0x1)
-			srv_info->srv_type = AM_SCAN_SRV_DTV;
-		else if (srv_info->srv_type == 0x2)
-			srv_info->srv_type = AM_SCAN_SRV_DRADIO;
-	} 
-	else 
-	{
-		if (srv_info->srv_type == 0x2)
-			srv_info->srv_type = AM_SCAN_SRV_DTV;
-		else if (srv_info->srv_type == 0x3)
-			srv_info->srv_type = AM_SCAN_SRV_DRADIO;
-	}
+    if (srv_info->src != FE_ANALOG)
+    {
+    	int standard = result->start_para->dtv_para.standard;
+    	int mode = result->start_para->dtv_para.mode;
+        
+    	/* Transform service types for different dtv standards */
+    	if (standard != AM_SCAN_DTV_STD_ATSC)
+    	{
+    		if (srv_info->srv_type == 0x1)
+    			srv_info->srv_type = AM_SCAN_SRV_DTV;
+    		else if (srv_info->srv_type == 0x2)
+    			srv_info->srv_type = AM_SCAN_SRV_DRADIO;
+    	} 
+    	else 
+    	{
+    		if (srv_info->srv_type == 0x2)
+    			srv_info->srv_type = AM_SCAN_SRV_DTV;
+    		else if (srv_info->srv_type == 0x3)
+    			srv_info->srv_type = AM_SCAN_SRV_DRADIO;
+    	}
 
 
-	/* if video valid, set this program to tv type,
-	 * if audio valid, but video not found, set it to radio type,
-	 * if both invalid, but service_type found in SDT/VCT, set to unknown service,
-	 * this mechanism is OPTIONAL
-	 */
-	if (srv_info->vid < 0x1fff)
-	{
-		srv_info->srv_type = AM_SCAN_SRV_DTV;
-	}
-	else if (srv_info->aud_info.audio_count > 0)
-	{
-		srv_info->srv_type = AM_SCAN_SRV_DRADIO;
-	}
-	else if (srv_info->srv_type == AM_SCAN_SRV_DTV || 
-			srv_info->srv_type == AM_SCAN_SRV_DRADIO)
-	{
-		srv_info->srv_type = AM_SCAN_SRV_UNKNOWN;
-	}
-			
-	/* Skip program for FTA mode */
-	if (srv_info->scrambled_flag && (mode & AM_SCAN_DTVMODE_FTA))
-	{
-		AM_DEBUG(1, "Skip program '%s' for FTA mode", srv_info->name);
-		return;
-	}
+    	/* if video valid, set this program to tv type,
+    	 * if audio valid, but video not found, set it to radio type,
+    	 * if both invalid, but service_type found in SDT/VCT, set to unknown service,
+    	 * this mechanism is OPTIONAL
+    	 */
+    	if (srv_info->vid < 0x1fff)
+    	{
+    		srv_info->srv_type = AM_SCAN_SRV_DTV;
+    	}
+    	else if (srv_info->aud_info.audio_count > 0)
+    	{
+    		srv_info->srv_type = AM_SCAN_SRV_DRADIO;
+    	}
+    	else if (srv_info->srv_type == AM_SCAN_SRV_DTV || 
+    			srv_info->srv_type == AM_SCAN_SRV_DRADIO)
+    	{
+    		srv_info->srv_type = AM_SCAN_SRV_UNKNOWN;
+    	}
+    			
+    	/* Skip program for FTA mode */
+    	if (srv_info->scrambled_flag && (mode & AM_SCAN_DTVMODE_FTA))
+    	{
+    		AM_DEBUG(1, "Skip program '%s' for FTA mode", srv_info->name);
+    		return;
+    	}
 
-	/* Skip program for service_type mode */
-	if (srv_info->srv_type == AM_SCAN_SRV_DTV && (mode & AM_SCAN_DTVMODE_NOTV))
-	{
-		AM_DEBUG(1, "Skip program '%s' for NO-TV mode", srv_info->name);
-		return;
-	}
-	if (srv_info->srv_type == AM_SCAN_SRV_DRADIO && (mode & AM_SCAN_DTVMODE_NORADIO))
-	{
-		AM_DEBUG(1, "Skip program '%s' for NO-RADIO mode", srv_info->name);
-		return;
-	}
+    	/* Skip program for service_type mode */
+    	if (srv_info->srv_type == AM_SCAN_SRV_DTV && (mode & AM_SCAN_DTVMODE_NOTV))
+    	{
+    		AM_DEBUG(1, "Skip program '%s' for NO-TV mode", srv_info->name);
+    		return;
+    	}
+    	if (srv_info->srv_type == AM_SCAN_SRV_DRADIO && (mode & AM_SCAN_DTVMODE_NORADIO))
+    	{
+    		AM_DEBUG(1, "Skip program '%s' for NO-RADIO mode", srv_info->name);
+    		return;
+    	}
 
-	/* Set default name to tv/radio program if no name specified */
-	if (!strcmp(srv_info->name, "") && 
-		(srv_info->srv_type == AM_SCAN_SRV_DTV || 
-		srv_info->srv_type == AM_SCAN_SRV_DRADIO))
-	{
-		strcpy(srv_info->name, "No Name");
-	}
+    	/* Set default name to tv/radio program if no name specified */
+    	if (!strcmp(srv_info->name, "") && 
+    		(srv_info->srv_type == AM_SCAN_SRV_DTV || 
+    		srv_info->srv_type == AM_SCAN_SRV_DRADIO))
+    	{
+    		strcpy(srv_info->name, "No Name");
+    	}
+    }
 
 	if (stmts == NULL)
 	{
