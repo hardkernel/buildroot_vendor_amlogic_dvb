@@ -34,7 +34,8 @@ typedef enum fe_type {
 	FE_QAM,
 	FE_OFDM,
 	FE_ATSC,
-	FE_ANALOG
+	FE_ANALOG,
+	FE_DTMB
 } fe_type_t;
 
 
