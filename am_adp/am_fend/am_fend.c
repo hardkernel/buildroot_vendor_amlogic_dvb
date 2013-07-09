@@ -120,6 +120,7 @@ static AM_Bool_t fend_para_equal(fe_type_t type, const struct dvb_frontend_param
 				return AM_FALSE;
 		break;
 		case FE_OFDM:
+		case FE_DTMB:
 		break;
 		case FE_ATSC:
 			if(p1->u.vsb.modulation!=p2->u.vsb.modulation)
