@@ -1203,14 +1203,11 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
     iconv_t handle;
     char **pin=&in_code;
     char **pout=&out_code;
-    char fbyte = 0,fbyteNext = 0;
-    char cod[32] = {0};
-
-	
+    char fbyte;
+    char cod[32];
     
 	if (!in_code || !out_code || in_len <= 0 || out_len <= 0)
 		return AM_FAILURE;
-
 
 	memset(out_code,0,out_len);
 	 
@@ -1259,39 +1256,9 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 		else if (fbyte == 0x15)
 			strcpy(cod, "utf-8");
 		else if (fbyte >= 0x20)
-		{
-			do{
-				if(in_len < 2)
-				{
-					return AM_FAILURE;
-				}
-				fbyteNext= in_code[1];
-				if (fbyte >= 0xB0 && fbyte <= 0xF7 &&fbyteNext >= 0xA0 && fbyteNext <= 0xFE)
-				{
-					strcpy(cod, "GB2312");
-					break;
-				}
-				else if(fbyte >= 0x81 && fbyte<= 0xFE && fbyteNext>= 0x40 && fbyteNext <= 0xFE)
-				{
-					strcpy(cod, "GBK");
-					break;
-				}
-				else if((0xA0 <= fbyte && fbyte <= 0xFE) &&((0xA0 <= fbyteNext && fbyteNext<= 0xFE) || (0x40 <= fbyteNext && fbyteNext <= 0x7E)))
-				{
-					strcpy(cod, "BIG5");
-					break;
-				}
-				else
-				{
-					strcpy(cod, "ISO6937");
-				}
-			}while(FALSE);
-		}
+			strcpy(cod, "ISO6937");
 		else
-		{
 			return AM_FAILURE;
-		}
-			
 
 		/*调整输入*/
 		if (fbyte < 0x20)

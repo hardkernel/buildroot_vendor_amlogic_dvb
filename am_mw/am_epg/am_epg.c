@@ -666,10 +666,10 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 	dvbpsi_eit_t *eit = (dvbpsi_eit_t*)eit_section;
 	dvbpsi_eit_event_t *event;
 	dvbpsi_descriptor_t *descr;
-	char name[EVT_NAME_LEN+1] = {0};
-	char desc[EVT_TEXT_LEN+1] = {0};
-	char item_descr[ITEM_DESCR_LEN+1] = {0};
-	char ext_descr[EXT_TEXT_LEN + 1] = {0};
+	char name[EVT_NAME_LEN+1];
+	char desc[EVT_TEXT_LEN+1];
+	char item_descr[ITEM_DESCR_LEN+1];
+	char ext_descr[EXT_TEXT_LEN + 1];
 	char sql[256];
 	char *db_item;
 	int row = 1;
@@ -743,11 +743,11 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 		items = NULL;
 		items_tail = NULL;
 		db_item = NULL;
-		//name[0] = 0};
-		//desc[0] = {0};
-		//item_descr[0] = {0};
-		//ext_descr[0] = {0};
-		//ext_descr_len = {0};
+		name[0] = 0;
+		desc[0] = 0;
+		item_descr[0] = 0;
+		ext_descr[0] = 0;
+		ext_descr_len = 0;
 		nibble = 0;
 		
 		memset(eedecrs, 0, sizeof(eedecrs));
@@ -755,7 +755,7 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 			if (descr->i_tag == AM_SI_DESCR_SHORT_EVENT && descr->p_decoded)
 			{
 				dvbpsi_short_event_dr_t *pse = (dvbpsi_short_event_dr_t*)descr->p_decoded;
-				//AM_DEBUG(1, " event_id 0x%x, name %s",event->i_event_id, pse->i_event_name);
+
 				AM_SI_ConvertDVBTextCode((char*)pse->i_event_name, pse->i_event_name_length,\
 								name, EVT_NAME_LEN);
 				name[EVT_NAME_LEN] = 0;
@@ -763,7 +763,7 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 				AM_SI_ConvertDVBTextCode((char*)pse->i_text, pse->i_text_length,\
 								desc, EVT_TEXT_LEN);
 				desc[EVT_TEXT_LEN] = 0;
-				
+				//AM_DEBUG(1, "event_id 0x%x, name '%s'", event->i_event_id, name);
 			}
 			else if (descr->i_tag == AM_SI_DESCR_EXTENDED_EVENT && descr->p_decoded)
 			{

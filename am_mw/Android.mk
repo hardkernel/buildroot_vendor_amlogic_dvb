@@ -241,13 +241,13 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    external/icu4c/common\
 		    $(LOCAL_PATH)/am_ci
 
-#ifeq ($(strip $(BOARD_TVAPI_HAVE_TVPLAYER)),true)
- #   LOCAL_C_INCLUDES +=  external/tvapi/libsigdetect
+ifeq ($(strip $(BOARD_TVAPI_HAVE_TVPLAYER)),true)
+    LOCAL_C_INCLUDES +=  external/tvapi/libsigdetect
     
-#	LOCAL_SHARED_LIBRARIES += libsigdetect
+	LOCAL_SHARED_LIBRARIES += libsigdetect
 	
-#	LOCAL_CFLAGS += -DCC_BOARD_ATV_SIGDETECT
-#endif
+	LOCAL_CFLAGS += -DCC_BOARD_ATV_SIGDETECT
+endif
 
 LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc  
 

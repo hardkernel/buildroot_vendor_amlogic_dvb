@@ -3268,7 +3268,7 @@ static void* aml_av_monitor_thread(void *arg)
                                          {     
                                             if(sscanf(buf, "%d", &bypass_hd)==1)
                                             {
-                                             //   AM_DEBUG(1, " Get DI bypass_hd status  ========= di bypass_hd is :%d",bypass_hd);
+                                                AM_DEBUG(1, " Get DI bypass_hd status  ========= di bypass_hd is :%d",bypass_hd);
                                             }else
                                                bypass_hd = 0; 
                                          } 
@@ -3300,8 +3300,8 @@ static void* aml_av_monitor_thread(void *arg)
                                       }
 #endif
 				}
-				/*AM_DEBUG(1, "asize %d adata %d vsize %d vdata %d apts_diff %d vpts_diff %d resample %d",
-					ab_size, a_size, vb_size, v_size, dmx_apts-apts, dmx_vpts-vpts, resample);*/
+				AM_DEBUG(1, "asize %d adata %d vsize %d vdata %d apts_diff %d vpts_diff %d resample %d",
+					ab_size, a_size, vb_size, v_size, dmx_apts-apts, dmx_vpts-vpts, resample);
 
 				if(resample != curr_resample){
 					int set = 1;
