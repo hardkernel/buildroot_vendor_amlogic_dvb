@@ -1,3 +1,6 @@
+#ifdef _FORTIFY_SOURCE
+#undef _FORTIFY_SOURCE
+#endif
 
 #define AM_DEBUG_LEVEL 1
 

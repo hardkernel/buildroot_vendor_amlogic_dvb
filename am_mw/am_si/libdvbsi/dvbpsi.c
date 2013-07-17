@@ -1,3 +1,6 @@
+#ifdef _FORTIFY_SOURCE
+#undef _FORTIFY_SOURCE
+#endif
 /*****************************************************************************
  * dvbpsi.c: conversion from TS packets to PSI sections
  *----------------------------------------------------------------------------

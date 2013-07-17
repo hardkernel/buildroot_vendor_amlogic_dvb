@@ -1,3 +1,6 @@
+#ifdef _FORTIFY_SOURCE
+#undef _FORTIFY_SOURCE
+#endif
 
 #include "am_dmx.h"
 #include "am_av.h"

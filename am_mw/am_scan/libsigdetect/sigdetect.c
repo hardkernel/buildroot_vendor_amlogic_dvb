@@ -1,3 +1,6 @@
+#ifdef _FORTIFY_SOURCE
+#undef _FORTIFY_SOURCE
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>

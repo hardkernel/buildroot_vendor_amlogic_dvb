@@ -1,3 +1,6 @@
+#ifdef _FORTIFY_SOURCE
+#undef _FORTIFY_SOURCE
+#endif
 /*
 	en50221 encoder An implementation for libdvb
 	an implementation for the en50221 transport layer

@@ -1,3 +1,6 @@
+#ifdef _FORTIFY_SOURCE
+#undef _FORTIFY_SOURCE
+#endif
 /*
 	ASN.1 routines, implementation for libdvben50221
 	an implementation for the High Level Common Interface

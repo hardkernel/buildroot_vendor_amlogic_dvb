@@ -1,3 +1,6 @@
+#ifdef _FORTIFY_SOURCE
+#undef _FORTIFY_SOURCE
+#endif
 /***************************************************************************
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */

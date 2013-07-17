@@ -1,3 +1,6 @@
+#ifdef _FORTIFY_SOURCE
+#undef _FORTIFY_SOURCE
+#endif
 #include <am_tt2.h>
 #include <am_debug.h>
 #include <am_util.h>

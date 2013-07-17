@@ -1,3 +1,6 @@
+#ifdef _FORTIFY_SOURCE
+#undef _FORTIFY_SOURCE
+#endif
 /*
 ** MEMWATCH.C
 ** Nonintrusive ANSI C memory leak / overwrite detection

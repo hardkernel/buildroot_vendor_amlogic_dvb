@@ -1,3 +1,6 @@
+#ifdef _FORTIFY_SOURCE
+#undef _FORTIFY_SOURCE
+#endif
 /*****************************************************************************
  * dr_03.c
  * (c)2001-2002 VideoLAN
