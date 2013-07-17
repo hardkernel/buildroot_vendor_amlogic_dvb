@@ -270,6 +270,13 @@ extern AM_ErrorCode_t AM_SI_ReleaseSection(int handle, uint8_t table_id, void *s
  */
 extern AM_ErrorCode_t AM_SI_GetSectionHeader(int handle, uint8_t *buf, uint16_t len, AM_SI_SectionHeader_t *sec_header);
 
+/**\brief 设置默认的DVB编码方式，当前端流未按照DVB标准，即第一个
+ * 字符没有指定编码方式时，可以调用该函数来指定一个强制转换的编码。
+ * \param [in] code 默认进行强制转换的字符编码方式,如GB2312，BIG5等.
+ * \return
+ */
+extern void AM_SI_SetDefaultDVBTextCoding(const char *coding);
+
 /**\brief 按DVB标准将输入字符转成UTF-8编码
  * \param [in] in_code 需要转换的字符数据
  * \param in_len 需要转换的字符数据长度

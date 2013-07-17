@@ -49,8 +49,6 @@
 		}\
 	AM_MACRO_END
 
-/*DVB字符默认编码,在进行DVB字符转码时会强制使用该编码为输入编码*/
-#define DEFAULT_DVB_CODE ""/*"GB2312"*/
 
 /****************************************************************************
  * Static data
@@ -65,6 +63,8 @@ extern void dvbpsi_DecodeEITSections(dvbpsi_eit_t *p_eit,dvbpsi_psi_section_t* p
 extern void dvbpsi_DecodeTOTSections(dvbpsi_tot_t *p_tot,dvbpsi_psi_section_t* p_section);
 extern void dvbpsi_DecodeBATSections(dvbpsi_bat_t *p_tot,dvbpsi_psi_section_t* p_section);
 
+/*DVB字符默认编码,在进行DVB字符转码时会强制使用该编码为输入编码*/
+static char forced_dvb_text_coding[32] = {0};
 
 static const char * const si_prv_data = "AM SI Decoder";
 
@@ -1188,6 +1188,15 @@ AM_ErrorCode_t AM_SI_GetSectionHeader(int handle, uint8_t *buf, uint16_t len, AM
 	return AM_SUCCESS;
 }
 
+/**\brief 设置默认的DVB编码方式，当前端流未按照DVB标准，即第一个
+ * 字符没有指定编码方式时，可以调用该函数来指定一个强制转换的编码。
+ * \param [in] code 默认进行强制转换的字符编码方式,如GB2312，BIG5等.
+ * \return
+ */
+void AM_SI_SetDefaultDVBTextCoding(const char *coding)
+{
+	snprintf(forced_dvb_text_coding, sizeof(forced_dvb_text_coding), "%s", coding);
+}
 
 /**\brief 按DVB标准将输入字符转成UTF-8编码
  * \param [in] in_code 需要转换的字符数据
@@ -1212,10 +1221,10 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 	memset(out_code,0,out_len);
 	 
 	/*查找输入编码方式*/
-	if (strcmp(DEFAULT_DVB_CODE, ""))
+	if (strcmp(forced_dvb_text_coding, ""))
 	{
 		/*强制将输入按默认编码处理*/
-		strcpy(cod, DEFAULT_DVB_CODE);
+		strcpy(cod, forced_dvb_text_coding);
 	}
 	else if (in_len <= 1)
 	{
