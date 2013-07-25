@@ -166,6 +166,10 @@ extern "C"
 /*单个Program最大支持的音频个数*/
 #define AM_SI_MAX_AUD_CNT 32
 
+#define AM_SI_MAX_SUB_CNT 32
+
+#define AM_SI_MAX_TTX_CNT 32
+
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
@@ -206,9 +210,34 @@ typedef struct
 		int		pid;	/**< audio PID*/
 		int		fmt;	/**< audio format*/
 		char	lang[10];	/**< audio language*/	
-	}audios[32];
+	}audios[AM_SI_MAX_AUD_CNT];
 }AM_SI_AudioInfo_t;
 
+typedef struct
+{
+	int subtitle_count;
+	struct
+	{
+		int pid;
+		int type;
+		int comp_page_id;
+		int anci_page_id;
+		char lang[16];
+	}subtitles[AM_SI_MAX_SUB_CNT];
+}AM_SI_SubtitleInfo_t;
+
+typedef struct
+{
+	int teletext_count;
+	struct
+	{
+		int pid;
+		int type;
+		int magazine_no;
+		int page_no;
+		char lang[16];
+	}teletexts[AM_SI_MAX_TTX_CNT];
+}AM_SI_TeletextInfo_t;
 
 /****************************************************************************
  * Function prototypes  

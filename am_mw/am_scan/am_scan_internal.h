@@ -98,10 +98,6 @@ enum
 	DELETE_TS_EVTS,
 	QUERY_TS_BY_FREQ_ORDER,
 	DELETE_SRV_GRP,
-	INSERT_SUBTITLE,
-	INSERT_TELETEXT,
-	DELETE_TS_SUBTITLES,
-	DELETE_TS_TELETEXTS,
 	QUERY_SRV_TS_NET_ID,
 	UPDATE_CHAN_SKIP,
 	QUERY_MAX_CHAN_NUM_BY_TYPE,
@@ -244,6 +240,8 @@ typedef struct
 	char str_afmts[256];
 	char str_alangs[256];
 	AM_SI_AudioInfo_t aud_info;
+	AM_SI_SubtitleInfo_t sub_info;
+	AM_SI_TeletextInfo_t ttx_info;
 }AM_SCAN_ServiceInfo_t;
 
 /**\brief 搜索中间数据*/

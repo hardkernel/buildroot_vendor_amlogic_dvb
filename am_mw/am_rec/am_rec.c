@@ -61,8 +61,277 @@ static inline long long am_rec_get_file_size(AM_REC_Recorder_t *rec)
 	return size;
 }
 
+static void am_rec_packet_data(int fd, int pid, const uint8_t *data, int size, int appearence)
+{
+	uint8_t buf[188];
+	int left, cc = 0;
+
+	buf[0] = 0x47;
+    buf[1] = 0x40 | ((uint8_t)(pid>>8)&0x1f);
+    buf[2] = pid&0xff;
+		
+	while (appearence > 0)
+	{
+		left = size;
+		while (left > 0)
+		{
+			buf[3] = 0x10 + (cc%0x10);
+			if (left >= 184)
+			{
+				memcpy(buf+4, &data[size-left], 184);
+				left -= 184;
+			}
+			else
+			{
+				memset(buf+4, 0xff, 184);
+				memcpy(buf+4, &data[size-left], left);
+				left = 0;
+			}
+			
+			cc++;	
+
+			/* write this ts packet to file */
+			write(fd, buf, sizeof(buf));
+		}
+
+		appearence--;
+	}
+}
+
+static AM_ErrorCode_t am_rec_insert_pat(AM_REC_Recorder_t *rec)
+{
+	dvbpsi_psi_section_t *psec;
+	dvbpsi_pat_t pat;
+	dvbpsi_pat_program_t program;
+
+	program.i_number = 0x1;
+	program.i_pid = rec->rec_para.pmt_pid;
+	program.p_next = NULL;
+
+	pat.b_current_next = 1;
+	pat.i_table_id = 0;
+	pat.i_ts_id = 0x1;
+	pat.i_version = 0;
+	pat.p_first_program = &program;
+	pat.p_next = NULL;
+	
+	psec = dvbpsi_GenPATSections(&pat, 1);
+	if (psec == NULL)
+	{
+		AM_DEBUG(1, "Cannot insert PAT to file!");
+		return AM_REC_ERROR_BASE;
+	}
+
+	am_rec_packet_data(rec->rec_fd, 0, psec->p_data, psec->i_length + 3, 10);
+
+	dvbpsi_DeletePSISections(psec);
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t am_rec_insert_file_header(AM_REC_Recorder_t *rec)
+{
+    uint8_t buf[188];
+	uint8_t stream[sizeof(AM_REC_MediaInfo_t)];
+    uint16_t header_pid = 0x1234;
+	int pos = 0, i, left, npacket;
+	AM_REC_MediaInfo_t *pp = &rec->rec_para.media_info; 
+
+#define WRITE_INT(_i)\
+	AM_MACRO_BEGIN\
+		stream[pos++] = (uint8_t)(((_i)&0xff000000) >> 24);\
+		stream[pos++] = (uint8_t)(((_i)&0x00ff0000) >> 16);\
+		stream[pos++] = (uint8_t)(((_i)&0x0000ff00) >> 8);\
+		stream[pos++] = (uint8_t)((_i)&0x000000ff);\
+	AM_MACRO_END
+
+	WRITE_INT(0);
+	memcpy(stream, pp->program_name, sizeof(pp->program_name));
+	pos += sizeof(pp->program_name);
+	WRITE_INT(pp->vid_pid);
+	WRITE_INT(pp->vid_fmt);
+
+	if (pp->aud_cnt > (int)AM_ARRAY_SIZE(pp->audios))
+		pp->aud_cnt = AM_ARRAY_SIZE(pp->audios);
+	WRITE_INT(pp->aud_cnt);
+	for (i=0; i<pp->aud_cnt; i++)
+	{
+		WRITE_INT(pp->audios[i].pid);
+		WRITE_INT(pp->audios[i].fmt);
+		memcpy(stream+pos, pp->audios[i].lang, sizeof(pp->audios[i].lang));
+		pos += sizeof(pp->audios[i].lang);
+	}
+	
+	if (pp->sub_cnt > (int)AM_ARRAY_SIZE(pp->subtitles))
+		pp->sub_cnt = AM_ARRAY_SIZE(pp->subtitles);
+	WRITE_INT(pp->sub_cnt);
+	for (i=0; i<pp->sub_cnt; i++)
+	{
+		WRITE_INT(pp->subtitles[i].pid);
+		WRITE_INT(pp->subtitles[i].type);
+		WRITE_INT(pp->subtitles[i].composition_page);
+		WRITE_INT(pp->subtitles[i].ancillary_page);
+		WRITE_INT(pp->subtitles[i].magzine_no);
+		WRITE_INT(pp->subtitles[i].page_no);
+		memcpy(stream+pos, pp->subtitles[i].lang, sizeof(pp->subtitles[i].lang));
+		pos += sizeof(pp->subtitles[i].lang);
+	}
+	
+	if (pp->ttx_cnt > (int)AM_ARRAY_SIZE(pp->teletexts))
+		pp->ttx_cnt = AM_ARRAY_SIZE(pp->teletexts);
+	WRITE_INT(pp->ttx_cnt);
+	for (i=0; i<pp->ttx_cnt; i++)
+	{
+		WRITE_INT(pp->teletexts[i].pid);
+		WRITE_INT(pp->teletexts[i].magzine_no);
+		WRITE_INT(pp->teletexts[i].page_no);
+		memcpy(stream+pos, pp->teletexts[i].lang, sizeof(pp->teletexts[i].lang));
+		pos += sizeof(pp->teletexts[i].lang);
+	}
+	
+    /* In order to be compatible with libplayer, we pack it as a ts packet */
+	lseek64(rec->rec_fd, 0, SEEK_SET);
+	am_rec_packet_data(rec->rec_fd, header_pid, stream, pos, 1);
+	
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t am_rec_update_record_time(AM_REC_Recorder_t *rec)
+{
+	int now, rec_time;
+	off64_t cur_pos;
+	uint8_t buf[4];
+
+	if (rec->rec_start_time > 0)
+	{
+		cur_pos = lseek64(rec->rec_fd, 0, SEEK_CUR);
+		
+		AM_TIME_GetClock(&now);
+		rec_time = (now - rec->rec_start_time)/1000;
+		lseek64(rec->rec_fd, 4, SEEK_SET);
+
+		buf[0] = (uint8_t)(((rec_time)&0xff000000) >> 24);
+		buf[1] = (uint8_t)(((rec_time)&0x00ff0000) >> 16);
+		buf[2] = (uint8_t)(((rec_time)&0x0000ff00) >> 8);
+		buf[3] = (uint8_t)((rec_time)&0x000000ff);
+
+		write(rec->rec_fd, buf, sizeof(buf));
+
+		lseek64(rec->rec_fd, cur_pos, SEEK_SET);
+	}	
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t am_rec_gen_next_file_name(AM_REC_Recorder_t *rec, const char *prefix, const char *suffix)
+{	
+	struct stat st;
+	
+	do
+	{
+		if (rec->rec_file_index <= 1)
+		{
+			snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), 
+				"%s/%s.%s", rec->create_para.store_dir, prefix, suffix);
+		}
+		else
+		{
+			snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), 
+				"%s/%s-%d.%s", rec->create_para.store_dir, prefix, 
+				rec->rec_file_index, suffix);
+		}
+		
+		if (!stat(rec->rec_file_name, &st))
+		{
+			AM_DEBUG(1, "PVR file '%s' already exist.", rec->rec_file_name);
+			rec->rec_file_index++;
+			
+			continue;
+		}
+		else if (errno == ENOENT)
+		{
+			AM_DEBUG(1, "PVR file is assigned to '%s'", rec->rec_file_name);
+			break;
+		}
+		else
+		{
+			AM_DEBUG(1, "Searching PVR files failed, error: %s", strerror(errno));
+			if (errno == EACCES)
+				return AM_REC_ERR_CANNOT_ACCESS_FILE;
+			
+			return AM_REC_ERR_CANNOT_OPEN_FILE;
+		}	
+
+		if (rec->rec_file_index == INT_MAX)
+		{
+			/* Is this possible? */
+			AM_DEBUG(1, "Too many sub-files!");
+			return AM_REC_ERR_CANNOT_OPEN_FILE;
+		}
+		
+		rec->rec_file_index++;
+	}while(1);
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t am_rec_auto_switch_file(AM_REC_Recorder_t *rec)
+{
+	if (rec->rec_fd >= 0)
+	{
+		close(rec->rec_fd);
+		rec->rec_fd = -1;
+	}
+
+	/* try to create the new record sub-file */
+	AM_TRY(am_rec_gen_next_file_name(rec, rec->rec_para.prefix_name, rec->rec_para.suffix_name));
+
+	rec->rec_fd = open(rec->rec_file_name, O_TRUNC|O_CREAT|O_WRONLY, 0666);
+	if (rec->rec_fd == -1)
+	{
+		AM_DEBUG(1, "Cannot open new file '%s', record aborted.", rec->rec_file_name);
+		return AM_REC_ERR_CANNOT_OPEN_FILE;
+	}
+
+	am_rec_insert_file_header(rec);
+
+	am_rec_insert_pat(rec);
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t am_rec_start_dvr(AM_REC_Recorder_t *rec)
+{
+	int i;
+	AM_DVR_StartRecPara_t spara;
+	AM_REC_MediaInfo_t *minfo = &rec->rec_para.media_info;
+
+#define ADD_PID(_pid)\
+	AM_MACRO_BEGIN\
+		if ((_pid) < 0x1fff && spara.pid_count < AM_DVR_MAX_PID_COUNT)\
+			spara.pids[spara.pid_count++] = (_pid);\
+	AM_MACRO_END
+
+	spara.pid_count = 0;
+	ADD_PID(minfo->vid_pid);
+	for (i=0; i<minfo->aud_cnt; i++)
+	{
+		ADD_PID(minfo->audios[i].pid);
+	}
+	for (i=0; i<minfo->sub_cnt; i++)
+	{
+		ADD_PID(minfo->subtitles[i].pid);
+	}
+	for (i=0; i<minfo->ttx_cnt; i++)
+	{
+		ADD_PID(minfo->teletexts[i].pid);
+	}
+	
+	return AM_DVR_StartRecord(rec->create_para.dvr_dev, &spara);
+}
+
 /**\brief 写录像数据到文件*/
-static int am_rec_data_write(int fd, uint8_t *buf, int size)
+static int am_rec_data_write(AM_REC_Recorder_t *rec, uint8_t *buf, int size)
 {
 	int ret;
 	int left = size;
@@ -70,10 +339,17 @@ static int am_rec_data_write(int fd, uint8_t *buf, int size)
 
 	while (left > 0)
 	{
-		ret = write(fd, p, left);
+		ret = write(rec->rec_fd, p, left);
 		if (ret == -1)
 		{
-			if (errno != EINTR)
+			if (errno == EFBIG)
+			{
+				AM_DEBUG(1, "EFBIG detected, automatically write to a new file!");
+				
+				if (am_rec_auto_switch_file(rec) != AM_SUCCESS)
+					break;
+			}
+			else if (errno != EINTR)
 			{
 				AM_DEBUG(0, "Write record data failed: %s", strerror(errno));
 				break;
@@ -92,11 +368,12 @@ static int am_rec_data_write(int fd, uint8_t *buf, int size)
 static void *am_rec_record_thread(void* arg)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)arg;
-	int cnt, err = 0, check_time;
+	int cnt, err = 0, check_time, update_time=0;
 	uint8_t buf[256*1024];
 	AM_DVR_OpenPara_t para;
 	AM_DVR_StartRecPara_t spara;
 	AM_REC_RecEndPara_t epara;
+	const int UPDATE_TIME_PERIOD = 1000;
 	
 	memset(&epara, 0, sizeof(epara));
 	epara.hrec = (int)rec;
@@ -111,9 +388,7 @@ static void *am_rec_record_thread(void* arg)
 
 	AM_DVR_SetSource(rec->create_para.dvr_dev, rec->create_para.async_fifo_id);
 	
-	spara.pid_count = rec->rec_para.pid_count;
-	memcpy(spara.pids, rec->rec_para.pids, sizeof(spara.pids));
-	if (AM_DVR_StartRecord(rec->create_para.dvr_dev, &spara) != AM_SUCCESS)
+	if (am_rec_start_dvr(rec) != AM_SUCCESS)
 	{
 		AM_DEBUG(0, "Start DVR%d failed", rec->create_para.dvr_dev);
 		err = AM_REC_ERR_DVR;
@@ -123,13 +398,22 @@ static void *am_rec_record_thread(void* arg)
 	/*从DVR设备读取数据并存入文件*/
 	while (rec->stat_flag & REC_STAT_FL_RECORDING)
 	{
-		if (rec->rec_start_time > 0 && rec->rec_para.total_time > 0)
+		if (rec->rec_start_time > 0)
 		{
 			AM_TIME_GetClock(&check_time);
-			if ((check_time-rec->rec_start_time) >= rec->rec_para.total_time)
+			
+			if (rec->rec_para.total_time > 0 && 
+				(check_time-rec->rec_start_time) >= (rec->rec_para.total_time*1000))
 			{
 				AM_DEBUG(1, "Reach record end time, now will stop recording...");
+				am_rec_update_record_time(rec);
 				break;
+			}
+			
+			if (update_time == 0 || (check_time-update_time) >= UPDATE_TIME_PERIOD)
+			{
+				am_rec_update_record_time(rec);
+				update_time = check_time;
 			}
 		}
 			
@@ -150,7 +434,7 @@ static void *am_rec_record_thread(void* arg)
 		}
 		else
 		{
-			if (am_rec_data_write(rec->rec_fd, buf, cnt) == 0)
+			if (am_rec_data_write(rec, buf, cnt) != cnt)
 			{
 				err = AM_REC_ERR_CANNOT_WRITE_FILE;
 				break;
@@ -185,9 +469,11 @@ close_file:
 		duration /= 1000;
 		epara.total_size = am_rec_get_file_size(rec);
 		epara.total_time = duration;
-		epara.error_code = err;
+		
 		AM_DEBUG(1, "Record end , duration %d:%02d:%02d", duration/3600, (duration%3600)/60, duration%60);
 	}
+
+	epara.error_code = err;
 
 	if ((rec->stat_flag & REC_STAT_FL_RECORDING))
 	{
@@ -203,11 +489,8 @@ close_file:
 /**\brief 取录像参数*/
 static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start_para)
 {
-	if (start_para->pid_count <= 0)
-		return AM_REC_ERR_INVALID_PARAM;
-		
 	snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), 
-		"%s/DVBRecordFiles", rec->create_para.store_dir);	
+		"%s", rec->create_para.store_dir);	
 	/*尝试创建录像文件夹*/
 	if (mkdir(rec->rec_file_name, 0666) && errno != EEXIST)
 	{
@@ -223,44 +506,13 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start
 	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
 	{
 		snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), 
-			"%s/DVBRecordFiles/REC_TimeShifting%d.amrec", 
-			rec->create_para.store_dir, 0/*AV_DEV*/);
+			"%s/TimeShifting%d.%s", rec->create_para.store_dir, 
+			0/*AV_DEV*/, start_para->suffix_name);
 	}
 	else
 	{
-		int now;
-		time_t tnow;
-		struct stat st;
-		struct tm stim;
-
-		/*新建一个不同名的文件名*/
-		AM_EPG_GetUTCTime(&now);
-		tnow = (time_t)now;
-		gmtime_r(&tnow, &stim);
-		srand(now);
-		do
-		{
-			now = rand();
-			snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), 
-				"%s/DVBRecordFiles/REC_%04d%02d%02d_%d.amrec", rec->create_para.store_dir, 
-				stim.tm_year + 1900, stim.tm_mon+1, stim.tm_mday, now);
-			if (!stat(rec->rec_file_name, &st))
-			{
-				continue;
-			}
-			else if (errno == ENOENT)
-			{
-				break;
-			}
-			else
-			{
-				AM_DEBUG(1, "Try search file in %s/DVBRecordFiles Failed, error: %s", 
-					rec->create_para.store_dir, strerror(errno));
-				if (errno == EACCES)
-					return AM_REC_ERR_CANNOT_ACCESS_FILE;
-				return AM_REC_ERR_CANNOT_OPEN_FILE;
-			}	
-		}while(1);
+		rec->rec_file_index = 1;
+		return am_rec_gen_next_file_name(rec, start_para->prefix_name, start_para->suffix_name);
 	}
 	
 	return 0;
@@ -283,6 +535,7 @@ static int am_rec_start_record(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start_p
 		
 	/*打开录像文件*/
 	rec->rec_fd = -1;
+	rec->rec_para = *start_para;
 	if (! rec->rec_para.is_timeshift)
 	{
 		rec->rec_fd = open(rec->rec_file_name, O_TRUNC|O_CREAT|O_WRONLY, 0666);
@@ -292,11 +545,13 @@ static int am_rec_start_record(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start_p
 			ret = AM_REC_ERR_CANNOT_OPEN_FILE;
 			goto start_end;
 		}
+
+		am_rec_insert_file_header(rec);
+		am_rec_insert_pat(rec);
 	}
 	
 	rec->rec_start_time = 0;
 	rec->stat_flag |= REC_STAT_FL_RECORDING;
-	rec->rec_para = *start_para;
 	rc = pthread_create(&rec->rec_thread, NULL, am_rec_record_thread, (void*)rec);
 	if (rc)
 	{
@@ -383,7 +638,6 @@ AM_ErrorCode_t AM_REC_Create(AM_REC_CreatePara_t *para, int *handle)
 	pthread_mutexattr_destroy(&mta);
 
 	*handle = (int)rec;
-	AM_DEBUG(1, "return handle %x, %p", *handle, rec);
 
 	return AM_SUCCESS;
 }
@@ -420,7 +674,6 @@ AM_ErrorCode_t AM_REC_StartRecord(int handle, AM_REC_RecPara_t *start_para)
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
-	AM_DEBUG(1, "handle %x, %p", handle, rec);
 	assert(rec && start_para);
 	pthread_mutex_lock(&rec->lock);
 	ret = am_rec_start_record(rec, start_para);

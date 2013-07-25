@@ -25,7 +25,11 @@ extern "C"
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
+#define AM_REC_PATH_MAX 1024
+#define AM_REC_NAME_MAX 255
+#define AM_REC_SUFFIX_MAX 10
 
+#define AM_REC_MediaInfo_t AM_AV_TimeshiftMediaInfo_t
 
 /****************************************************************************
  * Error code definitions
@@ -83,24 +87,24 @@ typedef struct
 	int		fend_dev;		/**< 前端设备号*/
 	int		dvr_dev;		/**< 录像使用的DVR设备号, 对于不同的REC需唯一*/
 	int		async_fifo_id;	/**< 连接到硬件的ASYNC FIFO id，对于不同的REC需唯一*/
-	char	store_dir[256];	/**< 录像文件存储位置*/
+	char	store_dir[AM_REC_PATH_MAX];	/**< 录像文件存储位置*/
 }AM_REC_CreatePara_t;
 
 /**\brief 录像参数*/
 typedef struct
 {
 	AM_Bool_t is_timeshift;	/**< 是否是时移录像*/
-	AM_Bool_t has_video;	/**< 是否有视频流录像*/
-	AM_Bool_t has_audio;	/**< 是否有音频流录像*/
+	int pmt_pid;
+	AM_REC_MediaInfo_t media_info;
 	int total_time;			/**< 需要录制的总时间，单位秒，<=0表示一直录像直到调用了Stop*/
-	int pid_count;					/**< 指定PID个数*/
-	int pids[AM_DVR_MAX_PID_COUNT];	/**< 指定每个PID*/
+	char prefix_name[AM_REC_NAME_MAX];
+	char suffix_name[AM_REC_SUFFIX_MAX];
 }AM_REC_RecPara_t;
 
 /**\brief 录像信息数据*/
 typedef struct
 {
-	char file_path[256];	/**< 当前录像文件路径*/
+	char file_path[AM_REC_PATH_MAX];	/**< 当前录像文件路径*/
 	long long file_size;	/**< 当前录像文件大小，即已录制数据大小*/
 	int cur_rec_time;	/**< 当前录制的总时间，单位秒*/
 	AM_REC_CreatePara_t create_para;	/**< 由AM_REC_Create传入的参数*/

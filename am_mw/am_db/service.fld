@@ -12,17 +12,32 @@
 "free_ca_mode integer", 							/**< free_ca_mode*/
 "volume integer", 									/**< 音量*/
 "aud_track integer", 								/**< 声道*/
+"pmt_pid integer",                                               /**< PMT PID*/
 "vid_pid integer", 									/**< 视频PID*/
 "vid_fmt integer",									/**< 视频压缩格式*/
 "scrambled_flag integer",							/**< 加扰标识，0-无加扰，1-有加扰*/
 
-"current_aud integer",								/**< 当前音频索引，0为第一个*/
-/**< Note: 一下audio相关的3组数据里，audio顺序是一致的，如第一个audio对应的数据分别位pid1,fmt1,lang1*/
-"aud_pids text",									/**< 音频PIDs，格式为[pid1, pid2,...]*/
-"aud_fmts text",									/**< 音频压缩格式，格式为[fmt1, fmt2,...]*/
-"aud_langs text",									/**< 音频语言，多语言支持，格式为[lang1, lang2,...]*/	
+/**< 以下audio,subtitle,teletext的字段中，text型字段以字符串形式存储多个数值，每个数值用','分开，
+ *   取一组值时，需根据数值在字符串中的相同的顺序提取。如取第一组audio，应取pid1 fmt1 lang1*/
+"current_aud integer",                                            /**< 当前音频索引，0为第一个*/
+"aud_pids text",                                                  /**< 音频PIDs，格式为[pid1, pid2,...]*/
+"aud_fmts text",                                                  /**< 音频压缩格式，格式为[fmt1, fmt2,...]*/
+"aud_langs text",                                                 /**< 音频语言，多语言支持，格式为[lang1, lang2,...]*/	
 
-"db_sub_id integer",								/**< 该service的当前subtitle数据库索引*/
+"current_sub integer",                                            /**< 当前subtitle索引，0为第一个*/
+"sub_pids text",                                                  /**< Subtitle PID*/
+"sub_types text",                                                 /**< Subtitle type*/
+"sub_composition_page_ids text",                                  /**< Composition page id*/
+"sub_ancillary_page_ids text",                                    /**< Aancillary page id*/
+"sub_langs text",                                                 /**< ISO-639-2语言编码,如eng, chs等*/
+
+"current_ttx integer",                                            /**< 当前teletext索引，0为第一个*/
+"ttx_pids text",                                                  /**< Teletext PID*/
+"ttx_types text",                                                 /**< Teletext type*/
+"ttx_magazine_nos text",                                          /**< Teletext Magazine Number*/
+"ttx_page_nos text",                                              /**< Teletext Page Number*/
+"ttx_langs text",                                                 /**< ISO-639-2语言编码,如eng, chs等*/
+
 "chan_num numeric",									/**< 频道号*/
 "skip integer",										/**< 是否隐藏, 0不隐藏，1隐藏*/
 "lock integer",										/**< 父母锁, 0不加锁，1加锁*/

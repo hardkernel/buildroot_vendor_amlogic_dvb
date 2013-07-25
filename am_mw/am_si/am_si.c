@@ -1477,4 +1477,147 @@ AM_ErrorCode_t AM_SI_ExtractAVFromATSCVC(vct_channel_info_t *vcinfo, int *vid, i
 	return AM_SUCCESS;
 }
 
+AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_SubtitleInfo_t *sub_info)
+{
+	dvbpsi_descriptor_t *descr;
+	
+	AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+		if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SUBTITLING)
+		{
+			int isub, i;
+			dvbpsi_subtitle_t *tmp_sub;
+			dvbpsi_subtitling_dr_t *psd = (dvbpsi_subtitling_dr_t*)descr->p_decoded;
+
+			for (isub=0; isub<psd->i_subtitles_number; isub++)
+			{	
+				tmp_sub = &psd->p_subtitle[isub];
+				
+				/* already added ? */
+				for (i=0; i<sub_info->subtitle_count; i++)
+				{
+					if (es->i_pid                      == sub_info->subtitles[i].pid &&
+						tmp_sub->i_subtitling_type     == sub_info->subtitles[i].type &&
+						tmp_sub->i_ancillary_page_id   == sub_info->subtitles[i].anci_page_id &&
+						tmp_sub->i_composition_page_id == sub_info->subtitles[i].comp_page_id &&
+						! memcmp(tmp_sub->i_iso6392_language_code, sub_info->subtitles[i].lang, 3))
+					{
+						AM_DEBUG(1, "Skipping a exist subtitle: pid %d, lang %c%c%c",
+							es->i_pid, tmp_sub->i_iso6392_language_code[0], 
+							tmp_sub->i_iso6392_language_code[1], 
+							tmp_sub->i_iso6392_language_code[2]);
+						break;
+					}
+				}
+
+				if (i < sub_info->subtitle_count)
+					continue;
+				
+				if (sub_info->subtitle_count >= AM_SI_MAX_SUB_CNT)
+				{
+					AM_DEBUG(1, "Too many subtitles, Max count %d", AM_SI_MAX_SUB_CNT);
+					return AM_SUCCESS;
+				}
+				
+				if (sub_info->subtitle_count < 0)
+					sub_info->subtitle_count = 0;
+				
+				sub_info->subtitles[sub_info->subtitle_count].pid          = es->i_pid;
+				sub_info->subtitles[sub_info->subtitle_count].type         = tmp_sub->i_subtitling_type;
+				sub_info->subtitles[sub_info->subtitle_count].comp_page_id = tmp_sub->i_composition_page_id;
+				sub_info->subtitles[sub_info->subtitle_count].anci_page_id = tmp_sub->i_ancillary_page_id;
+				if (tmp_sub->i_iso6392_language_code[0] == 0)
+				{
+					sprintf(sub_info->subtitles[sub_info->subtitle_count].lang, "Subtitle%d", sub_info->subtitle_count+1);
+				}
+				else
+				{
+					memcpy(sub_info->subtitles[sub_info->subtitle_count].lang, tmp_sub->i_iso6392_language_code, 3);
+					sub_info->subtitles[sub_info->subtitle_count].lang[3] = 0;
+				}
+				
+				AM_DEBUG(0, "Add a subtitle: pid %d, language: %s", es->i_pid, sub_info->subtitles[sub_info->subtitle_count].lang);
+
+				sub_info->subtitle_count++;
+			}
+		}
+	AM_SI_LIST_END()
+
+	return AM_SUCCESS;
+}
+
+
+AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_TeletextInfo_t *ttx_info)
+{
+	dvbpsi_descriptor_t *descr;
+	
+	AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+		if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_TELETEXT)
+		{
+			int itel, i;
+			dvbpsi_teletextpage_t *tmp_ttx;
+			dvbpsi_teletextpage_t def_ttx;
+			dvbpsi_teletext_dr_t *ptd = (dvbpsi_teletext_dr_t*)descr->p_decoded;
+
+			memset(&def_ttx, 0, sizeof(def_ttx));
+			def_ttx.i_teletext_magazine_number = 1;
+			
+			for (itel=0; itel<ptd->i_pages_number; itel++)
+			{	
+				if (ptd != NULL)
+					tmp_ttx = &ptd->p_pages[itel];
+				else
+					tmp_ttx = &def_ttx;
+
+				/* already added ? */
+				for (i=0; i<ttx_info->teletext_count; i++)
+				{
+					if (es->i_pid                           == ttx_info->teletexts[i].pid &&
+						tmp_ttx->i_teletext_type            == ttx_info->teletexts[i].type &&
+						tmp_ttx->i_teletext_magazine_number == ttx_info->teletexts[i].magazine_no &&
+						tmp_ttx->i_teletext_page_number     == ttx_info->teletexts[i].page_no &&
+						! memcmp(tmp_ttx->i_iso6392_language_code, ttx_info->teletexts[i].lang, 3))
+					{
+						AM_DEBUG(1, "Skipping a exist teletext: pid %d, lang %c%c%c",
+							es->i_pid, tmp_ttx->i_iso6392_language_code[0], 
+							tmp_ttx->i_iso6392_language_code[1], 
+							tmp_ttx->i_iso6392_language_code[2]);
+						break;
+					}
+				}
+
+				if (i < ttx_info->teletext_count)
+					continue;
+				
+				if (ttx_info->teletext_count >= AM_SI_MAX_TTX_CNT)
+				{
+					AM_DEBUG(1, "Too many teletexts, Max count %d", AM_SI_MAX_TTX_CNT);
+					return AM_SUCCESS;
+				}
+				
+				if (ttx_info->teletext_count < 0)
+					ttx_info->teletext_count = 0;
+				
+				ttx_info->teletexts[ttx_info->teletext_count].pid          = es->i_pid;
+				ttx_info->teletexts[ttx_info->teletext_count].type         = tmp_ttx->i_teletext_type;
+				ttx_info->teletexts[ttx_info->teletext_count].magazine_no  = tmp_ttx->i_teletext_magazine_number;
+				ttx_info->teletexts[ttx_info->teletext_count].page_no      = tmp_ttx->i_teletext_page_number;
+				if (tmp_ttx->i_iso6392_language_code[0] == 0)
+				{
+					sprintf(ttx_info->teletexts[ttx_info->teletext_count].lang, "Teletext%d", ttx_info->teletext_count+1);
+				}
+				else
+				{
+					memcpy(ttx_info->teletexts[ttx_info->teletext_count].lang, tmp_ttx->i_iso6392_language_code, 3);
+					ttx_info->teletexts[ttx_info->teletext_count].lang[3] = 0;
+				}
+				
+				AM_DEBUG(0, "Add a teletext: pid %d, language: %s", es->i_pid, ttx_info->teletexts[ttx_info->teletext_count].lang);
+
+				ttx_info->teletext_count++;
+			}
+		}
+	AM_SI_LIST_END()
+
+	return AM_SUCCESS;
+}
 

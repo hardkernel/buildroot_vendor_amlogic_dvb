@@ -201,6 +201,9 @@ static int dvbc_std_freqs[] =
 874000
 };
 
+/*,skip=0,lock=0,chan_num=?,\
+	 major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,hide_guide=?, source_id=?,favor=?,db_sat_para_id=?,\
+	 scrambled_flag=?,lcn=-1,hd_lcn=-1,sd_lcn=-1,default_chan_num=-1,chan_order=0,lcn_order=0,service_id_order=0,hd_sd_order=0*/
 
 /*SQLite3 stmts*/
 const char *sql_stmts[MAX_STMT] = 
@@ -215,19 +218,18 @@ const char *sql_stmts[MAX_STMT] =
 	"select db_id from srv_table where db_net_id=? and db_ts_id=? and service_id=?",
 	"insert into srv_table(db_net_id, db_ts_id,service_id) values(?,?,?)",
 	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?,\
-	 running_status=?,free_ca_mode=?,volume=?,aud_track=?,vid_pid=?,vid_fmt=?,aud_pids=?,aud_fmts=?,\
-	 aud_langs=?,db_sub_id=-1,skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,\
-	 hidden=?,hide_guide=?, source_id=?,favor=?,current_aud=?,db_sat_para_id=?,scrambled_flag=?,lcn=-1,hd_lcn=-1,\
-	 sd_lcn=-1,default_chan_num=-1,chan_order=0,lcn_order=0,service_id_order=0,hd_sd_order=0 where db_id=?",
+	 running_status=?,free_ca_mode=?,volume=?,aud_track=?,vid_pid=?,vid_fmt=?,\
+	 current_aud=-1,aud_pids=?,aud_fmts=?,aud_langs=?,\
+	 current_sub=-1,sub_pids=?,sub_types=?,sub_composition_page_ids=?,sub_ancillary_page_ids=?,sub_langs=?,\
+	 current_ttx=-1,ttx_pids=?,ttx_types=?,ttx_magazine_nos=?,ttx_page_nos=?,ttx_langs=?,\
+	 skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,\
+	 hide_guide=?, source_id=?,favor=?,db_sat_para_id=?,scrambled_flag=?,lcn=-1,hd_lcn=-1,sd_lcn=-1,\
+	 default_chan_num=-1,chan_order=0,lcn_order=0,service_id_order=0,hd_sd_order=0 where db_id=?",
 	"select db_id,service_type from srv_table where db_ts_id=? order by service_id",
 	"update srv_table set chan_num=? where db_id=?",
 	"delete  from evt_table where db_ts_id=?",
 	"select db_id from ts_table where src=? order by freq",
 	"delete from grp_map_table where db_srv_id in (select db_id from srv_table where db_ts_id=?)",
-	"insert into subtitle_table(db_srv_id,pid,type,composition_page_id,ancillary_page_id,language) values(?,?,?,?,?,?)",
-	"insert into teletext_table(db_srv_id,pid,type,magazine_number,page_number,language) values(?,?,?,?,?,?)",
-	"delete from subtitle_table where db_srv_id in (select db_id from srv_table where db_ts_id=?)",
-	"delete from teletext_table where db_srv_id in (select db_id from srv_table where db_ts_id=?)",
 	"select srv_table.service_id, ts_table.ts_id, net_table.network_id from srv_table, ts_table, net_table where srv_table.db_id=? and ts_table.db_id=srv_table.db_ts_id and net_table.db_id=srv_table.db_net_id",
 	"update srv_table set skip=? where db_id=?",
 	"select max(chan_num) from srv_table where service_type=? and src=?",
@@ -726,54 +728,6 @@ static int insert_srv(sqlite3_stmt **stmts, int db_net_id, int db_ts_id, int srv
 	return db_id;
 }
 
-/**\brief 插入一个Subtitle记录*/
-static int insert_subtitle(sqlite3_stmt **stmts, int db_srv_id, int pid, dvbpsi_subtitle_t *psd)
-{
-	sqlite3_bind_int(stmts[INSERT_SUBTITLE], 1, db_srv_id);
-	sqlite3_bind_int(stmts[INSERT_SUBTITLE], 2, pid);
-	sqlite3_bind_int(stmts[INSERT_SUBTITLE], 3, psd->i_subtitling_type);
-	sqlite3_bind_int(stmts[INSERT_SUBTITLE], 4, psd->i_composition_page_id);
-	sqlite3_bind_int(stmts[INSERT_SUBTITLE], 5, psd->i_ancillary_page_id);
-	if (psd->i_iso6392_language_code[0] == 0)
-		sqlite3_bind_text(stmts[INSERT_SUBTITLE], 6, "sub", 3, SQLITE_STATIC);
-	else
-		sqlite3_bind_text(stmts[INSERT_SUBTITLE], 6, (const char*)psd->i_iso6392_language_code, 3, SQLITE_STATIC);
-	AM_DEBUG(1, "Insert a new subtitle");
-	sqlite3_step(stmts[INSERT_SUBTITLE]);
-	sqlite3_reset(stmts[INSERT_SUBTITLE]);
-
-	return 0;
-}
-
-/**\brief 插入一个Teletext记录*/
-static int insert_teletext(sqlite3_stmt **stmts, int db_srv_id, int pid, dvbpsi_teletextpage_t *ptd)
-{
-	sqlite3_bind_int(stmts[INSERT_TELETEXT], 1, db_srv_id);
-	sqlite3_bind_int(stmts[INSERT_TELETEXT], 2, pid);
-	if (ptd)
-	{
-		sqlite3_bind_int(stmts[INSERT_TELETEXT], 3, ptd->i_teletext_type);
-		sqlite3_bind_int(stmts[INSERT_TELETEXT], 4, ptd->i_teletext_magazine_number);
-		sqlite3_bind_int(stmts[INSERT_TELETEXT], 5, ptd->i_teletext_page_number);
-		if (ptd->i_iso6392_language_code[0] == 0)
-			sqlite3_bind_text(stmts[INSERT_TELETEXT], 6, "ttx", 3, SQLITE_STATIC);
-		else
-			sqlite3_bind_text(stmts[INSERT_TELETEXT], 6, (const char*)ptd->i_iso6392_language_code, 3, SQLITE_STATIC);
-	}
-	else
-	{
-		sqlite3_bind_int(stmts[INSERT_TELETEXT], 3, 0);
-		sqlite3_bind_int(stmts[INSERT_TELETEXT], 4, 1);
-		sqlite3_bind_int(stmts[INSERT_TELETEXT], 5, 0);
-		sqlite3_bind_text(stmts[INSERT_TELETEXT], 6, "ttx", -1, SQLITE_STATIC);
-	}
-	AM_DEBUG(1, "Insert a new teletext");
-	sqlite3_step(stmts[INSERT_TELETEXT]);
-	sqlite3_reset(stmts[INSERT_TELETEXT]);
-
-	return 0;
-}
-
 /**\brief 将audio数据格式化成字符串已便存入数据库*/
 static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, char *langs)
 {
@@ -798,6 +752,72 @@ static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, 
 			sprintf(pids, "%s %d", pids, ai->audios[i].pid);
 			sprintf(fmts, "%s %d", fmts, ai->audios[i].fmt);
 			sprintf(langs, "%s %s", langs, ai->audios[i].lang);
+		}
+	}
+}
+
+static void format_subtitle_strings(AM_SI_SubtitleInfo_t *si, char *pids, char *types, char *cids, char *aids, char *langs)
+{
+	int i;
+	
+	if (si->subtitle_count< 0)
+		si->subtitle_count = 0;
+		
+	pids[0]  = 0;
+	types[0] = 0;
+	cids[0]  = 0;
+	aids[0]  = 0;
+	langs[0] = 0;
+	for (i=0; i<si->subtitle_count; i++)
+	{
+		if (i == 0)
+		{
+			sprintf(pids,  "%d", si->subtitles[i].pid);
+			sprintf(types, "%d", si->subtitles[i].type);
+			sprintf(cids,  "%d", si->subtitles[i].comp_page_id);
+			sprintf(aids,  "%d", si->subtitles[i].anci_page_id);
+			sprintf(langs, "%s", si->subtitles[i].lang);
+		}
+		else
+		{
+			sprintf(pids,  "%s %d", pids, si->subtitles[i].pid);
+			sprintf(types, "%s %d", types, si->subtitles[i].type);
+			sprintf(cids,  "%s %d", cids, si->subtitles[i].comp_page_id);
+			sprintf(aids,  "%s %d", aids, si->subtitles[i].anci_page_id);
+			sprintf(langs, "%s %s", langs, si->subtitles[i].lang);
+		}
+	}
+}
+
+static void format_teletext_strings(AM_SI_TeletextInfo_t *ti, char *pids, char *types, char *magnos, char *pgnos, char *langs)
+{
+	int i;
+	
+	if (ti->teletext_count< 0)
+		ti->teletext_count = 0;
+		
+	pids[0]   = 0;
+	types[0]  = 0;
+	magnos[0] = 0;
+	pgnos[0]  = 0;
+	langs[0]  = 0;
+	for (i=0; i<ti->teletext_count; i++)
+	{
+		if (i == 0)
+		{
+			sprintf(pids,   "%d", ti->teletexts[i].pid);
+			sprintf(types,  "%d", ti->teletexts[i].type);
+			sprintf(magnos, "%d", ti->teletexts[i].magazine_no);
+			sprintf(pgnos,  "%d", ti->teletexts[i].page_no);
+			sprintf(langs,  "%s", ti->teletexts[i].lang);
+		}
+		else
+		{
+			sprintf(pids,   "%s %d", pids, ti->teletexts[i].pid);
+			sprintf(types,  "%s %d", types, ti->teletexts[i].type);
+			sprintf(magnos, "%s %d", magnos, ti->teletexts[i].magazine_no);
+			sprintf(pgnos,  "%s %d", pgnos, ti->teletexts[i].page_no);
+			sprintf(langs,  "%s %s", langs, ti->teletexts[i].lang);
 		}
 	}
 }
@@ -1022,15 +1042,6 @@ static void am_scan_update_ts_info(sqlite3_stmt **stmts, int net_dbid, int dbid,
 	sqlite3_bind_int(stmts[DELETE_SRV_GRP], 1, dbid);
 	sqlite3_step(stmts[DELETE_SRV_GRP]);
 	sqlite3_reset(stmts[DELETE_SRV_GRP]);
-
-	/*清除该TS下所有subtitles,teletexts*/
-	AM_DEBUG(1, "Delete all subtitles & teletexts in TS %d", dbid);
-	sqlite3_bind_int(stmts[DELETE_TS_SUBTITLES], 1, dbid);
-	sqlite3_step(stmts[DELETE_TS_SUBTITLES]);
-	sqlite3_reset(stmts[DELETE_TS_SUBTITLES]);
-	sqlite3_bind_int(stmts[DELETE_TS_TELETEXTS], 1, dbid);
-	sqlite3_step(stmts[DELETE_TS_TELETEXTS]);
-	sqlite3_reset(stmts[DELETE_TS_TELETEXTS]);
 	
 	/*清除该TS下所有service*/
 	sqlite3_bind_int(stmts[DELETE_TS_SRVS], 1, dbid);
@@ -1049,6 +1060,7 @@ static void am_scan_init_service_info(AM_SCAN_ServiceInfo_t *srv_info)
 {
 	memset(srv_info, 0, sizeof(AM_SCAN_ServiceInfo_t));
 	srv_info->vid = 0x1fff;
+	srv_info->vfmt = -1;
 	srv_info->free_ca = 1;
 	srv_info->srv_id = 0xffff;
 	srv_info->srv_dbid = -1;
@@ -1058,74 +1070,78 @@ static void am_scan_init_service_info(AM_SCAN_ServiceInfo_t *srv_info)
 /**\brief 更新一个service数据到数据库*/
 static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_ServiceInfo_t *srv_info)
 {	
-    if (srv_info->src != FE_ANALOG)
-    {
-    	int standard = result->start_para->dtv_para.standard;
-    	int mode = result->start_para->dtv_para.mode;
-        
-    	/* Transform service types for different dtv standards */
-    	if (standard != AM_SCAN_DTV_STD_ATSC)
-    	{
-    		if (srv_info->srv_type == 0x1)
-    			srv_info->srv_type = AM_SCAN_SRV_DTV;
-    		else if (srv_info->srv_type == 0x2)
-    			srv_info->srv_type = AM_SCAN_SRV_DRADIO;
-    	} 
-    	else 
-    	{
-    		if (srv_info->srv_type == 0x2)
-    			srv_info->srv_type = AM_SCAN_SRV_DTV;
-    		else if (srv_info->srv_type == 0x3)
-    			srv_info->srv_type = AM_SCAN_SRV_DRADIO;
-    	}
+#define str(i) (char*)(strings + i)
+
+	static char strings[14][256];
+
+	if (srv_info->src != FE_ANALOG)
+	{
+		int standard = result->start_para->dtv_para.standard;
+		int mode = result->start_para->dtv_para.mode;
+
+		/* Transform service types for different dtv standards */
+		if (standard != AM_SCAN_DTV_STD_ATSC)
+		{
+			if (srv_info->srv_type == 0x1)
+				srv_info->srv_type = AM_SCAN_SRV_DTV;
+			else if (srv_info->srv_type == 0x2)
+				srv_info->srv_type = AM_SCAN_SRV_DRADIO;
+		} 
+		else 
+		{
+			if (srv_info->srv_type == 0x2)
+				srv_info->srv_type = AM_SCAN_SRV_DTV;
+			else if (srv_info->srv_type == 0x3)
+				srv_info->srv_type = AM_SCAN_SRV_DRADIO;
+		}
 
 
-    	/* if video valid, set this program to tv type,
-    	 * if audio valid, but video not found, set it to radio type,
-    	 * if both invalid, but service_type found in SDT/VCT, set to unknown service,
-    	 * this mechanism is OPTIONAL
-    	 */
-    	if (srv_info->vid < 0x1fff)
-    	{
-    		srv_info->srv_type = AM_SCAN_SRV_DTV;
-    	}
-    	else if (srv_info->aud_info.audio_count > 0)
-    	{
-    		srv_info->srv_type = AM_SCAN_SRV_DRADIO;
-    	}
-    	else if (srv_info->srv_type == AM_SCAN_SRV_DTV || 
-    			srv_info->srv_type == AM_SCAN_SRV_DRADIO)
-    	{
-    		srv_info->srv_type = AM_SCAN_SRV_UNKNOWN;
-    	}
+		/* if video valid, set this program to tv type,
+		 * if audio valid, but video not found, set it to radio type,
+		 * if both invalid, but service_type found in SDT/VCT, set to unknown service,
+		 * this mechanism is OPTIONAL
+		 */
+		if (srv_info->vid < 0x1fff)
+		{
+			srv_info->srv_type = AM_SCAN_SRV_DTV;
+		}
+		else if (srv_info->aud_info.audio_count > 0)
+		{
+			srv_info->srv_type = AM_SCAN_SRV_DRADIO;
+		}
+		else if (srv_info->srv_type == AM_SCAN_SRV_DTV || 
+			srv_info->srv_type == AM_SCAN_SRV_DRADIO)
+		{
+			srv_info->srv_type = AM_SCAN_SRV_UNKNOWN;
+		}
     			
-    	/* Skip program for FTA mode */
-    	if (srv_info->scrambled_flag && (mode & AM_SCAN_DTVMODE_FTA))
-    	{
-    		AM_DEBUG(1, "Skip program '%s' for FTA mode", srv_info->name);
-    		return;
-    	}
+		/* Skip program for FTA mode */
+		if (srv_info->scrambled_flag && (mode & AM_SCAN_DTVMODE_FTA))
+		{
+			AM_DEBUG(1, "Skip program '%s' for FTA mode", srv_info->name);
+			return;
+		}
 
-    	/* Skip program for service_type mode */
-    	if (srv_info->srv_type == AM_SCAN_SRV_DTV && (mode & AM_SCAN_DTVMODE_NOTV))
-    	{
-    		AM_DEBUG(1, "Skip program '%s' for NO-TV mode", srv_info->name);
-    		return;
-    	}
-    	if (srv_info->srv_type == AM_SCAN_SRV_DRADIO && (mode & AM_SCAN_DTVMODE_NORADIO))
-    	{
-    		AM_DEBUG(1, "Skip program '%s' for NO-RADIO mode", srv_info->name);
-    		return;
-    	}
+		/* Skip program for service_type mode */
+		if (srv_info->srv_type == AM_SCAN_SRV_DTV && (mode & AM_SCAN_DTVMODE_NOTV))
+		{
+			AM_DEBUG(1, "Skip program '%s' for NO-TV mode", srv_info->name);
+			return;
+		}
+		if (srv_info->srv_type == AM_SCAN_SRV_DRADIO && (mode & AM_SCAN_DTVMODE_NORADIO))
+		{
+			AM_DEBUG(1, "Skip program '%s' for NO-RADIO mode", srv_info->name);
+			return;
+		}
 
-    	/* Set default name to tv/radio program if no name specified */
-    	if (!strcmp(srv_info->name, "") && 
-    		(srv_info->srv_type == AM_SCAN_SRV_DTV || 
-    		srv_info->srv_type == AM_SCAN_SRV_DRADIO))
-    	{
-    		strcpy(srv_info->name, "No Name");
-    	}
-    }
+		/* Set default name to tv/radio program if no name specified */
+		if (!strcmp(srv_info->name, "") && 
+			(srv_info->srv_type == AM_SCAN_SRV_DTV || 
+			srv_info->srv_type == AM_SCAN_SRV_DRADIO))
+		{
+			strcpy(srv_info->name, "No Name");
+		}
+	}
 
 	if (stmts == NULL)
 	{
@@ -1142,6 +1158,8 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 	}
 	
 	/* Update to database */	
+	AM_DEBUG(1, "Updating Program: '%s', db_srv_id(%d), srv_type(%d)",
+		srv_info->name, srv_info->srv_dbid, srv_info->srv_type);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 1, srv_info->src);
 	sqlite3_bind_text(stmts[UPDATE_SRV], 2, srv_info->name, strlen(srv_info->name), SQLITE_STATIC);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 3, srv_info->srv_type);
@@ -1151,68 +1169,43 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 	sqlite3_bind_int(stmts[UPDATE_SRV], 7, srv_info->free_ca);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 8, 50);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 9, AM_AOUT_OUTPUT_DUAL_LEFT);
+	AM_DEBUG(1, "Video: pid(%d), fmt(%d)", srv_info->vid,srv_info->vfmt);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 10, srv_info->vid);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 11, srv_info->vfmt);
-	sqlite3_bind_text(stmts[UPDATE_SRV], 12, srv_info->str_apids, strlen(srv_info->str_apids), SQLITE_STATIC);
-	sqlite3_bind_text(stmts[UPDATE_SRV], 13, srv_info->str_afmts, strlen(srv_info->str_afmts), SQLITE_STATIC);
-	sqlite3_bind_text(stmts[UPDATE_SRV], 14, srv_info->str_alangs, strlen(srv_info->str_alangs), SQLITE_STATIC);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 15, srv_info->chan_num);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 16, srv_info->major_chan_num);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 17, srv_info->minor_chan_num);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 18, srv_info->access_controlled);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 19, srv_info->hidden);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 20, srv_info->hide_guide);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 21, srv_info->source_id);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 22, 0);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 23, -1);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 24, srv_info->satpara_dbid);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 25, srv_info->scrambled_flag);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 26, srv_info->srv_dbid);
+	format_audio_strings(&srv_info->aud_info, str(0), str(1), str(2));
+	AM_DEBUG(1, "Audios: pids(%s), fmts(%s), langs(%s)", str(0), str(1), str(2));
+	sqlite3_bind_text(stmts[UPDATE_SRV], 12, str(0), strlen(str(0)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 13, str(1), strlen(str(1)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 14, str(2), strlen(str(2)), SQLITE_STATIC);
+	format_subtitle_strings(&srv_info->sub_info, str(3), str(4), str(5), str(6), str(7));
+	AM_DEBUG(1, "Subtitles: pids(%s), types(%s), cids(%s), aids(%s), langs(%s)", 
+		str(3), str(4), str(5), str(6), str(7));
+	sqlite3_bind_text(stmts[UPDATE_SRV], 15, str(3), strlen(str(3)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 16, str(4), strlen(str(4)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 17, str(5), strlen(str(5)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 18, str(6), strlen(str(6)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 19, str(7), strlen(str(7)), SQLITE_STATIC);
+	format_teletext_strings(&srv_info->ttx_info, str(8), str(9), str(10), str(11), str(12));
+	AM_DEBUG(1, "Teletexts: pids(%s), types(%s), magnos(%s), pgnos(%s), langs(%s)", 
+		str(8), str(9), str(10), str(11), str(12));
+	sqlite3_bind_text(stmts[UPDATE_SRV], 20, str(8), strlen(str(8)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 21, str(9), strlen(str(9)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 22, str(10), strlen(str(10)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 23, str(11), strlen(str(11)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 24, str(12), strlen(str(12)), SQLITE_STATIC);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 25, srv_info->chan_num);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 26, srv_info->major_chan_num);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 27, srv_info->minor_chan_num);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 28, srv_info->access_controlled);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 29, srv_info->hidden);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 30, srv_info->hide_guide);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 31, srv_info->source_id);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 32, 0);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 33, srv_info->satpara_dbid);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 34, srv_info->scrambled_flag);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 35, srv_info->srv_dbid);
 	sqlite3_step(stmts[UPDATE_SRV]);
 	sqlite3_reset(stmts[UPDATE_SRV]);
-	
-	AM_DEBUG(1, "Updating Program: '%s',srv_type(%d), vpid(%d), vfmt(%d),apids(%s), afmts(%s), alangs(%s) ",
-		srv_info->name,srv_info->srv_type,srv_info->vid,srv_info->vfmt,
-		srv_info->str_apids, srv_info->str_afmts, srv_info->str_alangs);
-}
-
-/**\brief 从一个ES流中提取teletext & subtitle*/
-static void am_scan_extract_ttx_sub_from_es(sqlite3_stmt **stmts, int srv_dbid, dvbpsi_pmt_es_t *es)
-{
-	dvbpsi_descriptor_t *descr;
-	
-	/*查找Subtilte和Teletext描述符，并添加相关记录*/
-	AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
-		if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SUBTITLING)
-		{
-			int isub;
-			dvbpsi_subtitling_dr_t *psd = (dvbpsi_subtitling_dr_t*)descr->p_decoded;
-
-			AM_DEBUG(1, "Find subtitle descriptor, number:%d",psd->i_subtitles_number);
-			for (isub=0; isub<psd->i_subtitles_number; isub++)
-			{
-				insert_subtitle(stmts, srv_dbid, es->i_pid, &psd->p_subtitle[isub]);
-			}
-		}
-		else if (descr->i_tag == AM_SI_DESCR_TELETEXT)
-		{
-			int itel;
-			dvbpsi_teletext_dr_t *ptd = (dvbpsi_teletext_dr_t*)descr->p_decoded;
-
-			AM_DEBUG(1, "Find teletext descriptor, ptd %p", ptd);
-			if (ptd)
-			{
-				for (itel=0; itel<ptd->i_pages_number; itel++)
-				{
-					insert_teletext(stmts, srv_dbid, es->i_pid, &ptd->p_pages[itel]);
-				}
-			}
-			else
-			{
-				insert_teletext(stmts, srv_dbid, es->i_pid, NULL);
-			}
-		}
-	AM_SI_LIST_END()
 }
 
 /**\brief 提取CA加扰标识*/
@@ -1429,7 +1422,6 @@ static void store_analog_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_S
 	srv_info.vfmt = -1;
 	memset(lang_tmp, 0, sizeof(lang_tmp));
 	add_audio(&srv_info.aud_info, 0x1fff, -1, lang_tmp);
-	format_audio_strings(&srv_info.aud_info, srv_info.str_apids, srv_info.str_afmts, srv_info.str_alangs);
 	srv_info.chan_num = 0;
 	srv_info.srv_type = AM_SCAN_SRV_ATV; 
 	strcpy(srv_info.name, "ATV Program");
@@ -1557,10 +1549,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 			}
 		AM_SI_LIST_END()
 		AM_SI_LIST_END()
-VCT_END:
-		/*格式化音频数据字符串*/
-		format_audio_strings(&srv_info.aud_info, srv_info.str_apids, srv_info.str_afmts, srv_info.str_alangs);
-		
+VCT_END:		
 		/*Store this service*/
 		am_scan_update_service_info(stmts, result, &srv_info);
 	AM_SI_LIST_END()
@@ -1656,7 +1645,8 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 			if (store)
 			{
 				/* 提取subtitle & teletext */
-				am_scan_extract_ttx_sub_from_es(stmts, srv_info.srv_dbid, es);
+				AM_SI_ExtractDVBSubtitleFromES(es, &srv_info.sub_info);
+				AM_SI_ExtractDVBTeletextFromES(es, &srv_info.ttx_info);
 			}
 			
 			/* 查找CA加扰标识 */
@@ -1664,8 +1654,6 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 				am_scan_extract_ca_scrambled_flag(es->p_first_descriptor, &srv_info.scrambled_flag);
 		AM_SI_LIST_END()
 		
-		/*格式化音频数据字符串*/
-		format_audio_strings(&srv_info.aud_info, srv_info.str_apids, srv_info.str_afmts, srv_info.str_alangs);
 		/*获取节目名称，类型等信息*/
 		am_scan_extract_srv_info_from_sdt(ts->digital.sdts, &srv_info);
 		
@@ -1688,11 +1676,6 @@ static void am_scan_clear_source(sqlite3 *hdb, int src)
 	/*清空service group记录*/
 	snprintf(sqlstr, sizeof(sqlstr), "delete from grp_map_table where db_srv_id in (select db_id from srv_table where src=%d)",src);
 	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-	/*清空subtitle teletext记录*/
-	snprintf(sqlstr, sizeof(sqlstr), "delete from subtitle_table where db_srv_id in (select db_id from srv_table where src=%d)",src);
-	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-	snprintf(sqlstr, sizeof(sqlstr), "delete from teletext_table where db_srv_id in (select db_id from srv_table where src=%d)",src);
-	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
 	/*清空SRV记录*/
 	snprintf(sqlstr, sizeof(sqlstr), "delete from srv_table where src=%d",src);
 	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
@@ -1712,10 +1695,6 @@ static void am_scan_clear_satellite(sqlite3 *hdb, int db_sat_id)
 	snprintf(sqlstr, sizeof(sqlstr), "delete from ts_table where db_sat_para_id=%d",db_sat_id);
 	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
 	snprintf(sqlstr, sizeof(sqlstr), "delete from grp_map_table where db_srv_id in (select db_id from srv_table where db_sat_para_id=%d)",db_sat_id);
-	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-	snprintf(sqlstr, sizeof(sqlstr), "delete from subtitle_table where db_srv_id in (select db_id from srv_table where db_sat_para_id=%d)",db_sat_id);
-	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
-	snprintf(sqlstr, sizeof(sqlstr), "delete from teletext_table where db_srv_id in (select db_id from srv_table where db_sat_para_id=%d)",db_sat_id);
 	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
 	snprintf(sqlstr, sizeof(sqlstr), "delete from evt_table where db_srv_id in (select db_id from srv_table where db_sat_para_id=%d)",db_sat_id);
 	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
@@ -4095,21 +4074,20 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 static void am_scan_solve_blind_scan_done_evt(AM_SCAN_Scanner_t *scanner)
 {
 	AM_ErrorCode_t ret = AM_FAILURE;
-	int i;
-	int index = 0;
+	int i, index;
 
-	if(scanner->start_para.mode == AM_SCAN_MODE_DTV_ATV){
-		index = 0;
-	} else if(scanner->start_para.mode == AM_SCAN_MODE_ATV_DTV){
-		index = scanner->start_freqs_cnt;
+	if (scanner->dtvctl.bs_ctl.stage == 0)
+	{
+		/* start from the new-searched TPs */
+		dtv_start_para.fe_cnt = 0;
 	}
-
-	scanner->dtvctl.start_idx = index;
-	dtv_start_para.fe_cnt = 0;
+	
+	index = scanner->dtvctl.start_idx + dtv_start_para.fe_cnt;
 	
 	/*Copy 本次搜索到的新TP到start_freqs*/
-	for (i=0; i<scanner->dtvctl.bs_ctl.searched_tp_cnt && scanner->start_freqs_cnt < AM_SCAN_MAX_BS_TP_CNT; i++)
+	for (i=0; i<scanner->dtvctl.bs_ctl.searched_tp_cnt && dtv_start_para.fe_cnt < AM_SCAN_MAX_BS_TP_CNT; i++)
 	{
+		scanner->start_freqs[index].flag | AM_SCAN_FE_FL_DTV;
 		scanner->start_freqs[index].fe_para.m_type = dtv_start_para.source;
 		scanner->start_freqs[index].fe_para.sat.polarisation = scanner->dtvctl.bs_ctl.progress.polar;
 		*dvb_fend_para(scanner->start_freqs[index].fe_para) = scanner->dtvctl.bs_ctl.searched_tps[i];
@@ -4117,6 +4095,9 @@ static void am_scan_solve_blind_scan_done_evt(AM_SCAN_Scanner_t *scanner)
 		scanner->start_freqs_cnt++;
 		dtv_start_para.fe_cnt++;
 	}
+
+	AM_DEBUG(1, "Blind scan stage done, start %d, total fe %d, dtv fe %d", 
+		scanner->dtvctl.start_idx, scanner->start_freqs_cnt, dtv_start_para.fe_cnt);
 	
 	/* 退出本次盲扫 */
 	AM_FEND_BlindExit(scanner->start_para.fend_dev_id);

@@ -566,6 +566,7 @@ static AM_Bool_t am_epg_check_program_av(sqlite3 * hdb, int db_srv_id, int vid, 
 			else
 				break;
 			i++;
+			cur_aud_info.audio_count++;
 		AM_TOKEN_PARSE_END(str_prev_apids, " ", str_tok)
 		i = 0;
 		AM_TOKEN_PARSE_BEGIN(str_prev_afmts, " ", str_tok)

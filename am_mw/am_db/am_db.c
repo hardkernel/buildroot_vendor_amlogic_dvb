@@ -108,18 +108,6 @@ static const char *grp_map_fields[] =
 #include "group_map.fld"
 };
 
-/**\brief subtitle table 字段定义*/
-static const char *subtitle_fields[] = 
-{
-#include "subtitle.fld"
-};
-
-/**\brief teletext table 字段定义*/
-static const char *teletext_fields[] = 
-{
-#include "teletext.fld"
-};
-
 /**\brief dimension table 字段定义*/
 static const char *dimension_fields[] = 
 {
@@ -146,8 +134,6 @@ DEFINE_GET_FIELD_COUNT_FUNC(evt_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(booking_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(grp_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(grp_map_fields)
-DEFINE_GET_FIELD_COUNT_FUNC(subtitle_fields)
-DEFINE_GET_FIELD_COUNT_FUNC(teletext_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(dimension_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(sat_para_fields)
 DEFINE_GET_FIELD_COUNT_FUNC(region_fields)
@@ -162,8 +148,6 @@ static AM_DB_Table_t db_tables[] =
 	{"booking_table", booking_fields, db_get_booking_fields_cnt},
 	{"grp_table", grp_fields, db_get_grp_fields_cnt},
 	{"grp_map_table", grp_map_fields, db_get_grp_map_fields_cnt},
-	{"subtitle_table", subtitle_fields, db_get_subtitle_fields_cnt},
-	{"teletext_table", teletext_fields, db_get_teletext_fields_cnt},
 	{"dimension_table", dimension_fields, db_get_dimension_fields_cnt},
 	{"sat_para_table", sat_para_fields, db_get_sat_para_fields_cnt},
 	{"region_table", region_fields, db_get_region_fields_cnt},

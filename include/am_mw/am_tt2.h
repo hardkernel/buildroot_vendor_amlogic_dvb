@@ -72,6 +72,7 @@ typedef struct
 	uint8_t         *bitmap;         /**< 绘图缓冲区*/
 	int              pitch;          /**< 绘图缓冲区每行字节数*/
 	void            *user_data;      /**< 用户定义数据*/
+	int             default_region;  /**< 默认区域，参见libzvbi/src/lang.c的vbi_font_descriptors*/
 }AM_TT2_Para_t;
 
 /**\brief 创建teletext解析句柄

@@ -69,8 +69,8 @@ static void sub2_check(AM_SUB2_Parser_t *parser)
 		{
 			pts = parser->para.get_pts(parser, parser->pic->pts);
 			diff = pts - parser->pic->pts;
-
-			if(diff > parser->pic->timeout * 90000ll)
+			
+			if((diff > parser->pic->timeout * 90000ll) || pts == 0llu)
 			{
 				dvbsub_remove_display_picture(parser->handle, parser->pic);
 				parser->pic = NULL;
@@ -216,11 +216,8 @@ AM_ErrorCode_t AM_SUB2_Decode(AM_SUB2_Handle_t handle, uint8_t *buf, int size)
 	parser = (AM_SUB2_Parser_t*)handle;
 
 	pthread_mutex_lock(&parser->lock);
-
 	dvbsub_parse_pes_packet(parser->handle, buf, size);
-
 	sub2_check(parser);
-
 	pthread_mutex_unlock(&parser->lock);
 
 	return AM_SUCCESS;

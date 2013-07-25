@@ -1,6 +1,8 @@
 #ifdef _FORTIFY_SOURCE
 #undef _FORTIFY_SOURCE
 #endif
+#define AM_DEBUG_LEVEL 1
+
 #include <am_tt2.h>
 #include <am_debug.h>
 #include <am_util.h>
@@ -8,8 +10,19 @@
 #include <libzvbi.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <am_time.h>
 
 #define AM_TT2_MAX_SLICES (32)
+#define AM_TT2_MAX_CACHED_PAGES (200)
+
+typedef struct AM_TT2_CachedPage_s
+{
+	int			count;
+	vbi_page	page;
+	uint64_t	pts;
+	struct AM_TT2_CachedPage_s *next;
+}AM_TT2_CachedPage_t;
 
 typedef struct
 {
@@ -24,12 +37,84 @@ typedef struct
 	pthread_mutex_t    lock;
 	pthread_cond_t     cond;
 	pthread_t          thread;
+	AM_TT2_CachedPage_t *cached_pages;
+	AM_TT2_CachedPage_t *cached_tail;
 }AM_TT2_Parser_t;
 
 enum systems {
 	SYSTEM_525 = 0,
 	SYSTEM_625
 };
+
+static uint64_t tt2_get_pts(const char *pts_file, int base)
+{
+	char buf[32];
+	AM_ErrorCode_t ret;
+	uint32_t v;
+	uint64_t r;
+	
+	ret=AM_FileRead(pts_file, buf, sizeof(buf));
+	if(!ret){
+		v = strtoul(buf, 0, base);
+		r = (uint64_t)v;
+	}else{
+		r = 0LL;
+	}
+
+	return r;
+}
+
+static void tt2_add_cached_page(AM_TT2_Parser_t *parser, vbi_page *vp)
+{
+	AM_TT2_CachedPage_t *tmp;
+	
+	if (parser->cached_pages && parser->cached_tail)
+	{
+		if ((parser->cached_tail->count-parser->cached_pages->count) >= AM_TT2_MAX_CACHED_PAGES)
+		{
+			AM_DEBUG(1, "Reach max teletext cached display pages !!");
+			return;
+		}
+	}
+	
+	tmp = (AM_TT2_CachedPage_t *)malloc(sizeof(AM_TT2_CachedPage_t));
+	if (tmp == NULL)
+	{
+		AM_DEBUG(1, "Cannot alloc memory for new cached page");\
+		return;
+	}
+	memset(tmp, 0, sizeof(AM_TT2_CachedPage_t));
+	if (parser->cached_tail == NULL)
+	{
+		parser->cached_pages = tmp;
+		parser->cached_tail = tmp;
+		tmp->count = 0;
+	}
+	else
+	{
+		parser->cached_tail->next = tmp;
+		tmp->count = parser->cached_tail->count + 1;
+		parser->cached_tail = tmp;
+	}
+	tmp->page = *vp;
+	tmp->pts = tt2_get_pts("/sys/class/stb/video_pts", 10);
+	AM_DEBUG(1, "Cache page, pts 0x%llx, total cache %d pages", tmp->pts,
+		parser->cached_tail->count - parser->cached_pages->count);
+}
+
+static void tt2_step_cached_page(AM_TT2_Parser_t *parser)
+{
+	if (parser->cached_pages != NULL)
+	{
+		AM_TT2_CachedPage_t *tmp = parser->cached_pages;
+		parser->cached_pages = tmp->next;
+		vbi_unref_page(&tmp->page);
+		free(tmp);
+	}
+	
+	if (parser->cached_pages == NULL)
+		parser->cached_tail = NULL;
+}
 
 static void tt_lofp_to_line(unsigned int *field, unsigned int *field_line, unsigned int *frame_line, unsigned int lofp, enum systems system)
 {
@@ -54,6 +139,58 @@ static void tt_lofp_to_line(unsigned int *field, unsigned int *field_line, unsig
 	}
 }
 
+static void tt2_check(AM_TT2_Parser_t *parser)
+{
+	if (parser->cached_pages != NULL)
+	{
+		if (vbi_bcd2dec(parser->cached_pages->page.pgno) != parser->page_no)
+		{
+			AM_DEBUG(1, "expired page no:%d, current %d", 
+				vbi_bcd2dec(parser->cached_pages->page.pgno), parser->page_no);
+			/* step to next cached page */
+			tt2_step_cached_page(parser);
+		}
+		else if (parser->cached_pages->pts <= tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16))
+		{
+			AM_DEBUG(1, "show ttx page, remain cached %d pages", 
+				parser->cached_tail->count - parser->cached_pages->count);
+			if(parser->para.draw_begin)
+				parser->para.draw_begin(parser);
+	
+			/*{
+				char buf[256];
+				int i, j;
+
+				for(i=0; i<page.rows; i++){
+					char *ptr = buf;
+					for(j=0; j<page.columns; j++){
+						sprintf(ptr, "%02x", page.text[i*page.columns+j].unicode);
+						ptr += 2;
+					}
+
+					AM_DEBUG(1, "text %02d: %s", i, buf);
+				}
+			}*/
+	
+			vbi_draw_vt_page_region(&parser->cached_pages->page, 
+					VBI_PIXFMT_RGBA32_LE, parser->para.bitmap, parser->para.pitch,
+					0, 0, parser->cached_pages->page.columns, 
+					parser->cached_pages->page.rows, 1, 1, parser->para.is_subtitle);
+
+			if(parser->para.draw_end)
+				parser->para.draw_end(parser);
+			/* step to next cached page */
+			tt2_step_cached_page(parser);
+		}
+		else
+		{
+			AM_DEBUG(2, "pts 0x%llx, pcrscr %llx, diff %lld", parser->cached_pages->pts,
+				tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16), 
+				parser->cached_pages->pts - tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16));
+		}
+	}
+}
+
 static void tt2_show(AM_TT2_Parser_t *parser)
 {
 	vbi_page page;
@@ -65,31 +202,7 @@ static void tt2_show(AM_TT2_Parser_t *parser)
 	
 	parser->sub_page_no      = page.subno;
 
-	if(parser->para.draw_begin)
-		parser->para.draw_begin(parser);
-	
-	/*{
-		char buf[256];
-		int i, j;
-
-		for(i=0; i<page.rows; i++){
-			char *ptr = buf;
-			for(j=0; j<page.columns; j++){
-				sprintf(ptr, "%02x", page.text[i*page.columns+j].unicode);
-				ptr += 2;
-			}
-
-			AM_DEBUG(1, "text %02d: %s", i, buf);
-		}
-	}*/
-	
-	vbi_draw_vt_page_region(&page, VBI_PIXFMT_RGBA32_LE, parser->para.bitmap, parser->para.pitch,
-			0, 0, page.columns, page.rows, 1, 1, parser->para.is_subtitle);
-
-	if(parser->para.draw_end)
-		parser->para.draw_end(parser);
-	
-	vbi_unref_page(&page);
+	tt2_add_cached_page(parser, &page);
 }
 
 static void* tt2_thread(void *arg)
@@ -100,14 +213,21 @@ static void* tt2_thread(void *arg)
 
 	while(parser->running)
 	{
-		while(parser->running && !parser->disp_update){
-			pthread_cond_wait(&parser->cond, &parser->lock);
+		if (parser->running)
+		{
+			struct timespec ts;
+			int timeout = 20;
+
+			AM_TIME_GetTimeSpecTimeout(timeout, &ts);
+			pthread_cond_timedwait(&parser->cond, &parser->lock, &ts);
 		}
 
 		if(parser->disp_update){
 			tt2_show(parser);
 			parser->disp_update = AM_FALSE;
 		}
+		
+		tt2_check(parser);
 	}
 
 	pthread_mutex_unlock(&parser->lock);
@@ -125,8 +245,12 @@ static void tt2_event_handler(vbi_event *ev, void *user_data)
 	
 	pgno  = vbi_bcd2dec(ev->ev.ttx_page.pgno);
 	subno = ev->ev.ttx_page.subno;
-
-	if((pgno==parser->page_no) && (parser->sub_page_no==AM_TT2_ANY_SUBNO || parser->sub_page_no==subno))
+		
+	AM_DEBUG(2, "TT event handler: pgno %d, subno %d, parser->page_no %d, parser->sub_page_no %d",
+		pgno, subno, parser->page_no, parser->sub_page_no	);
+	AM_DEBUG(2, "header_update %d, clock_update %d, roll_header %d", 
+		ev->ev.ttx_page.header_update, ev->ev.ttx_page.clock_update, ev->ev.ttx_page.roll_header);
+	if(ev->ev.ttx_page.clock_update || ((pgno==parser->page_no) && (parser->sub_page_no==AM_TT2_ANY_SUBNO || parser->sub_page_no==subno)))
 	{
 		parser->disp_update = AM_TRUE;
 		pthread_cond_signal(&parser->cond);
@@ -163,7 +287,10 @@ AM_ErrorCode_t AM_TT2_Create(AM_TT2_Handle_t *handle, AM_TT2_Para_t *para)
 		free(parser);
 		return AM_TT2_ERR_CREATE_DECODE;
 	}
-
+	
+	/* Set teletext default region, See libzvbi/src/lang.c */
+	vbi_teletext_set_default_region(parser->dec, para->default_region);
+	
 	vbi_event_handler_register(parser->dec, VBI_EVENT_TTX_PAGE, tt2_event_handler, parser);
 
 	pthread_mutex_init(&parser->lock, NULL);
@@ -194,6 +321,12 @@ AM_ErrorCode_t AM_TT2_Destroy(AM_TT2_Handle_t handle)
 	}
 
 	AM_TT2_Stop(handle);
+	
+	/* Free all cached pages */
+	while (parser->cached_pages != NULL)
+	{
+		tt2_step_cached_page(parser);
+	}
 
 	pthread_cond_destroy(&parser->cond);
 	pthread_mutex_destroy(&parser->lock);

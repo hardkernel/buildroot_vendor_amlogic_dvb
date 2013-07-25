@@ -360,17 +360,60 @@ typedef struct
 	int              ab_free;     /**< 音频缓冲区中空闲空间大小*/
 }AM_AV_AudioStatus_t;
 
+/**\brief Timeshifting Mode definition*/
+typedef enum
+{
+	AM_AV_TIMESHIFT_MODE_TIMESHIFTING, /**< Normal timeshifting*/
+	AM_AV_TIMESHIFT_MODE_PLAYBACK      /**< PVR playback*/
+}AM_AV_TimeshiftMode_t;
+
+/**\brief Timeshifting media info*/
+typedef struct
+{
+	int duration;
+	char program_name[16];
+	
+	int vid_pid;
+	int vid_fmt;
+
+	int aud_cnt;
+	struct
+	{
+		int pid;
+		int fmt;
+		char lang[4];
+	}audios[8]; /**< audios*/
+
+	int sub_cnt;
+	struct
+	{
+		int pid;
+		int type;
+		int composition_page;
+		int ancillary_page;
+		int magzine_no;
+		int page_no;
+		char lang[4];
+	}subtitles[8]; /**< subtitles*/
+
+	int ttx_cnt;
+	struct
+	{
+		int pid;
+		int magzine_no;
+		int page_no;
+		char lang[4];
+	}teletexts[8]; /**< teletexts*/
+}AM_AV_TimeshiftMediaInfo_t;
+
 /**\brief Timeshift播放参数*/
 typedef struct
 {
 	int              dmx_id;      /**< 用于回放的dmx*/
-	AM_AV_AFormat_t  aud_fmt;     /**< 音频格式*/
-	AM_AV_VFormat_t  vid_fmt;     /**< 视频格式*/
-	int              aud_id;      /**< 音频ID, -1表示没有音频*/
-	int              vid_id;      /**< 视频ID, -1表示没有视频*/
-	int              duration;    /**< 时移时长,秒为单位*/
 	char             file_path[256];     /**< 存储文件全路径*/
-	AM_Bool_t        playback_only;	/**< 仅回放,不做时移，相当于普通的文件播放*/
+	
+	AM_AV_TimeshiftMode_t mode;
+	AM_AV_TimeshiftMediaInfo_t media_info;
 } AM_AV_TimeshiftPara_t;
 
 /**\brief Timeshift播放信息*/
@@ -379,7 +422,6 @@ typedef struct
 	int                   current_time; /**< in seconds*/
 	int                   full_time;
 	int                   status;
-	AM_AV_TimeshiftPara_t play_para;
 }AM_AV_TimeshiftInfo_t;
 
 /**\brief 播放器状态信息*/
