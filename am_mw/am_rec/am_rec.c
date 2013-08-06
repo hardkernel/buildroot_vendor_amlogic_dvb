@@ -65,26 +65,42 @@ static void am_rec_packet_data(int fd, int pid, const uint8_t *data, int size, i
 {
 	uint8_t buf[188];
 	int left, cc = 0;
+	int data_start, data_len;
+	AM_Bool_t payload_start = (pid == 0) ? AM_TRUE : AM_FALSE;
 
 	buf[0] = 0x47;
-    buf[1] = 0x40 | ((uint8_t)(pid>>8)&0x1f);
-    buf[2] = pid&0xff;
+	buf[1] = ((uint8_t)(pid>>8)&0x1f);
+	buf[2] = pid&0xff;
 		
 	while (appearence > 0)
 	{
 		left = size;
 		while (left > 0)
 		{
-			buf[3] = 0x10 + (cc%0x10);
-			if (left >= 184)
+			if (left == size && payload_start)
 			{
-				memcpy(buf+4, &data[size-left], 184);
-				left -= 184;
+				buf[1] |= 0x40;
+				buf[4] = 0x0; /* pointer_field */
+				data_start = 5;
 			}
 			else
 			{
-				memset(buf+4, 0xff, 184);
-				memcpy(buf+4, &data[size-left], left);
+				buf[1] &= ~0x40;
+				data_start = 4;
+			}
+			
+			buf[3] = 0x10 + (cc%0x10);
+			data_len = 188 - data_start;
+			
+			if (left >= data_len)
+			{
+				memcpy(buf+data_start, &data[size-left], data_len);
+				left -= data_len;
+			}
+			else
+			{
+				memset(buf+data_start, 0xff, data_len);
+				memcpy(buf+data_start, &data[size-left], left);
 				left = 0;
 			}
 			
@@ -104,8 +120,7 @@ static AM_ErrorCode_t am_rec_insert_pat(AM_REC_Recorder_t *rec)
 	dvbpsi_pat_t pat;
 	dvbpsi_pat_program_t program;
 
-	program.i_number = 0x1;
-	program.i_pid = rec->rec_para.pmt_pid;
+	program = rec->rec_para.program;
 	program.p_next = NULL;
 
 	pat.b_current_next = 1;
@@ -146,7 +161,7 @@ static AM_ErrorCode_t am_rec_insert_file_header(AM_REC_Recorder_t *rec)
 	AM_MACRO_END
 
 	WRITE_INT(0);
-	memcpy(stream, pp->program_name, sizeof(pp->program_name));
+	memcpy(stream+pos, pp->program_name, sizeof(pp->program_name));
 	pos += sizeof(pp->program_name);
 	WRITE_INT(pp->vid_pid);
 	WRITE_INT(pp->vid_fmt);
@@ -326,6 +341,8 @@ static AM_ErrorCode_t am_rec_start_dvr(AM_REC_Recorder_t *rec)
 	{
 		ADD_PID(minfo->teletexts[i].pid);
 	}
+
+	ADD_PID(rec->rec_para.program.i_pid);
 	
 	return AM_DVR_StartRecord(rec->create_para.dvr_dev, &spara);
 }
@@ -374,6 +391,7 @@ static void *am_rec_record_thread(void* arg)
 	AM_DVR_StartRecPara_t spara;
 	AM_REC_RecEndPara_t epara;
 	const int UPDATE_TIME_PERIOD = 1000;
+	const int stat_flag = rec->stat_flag;
 	
 	memset(&epara, 0, sizeof(epara));
 	epara.hrec = (int)rec;
@@ -475,7 +493,7 @@ close_file:
 
 	epara.error_code = err;
 
-	if ((rec->stat_flag & REC_STAT_FL_RECORDING))
+	if ((stat_flag & REC_STAT_FL_RECORDING))
 	{
 		/*通知录像结束*/
 		AM_EVT_Signal((int)rec, AM_REC_EVT_RECORD_END, (void*)&epara);

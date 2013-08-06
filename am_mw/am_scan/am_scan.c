@@ -224,7 +224,7 @@ const char *sql_stmts[MAX_STMT] =
 	 current_ttx=-1,ttx_pids=?,ttx_types=?,ttx_magazine_nos=?,ttx_page_nos=?,ttx_langs=?,\
 	 skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,\
 	 hide_guide=?, source_id=?,favor=?,db_sat_para_id=?,scrambled_flag=?,lcn=-1,hd_lcn=-1,sd_lcn=-1,\
-	 default_chan_num=-1,chan_order=0,lcn_order=0,service_id_order=0,hd_sd_order=0 where db_id=?",
+	 default_chan_num=-1,chan_order=0,lcn_order=0,service_id_order=0,hd_sd_order=0,pmt_pid=? where db_id=?",
 	"select db_id,service_type from srv_table where db_ts_id=? order by service_id",
 	"update srv_table set chan_num=? where db_id=?",
 	"delete  from evt_table where db_ts_id=?",
@@ -1065,6 +1065,7 @@ static void am_scan_init_service_info(AM_SCAN_ServiceInfo_t *srv_info)
 	srv_info->srv_id = 0xffff;
 	srv_info->srv_dbid = -1;
 	srv_info->satpara_dbid = -1;
+	srv_info->pmt_pid = 0x1fff;
 }
 
 /**\brief 更新一个service数据到数据库*/
@@ -1203,7 +1204,8 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 	sqlite3_bind_int(stmts[UPDATE_SRV], 32, 0);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 33, srv_info->satpara_dbid);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 34, srv_info->scrambled_flag);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 35, srv_info->srv_dbid);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 35, srv_info->pmt_pid);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 36, srv_info->srv_dbid);
 	sqlite3_step(stmts[UPDATE_SRV]);
 	sqlite3_reset(stmts[UPDATE_SRV]);
 }
@@ -1224,11 +1226,16 @@ static void am_scan_extract_ca_scrambled_flag(dvbpsi_descriptor_t *p_first_descr
 }
 
 /**\brief 从SDT表获取相关service信息*/
-static void am_scan_extract_srv_info_from_sdt(dvbpsi_sdt_t *sdts, AM_SCAN_ServiceInfo_t *srv_info)
+static void am_scan_extract_srv_info_from_sdt(AM_SCAN_Result_t *result, dvbpsi_sdt_t *sdts, AM_SCAN_ServiceInfo_t *srv_info)
 {
 	dvbpsi_sdt_service_t *srv;
 	dvbpsi_sdt_t *sdt;
 	dvbpsi_descriptor_t *descr;
+	char *saved_lang = result->start_para->text_langs + strlen(result->start_para->text_langs) + 1;
+	char *default_lang = strstr(result->start_para->text_langs, result->start_para->default_text_lang);
+
+	if (default_lang == NULL)
+		default_lang = saved_lang;
 	
 	AM_SI_LIST_BEGIN(sdts, sdt)
 	AM_SI_LIST_BEGIN(sdt->p_first_service, srv)
@@ -1247,11 +1254,16 @@ static void am_scan_extract_srv_info_from_sdt(dvbpsi_sdt_t *sdts, AM_SCAN_Servic
 				dvbpsi_service_dr_t *psd = (dvbpsi_service_dr_t*)descr->p_decoded;
 		
 				/*取节目名称*/
-				if (psd->i_service_name_length > 0)
+				if (psd->i_service_name_length > 0 && saved_lang >= default_lang)
 				{
 					AM_SI_ConvertDVBTextCode((char*)psd->i_service_name, psd->i_service_name_length,\
 								srv_info->name, AM_DB_MAX_SRV_NAME_LEN);
 					srv_info->name[AM_DB_MAX_SRV_NAME_LEN] = 0;
+
+					if (strlen(srv_info->name) > 0)
+					{
+						saved_lang = default_lang;
+					}
 				}
 				/*业务类型*/
 				srv_info->srv_type = psd->i_service_type;
@@ -1260,9 +1272,33 @@ static void am_scan_extract_srv_info_from_sdt(dvbpsi_sdt_t *sdts, AM_SCAN_Servic
 				if((srv_info->srv_type == 0x16) || (srv_info->srv_type == 0x19) || (srv_info->srv_type == 0xc0))
 				{
 					srv_info->srv_type = 0x1;
+				}			
+			}
+			else if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_MULTI_SERVICE_NAME)
+			{
+				int i;
+				char temp_lang[4];
+				char *this_lang;
+				dvbpsi_multi_service_name_dr_t *pmsnd = (dvbpsi_multi_service_name_dr_t*)descr->p_decoded;
+
+				temp_lang[3] = 0;
+				for (i=0; i<pmsnd->i_name_count; i++)
+				{
+					memcpy(temp_lang, pmsnd->p_service_name[i].i_iso_639_code, 3);
+					this_lang = strstr(result->start_para->text_langs, temp_lang);
+					if (this_lang != NULL && saved_lang > this_lang)
+					{
+						AM_SI_ConvertDVBTextCode((char*)pmsnd->p_service_name[i].i_service_name, 
+							pmsnd->p_service_name[i].i_service_name_length,
+							srv_info->name, AM_DB_MAX_SRV_NAME_LEN);
+						srv_info->name[AM_DB_MAX_SRV_NAME_LEN] = 0;
+
+						if (strlen(srv_info->name) > 0)
+						{
+							saved_lang = this_lang;
+						}
+					}
 				}
-			
-				return ;
 			}
 			AM_SI_LIST_END()
 		}
@@ -1328,6 +1364,22 @@ static void add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang
 	AM_DEBUG(1, "Add a audio: pid %d, fmt %d, language: %s", aud_pid, aud_fmt, ai->audios[ai->audio_count].lang);
 
 	ai->audio_count++;
+}
+
+/**\brief 获取一个Program的PMT PID*/
+static int get_pmt_pid(dvbpsi_pat_t *pats, int program_number)
+{
+	dvbpsi_pat_t *pat;
+	dvbpsi_pat_program_t *prog;
+
+	AM_SI_LIST_BEGIN(pats, pat)
+	AM_SI_LIST_BEGIN(pat->p_first_program, prog)
+		if (prog->i_number == program_number)
+			return prog->i_pid;
+	AM_SI_LIST_END()
+	AM_SI_LIST_END()
+
+	return 0x1fff;
 }
 
 /**\brief Store a Analog TS to database */
@@ -1491,6 +1543,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 		srv_info.satpara_dbid = satpara_dbid;
 		srv_info.srv_id = pmt->i_program_number;
 		srv_info.src = src;
+		srv_info.pmt_pid = get_pmt_pid(ts->digital.pats, pmt->i_program_number);
 
 		if (store)
 		{
@@ -1617,6 +1670,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 		srv_info.satpara_dbid = satpara_dbid;
 		srv_info.srv_id = pmt->i_program_number;
 		srv_info.src = src;
+		srv_info.pmt_pid = get_pmt_pid(ts->digital.pats, pmt->i_program_number);
 
 		if (store)
 		{
@@ -1655,7 +1709,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 		AM_SI_LIST_END()
 		
 		/*获取节目名称，类型等信息*/
-		am_scan_extract_srv_info_from_sdt(ts->digital.sdts, &srv_info);
+		am_scan_extract_srv_info_from_sdt(result, ts->digital.sdts, &srv_info);
 		
 		/*Store this service*/
 		am_scan_update_service_info(stmts, result, &srv_info);

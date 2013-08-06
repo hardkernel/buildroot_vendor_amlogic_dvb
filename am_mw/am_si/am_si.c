@@ -447,7 +447,7 @@ void si_decode_descriptor(dvbpsi_descriptor_t *des)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_SUBTITLING, 		dvbpsi_DecodeSubtitlingDr)
 		/*SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_MULTI_NETWORK_NAME, 	NULL)*/
 		/*SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_MULTI_BOUQUET_NAME, 	NULL)*/
-		/*SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_MULTI_SERVICE_NAME, 	NULL)*/
+		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_MULTI_SERVICE_NAME, 	dvbpsi_DecodeMultiServiceNameDr)
 		/*SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_MULTI_COMPONENT, 		NULL)*/
 		/*SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_DATA_BROADCAST, 		NULL)*/
 		/*SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_DATA_BROADCAST_ID, 	NULL)*/
@@ -1224,12 +1224,7 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 	memset(out_code,0,out_len);
 	 
 	/*查找输入编码方式*/
-	if (strcmp(forced_dvb_text_coding, ""))
-	{
-		/*强制将输入按默认编码处理*/
-		strcpy(cod, forced_dvb_text_coding);
-	}
-	else if (in_len <= 1)
+	if (in_len <= 1)
 	{
 		pin = &in_code;
 		strcpy(cod, "ISO-8859-1");
@@ -1268,7 +1263,17 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 		else if (fbyte == 0x15)
 			strcpy(cod, "utf-8");
 		else if (fbyte >= 0x20)
-			strcpy(cod, "ISO6937");
+		{
+			if (strcmp(forced_dvb_text_coding, ""))
+			{
+				/*强制将输入按默认编码处理*/
+				strcpy(cod, forced_dvb_text_coding);
+			}
+			else
+			{
+				strcpy(cod, "ISO6937");
+			}
+		}
 		else
 			return AM_FAILURE;
 

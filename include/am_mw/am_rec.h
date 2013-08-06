@@ -16,6 +16,7 @@
 #include <sqlite3.h>
 #include <am_dvr.h>
 #include <am_av.h>
+#include <am_si.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -94,7 +95,7 @@ typedef struct
 typedef struct
 {
 	AM_Bool_t is_timeshift;	/**< 是否是时移录像*/
-	int pmt_pid;
+	dvbpsi_pat_program_t program;
 	AM_REC_MediaInfo_t media_info;
 	int total_time;			/**< 需要录制的总时间，单位秒，<=0表示一直录像直到调用了Stop*/
 	char prefix_name[AM_REC_NAME_MAX];

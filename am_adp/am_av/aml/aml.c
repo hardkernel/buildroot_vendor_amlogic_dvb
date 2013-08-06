@@ -2576,7 +2576,9 @@ static void *aml_timeshift_thread(void *arg)
 				tshift->timeout = FFFB_STEP;
 				info.current_time = tshift->fffb_base/1000;
 
-				if (tshift->rate)
+				if (is_playback_mode || tshift->file.loop)
+					info.full_time = tshift->duration;
+				else if (tshift->rate)
 					info.full_time = tshift->file.total/tshift->rate;
 				else
 					info.full_time = 0;
@@ -2600,10 +2602,14 @@ static void *aml_timeshift_thread(void *arg)
 			ioctl(tshift->av_fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1)
 			{
 				update_time = now;
-				if (tshift->rate)
+				
+				if (is_playback_mode || tshift->file.loop)
+					info.full_time = tshift->duration;
+				else if (tshift->rate)
 					info.full_time = tshift->file.total/tshift->rate;
 				else
 					info.full_time = 0;
+				
 				if (!is_playback_mode && !tshift->file.loop)
 					tshift->duration = info.full_time;
 				
@@ -5029,6 +5035,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");
 			AM_FileEcho("/sys/class/video/axis", "0 0 0 0");
 			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", AV_SMOOTH_SYNC_VAL);
+			usleep(200*1000);
 		}
 #endif
 	}

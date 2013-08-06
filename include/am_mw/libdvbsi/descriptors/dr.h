@@ -68,6 +68,7 @@
 #include "dr_83.h"
 #include "dr_87.h"
 #include "dr_88.h"
+#include "dr_5d.h"
 
 #else
 #error "Multiple inclusions of dr.h"

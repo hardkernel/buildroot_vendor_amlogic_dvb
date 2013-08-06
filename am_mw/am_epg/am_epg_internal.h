@@ -147,6 +147,7 @@ struct AM_EPG_Monitor_s
 	int				mon_service;	/**< 当前监控的db_srv_id*/
 	void			*user_data;
 	int				curr_ts;	/**< 当前监控的TS*/
+	char			text_langs[128];
 };
 
 /**\brief 当前时间管理*/

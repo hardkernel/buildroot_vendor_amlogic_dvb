@@ -120,6 +120,7 @@ typedef struct
 	int dmx_dev;	/**< DMX设备号*/
 	int source;	/*< 源标识*/
 	sqlite3	*hdb;	/**< 数据库句柄，可用于预约播放查询等数据库操作*/
+	char text_langs[128]; /**< */
 }AM_EPG_CreatePara_t;
 
 /****************************************************************************

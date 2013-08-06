@@ -154,10 +154,11 @@
 		{/*开启监控*/\
 			am_epg_request_section(mon, &mon->ctl);\
 		}\
-		else if (!(mon->mode & (f)) && (mon->ctl.fid != -1))\
+		else if (!(mon->mode & (f)))\
 		{/*关闭监控*/\
 			am_epg_free_filter(mon, &mon->ctl.fid);\
 			RELEASE_TABLE_FROM_LIST(dvbpsi_##table##_t, mon->table##s);\
+			am_epg_tablectl_clear(&mon->ctl);\
 		}\
 		else if ((mon->mode & (f)) && reset)\
 		{\
@@ -676,6 +677,8 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 	char ext_descr[EXT_TEXT_LEN + 1];
 	char sql[256];
 	char *db_item;
+	char temp_lang[4];
+	char *this_lang, *saved_lang, *random_lang;
 	int row = 1;
 	int srv_dbid, net_dbid, ts_dbid, evt_dbid;
 	int start, end, nibble, now;
@@ -753,6 +756,41 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 		ext_descr[0] = 0;
 		ext_descr_len = 0;
 		nibble = 0;
+
+		/* try to find the language specified by user */
+		temp_lang[3] = 0;
+		saved_lang = NULL;
+		
+		AM_SI_LIST_BEGIN(event->p_first_descriptor, descr)
+			if (descr->i_tag == AM_SI_DESCR_SHORT_EVENT && descr->p_decoded)
+			{
+				dvbpsi_short_event_dr_t *pse = (dvbpsi_short_event_dr_t*)descr->p_decoded;
+
+				memcpy(temp_lang, pse->i_iso_639_code, 3);
+				this_lang = strstr(mon->text_langs, temp_lang);
+				if (this_lang != NULL && (saved_lang == NULL || saved_lang > this_lang))
+				{
+					saved_lang = this_lang;
+				}
+			}
+			else if (descr->i_tag == AM_SI_DESCR_EXTENDED_EVENT && descr->p_decoded)
+			{
+				dvbpsi_extended_event_dr_t *pee = (dvbpsi_extended_event_dr_t*)descr->p_decoded;
+
+				memcpy(temp_lang, pee->i_iso_639_code, 3);
+				this_lang = strstr(mon->text_langs, temp_lang);
+				if (this_lang != NULL && (saved_lang == NULL || saved_lang > this_lang))
+				{
+					saved_lang = this_lang;
+				}
+			}
+
+			if (saved_lang == mon->text_langs)
+			{
+				/* found the first one, no need to continue */
+				break;
+			}
+		AM_SI_LIST_END()
 		
 		memset(eedecrs, 0, sizeof(eedecrs));
 		AM_SI_LIST_BEGIN(event->p_first_descriptor, descr)
@@ -760,10 +798,14 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 			{
 				dvbpsi_short_event_dr_t *pse = (dvbpsi_short_event_dr_t*)descr->p_decoded;
 
+				/* skip the non-saved_lang languages' text */
+				if (saved_lang != NULL && memcmp(saved_lang, pse->i_iso_639_code, 3))
+					continue;
+
 				AM_SI_ConvertDVBTextCode((char*)pse->i_event_name, pse->i_event_name_length,\
 								name, EVT_NAME_LEN);
 				name[EVT_NAME_LEN] = 0;
-
+				
 				AM_SI_ConvertDVBTextCode((char*)pse->i_text, pse->i_text_length,\
 								desc, EVT_TEXT_LEN);
 				desc[EVT_TEXT_LEN] = 0;
@@ -772,6 +814,10 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 			else if (descr->i_tag == AM_SI_DESCR_EXTENDED_EVENT && descr->p_decoded)
 			{
 				dvbpsi_extended_event_dr_t *pee = (dvbpsi_extended_event_dr_t*)descr->p_decoded;
+
+				/* skip the non-saved_lang languages' text */
+				if (saved_lang != NULL && memcmp(saved_lang, pee->i_iso_639_code, 3))
+					continue;
 				
 				if (pee->i_descriptor_number < 16)
 				{
@@ -903,10 +949,7 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 		}
 
 		/*添加新事件到evt_table*/
-		if (sqlite3_bind_int(stmt, 1, 0)!=SQLITE_OK)
-		{
-			AM_DEBUG(1, "sqlite3_bind failed!!!");
-		}
+		sqlite3_bind_int(stmt, 1, mon->src);
 		sqlite3_bind_int(stmt, 2, net_dbid);
 		sqlite3_bind_int(stmt, 3, ts_dbid);
 		sqlite3_bind_int(stmt, 4, srv_dbid);
@@ -932,6 +975,7 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 		sqlite3_bind_int(stmt, 16, -1);
 		sqlite3_bind_text(stmt, 17, "", -1, SQLITE_STATIC);
 		STEP_STMT(stmt, insert_evt_sql_name, insert_evt_sql);
+		
 		
 		/*设置更新通知标志*/
 		if (! mon->eit_has_data)
@@ -1141,7 +1185,7 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 		AM_SI_LIST_END()
 		
 		/*添加新事件到evt_table*/
-		sqlite3_bind_int(stmt, 1, 0);
+		sqlite3_bind_int(stmt, 1, mon->src);
 		sqlite3_bind_int(stmt, 2, -1);
 		sqlite3_bind_int(stmt, 3, -1);
 		sqlite3_bind_int(stmt, 4, -1);
@@ -2644,6 +2688,7 @@ AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, int *handle)
 	mon->src = para->source;
 	mon->fend_dev = para->fend_dev;
 	mon->dmx_dev = para->dmx_dev;
+	snprintf(mon->text_langs, sizeof(mon->text_langs), "%s", para->text_langs);
 	mon->eitpf_check_time = EITPF_CHECK_DISTANCE;
 	mon->eitsche_check_time = EITSCHE_CHECK_DISTANCE;
 	mon->mon_service = -1;

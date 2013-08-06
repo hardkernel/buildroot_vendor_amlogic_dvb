@@ -232,13 +232,15 @@ typedef struct
 typedef struct
 {
 	uint8_t srv_type, eit_sche, eit_pf, rs, free_ca, access_controlled, hidden, hide_guide;;
-	int vid, aid1, aid2, srv_id;
+	int vid, aid1, aid2, srv_id, pmt_pid;
 	int vfmt, chan_num, afmt_tmp, vfmt_tmp, scrambled_flag, major_chan_num, minor_chan_num, source_id;
 	int src, srv_dbid, satpara_dbid;
 	char name[AM_DB_MAX_SRV_NAME_LEN + 1];
 	char str_apids[256];
 	char str_afmts[256];
 	char str_alangs[256];
+	char *default_text_lang;
+	char *text_langs;
 	AM_SI_AudioInfo_t aud_info;
 	AM_SI_SubtitleInfo_t sub_info;
 	AM_SI_TeletextInfo_t ttx_info;
