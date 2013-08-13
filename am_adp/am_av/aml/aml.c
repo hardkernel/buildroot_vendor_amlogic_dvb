@@ -3383,7 +3383,7 @@ static AM_ErrorCode_t aml_get_pts(const char *class_file,  uint32_t *pts)
 //
 #define ENABLE_CORRECR_AV_SYNC
 #ifdef ENABLE_CORRECR_AV_SYNC
-#define DI_BYPASS_FILE "/sys/module/di/parameters/bypass_hd"
+#define DI_BYPASS_FILE "/sys/module/di/parameters/bypass_post"
 #endif
 //
 /**\brief AV buffer 监控线程*/
@@ -3409,7 +3409,7 @@ static void* aml_av_monitor_thread(void *arg)
 	int resample_change_ms = 0;
 #ifdef ENABLE_CORRECR_AV_SYNC
         int need_skip_DI_4_HD;
-        int  bypass_hd;
+        int  bypass_post;
 
         need_skip_DI_4_HD = 0;
 #endif
@@ -3549,11 +3549,11 @@ static void* aml_av_monitor_thread(void *arg)
                                         if(dev->ts_player.play_para.vpid < 0x1fff) {//gurantee it only effect for video                                    
                                          if(AM_FileRead(DI_BYPASS_FILE, buf, sizeof(buf))==AM_SUCCESS)
                                          {     
-                                            if(sscanf(buf, "%d", &bypass_hd)==1)
+                                            if(sscanf(buf, "%d", &bypass_post)==1)
                                             {
-                                                AM_DEBUG(1, " Get DI bypass_hd status  ========= di bypass_hd is :%d",bypass_hd);
+                                                AM_DEBUG(1, " Get DI bypass_post status  ========= di bypass_post is :%d",bypass_post);
                                             }else
-                                               bypass_hd = 0; 
+                                               bypass_post = 0; 
                                          } 
                                         }
 #endif
@@ -3562,8 +3562,8 @@ static void* aml_av_monitor_thread(void *arg)
 						resample = 1;
 #ifdef ENABLE_CORRECR_AV_SYNC            
                                         if(dev->ts_player.play_para.vpid < 0x1fff) {//gurantee it only effect for video                              
-                                          if( ((dmx_vpts - vpts) > 90000 *4 ) && bypass_hd == 0 && v_size > 0 ) {
-                                             AM_DEBUG(1, "HD near to lost AV SYNC=========set di bypass_hd to 1");	
+                                          if( ((dmx_vpts - vpts) > 90000 *4 ) && bypass_post == 0 && v_size > 0 ) {
+                                             AM_DEBUG(1, "HD near to lost AV SYNC=========set di bypass_post to 1");	
                                              need_skip_DI_4_HD = 1;     
                                              AM_FileEcho(DI_BYPASS_FILE,"1");
                                            }
@@ -3573,9 +3573,9 @@ static void* aml_av_monitor_thread(void *arg)
 #ifdef ENABLE_CORRECR_AV_SYNC
                                        if(dev->ts_player.play_para.vpid < 0x1fff) {//gurantee it only effect for video
                                         if( need_skip_DI_4_HD ==1 && abs((dmx_apts-apts) - (dmx_vpts-vpts)) <=  27000 ){
-			                    if(bypass_hd) //bypass_hd already set as bypass mode and need recover to di enable
+			                    if(bypass_post) //bypass_post already set as bypass mode and need recover to di enable
                                             {
-                                                 AM_DEBUG(1, "AV SYNC recover =========set di bypass_hd to 0");
+                                                 AM_DEBUG(1, "AV SYNC recover =========set di bypass_post to 0");
                                                  AM_FileEcho(DI_BYPASS_FILE,"0");
                                                  need_skip_DI_4_HD = 0;
                                            }
@@ -3769,11 +3769,11 @@ static void* aml_av_monitor_thread(void *arg)
 #ifdef ENABLE_CORRECR_AV_SYNC
        if( need_skip_DI_4_HD)
        { 
-         // if(bypass_hd) //bypass_hd already set as bypass mode and need recover to di enable
+         // if(bypass_post) //bypass_post already set as bypass mode and need recover to di enable
           {
-                  AM_DEBUG(1, " recover previous setting ========set di bypass_hd to 0");
+                  AM_DEBUG(1, " recover previous setting ========set di bypass_post to 0");
                   AM_FileEcho(DI_BYPASS_FILE,"0");
-                  bypass_hd = 0;
+                  bypass_post = 0;
           }
 
           need_skip_DI_4_HD = 0;
