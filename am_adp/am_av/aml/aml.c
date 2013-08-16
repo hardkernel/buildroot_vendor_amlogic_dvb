@@ -3386,6 +3386,8 @@ static AM_ErrorCode_t aml_get_pts(const char *class_file,  uint32_t *pts)
 #define DI_BYPASS_FILE "/sys/module/di/parameters/bypass_post"
 #endif
 //
+int am_av_restart_pts_repeat_count = 2;
+
 /**\brief AV buffer 监控线程*/
 static void* aml_av_monitor_thread(void *arg)
 {
@@ -3709,7 +3711,7 @@ static void* aml_av_monitor_thread(void *arg)
 						{
 							pts_repeat_count++;
 							AM_DEBUG(1, "Audio & Video PTS have not changed for %d times", pts_repeat_count);
-							if (pts_repeat_count>= 2)
+							if (pts_repeat_count>= am_av_restart_pts_repeat_count)
 							{
 								/*PTS 3秒内无变化，重新播放音视频*/
 								aml_close_ts_mode(dev, AM_FALSE);
