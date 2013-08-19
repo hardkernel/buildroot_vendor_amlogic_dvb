@@ -475,6 +475,14 @@ close_file:
 		rec->rec_fd = -1;
 	}
 
+	/* Maybe there is no space left in disk, we need to remove this empty file */
+	if (err == AM_REC_ERR_CANNOT_WRITE_FILE &&
+		am_rec_get_file_size(rec) <= 0)
+	{
+		AM_DEBUG(1, "unliking empty file: %s", rec->rec_file_name);
+		unlink(rec->rec_file_name);
+	}
+
 	if (! rec->rec_para.is_timeshift)
 	{
 		int duration = 0;
