@@ -54,19 +54,7 @@ stt_section_info_t *atsc_psip_new_stt_info(void)
 
 void   atsc_psip_free_stt_info(stt_section_info_t *info)
 {
-	stt_section_info_t *stt_sect_info = NULL;
-	stt_section_info_t *tmp_stt_sect_info = NULL;
-	if (info)
-	{
-		tmp_stt_sect_info = info;
-		while(tmp_stt_sect_info)
-		{
-			stt_sect_info = tmp_stt_sect_info->p_next;
-			AMMem_free(tmp_stt_sect_info);
-			tmp_stt_sect_info = stt_sect_info;
-		}
-	}
-    return ;
+	AMMem_free(info);
 }
 
 INT32S atsc_psip_parse_stt(INT8U* data, INT32U length, stt_section_info_t *info)

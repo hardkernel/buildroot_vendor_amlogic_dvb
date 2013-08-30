@@ -253,34 +253,20 @@ rrt_section_info_t *atsc_psip_new_rrt_info(void)
 
 void atsc_psip_free_rrt_info(rrt_section_info_t *info)
 {
-	rrt_section_info_t *sect_info = NULL;
-	rrt_section_info_t *tmp_sect_info = NULL;
-	INT8U i;
-	
-	if (info)
+	rrt_dimensions_info_t *dimensions_info = NULL;
+	rrt_dimensions_info_t *tmp_dimensions_info =NULL;
+	tmp_dimensions_info = info->dimensions_info;
+	while(tmp_dimensions_info)
 	{
-		tmp_sect_info = info;
-		while(tmp_sect_info)
-		{
-			rrt_dimensions_info_t *dimensions_info = NULL;
-			rrt_dimensions_info_t *tmp_dimensions_info =NULL;
-			tmp_dimensions_info = tmp_sect_info->dimensions_info;
-			while(tmp_dimensions_info)
-			{
-				dimensions_info = tmp_dimensions_info->p_next;
-				AMMem_free(tmp_dimensions_info);
-				tmp_dimensions_info = dimensions_info;
-			}
-			if (tmp_sect_info->desc)
-			{
-				atsc_DeleteDescriptors(tmp_sect_info->desc);	 // --
-			}
-			sect_info = tmp_sect_info->p_next;
-			AMMem_free(tmp_sect_info);
-			tmp_sect_info = sect_info;
-		}
+		dimensions_info = tmp_dimensions_info->p_next;
+		AMMem_free(tmp_dimensions_info);
+		tmp_dimensions_info = dimensions_info;
 	}
-       return ;
+	if (info->desc)
+	{
+		atsc_DeleteDescriptors(info->desc);	 // --
+	}
+	AMMem_free(info);
 }
 
 

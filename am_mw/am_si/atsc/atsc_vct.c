@@ -273,33 +273,21 @@ vct_section_info_t *atsc_psip_new_vct_info(void)
 
 void atsc_psip_free_vct_info(vct_section_info_t *info)
 {
-	vct_section_info_t *vct_sect_info = NULL;
-	vct_section_info_t *tmp_vct_sect_info = NULL;
-	if (info)
+	vct_channel_info_t *vct_chan_info = NULL;
+	vct_channel_info_t *tmp_vct_chan_info =NULL;
+	tmp_vct_chan_info = info->vct_chan_info;
+	while(tmp_vct_chan_info)
 	{
-		tmp_vct_sect_info = info;
-		while(tmp_vct_sect_info)
+		if (tmp_vct_chan_info->desc)
 		{
-			vct_channel_info_t *vct_chan_info = NULL;
-			vct_channel_info_t *tmp_vct_chan_info =NULL;
-			tmp_vct_chan_info = tmp_vct_sect_info->vct_chan_info;
-			while(tmp_vct_chan_info)
-			{
-				if (tmp_vct_chan_info->desc)
-				{
-					atsc_DeleteDescriptors(tmp_vct_chan_info->desc);
-					tmp_vct_chan_info->desc = NULL;
-				}
-				vct_chan_info = tmp_vct_chan_info->p_next;
-				AMMem_free(tmp_vct_chan_info);
-				tmp_vct_chan_info = vct_chan_info;
-			}
-			vct_sect_info = tmp_vct_sect_info->p_next;
-			AMMem_free(tmp_vct_sect_info);
-			tmp_vct_sect_info = vct_sect_info;
+			atsc_DeleteDescriptors(tmp_vct_chan_info->desc);
+			tmp_vct_chan_info->desc = NULL;
 		}
+		vct_chan_info = tmp_vct_chan_info->p_next;
+		AMMem_free(tmp_vct_chan_info);
+		tmp_vct_chan_info = vct_chan_info;
 	}
-       return ;
+	AMMem_free(info);
 }
 
 void atsc_psip_dump_vct_info(vct_section_info_t *info)

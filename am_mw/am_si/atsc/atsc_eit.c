@@ -268,32 +268,20 @@ eit_section_info_t *atsc_psip_new_eit_info(void)
 
 void atsc_psip_free_eit_info(eit_section_info_t *info)
 {
-	eit_section_info_t *eit_sect_info = NULL;
-	eit_section_info_t *tmp_eit_sect_info = NULL;
-	if (info)
+	eit_event_info_t *eit_event_info = NULL;
+	eit_event_info_t *tmp_eit_event_info =NULL;
+	tmp_eit_event_info = info->eit_event_info;
+	while(tmp_eit_event_info)
 	{
-		tmp_eit_sect_info = info;
-		while(tmp_eit_sect_info)
+		if (tmp_eit_event_info->desc)
 		{
-			eit_event_info_t *eit_event_info = NULL;
-			eit_event_info_t *tmp_eit_event_info =NULL;
-			tmp_eit_event_info = tmp_eit_sect_info->eit_event_info;
-			while(tmp_eit_event_info)
-			{
-				if (tmp_eit_event_info->desc)
-				{
-					atsc_DeleteDescriptors(tmp_eit_event_info->desc);
-					tmp_eit_event_info->desc = NULL;
-				}
-				eit_event_info = tmp_eit_event_info->p_next;
-				AMMem_free(tmp_eit_event_info);
-				tmp_eit_event_info = eit_event_info;
-			}
-			eit_sect_info = tmp_eit_sect_info->p_next;
-			AMMem_free(tmp_eit_sect_info);
-			tmp_eit_sect_info = eit_sect_info;
+			atsc_DeleteDescriptors(tmp_eit_event_info->desc);
+			tmp_eit_event_info->desc = NULL;
 		}
+		eit_event_info = tmp_eit_event_info->p_next;
+		AMMem_free(tmp_eit_event_info);
+		tmp_eit_event_info = eit_event_info;
 	}
-       return ;
+	AMMem_free(info);
 }
 

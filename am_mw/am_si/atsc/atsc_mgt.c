@@ -245,51 +245,37 @@ mgt_section_info_t *atsc_psip_new_mgt_info(void)
 
 void atsc_psip_free_mgt_info(mgt_section_info_t *info)
 {
-	mgt_section_info_t *sec_info = NULL;
-	mgt_section_info_t *tmp_sec_info = NULL;
-
-	if(info)
+	com_table_info_t *table_info = NULL;
+	com_table_info_t *tmp_table_info = NULL;
+	tmp_table_info = info->com_table_info;
+	
+	while(tmp_table_info)
 	{
-		tmp_sec_info = info;
-		while(tmp_sec_info)
+		tmp_table_info->table_type = 0;
+		tmp_table_info->table_type_pid = 0;
+		if (tmp_table_info->desc)
 		{
-			com_table_info_t *table_info = NULL;
-			com_table_info_t *tmp_table_info = NULL;
-			tmp_table_info = tmp_sec_info->com_table_info;
-			
-			while(tmp_table_info)
-			{
-				tmp_table_info->table_type = 0;
-				tmp_table_info->table_type_pid = 0;
-				if (tmp_table_info->desc)
-				{
-					atsc_DeleteDescriptors(tmp_table_info->desc);
-					tmp_table_info->desc = NULL;
-				}
-				table_info = tmp_table_info->p_next;
-				AMMem_free(tmp_table_info);
-				tmp_table_info = table_info;
-			}
-
-			tmp_sec_info->com_table_info = NULL;
-
-			if(tmp_sec_info->desc) //
-			{
-				atsc_DeleteDescriptors(tmp_sec_info->desc);
-				tmp_sec_info->desc= NULL;
-			}
-
-			tmp_sec_info->version_number = DVB_INVALID_VERSION;
-			tmp_sec_info->com_table_info = NULL;
-			tmp_sec_info->tables_defined = 0;
-			tmp_sec_info->is_cable = 0;
-			sec_info = tmp_sec_info->p_next;
-			AMMem_free(tmp_sec_info);
-			tmp_sec_info = sec_info;
+			atsc_DeleteDescriptors(tmp_table_info->desc);
+			tmp_table_info->desc = NULL;
 		}
+		table_info = tmp_table_info->p_next;
+		AMMem_free(tmp_table_info);
+		tmp_table_info = table_info;
 	}
 
-	return ;
+	info->com_table_info = NULL;
+
+	if(info->desc) //
+	{
+		atsc_DeleteDescriptors(info->desc);
+		info->desc= NULL;
+	}
+
+	info->version_number = DVB_INVALID_VERSION;
+	info->com_table_info = NULL;
+	info->tables_defined = 0;
+	info->is_cable = 0;
+	AMMem_free(info);
 }
 void atsc_psip_dump_mgt_info(mgt_section_info_t *info)
 {

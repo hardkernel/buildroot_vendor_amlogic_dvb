@@ -1606,6 +1606,45 @@ VCT_END:
 		/*Store this service*/
 		am_scan_update_service_info(stmts, result, &srv_info);
 	AM_SI_LIST_END()
+
+	/* All programs in PMTs added, now trying the programs in VCT but NOT in PMT */
+	AM_SI_LIST_BEGIN(ts->digital.vcts, vct)
+	AM_SI_LIST_BEGIN(vct->vct_chan_info, vcinfo)
+		am_scan_init_service_info(&srv_info);
+		srv_info.satpara_dbid = satpara_dbid;
+		srv_info.srv_id = vcinfo->program_number;
+		srv_info.src = src;
+
+		/*Skip inactive program*/
+		if (vcinfo->program_number == 0  || vcinfo->program_number == 0xffff)
+			continue;
+
+		if (store)
+		{
+			srv_info.srv_dbid = insert_srv(stmts, net_dbid, dbid, srv_info.srv_id);
+			if (srv_info.srv_dbid == -1)
+			{
+				AM_DEBUG(1, "insert new srv error");
+				continue;
+			}
+		}
+		if (vcinfo->channel_TSID == vct->transport_stream_id)
+		{
+			AM_SI_ExtractAVFromATSCVC(vcinfo, &srv_info.vid, &srv_info.vfmt, &srv_info.aud_info);
+			am_scan_extract_srv_info_from_vc(vcinfo, &srv_info);
+			
+			/*Store this service*/
+			am_scan_update_service_info(stmts, result, &srv_info);
+		}
+		else
+		{
+			AM_DEBUG(1, "Program(%d) of TS(%d) in VCT(%d) found, current(%d)",
+			vcinfo->program_number, vcinfo->channel_TSID,
+			vct->transport_stream_id, vcinfo->channel_TSID);
+			continue;
+		}
+	AM_SI_LIST_END()
+	AM_SI_LIST_END()
 }
 
 /**\brief 存储一个TS到数据库, DVB*/
@@ -4016,6 +4055,8 @@ static AM_ErrorCode_t am_scan_stop_dtv(AM_SCAN_Scanner_t *scanner)
 			RELEASE_TABLE_FROM_LIST(dvbpsi_pmt_t, ts->digital.pmts);
 			RELEASE_TABLE_FROM_LIST(dvbpsi_cat_t, ts->digital.cats);
 			RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.sdts);
+			RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.vcts);
+			RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.mgts);
 			free(ts);
 
 			ts = tnext;
