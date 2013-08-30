@@ -480,6 +480,8 @@ static AM_ErrorCode_t am_scan_open_vdin(AM_SCAN_Scanner_t *scanner)
 			AM_DEBUG(1, "Open %s failed", buf);
 			return AM_FAILURE;
 		}
+
+		AM_DEBUG(1, "Open vdin ok, fd = %d", scanner->atvctl.vdin_fd);
 	}
 
 	/* Open port */
@@ -496,19 +498,18 @@ static AM_ErrorCode_t am_scan_open_vdin(AM_SCAN_Scanner_t *scanner)
 
 static AM_ErrorCode_t am_scan_close_vdin(AM_SCAN_Scanner_t *scanner)
 {
-if (scanner->atvctl.vdin_fd >= 0) 
-{
-//*************************ADD**********************************
-if (ioctl(scanner->atvctl.vdin_fd, TVIN_IOC_CLOSE) < 0) 
-{
-            AM_DEBUG(1, "Vdin openTVIN_IOC_CLOSEport, error(%s)!", strerror(errno));
-        }
-//*************************FINISH**********************************
-        close(scanner->atvctl.vdin_fd);
-        scanner->atvctl.vdin_fd = -1;
-}
+	if (scanner->atvctl.vdin_fd >= 0) 
+	{
+		AM_DEBUG(1, "Close vdin, fd = %d", scanner->atvctl.vdin_fd);
+		if (ioctl(scanner->atvctl.vdin_fd, TVIN_IOC_CLOSE) < 0) 
+		{
+			AM_DEBUG(1, "Vdin TVIN_IOC_CLOSE, error(%s)!", strerror(errno));
+		}
 
-	
+		close(scanner->atvctl.vdin_fd);
+		scanner->atvctl.vdin_fd = -1;
+	}
+
 	return AM_SUCCESS;
 }
 
@@ -527,6 +528,8 @@ static AM_ErrorCode_t am_scan_open_afe(AM_SCAN_Scanner_t *scanner)
 			AM_DEBUG(1, "Open %s failed", buf);
 			return AM_FAILURE;
 		}
+
+		AM_DEBUG(1, "Open tvafe ok, fd = %d", scanner->atvctl.afe_fd);
 	}
 	
 	return AM_SUCCESS;
@@ -537,6 +540,7 @@ static AM_ErrorCode_t am_scan_close_afe(AM_SCAN_Scanner_t *scanner)
 {
 	if (scanner->atvctl.afe_fd >= 0)
 	{
+		AM_DEBUG(1, "Close tvafe, fd = %d", scanner->atvctl.afe_fd);
 		close(scanner->atvctl.afe_fd);
 		scanner->atvctl.afe_fd = -1;
 	}
@@ -1015,6 +1019,7 @@ static int am_scan_get_ts_network(sqlite3_stmt **stmts, int src, dvbpsi_nit_t *n
 static void am_scan_update_ts_info(sqlite3_stmt **stmts, int net_dbid, int dbid, AM_SCAN_TS_t *ts)
 {
 	int ts_id = -1;
+	int symbol_rate=0, modulation=0;
 	
 	/*更新TS数据*/
 	sqlite3_bind_int(stmts[UPDATE_TS], 1, net_dbid);
@@ -1024,10 +1029,26 @@ static void am_scan_update_ts_info(sqlite3_stmt **stmts, int net_dbid, int dbid,
 			ts_id = ts->digital.pats->i_ts_id;
 		else if (ts->digital.vcts != NULL)
 			ts_id = ts->digital.vcts->transport_stream_id;
+
+		if (ts->digital.fend_para.m_type == FE_QAM)
+		{
+			symbol_rate = (int)dvb_fend_para(ts->digital.fend_para)->u.qam.symbol_rate;
+			modulation = (int)dvb_fend_para(ts->digital.fend_para)->u.qam.modulation;
+		}
+		else if (ts->digital.fend_para.m_type == FE_QPSK)
+		{
+			symbol_rate = (int)dvb_fend_para(ts->digital.fend_para)->u.qpsk.symbol_rate;
+		}
+		else if (ts->digital.fend_para.m_type == FE_ATSC)
+		{
+			modulation = (int)dvb_fend_para(ts->digital.fend_para)->u.vsb.modulation;
+		}
+		AM_DEBUG(1, "Update ts: type %d, modulation %d", ts->digital.fend_para.m_type, modulation);
 	}
+   
 	sqlite3_bind_int(stmts[UPDATE_TS], 2, ts_id);
-	sqlite3_bind_int(stmts[UPDATE_TS], 3, (ts->type!=AM_SCAN_TS_ANALOG) ? (int)dvb_fend_para(ts->digital.fend_para)->u.qam.symbol_rate : 0);
-	sqlite3_bind_int(stmts[UPDATE_TS], 4, (ts->type!=AM_SCAN_TS_ANALOG) ? (int)dvb_fend_para(ts->digital.fend_para)->u.qam.modulation : 0);
+	sqlite3_bind_int(stmts[UPDATE_TS], 3, symbol_rate);
+	sqlite3_bind_int(stmts[UPDATE_TS], 4, modulation);
 	sqlite3_bind_int(stmts[UPDATE_TS], 5, (ts->type!=AM_SCAN_TS_ANALOG) ? (int)dvb_fend_para(ts->digital.fend_para)->u.ofdm.bandwidth : 0);
 	sqlite3_bind_int(stmts[UPDATE_TS], 6, (ts->type!=AM_SCAN_TS_ANALOG) ? ts->digital.snr : 0);
 	sqlite3_bind_int(stmts[UPDATE_TS], 7, (ts->type!=AM_SCAN_TS_ANALOG) ? ts->digital.ber : 0);
@@ -3571,6 +3592,11 @@ static AM_ErrorCode_t am_scan_atv_step_tune(AM_SCAN_Scanner_t *scanner)
 	
 	if (cur_fe_para.m_type == FE_ANALOG)
 	{
+		if (atv_start_para.mode = AM_SCAN_ATVMODE_FREQ)
+		{
+			return am_scan_start_next_ts(scanner);
+		}
+		
 		/* step to next */
 		do
 		{
@@ -3702,6 +3728,30 @@ static AM_ErrorCode_t am_scan_start_next_ts(AM_SCAN_Scanner_t *scanner)
 		if (ret == AM_SUCCESS)
 		{
 			scanner->recv_status |= AM_SCAN_RECVING_WAIT_FEND;
+
+			/* ATSC fast-scan, donot wait fend event while strenth < (-value)*/
+			if (dtv_start_para.source == FE_ATSC)
+			{
+				int strength = 0;
+				const int min = -84;
+
+				AM_DEBUG(1, "Sleep 100ms to wait for strength...");
+				usleep(100*1000);
+				AM_FEND_GetStrength(scanner->start_para.fend_dev_id, &strength);
+				strength -= 256;
+				
+				if (strength < min)
+				{
+					AM_DEBUG(1, "Strength is %d < %d, skip this frequency.", strength, min);
+					scanner->start_freqs[scanner->curr_freq].flag = 0;
+					ret = AM_FAILURE;
+				}
+				else
+				{
+					AM_DEBUG(1, "Strength is %d >= %d, waiting for fend event...", strength, min);
+				}
+			}
+			
 		}
 		else
 		{
@@ -4119,10 +4169,10 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 	}
 	
 	scanner->atvctl.start = 1;
+	
     TvinSigDetect_CreateThread();
 
 	am_scan_open_afe(scanner);
-	//am_scan_open_vdin(scanner);
 
     /*set atv cvbs*/
     int std = scanner->start_para.atv_para.default_std;
@@ -4139,7 +4189,7 @@ static AM_ErrorCode_t am_scan_stop_atv(AM_SCAN_Scanner_t *scanner)
 		AM_DEBUG(1, "Stopping atv ...");
 		AM_DEBUG(1, "Closing AFE device ...");
 		am_scan_close_afe(scanner);
-	//am_scan_close_vdin(scanner);	
+
         TvinSigDetect_Stop();
 
 		scanner->atvctl.start = 0;
@@ -4161,6 +4211,13 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 	}
 	else
 	{
+		if (scanner->start_para.mode == AM_SCAN_MODE_ADTV)
+		{
+			/* open atv devices */
+			am_scan_open_afe(scanner);
+			am_scan_open_vdin(scanner);
+		}
+		
 		return am_scan_start_dtv(scanner);
 	}
 }
@@ -4448,7 +4505,7 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 
 try_next:
 	/*尝试下一频点*/	
-	if (cur_fe_para.m_type == FE_ANALOG && atv_start_para.mode != AM_SCAN_ATVMODE_FREQ)
+	if (cur_fe_para.m_type == FE_ANALOG)
 	{
 		scanner->atvctl.step = atv_start_para.afc_unlocked_step;
 		am_scan_atv_step_tune(scanner);
@@ -4634,6 +4691,13 @@ handle_events:
 	
 	am_scan_stop_atv(scanner);
 	am_scan_stop_dtv(scanner);
+	
+	if (scanner->start_para.mode == AM_SCAN_MODE_ADTV)
+	{
+		/* close atv devices */
+		am_scan_close_vdin(scanner);	
+		am_scan_close_afe(scanner);
+	}
 			
 	pthread_mutex_unlock(&scanner->lock);
 	/*反注册前端事件*/
