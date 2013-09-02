@@ -2668,6 +2668,12 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 			am_scan_dtv_default_sort_by_scan_order(result, stmts, &srv_tab);
 		}
 	}
+
+	if (result->start_para->dtv_para.standard == AM_SCAN_DTV_STD_ATSC)
+	{
+		sqlite3_exec(hdb, "update srv_table set default_chan_num=chan_num \
+			 where chan_num>0", NULL, NULL, NULL);
+	}
 	
 	/* 生成最终 chan_num */
 	AM_DEBUG(1, "Updating chan_num & chan_order from default_chan_num ...");
@@ -3592,7 +3598,7 @@ static AM_ErrorCode_t am_scan_atv_step_tune(AM_SCAN_Scanner_t *scanner)
 	
 	if (cur_fe_para.m_type == FE_ANALOG)
 	{
-		if (atv_start_para.mode = AM_SCAN_ATVMODE_FREQ)
+		if (atv_start_para.mode == AM_SCAN_ATVMODE_FREQ)
 		{
 			return am_scan_start_next_ts(scanner);
 		}
