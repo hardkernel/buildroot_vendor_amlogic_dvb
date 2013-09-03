@@ -529,13 +529,7 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start
 	}
 		
 	/*设置输出文件名*/
-	if (rec->stat_flag & REC_STAT_FL_TIMESHIFTING)
-	{
-		snprintf(rec->rec_file_name, sizeof(rec->rec_file_name), 
-			"%s/TimeShifting%d.%s", rec->create_para.store_dir, 
-			0/*AV_DEV*/, start_para->suffix_name);
-	}
-	else
+	if (! start_para->is_timeshift)
 	{
 		rec->rec_file_index = 1;
 		return am_rec_gen_next_file_name(rec, start_para->prefix_name, start_para->suffix_name);

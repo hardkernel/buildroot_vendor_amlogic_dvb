@@ -2436,8 +2436,19 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 			tshift->left = 0;
 			tshift->inject_size = 0;
 			tshift->timeout = 0;
-			/* will turn to play state from current_time */
-			tshift->state = AV_TIMESHIFT_STAT_SEARCHOK;
+			if (tshift->state == AV_TIMESHIFT_STAT_PAUSE)
+			{
+				/* keep pause with the new audio */
+				ioctl(tshift->cntl_fd, AMSTREAM_IOC_TRICKMODE, TRICKMODE_NONE);
+				am_timeshift_reset(tshift, 2, AM_TRUE);
+				tshift->timeout = 1000;
+				aml_timeshift_pause_av(tshift);
+			}
+			else
+			{
+				/* will turn to play state from current_time */
+				tshift->state = AV_TIMESHIFT_STAT_SEARCHOK;
+			}
 			break;
 		default:
 			AM_DEBUG(1, "Unsupported timeshift play command %d", cmd);
@@ -2527,6 +2538,15 @@ static void *aml_timeshift_thread(void *arg)
 			if (ret > 0)
 			{
 				tshift->left += ret;
+			}
+			else
+			{
+				AM_DEBUG(1, "read playback file failed: %s", strerror(errno));
+				if (errno == EIO && is_playback_mode)
+				{
+					AM_DEBUG(1, "Disk may be plugged out, exit playback.");
+					break;
+				}
 			}
 		}
 		
@@ -2718,7 +2738,7 @@ static AM_ErrorCode_t aml_timeshift_fill_data(AM_AV_Device_t *dev, uint8_t *data
 					if (tshift->rate && tshift->file.loop)
 					{
 						/*Calculate the file size*/
-						tshift->file.size = tshift->rate * tshift->duration;
+						tshift->file.size = (loff_t)tshift->rate * (loff_t)tshift->duration;
 						pthread_cond_signal(&tshift->cond);
 						AM_DEBUG(1, "@@@wirte record data %lld bytes in %d ms,so the rate is assumed to %d bps, ring file size %lld", 
 							tshift->rtotal, now - tshift->rtime, tshift->rate*8, tshift->file.size);
