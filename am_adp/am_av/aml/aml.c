@@ -105,6 +105,8 @@ void *adec_handle;
 #define VID_ASPECT_MATCH_FILE "/sys/class/video/matchmethod" 
 #endif
 
+#define VDEC_H264_ERROR_RECOVERY_MODE_FILE "/sys/module/amvdec_h264/parameters/error_recovery_mode"
+
 #define DISP_MODE_FILE      "/sys/class/display/mode"
 #define ASTREAM_FORMAT_FILE "/sys/class/astream/format"
 
@@ -383,7 +385,7 @@ const AM_AV_Driver_t aml_av_drv =
 .timeshift_cmd = aml_timeshift_cmd,
 .get_timeshift_info = aml_timeshift_get_info,
 .set_vpath   = aml_set_vpath,
-.switch_ts_audio = aml_switch_ts_audio
+.switch_ts_audio = aml_switch_ts_audio,
 };
 
 /*音频控制（通过解码器）操作*/
@@ -4508,6 +4510,11 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 			name = VID_DISABLE_FILE;
 			cmd = "2";
 		break;
+		case AV_VIDEO_PARA_ERROR_RECOVERY_MODE:
+			name = VDEC_H264_ERROR_RECOVERY_MODE_FILE;
+			snprintf(buf, sizeof(buf), "%d", val);
+			cmd = buf;
+		break;
 	}
 	
 	if(name)
@@ -5153,5 +5160,24 @@ static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM
 	
 	return AM_SUCCESS;
 }
+
+
+/**\brief set vdec_h264 error_recovery_mode :0 or 2 -> skip display Mosaic  ,3: display mosaic in case of vdec hit error*/
+static AM_ErrorCode_t aml_set_vdec_error_recovery_mode(AM_AV_Device_t *dev, uint8_t error_recovery_mode)
+{
+    char buf[32];
+ 
+    if(error_recovery_mode < 0 || error_recovery_mode > 3)
+    {
+       AM_DEBUG(1, "set error_recovery_mode input parameters error!");
+       return AM_FAILURE;
+    }
+
+    snprintf(buf, sizeof(buf), "%d", error_recovery_mode);
+    AM_FileEcho(VDEC_H264_ERROR_RECOVERY_MODE_FILE, buf);
+
+    return AM_SUCCESS;
+}
+
 
 
