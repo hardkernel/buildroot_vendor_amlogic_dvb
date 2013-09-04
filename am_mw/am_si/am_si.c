@@ -1373,6 +1373,9 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 		case 0xea:
 			vfmt_tmp = VFORMAT_VC1;
 			break;
+		case 0x42:
+			vfmt_tmp = VFORMAT_AVS;
+			break;
 		/*audio pid and audio format*/ 
 		case 0x3:
 		case 0x4:
