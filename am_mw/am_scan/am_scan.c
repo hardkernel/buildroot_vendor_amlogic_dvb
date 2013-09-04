@@ -1631,6 +1631,8 @@ VCT_END:
 	/* All programs in PMTs added, now trying the programs in VCT but NOT in PMT */
 	AM_SI_LIST_BEGIN(ts->digital.vcts, vct)
 	AM_SI_LIST_BEGIN(vct->vct_chan_info, vcinfo)
+		AM_Bool_t found_in_pmt = AM_FALSE;
+
 		am_scan_init_service_info(&srv_info);
 		srv_info.satpara_dbid = satpara_dbid;
 		srv_info.srv_id = vcinfo->program_number;
@@ -1638,6 +1640,18 @@ VCT_END:
 
 		/*Skip inactive program*/
 		if (vcinfo->program_number == 0  || vcinfo->program_number == 0xffff)
+			continue;
+
+		/* Is already added in PMT? */
+		AM_SI_LIST_BEGIN(ts->digital.pmts, pmt)
+			if (vcinfo->program_number == pmt->i_program_number)
+			{
+				found_in_pmt = AM_TRUE;
+				break;
+			}
+		AM_SI_LIST_END()
+
+		if (found_in_pmt)
 			continue;
 
 		if (store)
