@@ -119,6 +119,14 @@ void *adec_handle;
 #define AUDIO_CACHE_TIME        200
 
 #ifdef ENABLE_AUDIO_RESAMPLE
+
+#define ENABLE_DROP_BFRAME    //release cpu bandwidth under HD playing due to lost av sync
+#ifdef ENABLE_DROP_BFRAME 
+//#include <cutils/properties.h>
+
+#define VIDEO_DROP_BFRAME_FILE  "/sys/module/amvdec_h264/parameters/enable_toggle_drop_B_frame"
+#define TSYNC_MODE_FILE   "/sys/class/tsync/mode"
+#endif
 #define ENABLE_RESAMPLE_FILE    "/sys/class/amaudio/enable_resample"
 #define RESAMPLE_TYPE_FILE      "/sys/class/amaudio/resample_type"
 #endif
@@ -3403,7 +3411,7 @@ static AM_ErrorCode_t aml_get_pts(const char *class_file,  uint32_t *pts)
 }
 
 //
-#define ENABLE_CORRECR_AV_SYNC
+//#define ENABLE_CORRECR_AV_SYNC
 #ifdef ENABLE_CORRECR_AV_SYNC
 #define DI_BYPASS_FILE "/sys/module/di/parameters/bypass_post"
 #endif
@@ -3609,7 +3617,50 @@ static void* aml_av_monitor_thread(void *arg)
 				}
 				AM_DEBUG(1, "asize %d adata %d vsize %d vdata %d apts_diff %d vpts_diff %d resample %d",
 					ab_size, a_size, vb_size, v_size, dmx_apts-apts, dmx_vpts-vpts, resample);
+#ifdef ENABLE_DROP_BFRAME
+                                //workaound to drop few B frame to fix HD program lost av sync sometimes due to deinterlaace bandwidth 
+                                if(1){ 
+                                  struct am_io_param vstatus;
+                                  int fd, rc;
+                                  char tmpbuf[32];
+                                  uint32_t tsync_mode =0;
 
+                                  fd = get_amstream(dev);
+                                  if(fd==-1)
+                                  {
+                                    AM_DEBUG(1, "cannot get status in this mode");
+                                  }
+
+                                  rc = ioctl(fd, AMSTREAM_IOC_VDECSTAT, &vstatus);
+                                  if(rc==-1)
+                                  {
+                                      AM_DEBUG(1, "AMSTREAM_IOC_VDECSTAT failed");
+                                  }
+                                  else {
+                                     AM_DEBUG(1,"==== src_width =%d,src_height=%d,======\n",vstatus.vstatus.width,vstatus.vstatus.height);
+
+                                     if(vstatus.vstatus.width >1280 && vstatus.vstatus.height >720){
+                                         if(AM_FileRead(TSYNC_MODE_FILE, tmpbuf, sizeof(tmpbuf)) ==AM_SUCCESS ){
+                                               if( sscanf(tmpbuf, "%d", &tsync_mode))
+                                                   AM_DEBUG(1, " Get tsync_mode  :%d",tsync_mode); 
+                                                else
+                                                    tsync_mode = 0;
+                                          }
+   
+                                         if((((dmx_vpts - vpts) > 90000 * 2) && (((dmx_vpts-vpts)-(dmx_apts-apts)) > 90000) && (apts-vpts> 0))
+                                         || (apts - vpts > 90000)){
+                                              if(tsync_mode) {
+                                                  AM_FileEcho( VIDEO_DROP_BFRAME_FILE ,"1");
+                                                  AM_DEBUG(1, "===drop B frame: dmx_vpts:%x vpts %x, dmx_apts: %x apts %x apts_diff %d vpts_diff %d resample %d====\n",
+                                                 dmx_vpts, vpts, dmx_apts, apts, dmx_apts-apts, dmx_vpts-vpts, resample);
+                                             }
+                                         } else {
+                                            AM_FileEcho( VIDEO_DROP_BFRAME_FILE ,"0");
+                                      } 
+                                    }
+                                   }
+                                }
+#endif //end  ENABLE_DROP_BFRAME
 				if(resample != curr_resample){
 					int set = 1;
 					
@@ -3803,7 +3854,9 @@ static void* aml_av_monitor_thread(void *arg)
           need_skip_DI_4_HD = 0;
        }
 #endif
-
+#ifdef ENABLE_DROP_BFRAME  
+       AM_FileEcho( VIDEO_DROP_BFRAME_FILE ,"0");
+#endif
 	AM_DEBUG(1, "AV  monitor thread exit now");
 	return NULL;
 }
