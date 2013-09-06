@@ -61,6 +61,7 @@
 #define M_KU_TP_END_FREQ (13450000)
 
 #define FRONTEND_SHORT_CIRCUIT_FILE   "/sys/class/avl_frontend/short_circuit"
+#define FRONTEND_SUSPENDED_FILE   "/sys/class/amlfe/aml_fe_suspended_flag"
 	
 /****************************************************************************
  * Static data
@@ -571,6 +572,44 @@ static AM_Bool_t AM_SEC_If_Timeout_Goto(eSecCommand_t *sec_cmd)
 	return AM_FALSE;
 }
 
+/**\brief */
+static void  AM_SEC_Invalid_CurPara(void)
+{
+	int num = 0; 
+
+	AM_DEBUG(1, "AM_SEC_Invalid_CurPara \n");
+	
+	for ( num = 0; num < NUM_DATA_ENTRIES; num++)
+	{
+		am_sec_fend_data[num] = -1;
+	}
+
+	return;
+}
+
+/**\brief */
+static void  AM_SEC_Suspended_Reset(void)
+{
+	char buf[32] = {0};
+	int v = 0;
+
+	AM_DEBUG(1, "AM_SEC_Suspended_Reset \n");
+	
+	if(AM_FileRead(FRONTEND_SUSPENDED_FILE, buf, sizeof(buf))==AM_SUCCESS)
+	{
+		if(sscanf(buf, "%d", &v) == 1)
+		{
+			if(v == 1)
+			{
+				AM_SEC_Invalid_CurPara();
+				AM_FileEcho(FRONTEND_SUSPENDED_FILE, "0");
+			}
+		}
+	}	
+
+	return;
+}
+
 /**\brief 卫星设备控制事件设置*/
 static AM_ErrorCode_t AM_Sec_AsyncSet(void)
 {
@@ -919,6 +958,8 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 	struct dvb_frontend_parameters convert_para;
 
 	AM_DEBUG(1, "AM_SEC_Prepare enter %d %p %p %p %d\n", dev_no, b_para, para, status, tunetimeout);
+
+	AM_SEC_Suspended_Reset();
 
 	if(para != NULL)
 	{
