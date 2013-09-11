@@ -337,6 +337,14 @@ extern AM_ErrorCode_t AM_SEC_GetSetting(int dev_no, AM_SEC_DVBSatelliteEquipment
  */
 extern AM_ErrorCode_t AM_SEC_ResetRotorStatusCache(int dev_no);
 
+/**\brief 缓存参数重置
+ * \param dev_no 前端设备号
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+extern void  AM_SEC_Cache_Reset(int dev_no);
+
 /**\brief 准备盲扫卫星设备控制
  * \param dev_no 前端设备号
  * \return

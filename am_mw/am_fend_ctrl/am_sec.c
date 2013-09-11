@@ -572,7 +572,7 @@ static AM_Bool_t AM_SEC_If_Timeout_Goto(eSecCommand_t *sec_cmd)
 	return AM_FALSE;
 }
 
-/**\brief */
+/**\brief 清除缓存参数*/
 static void  AM_SEC_Invalid_CurPara(void)
 {
 	int num = 0; 
@@ -587,7 +587,7 @@ static void  AM_SEC_Invalid_CurPara(void)
 	return;
 }
 
-/**\brief */
+/**\brief 进入过待机清除缓存参数*/
 static void  AM_SEC_Suspended_Reset(void)
 {
 	char buf[32] = {0};
@@ -2153,6 +2153,19 @@ AM_ErrorCode_t AM_SEC_ResetRotorStatusCache(int dev_no)
 	pthread_mutex_unlock(&(sec_control.m_lnbs.lock));
 
 	return ret;
+}
+
+/**\brief 缓存参数重置
+ * \param dev_no 前端设备号
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend_ctrl.h)
+ */
+void  AM_SEC_Cache_Reset(int dev_no)
+{
+	AM_SEC_Invalid_CurPara();
+
+	return;
 }
 
 /**\brief 准备盲扫卫星设备控制
