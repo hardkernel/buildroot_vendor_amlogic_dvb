@@ -4991,15 +4991,18 @@ aml_set_vpath(AM_AV_Device_t *dev)
 
 	AM_DEBUG(1, "set video path fs:%d di:%d ppmgr:%d", dev->vpath_fs, dev->vpath_di, dev->vpath_ppmgr);
 	AM_FileEcho("/sys/class/deinterlace/di0/config", "disable");
-
-		
+	
+	/*	
 	do{
 		ret = AM_FileEcho("/sys/class/vfm/map", "rm default");
 		if(ret!=AM_SUCCESS){
 			usleep(10000);
 		}
 	}while(ret!=AM_SUCCESS && times--);
+	*/
 
+	char video_axis[32];
+	AM_FileRead("/sys/class/video/axis", video_axis, sizeof(video_axis));
 	
 	if(dev->vpath_fs==AM_AV_FREE_SCALE_ENABLE){
 		char mode[16];
@@ -5041,10 +5044,10 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			blank = AM_FALSE;
 		}
 		if(blank){
-			AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
+			//AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
 		}
-		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "1");
-		AM_FileEcho("/sys/class/graphics/fb1/free_scale", "1");
+		//AM_FileEcho("/sys/class/graphics/fb0/free_scale", "1");
+		//AM_FileEcho("/sys/class/graphics/fb1/free_scale", "1");
 #ifdef ANDROID
 		{
 			AM_FileEcho("/sys/class/graphics/fb0/request2XScale", "2");
@@ -5052,7 +5055,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "0");
 			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "0");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","1");
-			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect", ppr);
+			//AM_FileEcho("/sys/class/ppmgr/ppscaler_rect", ppr);
 			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", "0");
 			usleep(200*1000);
 		}
@@ -5112,7 +5115,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 		}
 #endif
 		if(blank && scale){
-			AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
+			//AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
 		}
 		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "0");
 		AM_FileEcho("/sys/class/graphics/fb1/free_scale", "0");
@@ -5131,14 +5134,15 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "62");
 			AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","0");
-			AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");
-			AM_FileEcho("/sys/class/video/axis", "0 0 0 0");
+			//AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");
+			//AM_FileEcho("/sys/class/video/axis", "0 0 0 0");
 			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", AV_SMOOTH_SYNC_VAL);
-			usleep(200*1000);
+			usleep(2000*1000);
 		}
 #endif
 	}
 
+	/*
 	if(dev->vpath_ppmgr!=AM_AV_PPMGR_DISABLE){
 		if (dev->vpath_ppmgr == AM_AV_PPMGR_MODE3D_2D_TO_3D){
 			AM_FileEcho("/sys/class/vfm/map", "add default decoder deinterlace d2d3 amvideo");
@@ -5147,7 +5151,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			AM_FileEcho("/sys/class/vfm/map", "add default decoder ppmgr amvideo");
 			if (dev->vpath_ppmgr!=AM_AV_PPMGR_ENABLE) {
 				/*Set 3D mode*/
-				AM_TRY(aml_set_ppmgr_3dcmd(dev->vpath_ppmgr));
+	/*			AM_TRY(aml_set_ppmgr_3dcmd(dev->vpath_ppmgr));
 			}
 		}
 		
@@ -5157,7 +5161,11 @@ aml_set_vpath(AM_AV_Device_t *dev)
 	}else{
 		AM_FileEcho("/sys/class/vfm/map", "add default decoder amvideo");
 	}
+	*/
 	
+	AM_FileEcho("/sys/class/video/axis", video_axis);
+	AM_FileRead("/sys/class/video/axis", video_axis, sizeof(video_axis));
+
 	return AM_SUCCESS;
 }
 
