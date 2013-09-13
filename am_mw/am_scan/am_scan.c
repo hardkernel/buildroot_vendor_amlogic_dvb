@@ -557,7 +557,7 @@ static AM_Bool_t am_scan_atv_cvbs_lock(AM_SCAN_Scanner_t *scanner)
 
 	if (scanner->atvctl.afe_fd >= 0)
 	{
-		while (i < 5)
+		while (i < 20)
 		{
 			ret = ioctl(scanner->atvctl.afe_fd, TVIN_IOC_G_AFE_CVBS_LOCK, &cvbs_lock_status);
 			if (ret < 0) 
