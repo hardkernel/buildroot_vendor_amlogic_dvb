@@ -3306,7 +3306,7 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 		}
 	}
 
-	if ((tp->vfmt == VFORMAT_H264) || (tp->vfmt == VFORMAT_VC1)) {
+	/*if ((tp->vfmt == VFORMAT_H264) || (tp->vfmt == VFORMAT_VC1))*/ {
 
 		memset(&am_sysinfo,0,sizeof(dec_sysinfo_t));
 		if(ioctl(fd, AMSTREAM_IOC_SYSINFO, (unsigned long)&am_sysinfo)==-1)
