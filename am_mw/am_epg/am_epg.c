@@ -236,6 +236,17 @@ static inline int am_epg_convert_fetype_to_source(int fe_type)
 #endif
 }
 
+static void am_epg_wait_events_done(AM_EPG_Monitor_t *mon)
+{
+	if (mon->thread == pthread_self())
+		return;
+
+	while (mon->evt_flag != 0)
+	{
+		pthread_cond_wait(&mon->cond, &mon->lock);
+	}
+}
+
 /**\brief 预约一个EPG事件*/
 static AM_ErrorCode_t am_epg_subscribe_event(sqlite3 *hdb, int db_evt_id)
 {
@@ -2612,6 +2623,8 @@ handle_events:
 			{
 				goto handle_events;
 			}
+			/* To add the new event */
+			pthread_cond_signal(&mon->cond);
 		}
 	}
 	
@@ -2775,6 +2788,7 @@ AM_ErrorCode_t AM_EPG_ChangeMode(int handle, int op, int mode)
 	}
 	
 	pthread_mutex_lock(&mon->lock);
+	am_epg_wait_events_done(mon);
 	if ((op == AM_EPG_MODE_OP_ADD && (mon->mode&mode) != mode) ||
 		(op == AM_EPG_MODE_OP_REMOVE && (mon->mode&mode) != 0) ||
 		(op == AM_EPG_MODE_OP_SET && mon->mode != mode))
@@ -2814,6 +2828,7 @@ AM_ErrorCode_t AM_EPG_MonitorService(int handle, int db_srv_id)
 	assert(mon);
 
 	pthread_mutex_lock(&mon->lock);
+	am_epg_wait_events_done(mon);
 	mon->evt_flag |= AM_EPG_EVT_SET_MON_SRV;
 	mon->mon_service = db_srv_id;
 	pthread_cond_signal(&mon->cond);
@@ -2842,6 +2857,7 @@ AM_ErrorCode_t AM_EPG_SetEITPFCheckDistance(int handle, int distance)
 	}	
 	
 	pthread_mutex_lock(&mon->lock);
+	am_epg_wait_events_done(mon);
 	mon->evt_flag |= AM_EPG_EVT_SET_EITPF_CHECK_TIME;
 	mon->eitpf_check_time = distance;
 	pthread_cond_signal(&mon->cond);
@@ -2870,6 +2886,7 @@ AM_ErrorCode_t AM_EPG_SetEITScheCheckDistance(int handle, int distance)
 	}	
 	
 	pthread_mutex_lock(&mon->lock);
+	am_epg_wait_events_done(mon);
 	mon->evt_flag |= AM_EPG_EVT_SET_EITSCHE_CHECK_TIME;
 	mon->eitsche_check_time = distance;
 	pthread_cond_signal(&mon->cond);
