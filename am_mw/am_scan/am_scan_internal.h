@@ -231,7 +231,7 @@ typedef struct
 /**\brief service结构*/
 typedef struct
 {
-	uint8_t srv_type, eit_sche, eit_pf, rs, free_ca, access_controlled, hidden, hide_guide;;
+	uint8_t srv_type, eit_sche, eit_pf, rs, free_ca, access_controlled, hidden, hide_guide, plp_id;
 	int vid, aid1, aid2, srv_id, pmt_pid;
 	int vfmt, chan_num, afmt_tmp, vfmt_tmp, scrambled_flag, major_chan_num, minor_chan_num, source_id;
 	int src, srv_dbid, satpara_dbid;
@@ -258,6 +258,7 @@ struct AM_SCAN_Scanner_s
 	pthread_t          				thread;         /**< 状态监控线程*/
 	
 	int								curr_freq;		/**< 当前正在搜索的频点*/ 
+	int								curr_plp;		/**< Current PLP index*/
 	int								start_freqs_cnt;/**< 需要搜索的频点个数*/
 	struct dvb_frontend_event		fe_evt;			/**< 前段事件*/
 	AM_SCAN_FrontEndPara_t		 	*start_freqs;	/**< 需要搜索的频点列表*/ 

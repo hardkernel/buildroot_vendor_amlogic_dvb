@@ -52,6 +52,7 @@
 "hd_sd_order integer",								/**< 按高清在前，标清在后排序顺序*/
 
 "db_sat_para_id integer",							/**< 卫星信号下，保存的sat_para_table中的数据库唯一索引，非卫星信号下无效*/
+"dvbt2_plp_id integer",								/**< DVB-T2 data plp id, non-DVBT2 = -1*/
 
 /**< Note: the following fields are added for ATSC only, and they are NOT available for DVB*/
 "major_chan_num integer",							/**< ATSC 主频道号*/

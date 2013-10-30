@@ -1871,7 +1871,6 @@ static AM_ErrorCode_t AM_SEC_Prepare(int dev_no, const AM_FENDCTRL_DVBFrontendPa
 
 		AM_DEBUG(1, "degrees = %d \n", rotor_param.m_gotoxx_parameters.m_sat_longitude );
 		AM_DEBUG(1, "siteLatitude = %f, siteLongitude = %f, degrees = %f \n", SiteLat, SiteLon, SatLon );
-
 		AM_FEND_Diseqccmd_GotoAngularPositioner(dev_no, SiteLon, SiteLat, SatLon);	
 		/*because rotor maybe manual stop, we are not save rotor cmd*/
 		AM_SEC_ResetRotorStatusCache(dev_no);

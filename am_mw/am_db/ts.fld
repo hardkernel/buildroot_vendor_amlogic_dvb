@@ -15,3 +15,4 @@
 "std integer",										/**< ATV 声音,视频制式*/
 "aud_mode",											/**< ATV 声道*/
 "flags integer",									/**< ATV AFC的值*/
+"dvbt_flag  integer"								/*dvb-t模式 ，0-DVB-T，1-DVB-T2*/

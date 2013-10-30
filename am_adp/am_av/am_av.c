@@ -2804,7 +2804,8 @@ AM_AV_SetVPathPara(int dev_no, AM_AV_FreeScalePara_t fs, AM_AV_DeinterlacePara_t
 	
 	pthread_mutex_lock(&dev->lock);
 
-	ret = av_set_vpath(dev, fs, di, pp);
+	//ret = av_set_vpath(dev, fs, di, pp);
+	ret = av_set_vpath(dev, fs, AM_AV_DEINTERLACE_DISABLE, pp);
 	
 	pthread_mutex_unlock(&dev->lock);
 	

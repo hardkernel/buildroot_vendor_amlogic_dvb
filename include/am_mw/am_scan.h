@@ -71,6 +71,8 @@ enum AM_SCAN_ProgressEvt
 	AM_SCAN_PROGRESS_BLIND_SCAN,	/**< 卫星盲扫搜索进度，参数为AM_SCAN_BlindScanProgress_t给出的进度信息*/
 	AM_SCAN_PROGRESS_ATV_TUNING,	/**< ATV tuning a new frequency*/
 	AM_SCAN_PROGRESS_NEW_PROGRAM,	/**< Searched a new program which will be stored*/
+	AM_SCAN_PROGRESS_DVBT2_PLP_BEGIN,	/**< Start a DVB-T2 data PLP, parameter is AM_SCAN_PLPProgress_t*/
+	AM_SCAN_PROGRESS_DVBT2_PLP_END,	/**< DVB-T2 PLP search end, parameter is AM_SCAN_PLPProgress_t*/
 };
 
 /**\brief 搜索事件类型*/
@@ -164,6 +166,14 @@ typedef struct
 	AM_FENDCTRL_DVBFrontendParameters_t	fend_para;	/**< 当前搜索的频点信息*/
 }AM_SCAN_TSProgress_t;
 
+/**\brief DVB-T2 PLP progress data*/
+typedef struct
+{
+	int				index;	/**< current searching plp index, start from 0*/
+	int				total;	/**< total plps in current TS*/
+	struct AM_SCAN_TS_s	*ts;	/**< current searching TS*/
+}AM_SCAN_PLPProgress_t;
+
 /**\brief 搜索进度数据*/
 typedef struct 
 {
@@ -229,6 +239,15 @@ typedef struct AM_SCAN_TS_s
 			dvbpsi_sdt_t *sdts;		/**< 搜索到的SDT表*/
 			mgt_section_info_t *mgts;		/**< 搜索到的MGT表*/
 			vct_section_info_t *vcts;		/**< 搜索到的VCT表*/
+
+			int				dvbt2_data_plp_num;	/**< DVB-T2 DATA PLP count*/
+			struct
+			{
+				uint8_t					id;			/**< the data plp id*/
+				dvbpsi_pat_t				*pats;		/**< the pats in this data PLP*/
+				dvbpsi_pmt_t				*pmts;		/**< the pmts in this data PLP*/
+				dvbpsi_sdt_t 				*sdts;		/**< the sdt actuals in this data PLP*/
+			}dvbt2_data_plps[256];
 		}digital;
 		
 		struct
