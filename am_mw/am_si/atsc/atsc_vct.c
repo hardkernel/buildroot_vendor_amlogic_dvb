@@ -155,7 +155,12 @@ INT32S atsc_psip_parse_vct(INT8U* data, INT32U length, vct_section_info_t *info)
 				{
 					memset(tmp_chan_info, 0, sizeof(vct_channel_info_t));
 					chan_name_len = sizeof(tmp_chan_info->short_name);
-					atsc_convert_code_from_utf16_to_utf8((char*)ptr, 14, (char*)tmp_chan_info->short_name, &chan_name_len);
+					if(atsc_convert_code_from_utf16_to_utf8((char*)ptr, 14, (char*)tmp_chan_info->short_name, 
+                                          &chan_name_len) < 0 ) {
+                                               memset(tmp_chan_info->short_name,0 ,chan_name_len);//reset shortname due to hit name  paser error
+                                               strcpy(tmp_chan_info->short_name,"No Name");
+                                          }
+
 					//short_channel_name_parse(ptr, tmp_chan_info->short_name);
 					tmp_chan_info->major_channel_number = MAJOR_CHANNEL_NUM(vct_sect_chan->major_channel_number);
 					tmp_chan_info->minor_channel_number = MINOR_CHANNEL_NUM(vct_sect_chan->minor_channel_number);
