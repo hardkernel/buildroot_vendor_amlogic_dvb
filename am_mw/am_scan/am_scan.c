@@ -3830,30 +3830,6 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 		if (ret == AM_SUCCESS)
 		{
 			scanner->recv_status |= AM_SCAN_RECVING_WAIT_FEND;
-
-			/* ATSC fast-scan, donot wait fend event while strenth < (-value)*/
-			if (dtv_start_para.source == FE_ATSC)
-			{
-				int strength = 0;
-				const int min = -84;
-
-				AM_DEBUG(1, "Sleep 100ms to wait for strength...");
-				usleep(100*1000);
-				AM_FEND_GetStrength(scanner->start_para.fend_dev_id, &strength);
-				strength -= 256;
-				
-				if (strength < min)
-				{
-					AM_DEBUG(1, "Strength is %d < %d, skip this frequency.", strength, min);
-					scanner->start_freqs[scanner->curr_freq].flag = 0;
-					ret = AM_FAILURE;
-				}
-				else
-				{
-					AM_DEBUG(1, "Strength is %d >= %d, waiting for fend event...", strength, min);
-				}
-			}
-			
 		}
 		else
 		{
