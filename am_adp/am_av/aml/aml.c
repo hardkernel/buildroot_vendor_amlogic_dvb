@@ -4986,6 +4986,12 @@ get_osd_rect(const char *mode, int *x, int *y, int *w, int *h)
 static AM_ErrorCode_t
 aml_set_vpath(AM_AV_Device_t *dev)
 {
+	static char s_bypass_hd[2];
+	static char s_bypass_hd_prog[2];
+	static char s_bypass_prog[2];
+	static char s_bypass_1080p[2];
+	static char s_bypass_dynamic[2];
+	
 	AM_ErrorCode_t ret;
 	int times = 10;
 
@@ -5054,6 +5060,21 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			AM_FileEcho("/sys/class/graphics/fb1/scale", "0");
 			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "0");
 			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "0");
+
+			s_bypass_hd[1] = '\0';
+			s_bypass_hd_prog[1] = '\0';
+			s_bypass_prog[1] = '\0';
+			s_bypass_1080p[1] = '\0';
+			AM_FileEcho("/sys/module/di/parameters/bypass_hd", s_bypass_hd);
+			AM_FileEcho("/sys/module/di/parameters/bypass_hd_prog", s_bypass_hd_prog);
+			AM_FileEcho("/sys/module/di/parameters/bypass_prog", s_bypass_prog);
+			AM_FileEcho("/sys/module/di/parameters/bypass_1080p", s_bypass_1080p);
+#ifdef ENABLE_CORRECR_AV_SYNC			
+#else
+			s_bypass_dynamic[1] = '\0';
+			AM_FileEcho("/sys/module/di/parameters/bypass_dynamic", s_bypass_dynamic);
+#endif
+			
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","1");
 			//AM_FileEcho("/sys/class/ppmgr/ppscaler_rect", ppr);
 			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", "0");
@@ -5132,7 +5153,32 @@ aml_set_vpath(AM_AV_Device_t *dev)
 
 			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "3");
 			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "62");
-			AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
+
+			AM_FileRead("/sys/module/di/parameters/bypass_hd", s_bypass_hd, sizeof(s_bypass_hd));
+			AM_FileRead("/sys/module/di/parameters/bypass_hd_prog", s_bypass_hd_prog, sizeof(s_bypass_hd_prog));
+			AM_FileRead("/sys/module/di/parameters/bypass_prog", s_bypass_prog, sizeof(s_bypass_prog));
+			AM_FileRead("/sys/module/di/parameters/bypass_1080p", s_bypass_1080p, sizeof(s_bypass_1080p));
+			
+#ifdef ENABLE_CORRECR_AV_SYNC		
+			AM_DEBUG(1, "ENABLE_CORRECR_AV_SYNC");
+
+			AM_FileEcho("/sys/module/di/parameters/bypass_hd","0");
+			AM_FileEcho("/sys/module/di/parameters/bypass_hd_prog","0");
+			AM_FileEcho("/sys/module/di/parameters/bypass_prog","0");
+			AM_FileEcho("/sys/module/di/parameters/bypass_1080p","0");
+#else
+			AM_FileRead("/sys/module/di/parameters/bypass_dynamic", s_bypass_dynamic, sizeof(s_bypass_dynamic));
+
+			AM_DEBUG(1, "Not ENABLE_CORRECR_AV_SYNC");
+
+			AM_FileEcho("/sys/module/di/parameters/bypass_hd","0");
+			AM_FileEcho("/sys/module/di/parameters/bypass_hd_prog","0");
+			AM_FileEcho("/sys/module/di/parameters/bypass_prog","0");
+			AM_FileEcho("/sys/module/di/parameters/bypass_1080p","0");
+			AM_FileEcho("/sys/module/di/parameters/bypass_dynamic","1");
+
+			//AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
+#endif
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","0");
 			//AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");
 			//AM_FileEcho("/sys/class/video/axis", "0 0 0 0");

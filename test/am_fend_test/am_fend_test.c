@@ -486,6 +486,8 @@ int main(int argc, char **argv)
 
 		AM_TRY(AM_FEND_Open(/*FEND_DEV_NO*/fe_id, &para));
 
+		AM_FEND_SetMode(fe_id, para.mode);
+
 		while(1) {
 
 			if(mode == 2) {
