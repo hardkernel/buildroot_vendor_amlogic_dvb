@@ -311,3 +311,201 @@ AM_ErrorCode_t AM_LocalGetResp(int fd, char *buf, int len)
 	return AM_SUCCESS;
 }
 
+/* UTF8 utilities */
+
+/* This parses a UTF8 string one character at a time. It is passed a pointer
+ * to the string and the length of the string. It sets 'value' to the value of
+ * the current character. It returns the number of characters read or a
+ * negative error code:
+ * -1 = string too short
+ * -2 = illegal character
+ * -3 = subsequent characters not of the form 10xxxxxx
+ * -4 = character encoded incorrectly (not minimal length).
+ */
+
+int UTF8_getc(const unsigned char *str, int len, unsigned long *val)
+{
+	const unsigned char *p;
+	unsigned long value;
+	int ret;
+	if(len <= 0) return 0;
+	p = str;
+
+	/* Check syntax and work out the encoded value (if correct) */
+	if((*p & 0x80) == 0) {
+		value = *p++ & 0x7f;
+		ret = 1;
+	} else if((*p & 0xe0) == 0xc0) {
+		if(len < 2) return -1;
+		if((p[1] & 0xc0) != 0x80) return -3;
+		value = (*p++ & 0x1f) << 6;
+		value |= *p++ & 0x3f;
+		if(value < 0x80) return -4;
+		ret = 2;
+	} else if((*p & 0xf0) == 0xe0) {
+		if(len < 3) return -1;
+		if( ((p[1] & 0xc0) != 0x80)
+		   || ((p[2] & 0xc0) != 0x80) ) return -3;
+		value = (*p++ & 0xf) << 12;
+		value |= (*p++ & 0x3f) << 6;
+		value |= *p++ & 0x3f;
+		if(value < 0x800) return -4;
+		ret = 3;
+	} else if((*p & 0xf8) == 0xf0) {
+		if(len < 4) return -1;
+		if( ((p[1] & 0xc0) != 0x80)
+		   || ((p[2] & 0xc0) != 0x80) 
+		   || ((p[3] & 0xc0) != 0x80) ) return -3;
+		value = ((unsigned long)(*p++ & 0x7)) << 18;
+		value |= (*p++ & 0x3f) << 12;
+		value |= (*p++ & 0x3f) << 6;
+		value |= *p++ & 0x3f;
+		if(value < 0x10000) return -4;
+		ret = 4;
+	} else if((*p & 0xfc) == 0xf8) {
+		if(len < 5) return -1;
+		if( ((p[1] & 0xc0) != 0x80)
+		   || ((p[2] & 0xc0) != 0x80) 
+		   || ((p[3] & 0xc0) != 0x80) 
+		   || ((p[4] & 0xc0) != 0x80) ) return -3;
+		value = ((unsigned long)(*p++ & 0x3)) << 24;
+		value |= ((unsigned long)(*p++ & 0x3f)) << 18;
+		value |= ((unsigned long)(*p++ & 0x3f)) << 12;
+		value |= (*p++ & 0x3f) << 6;
+		value |= *p++ & 0x3f;
+		if(value < 0x200000) return -4;
+		ret = 5;
+	} else if((*p & 0xfe) == 0xfc) {
+		if(len < 6) return -1;
+		if( ((p[1] & 0xc0) != 0x80)
+		   || ((p[2] & 0xc0) != 0x80) 
+		   || ((p[3] & 0xc0) != 0x80) 
+		   || ((p[4] & 0xc0) != 0x80) 
+		   || ((p[5] & 0xc0) != 0x80) ) return -3;
+		value = ((unsigned long)(*p++ & 0x1)) << 30;
+		value |= ((unsigned long)(*p++ & 0x3f)) << 24;
+		value |= ((unsigned long)(*p++ & 0x3f)) << 18;
+		value |= ((unsigned long)(*p++ & 0x3f)) << 12;
+		value |= (*p++ & 0x3f) << 6;
+		value |= *p++ & 0x3f;
+		if(value < 0x4000000) return -4;
+		ret = 6;
+	} else return -2;
+	*val = value;
+	return ret;
+}
+
+static int in_utf8(unsigned long value, void *arg)
+{
+	int *nchar;
+	nchar = arg;
+	(*nchar) += value;
+	return 1;
+}
+
+/* This function traverses a string and passes the value of each character
+ * to an optional function along with a void * argument.
+ */
+
+static int traverse_string(const unsigned char *p, int len,
+		 int (*rfunc)(unsigned long value, void *in), void *arg)
+{
+	unsigned long value;
+	int ret;
+	while(len) {
+
+		ret = UTF8_getc(p, len, &value);
+		if(ret < 0) return -1;
+		len -= ret;
+		p += ret;
+		
+		if(rfunc) {
+			ret = rfunc(ret, arg);
+			if(ret <= 0) return ret;
+		}
+	}
+	return 1;
+}
+
+
+/**\brief 跳过无效UTF8字符
+ * \param[in] src 源字符缓冲区
+ * \param src_len 源字符缓冲区大小
+ * \param[out] dest 目标字符缓冲区
+ * \param[in] dest_len 目标字符缓冲区大小
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码
+ */
+AM_ErrorCode_t AM_Check_UTF8(const char *src, int src_len, char *dest, int *dest_len)
+{
+	assert(src);
+	assert(dest);
+	assert(dest_len);
+
+	int ret;
+	int nchar;
+
+	nchar = 0;
+	/* This counts the characters and does utf8 syntax checking */
+	ret = traverse_string(src, src_len, in_utf8, &nchar);
+
+	if(nchar >  dest_len)
+		nchar = dest_len;
+
+	memcpy(dest, src, nchar);
+	
+	*dest_len = nchar;
+
+#if 0
+	unsigned long value;
+	int ret = 0;
+	int dest_total_len = 0;
+	while(src_len) {
+		ret = UTF8_getc(src, src_len, &value);
+
+		if(ret < 0) {
+			//AM_DEBUG(1, "AM_Check_UTF8 %d\n", ret);
+		}
+		
+		if(ret == -1) {
+			break;
+		}
+		else if(ret == -2) {
+			break;
+		}
+		else if(ret == -3) {
+			break;
+		}
+		else if(ret == -4) {
+			break;
+		}
+		else if(ret < 0) {
+			break;
+		}
+
+		if(ret > dest_len) {
+			break;
+		}
+
+		memcpy(dest, src, ret);
+		
+		src_len -= ret;
+		src += ret;
+
+		dest_len -= ret;
+		dest += ret;
+
+		dest_total_len += ret;
+	}
+
+	*dest_len = dest_total_len;
+
+	//AM_DEBUG(1, "AM_Check_UTF8 %s\n", dest);
+#endif
+	
+	return AM_SUCCESS;
+	
+}
+
+

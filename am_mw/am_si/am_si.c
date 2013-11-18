@@ -11,7 +11,7 @@
  * \date 2010-10-15: create the document
  ***************************************************************************/
 
-#define AM_DEBUG_LEVEL 1
+#define AM_DEBUG_LEVEL 5
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1290,6 +1290,11 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 	if (! strcmp(cod, "ISO6937"))
 	{
 		return si_convert_iso6937_to_utf8(in_code,in_len,out_code,&out_len);
+	}	
+	else if(! strcmp(cod, "utf-8"))
+	{
+		return AM_Check_UTF8(in_code,in_len,out_code,&out_len);
+		
 	}
 	else
 	{

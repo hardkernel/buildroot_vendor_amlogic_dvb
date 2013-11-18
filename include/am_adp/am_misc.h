@@ -88,6 +88,17 @@ extern AM_ErrorCode_t AM_LocalSendCmd(int fd, const char *cmd);
  */
 extern AM_ErrorCode_t AM_LocalGetResp(int fd, char *buf, int len);
 
+/**\brief 跳过无效UTF8字符
+ * \param[in] src 源字符缓冲区
+ * \param src_len 源字符缓冲区大小
+ * \param[out] dest 目标字符缓冲区
+ * \param[in] dest_len 目标字符缓冲区大小
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码
+ */
+extern AM_ErrorCode_t AM_Check_UTF8(const char *src, int src_len, char *dest, int *dest_len);
+
 #ifdef __cplusplus
 }
 #endif
