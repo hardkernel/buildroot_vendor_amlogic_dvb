@@ -778,7 +778,7 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 				dvbpsi_short_event_dr_t *pse = (dvbpsi_short_event_dr_t*)descr->p_decoded;
 
 				memcpy(temp_lang, pse->i_iso_639_code, 3);
-				this_lang = strstr(mon->text_langs, temp_lang);
+				this_lang = strcasestr(mon->text_langs, temp_lang);
 				if (this_lang != NULL && (saved_lang == NULL || saved_lang > this_lang))
 				{
 					saved_lang = this_lang;
@@ -789,7 +789,7 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 				dvbpsi_extended_event_dr_t *pee = (dvbpsi_extended_event_dr_t*)descr->p_decoded;
 
 				memcpy(temp_lang, pee->i_iso_639_code, 3);
-				this_lang = strstr(mon->text_langs, temp_lang);
+				this_lang = strcasestr(mon->text_langs, temp_lang);
 				if (this_lang != NULL && (saved_lang == NULL || saved_lang > this_lang))
 				{
 					saved_lang = this_lang;

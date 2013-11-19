@@ -94,6 +94,8 @@ dvbpsi_teletext_dr_t * dvbpsi_DecodeTeletextDr(
   {
     memcpy(p_decoded->p_pages[i].i_iso6392_language_code,
                      p_descriptor->p_data + 5 * i, 3);
+    /* Convert to lower case if possible */
+    dvbpsi_ToLower(p_decoded->p_pages[i].i_iso6392_language_code, 3);
 
     p_decoded->p_pages[i].i_teletext_type =
                 ((uint8_t)(p_descriptor->p_data[5 * i + 3]) >> 3);

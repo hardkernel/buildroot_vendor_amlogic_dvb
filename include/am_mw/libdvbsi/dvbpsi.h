@@ -40,6 +40,7 @@
 extern "C" {
 #endif
 
+#include <ctype.h>
 
 /*****************************************************************************
  * dvbpsi_handle
@@ -128,6 +129,24 @@ typedef struct dvbpsi_decoder_s
 
 } dvbpsi_decoder_t;
 
+/*****************************************************************************
+ * dvbpsi_ToLower
+ *****************************************************************************/
+/*!
+ * \brief Convert characters to lower case.
+ */
+static inline void dvbpsi_ToLower(uint8_t *p_str, int len)
+{
+  int i;
+  
+  if (p_str == NULL || len <= 0)
+    return;
+
+  for (i=0; i<len; i++)
+  {
+    p_str[i] = tolower(p_str[i]);
+  }
+}
 
 #ifdef __cplusplus
 };

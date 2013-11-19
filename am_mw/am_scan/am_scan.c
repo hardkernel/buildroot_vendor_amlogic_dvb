@@ -1296,7 +1296,7 @@ static void am_scan_extract_srv_info_from_sdt(AM_SCAN_Result_t *result, dvbpsi_s
 	dvbpsi_sdt_t *sdt;
 	dvbpsi_descriptor_t *descr;
 	char *saved_lang = result->start_para->text_langs + strlen(result->start_para->text_langs) + 1;
-	char *default_lang = strstr(result->start_para->text_langs, result->start_para->default_text_lang);
+	char *default_lang = strcasestr(result->start_para->text_langs, result->start_para->default_text_lang);
 
 	if (default_lang == NULL)
 		default_lang = saved_lang;
@@ -1349,7 +1349,7 @@ static void am_scan_extract_srv_info_from_sdt(AM_SCAN_Result_t *result, dvbpsi_s
 				for (i=0; i<pmsnd->i_name_count; i++)
 				{
 					memcpy(temp_lang, pmsnd->p_service_name[i].i_iso_639_code, 3);
-					this_lang = strstr(result->start_para->text_langs, temp_lang);
+					this_lang = strcasestr(result->start_para->text_langs, temp_lang);
 					if (this_lang != NULL && saved_lang > this_lang)
 					{
 						AM_SI_ConvertDVBTextCode((char*)pmsnd->p_service_name[i].i_service_name, 

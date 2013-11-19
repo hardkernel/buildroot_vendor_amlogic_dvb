@@ -99,7 +99,9 @@ dvbpsi_subtitling_dr_t * dvbpsi_DecodeSubtitlingDr(
   {
     memcpy(p_decoded->p_subtitle[i].i_iso6392_language_code,
                      p_descriptor->p_data + 8 * i, 3);
-
+    /* Convert to lower case if possible */
+    dvbpsi_ToLower(p_decoded->p_subtitle[i].i_iso6392_language_code, 3);
+	
     p_decoded->p_subtitle[i].i_subtitling_type = 
                                  p_descriptor->p_data[8 * i + 3];
     

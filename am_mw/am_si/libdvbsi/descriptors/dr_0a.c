@@ -85,6 +85,10 @@ dvbpsi_iso639_dr_t * dvbpsi_DecodeISO639Dr(dvbpsi_descriptor_t * p_descriptor)
     p_decoded->code[i].iso_639_code[0] = p_descriptor->p_data[i*4];
     p_decoded->code[i].iso_639_code[1] = p_descriptor->p_data[i*4+1];
     p_decoded->code[i].iso_639_code[2] = p_descriptor->p_data[i*4+2];
+    
+    /* Convert to lower case if possible */
+    dvbpsi_ToLower(p_decoded->code[i].iso_639_code, 3);
+    
     p_decoded->code[i].i_audio_type = p_descriptor->p_data[i*4+3];
     i++;
   }
