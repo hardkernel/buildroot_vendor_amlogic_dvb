@@ -408,17 +408,31 @@ static int in_utf8(unsigned long value, void *arg)
  */
 
 static int traverse_string(const unsigned char *p, int len,
-		 int (*rfunc)(unsigned long value, void *in), void *arg)
+		 int (*rfunc)(unsigned long value, void *in), void *arg,char *dest, int *dest_len)
 {
 	unsigned long value;
 	int ret;
 	while(len) {
 
 		ret = UTF8_getc(p, len, &value);
-		if(ret < 0) return -1;
-		len -= ret;
-		p += ret;
-		
+		if(ret < 0) 
+		{
+			len -- ;
+			p++;
+			continue;
+		}//return -1;
+		else
+		{        
+			int *pos = arg;
+
+                    if((*pos + ret) > *dest_len)
+                        break;            
+			
+			char *tp = dest+(*pos);
+			memcpy(tp,p,ret);
+			len -= ret;
+			p += ret;			
+		}
 		if(rfunc) {
 			ret = rfunc(ret, arg);
 			if(ret <= 0) return ret;
@@ -445,67 +459,12 @@ AM_ErrorCode_t AM_Check_UTF8(const char *src, int src_len, char *dest, int *dest
 
 	int ret;
 	int nchar;
-
 	nchar = 0;
 	/* This counts the characters and does utf8 syntax checking */
-	ret = traverse_string(src, src_len, in_utf8, &nchar);
+	ret = traverse_string(src, src_len, in_utf8, &nchar,dest, dest_len);
 
-	if(nchar >  dest_len)
-		nchar = dest_len;
-
-	memcpy(dest, src, nchar);
-	
-	*dest_len = nchar;
-
-#if 0
-	unsigned long value;
-	int ret = 0;
-	int dest_total_len = 0;
-	while(src_len) {
-		ret = UTF8_getc(src, src_len, &value);
-
-		if(ret < 0) {
-			//AM_DEBUG(1, "AM_Check_UTF8 %d\n", ret);
-		}
-		
-		if(ret == -1) {
-			break;
-		}
-		else if(ret == -2) {
-			break;
-		}
-		else if(ret == -3) {
-			break;
-		}
-		else if(ret == -4) {
-			break;
-		}
-		else if(ret < 0) {
-			break;
-		}
-
-		if(ret > dest_len) {
-			break;
-		}
-
-		memcpy(dest, src, ret);
-		
-		src_len -= ret;
-		src += ret;
-
-		dest_len -= ret;
-		dest += ret;
-
-		dest_total_len += ret;
-	}
-
-	*dest_len = dest_total_len;
-
-	//AM_DEBUG(1, "AM_Check_UTF8 %s\n", dest);
-#endif
-	
-	return AM_SUCCESS;
-	
+	*dest_len = nchar;	
+	return AM_SUCCESS;	
 }
 
 

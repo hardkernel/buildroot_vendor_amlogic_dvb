@@ -51,7 +51,7 @@ static AM_SMC_Device_t smc_devices[] =
 
 /**\brief 智能卡设备数*/
 #define SMC_DEV_COUNT    AM_ARRAY_SIZE(smc_devices)
-#define SMC_BUF_SIZE      (255)
+#define SMC_BUF_SIZE      (1024)
 
 struct ringbuffer {
 	uint8_t         *data;
