@@ -23,6 +23,8 @@ extern "C"
  ***************************************************************************/
 /*卫星盲扫最大缓冲TP个数*/
 #define AM_SCAN_MAX_BS_TP_CNT 128
+/*Max service name languages*/
+#define AM_SCAN_MAX_SRV_NAME_LANG 4
 
 /****************************************************************************
  * Type definitions
@@ -235,7 +237,7 @@ typedef struct
 	int vid, aid1, aid2, srv_id, pmt_pid;
 	int vfmt, chan_num, afmt_tmp, vfmt_tmp, scrambled_flag, major_chan_num, minor_chan_num, source_id;
 	int src, srv_dbid, satpara_dbid;
-	char name[AM_DB_MAX_SRV_NAME_LEN + 1];
+	char name[(AM_DB_MAX_SRV_NAME_LEN+4)*AM_SCAN_MAX_SRV_NAME_LANG + 1];
 	char str_apids[256];
 	char str_afmts[256];
 	char str_alangs[256];

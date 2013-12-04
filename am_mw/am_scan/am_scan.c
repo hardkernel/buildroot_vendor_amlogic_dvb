@@ -1323,11 +1323,20 @@ static void am_scan_extract_srv_info_from_sdt(AM_SCAN_Result_t *result, dvbpsi_s
 	dvbpsi_sdt_service_t *srv;
 	dvbpsi_sdt_t *sdt;
 	dvbpsi_descriptor_t *descr;
-	char *saved_lang = result->start_para->text_langs + strlen(result->start_para->text_langs) + 1;
-	char *default_lang = strcasestr(result->start_para->text_langs, result->start_para->default_text_lang);
+	const uint8_t split = 0x80;
+	const int name_size = (int)sizeof(srv_info->name);
+	int curr_name_len = 0, tmp_len;
+	char name[AM_DB_MAX_SRV_NAME_LEN+1];
 
-	if (default_lang == NULL)
-		default_lang = saved_lang;
+#define COPY_NAME(_s, _slen)\
+	AM_MACRO_BEGIN\
+		int copy_len = ((curr_name_len+_slen)>=name_size) ? (name_size-curr_name_len) : _slen;\
+		if (copy_len > 0){\
+			memcpy(srv_info->name+curr_name_len, _s, copy_len);\
+			curr_name_len += copy_len;\
+		}\
+	AM_MACRO_END
+	
 	
 	AM_SI_LIST_BEGIN(sdts, sdt)
 	AM_SI_LIST_BEGIN(sdt->p_first_service, srv)
@@ -1339,23 +1348,25 @@ static void am_scan_extract_srv_info_from_sdt(AM_SCAN_Result_t *result, dvbpsi_s
 			srv_info->eit_pf = (uint8_t)srv->b_eit_present;
 			srv_info->rs = srv->i_running_status;
 			srv_info->free_ca = (uint8_t)srv->b_free_ca;
-		
+
+			/* look up service_descr first, to ensure service name stored at first */
 			AM_SI_LIST_BEGIN(srv->p_first_descriptor, descr)
 			if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE)
 			{
 				dvbpsi_service_dr_t *psd = (dvbpsi_service_dr_t*)descr->p_decoded;
 		
-				/*取节目名称*/
-				if (psd->i_service_name_length > 0 && saved_lang >= default_lang)
+				if (psd->i_service_name_length > 0)
 				{
+					name[0] = 0;
 					AM_SI_ConvertDVBTextCode((char*)psd->i_service_name, psd->i_service_name_length,\
-								srv_info->name, AM_DB_MAX_SRV_NAME_LEN);
-					srv_info->name[AM_DB_MAX_SRV_NAME_LEN] = 0;
+								name, AM_DB_MAX_SRV_NAME_LEN);
+					name[AM_DB_MAX_SRV_NAME_LEN] = 0;
 
-					if (strlen(srv_info->name) > 0)
-					{
-						saved_lang = default_lang;
-					}
+					/*3bytes language code, using xxx to simulate*/
+					COPY_NAME("xxx", 3);
+					/*following by name text*/
+					tmp_len = strlen(name);
+					COPY_NAME(name, tmp_len);
 				}
 				/*业务类型*/
 				srv_info->srv_type = psd->i_service_type;
@@ -1364,35 +1375,48 @@ static void am_scan_extract_srv_info_from_sdt(AM_SCAN_Result_t *result, dvbpsi_s
 				if((srv_info->srv_type == 0x16) || (srv_info->srv_type == 0x19) || (srv_info->srv_type == 0xc0))
 				{
 					srv_info->srv_type = 0x1;
-				}			
+				}
+				
+				break;
 			}
-			else if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_MULTI_SERVICE_NAME)
+			AM_SI_LIST_END()
+
+			/* store multilingual service name */
+			AM_SI_LIST_BEGIN(srv->p_first_descriptor, descr)
+			if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_MULTI_SERVICE_NAME)
 			{
 				int i;
-				char temp_lang[4];
-				char *this_lang;
 				dvbpsi_multi_service_name_dr_t *pmsnd = (dvbpsi_multi_service_name_dr_t*)descr->p_decoded;
 
-				temp_lang[3] = 0;
 				for (i=0; i<pmsnd->i_name_count; i++)
 				{
-					memcpy(temp_lang, pmsnd->p_service_name[i].i_iso_639_code, 3);
-					this_lang = strcasestr(result->start_para->text_langs, temp_lang);
-					if (this_lang != NULL && saved_lang > this_lang)
-					{
-						AM_SI_ConvertDVBTextCode((char*)pmsnd->p_service_name[i].i_service_name, 
-							pmsnd->p_service_name[i].i_service_name_length,
-							srv_info->name, AM_DB_MAX_SRV_NAME_LEN);
-						srv_info->name[AM_DB_MAX_SRV_NAME_LEN] = 0;
+					name[0] = 0;
+					AM_SI_ConvertDVBTextCode((char*)pmsnd->p_service_name[i].i_service_name, 
+						pmsnd->p_service_name[i].i_service_name_length,
+						name, AM_DB_MAX_SRV_NAME_LEN);
+					name[AM_DB_MAX_SRV_NAME_LEN] = 0;
 
-						if (strlen(srv_info->name) > 0)
-						{
-							saved_lang = this_lang;
-						}
+					if (curr_name_len > 0)
+					{
+						/*extra split mark*/
+						COPY_NAME(&split, 1);
 					}
+					/*3bytes language code*/
+					COPY_NAME(pmsnd->p_service_name[i].i_iso_639_code, 3);
+					/*following by name text*/
+					tmp_len = strlen(name);
+					COPY_NAME(name, tmp_len);
 				}
 			}
 			AM_SI_LIST_END()
+
+			/* set the ending null byte */
+			if (curr_name_len >= name_size)
+				srv_info->name[name_size-1] = 0;
+			else
+				srv_info->name[curr_name_len] = 0;
+
+			break;
 		}
 	AM_SI_LIST_END()
 	AM_SI_LIST_END()

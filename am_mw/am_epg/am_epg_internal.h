@@ -26,6 +26,8 @@ extern "C"
 #define ITEM_CHAR_LEN 1024
 #define EVT_TEXT_LEN 1024
 #define EXT_TEXT_LEN 4096
+#define MAX_LANGUAGE_CNT 4
+#define MAX_ITEM_CNT 16
 
 /****************************************************************************
  * Type definitions
@@ -161,12 +163,22 @@ typedef struct
 typedef struct ExtendedEventItem_s
 {
 	int char_len;
-	char item_descr[ITEM_DESCR_LEN+1];
-	char item_char[ITEM_CHAR_LEN+1]; /**< 1KB*/
-
-	struct ExtendedEventItem_s *next;
+	int descr_len;
+	uint8_t item_descr[256]; 
+	uint8_t item_char[1024]; /* buffered composed raw data */
 }ExtendedEventItem;
 
+typedef struct
+{
+	char lang[3];
+	dvbpsi_extended_event_dr_t *descrs[16];
+}ExtendedEventLanguage;
+
+typedef struct
+{
+	char lang[3];
+	dvbpsi_short_event_dr_t *descr;
+}ShortEventLanguage;
 
 /****************************************************************************
  * Function prototypes  

@@ -677,32 +677,287 @@ static void am_epg_proc_stt_section(AM_EPG_Monitor_t *mon, void *stt_section)
 	pthread_mutex_unlock(&time_lock);
 }
 
+static void am_epg_gen_short_event_text(ShortEventLanguage *all_langs, int lang_cnt, 
+	char *evt_name, int name_len, char *short_descr, int descr_len)
+{
+	const uint8_t split = 0x80;
+	int i, cur_name_len, cur_descr_len, tmp_len, n;
+	char name[EVT_NAME_LEN+1];
+	char desc[EVT_TEXT_LEN+1];
+	dvbpsi_short_event_dr_t *pse;
+
+#define COPY_BYTES(_d, _dlen, _s, _slen, _curdlen)\
+	AM_MACRO_BEGIN\
+		int copy_len = ((_curdlen+_slen)>=_dlen) ? (_dlen-_curdlen) : _slen;\
+		if (copy_len > 0){\
+			memcpy(_d+_curdlen, _s, copy_len);\
+			_curdlen += copy_len;\
+		}\
+	AM_MACRO_END
+	
+	cur_name_len = 0;
+	cur_descr_len = 0;
+	for (i=0; i<lang_cnt; i++)
+	{
+		pse = all_langs[i].descr;
+
+		name[0] = 0;
+		desc[0] = 0;
+		
+		AM_SI_ConvertDVBTextCode((char*)pse->i_event_name, pse->i_event_name_length,\
+								name, EVT_NAME_LEN);
+		name[EVT_NAME_LEN] = 0;
+		
+		AM_SI_ConvertDVBTextCode((char*)pse->i_text, pse->i_text_length,\
+						desc, EVT_TEXT_LEN);
+		desc[EVT_TEXT_LEN] = 0;
+
+		if (i != 0)
+		{
+			/* extra split mark */
+			COPY_BYTES(evt_name, name_len, &split, 1, cur_name_len);
+		}
+		/* 3 bytes language code at first */
+		COPY_BYTES(evt_name, name_len, all_langs[i].lang, 3, cur_name_len);
+		/* following by its name text */
+		tmp_len = strlen(name);
+		COPY_BYTES(evt_name, name_len, name, tmp_len, cur_name_len);
+
+		if (i != 0)
+		{
+			/* extra split mark */
+			COPY_BYTES(short_descr, descr_len, &split, 1, cur_descr_len);
+		}
+		/* 3 bytes language code at first */
+		COPY_BYTES(short_descr, descr_len, all_langs[i].lang, 3, cur_descr_len);
+		/* following by its descr text */
+		tmp_len = strlen(desc);
+		COPY_BYTES(short_descr, descr_len, desc, tmp_len, cur_descr_len);
+
+	}
+
+	/* set the ending null byte */
+	if (cur_name_len >= name_len)
+		evt_name[name_len-1] = 0;
+	else
+		evt_name[cur_name_len] = 0;
+
+	if (cur_descr_len >= descr_len)
+		short_descr[descr_len-1] = 0;
+	else
+		short_descr[cur_descr_len] = 0;
+}
+
+static void am_epg_gen_extended_event_text(ExtendedEventLanguage *all_langs, int lang_cnt, 
+	char *item_text, int item_len, char *ext_text, int ext_len)
+{
+	const uint8_t split = 0x80;
+	int i, ii, cur_text_len, cur_item_len, tmp_len;
+	char item_descr[ITEM_DESCR_LEN+1];
+	char item_char[ITEM_CHAR_LEN + 1];
+	char desc[EXT_TEXT_LEN+1];
+	int item_cnt, text_len;
+	uint8_t text_buffer[64*1024];
+	ExtendedEventItem items[MAX_ITEM_CNT];
+	dvbpsi_extended_event_dr_t **eedecrs;
+
+#define COPY_BYTES(_d, _dlen, _s, _slen, _curdlen)\
+	AM_MACRO_BEGIN\
+		int copy_len = ((_curdlen+_slen)>=_dlen) ? (_dlen-_curdlen) : _slen;\
+		if (copy_len > 0){\
+			memcpy(_d+_curdlen, _s, copy_len);\
+			_curdlen += copy_len;\
+		}\
+	AM_MACRO_END
+	
+	cur_text_len = 0;
+	cur_item_len = 0;
+	for (i=0; i<lang_cnt; i++)
+	{
+		/*Start a new language*/
+		eedecrs = all_langs[i].descrs;
+		memset(items, 0, sizeof(items));
+		item_cnt = 0;
+		text_len = 0;
+
+		for (ii=0; ii<16; ii++)
+		{
+			if (eedecrs[ii] != NULL)
+			{
+				dvbpsi_extended_event_dr_t *pee = eedecrs[ii];
+				int j, k;
+				
+				AM_DEBUG(2, "extended event descr %d, entry count %d", ii, pee->i_entry_count);
+				/*Merge items*/
+				for (j=0; j<pee->i_entry_count; j++)
+				{
+					for (k=0; k<item_cnt; k++)
+					{
+						if (!memcmp(items[k].item_descr, pee->i_item_description[j], pee->i_item_description_length[j]))
+							break;
+					}
+
+					if (k >= item_cnt)
+					{
+						/*Add a new item*/
+						if (item_cnt >= MAX_ITEM_CNT)
+						{
+							AM_DEBUG(2, "Too many items");
+							continue;
+						}
+
+						items[item_cnt].char_len = pee->i_item_length[j];
+						items[item_cnt].descr_len = pee->i_item_description_length[j];
+						if (pee->i_item[j] != NULL)
+							memcpy(items[item_cnt].item_char, pee->i_item[j], pee->i_item_length[j]);
+						if (pee->i_item_description[j] != NULL)
+						{
+							AM_DEBUG(1, "item_cnt %d, %p, %d", item_cnt, pee->i_item_description[j], pee->i_item_description_length[j]);
+							memcpy(items[item_cnt].item_descr, pee->i_item_description[j], pee->i_item_description_length[j]);
+						}
+						item_cnt++;
+					}
+					else
+					{
+						int copy_len;
+
+						if ((items[k].char_len + pee->i_item_length[j]) >= (int)sizeof(items[k].item_char))
+							copy_len = sizeof(items[k].item_char) - items[k].char_len;
+						else
+							copy_len = pee->i_item_length[j];
+						
+						/*Merge the item_char*/
+						if (pee->i_item[j] != NULL && copy_len > 0)
+						{
+							uint8_t *pdata = pee->i_item[j];
+
+							if (pdata[0] < 0x20)
+							{
+								/*skip the first byte*/
+								copy_len--;
+								pdata++;
+							}
+							memcpy(items[k].item_char+items[k].char_len, pdata, copy_len);
+							items[k].char_len += copy_len;
+						}
+					}
+					
+				}
+
+				/*Merge the text*/
+				if (pee->i_text != NULL && pee->i_text_length > 0)
+				{
+					int copy_len;
+					uint8_t *pdata = pee->i_text;
+
+					if ((text_len + pee->i_text_length) >= (int)sizeof(text_buffer))
+						copy_len = sizeof(text_buffer)-text_len;
+					else
+						copy_len = pee->i_text_length;
+					
+					if (pdata[0] < 0x20)
+					{
+						/*skip the first byte*/
+						copy_len--;
+						pdata++;
+					}
+					
+					memcpy(text_buffer+text_len, pdata, copy_len);
+				}
+			}
+		}
+				
+				
+		/*Merge all the items in following format:
+		 * description1:char1
+		 * description2:char2
+		  ...
+		 * descriptionN:charN
+		 */
+
+		if (i != 0)
+		{
+			/* extra split mark */
+			COPY_BYTES(item_text, item_len, &split, 1, cur_item_len);
+		}
+		
+		/* 3 bytes language code at first */
+		COPY_BYTES(item_text, item_len, all_langs[i].lang, 3, cur_item_len);
+
+		/* description:char */
+		for (ii=0; ii<item_cnt; ii++)
+		{
+			item_descr[0] = 0;
+			item_char[0]  = 0;
+			
+			AM_SI_ConvertDVBTextCode((char*)items[ii].item_descr, items[ii].descr_len, item_descr, ITEM_DESCR_LEN);
+			item_descr[ITEM_DESCR_LEN] = 0;
+
+			tmp_len = strlen(item_descr);
+			COPY_BYTES(item_text, item_len, item_descr, tmp_len, cur_item_len);
+
+			COPY_BYTES(item_text, item_len, ":", 1, cur_item_len);
+
+			AM_SI_ConvertDVBTextCode((char*)items[ii].item_char, items[ii].char_len, item_char, ITEM_CHAR_LEN);
+			item_char[ITEM_CHAR_LEN] = 0;
+			
+			tmp_len = strlen(item_char);
+			COPY_BYTES(item_text, item_len, item_char, tmp_len, cur_item_len);
+
+			COPY_BYTES(item_text, item_len, "\n", 1, cur_item_len);
+		}
+
+		/* text */
+		desc[0] = 0;
+
+		if (i != 0)
+		{
+			/* extra split mark */
+			COPY_BYTES(ext_text, ext_len, &split, 1, cur_text_len);
+		}
+		
+		/* 3 bytes language code at first */
+		COPY_BYTES(ext_text, ext_len, all_langs[i].lang, 3, cur_text_len);
+		AM_SI_ConvertDVBTextCode((char*)text_buffer, text_len, desc, EXT_TEXT_LEN);
+		desc[EXT_TEXT_LEN] = 0;
+		tmp_len = strlen(item_char);
+		COPY_BYTES(ext_text, ext_len, desc, tmp_len, cur_text_len);
+	}
+
+	/* set the ending null byte */
+	if (cur_text_len >= ext_len)
+		ext_text[ext_len-1] = 0;
+	else
+		ext_text[cur_text_len] = 0;
+	if (cur_item_len >= item_len)
+		item_text[item_len-1] = 0;
+	else
+		item_text[cur_item_len] = 0;
+}
+
 static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 {
+#define COMPOSED_NAME_LEN ((EVT_NAME_LEN/*single len*/+1/*extra 0x80 for language splitting*/+3/*language code*/)*MAX_LANGUAGE_CNT)
+#define COMPOSED_DESCR_LEN ((EVT_TEXT_LEN+4)*MAX_LANGUAGE_CNT)
+#define COMPOSED_EXT_ITEM_LEN ((ITEM_DESCR_LEN+ITEM_CHAR_LEN+2/*:\n*/+4)*MAX_LANGUAGE_CNT)
+#define COMPOSED_EXT_DESCR_LEN ((EXT_TEXT_LEN+4)*MAX_LANGUAGE_CNT)
 	dvbpsi_eit_t *eit = (dvbpsi_eit_t*)eit_section;
 	dvbpsi_eit_event_t *event;
 	dvbpsi_descriptor_t *descr;
-	char name[EVT_NAME_LEN+1];
-	char desc[EVT_TEXT_LEN+1];
-	char item_descr[ITEM_DESCR_LEN+1];
-	char ext_descr[EXT_TEXT_LEN + 1];
+	char name[COMPOSED_NAME_LEN+1];
+	char desc[COMPOSED_DESCR_LEN+1];
+	char ext_item[COMPOSED_EXT_ITEM_LEN + 1];
+	char ext_descr[COMPOSED_EXT_DESCR_LEN + 1];
 	char sql[256];
-	char *db_item;
-	char temp_lang[4];
-	char *this_lang, *saved_lang, *random_lang;
 	int row = 1;
 	int srv_dbid, net_dbid, ts_dbid, evt_dbid;
 	int start, end, nibble, now;
-	int item_len;
-	int ext_descr_len;
 	int parental_rating = 0;
 	uint16_t mjd;
 	uint8_t hour, min, sec;
-	ExtendedEventItem *item, *next;
-	ExtendedEventItem *items;
-	ExtendedEventItem *items_tail;
-	dvbpsi_extended_event_dr_t *eedecrs[16];
-	int ii;
+	ExtendedEventLanguage ext_langs[MAX_LANGUAGE_CNT];
+	ShortEventLanguage short_langs[MAX_LANGUAGE_CNT];
+	int short_lang_cnt, ext_lang_cnt;
 	sqlite3 *hdb;
 	sqlite3_stmt *stmt;
 	const char *insert_evt_sql = "insert into evt_table(src,db_net_id, db_ts_id, \
@@ -758,84 +1013,59 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 		if (AM_DB_Select(hdb, sql, &row, "%d", &evt_dbid) == AM_SUCCESS && row > 0)
 			continue;
 
-		items = NULL;
-		items_tail = NULL;
-		db_item = NULL;
 		name[0] = 0;
 		desc[0] = 0;
-		item_descr[0] = 0;
 		ext_descr[0] = 0;
-		ext_descr_len = 0;
 		nibble = 0;
-
-		/* try to find the language specified by user */
-		temp_lang[3] = 0;
-		saved_lang = NULL;
+		short_lang_cnt = 0;
+		ext_lang_cnt = 0;
+		memset(short_langs, 0, sizeof(short_langs));
+		memset(ext_langs, 0, sizeof(ext_langs));
 		
 		AM_SI_LIST_BEGIN(event->p_first_descriptor, descr)
 			if (descr->i_tag == AM_SI_DESCR_SHORT_EVENT && descr->p_decoded)
 			{
+				int ishort;
 				dvbpsi_short_event_dr_t *pse = (dvbpsi_short_event_dr_t*)descr->p_decoded;
 
-				memcpy(temp_lang, pse->i_iso_639_code, 3);
-				this_lang = strcasestr(mon->text_langs, temp_lang);
-				if (this_lang != NULL && (saved_lang == NULL || saved_lang > this_lang))
+				/* multil-language support */
+				if (short_lang_cnt >= MAX_LANGUAGE_CNT)
+					continue;
+				for (ishort=0; ishort<short_lang_cnt; ishort++)
 				{
-					saved_lang = this_lang;
+					if (!memcmp(short_langs[ishort].lang, pse->i_iso_639_code, 3))
+						break;
 				}
+				/* already found, can this case be true? */
+				if (ishort < short_lang_cnt)
+					continue;
+				/* add a new language */
+				memcpy(short_langs[short_lang_cnt].lang, pse->i_iso_639_code, 3);
+				short_langs[short_lang_cnt++].descr = pse;
 			}
 			else if (descr->i_tag == AM_SI_DESCR_EXTENDED_EVENT && descr->p_decoded)
 			{
+				int iext;
 				dvbpsi_extended_event_dr_t *pee = (dvbpsi_extended_event_dr_t*)descr->p_decoded;
 
-				memcpy(temp_lang, pee->i_iso_639_code, 3);
-				this_lang = strcasestr(mon->text_langs, temp_lang);
-				if (this_lang != NULL && (saved_lang == NULL || saved_lang > this_lang))
-				{
-					saved_lang = this_lang;
-				}
-			}
-
-			if (saved_lang == mon->text_langs)
-			{
-				/* found the first one, no need to continue */
-				break;
-			}
-		AM_SI_LIST_END()
-		
-		memset(eedecrs, 0, sizeof(eedecrs));
-		AM_SI_LIST_BEGIN(event->p_first_descriptor, descr)
-			if (descr->i_tag == AM_SI_DESCR_SHORT_EVENT && descr->p_decoded)
-			{
-				dvbpsi_short_event_dr_t *pse = (dvbpsi_short_event_dr_t*)descr->p_decoded;
-
-				/* skip the non-saved_lang languages' text */
-				if (saved_lang != NULL && memcmp(saved_lang, pse->i_iso_639_code, 3))
+				/* multil-language support */
+				if (ext_lang_cnt >= MAX_LANGUAGE_CNT)
 					continue;
-
-				AM_SI_ConvertDVBTextCode((char*)pse->i_event_name, pse->i_event_name_length,\
-								name, EVT_NAME_LEN);
-				name[EVT_NAME_LEN] = 0;
-				
-				AM_SI_ConvertDVBTextCode((char*)pse->i_text, pse->i_text_length,\
-								desc, EVT_TEXT_LEN);
-				desc[EVT_TEXT_LEN] = 0;
-				//AM_DEBUG(1, "event_id 0x%x, name '%s'", event->i_event_id, name);
-			}
-			else if (descr->i_tag == AM_SI_DESCR_EXTENDED_EVENT && descr->p_decoded)
-			{
-				dvbpsi_extended_event_dr_t *pee = (dvbpsi_extended_event_dr_t*)descr->p_decoded;
-
-				/* skip the non-saved_lang languages' text */
-				if (saved_lang != NULL && memcmp(saved_lang, pee->i_iso_639_code, 3))
-					continue;
-				
-				if (pee->i_descriptor_number < 16)
+				for (iext=0; iext<ext_lang_cnt; iext++)
 				{
-					AM_DEBUG(2, "Add a extended event descr, descr_number %d, last_number %d",
-						pee->i_descriptor_number, pee->i_last_descriptor_number);
-					eedecrs[pee->i_descriptor_number] = pee;
+					if (!memcmp(ext_langs[iext].lang, pee->i_iso_639_code, 3))
+						break;
 				}
+				/* already found, add this descriptor to its language */
+				if (iext < ext_lang_cnt)
+				{
+					if (pee->i_descriptor_number < 16)
+						ext_langs[iext].descrs[pee->i_descriptor_number] = pee;
+					continue;
+				}
+				/* add a new language */
+				memcpy(ext_langs[ext_lang_cnt].lang, pee->i_iso_639_code, 3);
+				ext_langs[ext_lang_cnt++].descrs[pee->i_descriptor_number] = pee;
 			}
 			else if (descr->i_tag == AM_SI_DESCR_CONTENT && descr->p_decoded)
 			{
@@ -859,105 +1089,13 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 				}
 			}
 		AM_SI_LIST_END()
-		
-		for (ii=0; ii<16; ii++)
-		{
-			if (eedecrs[ii] != NULL)
-			{
-				dvbpsi_extended_event_dr_t *pee = eedecrs[ii];
-				int j;
-				
-				AM_DEBUG(2, "extended event descr %d, entry count %d", ii, pee->i_entry_count);
-				/*取所有item*/
-				for (j=0; j<pee->i_entry_count; j++)
-				{
-					AM_SI_ConvertDVBTextCode((char*)pee->i_item_description[j], pee->i_item_description_length[j],\
-								item_descr, ITEM_DESCR_LEN);
-					item_descr[ITEM_DESCR_LEN] = 0;
 
-					item = items;
-					while (item != NULL)
-					{
-						if (! strcmp(item_descr, item->item_descr))
-							break;
-						item = item->next;
-					}
-					if (item == NULL)
-					{
-						/*Add a new Item*/
-						item = (ExtendedEventItem *)malloc(sizeof(ExtendedEventItem));
-						if (item == NULL)
-						{
-							AM_DEBUG(1, "Cannot alloc memory for new item");
-							continue;
-						}
-
-						memset(item, 0, sizeof(ExtendedEventItem));
-						if (items == NULL)
-							items = item;
-						else
-							items_tail->next = item;
-						items_tail = item;
-						snprintf(item->item_descr, sizeof(item->item_descr), "%s", item_descr);
-					}
-					/*Merge the item_char*/
-					if (item->char_len >= (int)(sizeof(item->item_char)-1))
-						continue;
-
-					if (AM_SI_ConvertDVBTextCode((char*)pee->i_item[j], pee->i_item_length[j],\
-								item->item_char+item->char_len, \
-								sizeof(item->item_char)-item->char_len) == AM_SUCCESS)
-					{
-						item->item_char[ITEM_CHAR_LEN] = 0;
-						item->char_len = strlen(item->item_char);
-					}
-				}
-
-				/*融合详细描述文本*/
-				if (ext_descr_len < (int)(sizeof(ext_descr)-1))
-				{
-					AM_SI_ConvertDVBTextCode((char*)pee->i_text, pee->i_text_length,
-								ext_descr+ext_descr_len, sizeof(ext_descr)-ext_descr_len);
-					ext_descr[EXT_TEXT_LEN] = 0;
-					ext_descr_len = strlen(ext_descr);
-				}			
-			}
-		}
-				
-				
-		/*Merge all the items*/
-		item_len = 0;
-		item = items;
-		while (item != NULL)
-		{
-			item_len += strlen(":\n");
-			item_len += strlen(item->item_descr);
-			item_len += item->char_len;
-			item = item->next;
-		}
-		item_len += ext_descr_len;
-		if (item_len > 0)
-		{
-			db_item = (char*)malloc(item_len+1);
-			if (db_item != NULL)
-			{
-				db_item[0] = 0;
-				item = items;
-				while (item != NULL)
-				{
-					next = item->next;
-					strcat(db_item, item->item_descr);
-					strcat(db_item, ":");
-					strcat(db_item, item->item_char);
-					strcat(db_item, "\n");
-					free(item);
-					item = next;
-				}
-				if (ext_descr_len > 0)
-					strcat(db_item, ext_descr);
-				db_item[item_len] = 0;
-			}
-		}
+		/* generate multi-language text */
+		am_epg_gen_short_event_text(short_langs, short_lang_cnt, name, 
+			sizeof(name), desc, sizeof(desc));
+		/* extended text */
+		am_epg_gen_extended_event_text(ext_langs, ext_lang_cnt, ext_item, 
+			sizeof(ext_item), ext_descr, sizeof(ext_descr));
 
 		/*添加新事件到evt_table*/
 		sqlite3_bind_int(stmt, 1, mon->src);
@@ -969,15 +1107,7 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 		sqlite3_bind_int(stmt, 7, start);
 		sqlite3_bind_int(stmt, 8, end);
 		sqlite3_bind_text(stmt, 9, desc, -1, SQLITE_STATIC);
-		if (db_item != NULL)
-		{
-			sqlite3_bind_text(stmt, 10, db_item, -1, SQLITE_STATIC);
-			free(db_item);
-		}
-		else
-		{
-			sqlite3_bind_text(stmt, 10, "", -1, SQLITE_STATIC);
-		}
+		sqlite3_bind_text(stmt, 10, ext_item, -1, SQLITE_STATIC);
 		sqlite3_bind_text(stmt, 11, ext_descr, -1, SQLITE_STATIC);
 		sqlite3_bind_int(stmt, 12, nibble);
 		sqlite3_bind_int(stmt, 13, 0);
