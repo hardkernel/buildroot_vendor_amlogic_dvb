@@ -124,6 +124,8 @@ enum AM_SCAN_DTVMode
 	AM_SCAN_DTVMODE_FTA				= 0x20,	/**< Only scan free programs*/
 	AM_SCAN_DTVMODE_NOTV			= 0x40, /**< Donot store tv programs*/
 	AM_SCAN_DTVMODE_NORADIO			= 0x80, /**< Donot store radio programs*/
+	AM_SCAN_DTVMODE_ISDBT_ONESEG	= 0x100, /**< Scan ISDBT oneseg in layer A*/
+	AM_SCAN_DTVMODE_ISDBT_FULLSEG	= 0x200, /**< Scan ISDBT fullseg*/
 };
 
 /**\brief ATV搜索模式定义*/

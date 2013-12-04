@@ -35,8 +35,17 @@ typedef enum fe_type {
 	FE_OFDM,
 	FE_ATSC,
 	FE_ANALOG,
-	FE_DTMB
+	FE_DTMB,
+	FE_ISDBT
 } fe_type_t;
+
+typedef enum fe_layer {
+	Layer_A_B_C,
+	Layer_A,
+	Layer_B,
+	Layer_C,
+} fe_layer_t;
+
 
 
 typedef enum fe_caps {
@@ -65,6 +74,7 @@ typedef enum fe_caps {
 	FE_CAN_8VSB			= 0x200000,
 	FE_CAN_16VSB			= 0x400000,
 	FE_HAS_EXTENDED_CAPS		= 0x800000,   /* We need more bitspace for newer APIs, indicate this. */
+	FE_CAN_3_LAYER			= 0x1000000,		/*isdbt three layers*/
 	FE_CAN_TURBO_FEC		= 0x8000000,  /* frontend supports "turbo fec modulation" */
 	FE_CAN_2G_MODULATION		= 0x10000000, /* frontend supports "2nd generation modulation" (DVB-S2) */
 	FE_NEEDS_BENDING		= 0x20000000, /* not supported anymore, don't use (frontend requires frequency bending) */
@@ -337,7 +347,7 @@ struct dvb_frontend_event {
 
 #define DTV_ISDBS_TS_ID		42
 
-#define DTV_DVBT2_PLP_ID        43
+#define DTV_DVBT2_PLP_ID	43
 #define DTV_DVBT2_DATA_PLPS	44
 
 #define DTV_MAX_COMMAND			DTV_DVBT2_DATA_PLPS	
@@ -409,10 +419,6 @@ struct dtv_properties {
 	__u32 num;
 	struct dtv_property *props;
 };
-
-#define FE_SET_PROPERTY		   _IOW('o', 82, struct dtv_properties)
-#define FE_GET_PROPERTY		   _IOR('o', 83, struct dtv_properties)
-
 //for atv
 typedef struct tuner_status_s {
 	unsigned int frequency;
@@ -456,6 +462,9 @@ typedef struct tuner_param_s {
 	unsigned int      parm;
 	unsigned int 	  resvred;
 }tuner_param_t;
+
+#define FE_SET_PROPERTY		   _IOW('o', 82, struct dtv_properties)
+#define FE_GET_PROPERTY		   _IOR('o', 83, struct dtv_properties)
 
 /* Satellite blind scan settings */
 struct dvbsx_blindscanpara {
@@ -525,6 +534,7 @@ struct dvbsx_blindscanevent {
 #define FE_DISHNETWORK_SEND_LEGACY_CMD _IO('o', 80) /* unsigned int */
 
 #define FE_SET_DELAY               _IO('o', 100)
+
 
 #define FE_SET_MODE                _IO('o', 90)
 #define FE_READ_AFC                _IOR('o', 91, __u32)

@@ -61,6 +61,11 @@
 #define STT_TIMEOUT 0
 #define VCT_TIMEOUT 2500
 #define RRT_TIMEOUT 70000
+#define ISDBT_PAT_TIMEOUT 1000
+
+/*ISDBT one-seg PMTs*/
+#define ISDBT_ONESEG_PMT_BEGIN 0x1fc8
+#define ISDBT_ONESEG_PMT_END   0x1fcf
 
 /*子表最大个数*/
 #define MAX_BAT_SUBTABLE_CNT 32
@@ -164,7 +169,9 @@
 
 #define IS_DVBT2_TS(_para) (_para.m_type==FE_OFDM && \
 	_para.terrestrial.para.u.ofdm.ofdm_mode == OFDM_DVBT2)
+#define IS_ISDBT_TS(_para) (_para.m_type==FE_ISDBT)
 #define IS_DVBT2() IS_DVBT2_TS(scanner->start_freqs[scanner->curr_freq].fe_para)
+#define IS_ISDBT() IS_ISDBT_TS(scanner->start_freqs[scanner->curr_freq].fe_para)
 
 #define cur_fe_para			scanner->start_freqs[scanner->curr_freq].fe_para
 #define dtv_start_para		scanner->start_para.dtv_para
@@ -205,10 +212,6 @@ static int dvbc_std_freqs[] =
 842000, 850000, 858000, 866000,
 874000
 };
-
-/*,skip=0,lock=0,chan_num=?,\
-	 major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,hide_guide=?, source_id=?,favor=?,db_sat_para_id=?,\
-	 scrambled_flag=?,lcn=-1,hd_lcn=-1,sd_lcn=-1,default_chan_num=-1,chan_order=0,lcn_order=0,service_id_order=0,hd_sd_order=0*/
 
 /*SQLite3 stmts*/
 const char *sql_stmts[MAX_STMT] = 
@@ -282,6 +285,7 @@ static AM_ErrorCode_t am_scan_request_next_pmt(AM_SCAN_Scanner_t *scanner);
 static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner);
 static AM_ErrorCode_t am_scan_start_dtv(AM_SCAN_Scanner_t *scanner);
 static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner);
+static AM_ErrorCode_t am_scan_isdbt_prepare_oneseg(AM_SCAN_TS_t *ts);
 
 extern AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,int out_len);
 
@@ -1037,6 +1041,23 @@ static dvbpsi_pat_t *get_valid_pats(AM_SCAN_TS_t *ts)
 	{
 		valid_pat = ts->digital.pats;
 	}
+	else if (IS_ISDBT_TS(ts->digital.fend_para))
+	{
+		/* process for isdbt one-seg inserted PAT, which ts_id is 0xffff */
+		valid_pat = ts->digital.pats;
+		while (valid_pat != NULL && valid_pat->i_ts_id == 0xffff)
+		{
+			valid_pat = valid_pat->p_next;
+		}
+
+		if (valid_pat == NULL && ts->digital.pats != NULL)
+		{
+			valid_pat = ts->digital.pats;
+			
+			if (ts->digital.sdts != NULL)
+				valid_pat->i_ts_id = ts->digital.sdts->i_ts_id;
+		}
+	}
 	else
 	{
 		int plp;
@@ -1055,10 +1076,10 @@ static dvbpsi_pat_t *get_valid_pats(AM_SCAN_TS_t *ts)
 }
 
 /***\brief 更新一个TS数据*/
-static void am_scan_update_ts_info(sqlite3_stmt **stmts, int net_dbid, int dbid, AM_SCAN_TS_t *ts)
+static void am_scan_update_ts_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, int net_dbid, int dbid, AM_SCAN_TS_t *ts)
 {
 	int ts_id = -1;
-	int symbol_rate=0, modulation=0;
+	int symbol_rate=0, modulation=0, dvbt_flag=0;
 	
 	/*更新TS数据*/
 	sqlite3_bind_int(stmts[UPDATE_TS], 1, net_dbid);
@@ -1095,7 +1116,14 @@ static void am_scan_update_ts_info(sqlite3_stmt **stmts, int net_dbid, int dbid,
 	sqlite3_bind_int(stmts[UPDATE_TS], 8, (ts->type!=AM_SCAN_TS_ANALOG) ? ts->digital.strength : 0);
 	sqlite3_bind_int(stmts[UPDATE_TS], 9, (ts->type==AM_SCAN_TS_ANALOG) ? ts->analog.std : -1);
 	sqlite3_bind_int(stmts[UPDATE_TS], 10,(ts->type==AM_SCAN_TS_ANALOG) ?  1/*Stereo*/ : -1);
-	sqlite3_bind_int(stmts[UPDATE_TS], 11,(ts->type!=AM_SCAN_TS_ANALOG) ?  (int)dvb_fend_para(ts->digital.fend_para)->u.ofdm.ofdm_mode : 0);	
+	if (ts->type!=AM_SCAN_TS_ANALOG)
+	{
+		if (IS_DVBT2_TS(ts->digital.fend_para))
+			dvbt_flag = (int)dvb_fend_para(ts->digital.fend_para)->u.ofdm.ofdm_mode;
+		else if (IS_ISDBT_TS(ts->digital.fend_para))
+			dvbt_flag = (result->start_para->dtv_para.mode&AM_SCAN_DTVMODE_ISDBT_ONESEG) ? Layer_A : Layer_A_B_C;
+	}
+	sqlite3_bind_int(stmts[UPDATE_TS], 11, dvbt_flag);	
 	sqlite3_bind_int(stmts[UPDATE_TS], 12, dbid);
 	sqlite3_step(stmts[UPDATE_TS]);
 	sqlite3_reset(stmts[UPDATE_TS]);
@@ -1517,7 +1545,7 @@ static void store_analog_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_S
 		}
 
 		/* 更新TS数据 */
-		am_scan_update_ts_info(stmts,  -1, dbid, ts);	
+		am_scan_update_ts_info(stmts, result, -1, dbid, ts);	
 	}
 	
 	/* 存储ATV频道 */
@@ -1598,7 +1626,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 		}
 		
 		/* 更新TS数据 */
-		am_scan_update_ts_info(stmts, net_dbid, dbid, ts);
+		am_scan_update_ts_info(stmts, result, net_dbid, dbid, ts);
 	}
 	
 	/*遍历PMT表*/
@@ -1782,7 +1810,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 		}
 		
 		/* 更新TS数据 */
-		am_scan_update_ts_info(stmts, net_dbid, dbid, ts);
+		am_scan_update_ts_info(stmts, result, net_dbid, dbid, ts);
 	}
 	
 	/*存储DTV节目，遍历PMT表*/
@@ -3095,6 +3123,12 @@ static void am_scan_pat_done(AM_SCAN_Scanner_t *scanner)
 	scanner->recv_status &= ~scanner->dtvctl.patctl.recv_flag;
 
 	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_PAT_DONE, (void*)scanner->curr_ts->digital.pats);
+
+	/* try to add fixed pmt-pid programs for ISDBT */
+	if (IS_ISDBT())
+	{
+		am_scan_isdbt_prepare_oneseg(scanner->curr_ts);
+	}
 	
 	/* Set the current PAT section */
 	scanner->dtvctl.cur_pat = scanner->curr_ts->digital.pats;
@@ -3441,7 +3475,7 @@ static AM_ErrorCode_t am_scan_request_section(AM_SCAN_Scanner_t *scanner, AM_SCA
 	param.filter.mask[0] = 0xff;
 	
 	/*For PMT, we must filter its extension*/
-	if (scl->tid == AM_SI_TID_PMT)
+	if (scl->tid == AM_SI_TID_PMT && scl->ext != 0xffff/* a special mark for isdbt one-seg program */)
 	{
 		param.filter.filter[1] = (uint8_t)((scl->ext&0xff00)>>8);
 		param.filter.mask[1] = 0xff;
@@ -4129,6 +4163,67 @@ static AM_ErrorCode_t am_scan_dvbt2_start_next_data_plp(AM_SCAN_Scanner_t *scann
 	return ret;
 }
 
+/**\brief ISDBT switching layer*/
+static AM_ErrorCode_t am_scan_isdbt_switch_layer(AM_SCAN_Scanner_t *scanner, int layer)
+{
+	struct dtv_properties props;
+	struct dtv_property prop;
+
+	prop.cmd    = DTV_ISDBT_LAYER_ENABLED;
+	prop.u.data = layer;
+
+	props.num = 1;
+	props.props = &prop;
+
+	AM_DEBUG(1, "Switching to ISDBT layer %d(0-All, 1-A, 2-B, 3-C)", layer);
+
+	return AM_FEND_SetProp(scanner->start_para.fend_dev_id, &props);	
+}
+
+/**\brief prepare isdbt one-seg mode*/
+static AM_ErrorCode_t am_scan_isdbt_prepare_oneseg(AM_SCAN_TS_t *ts)
+{
+	int i;
+	AM_Bool_t found;
+	dvbpsi_pat_t *new_pat, *pat;
+	dvbpsi_pat_program_t *prog;
+	const uint16_t oneseg_pmt_count = ISDBT_ONESEG_PMT_END - ISDBT_ONESEG_PMT_BEGIN + 1;
+
+	dvbpsi_NewPAT(new_pat, 0xffff/*Mark*/, 0, 1);
+
+	if (new_pat == NULL)
+		return AM_SCAN_ERR_NO_MEM;
+
+	new_pat->p_next = ts->digital.pats;
+
+	for (i=0; i<oneseg_pmt_count; i++)
+	{
+		found = AM_FALSE;
+		AM_SI_LIST_BEGIN(ts->digital.pats, pat)
+			AM_SI_LIST_BEGIN(pat->p_first_program, prog)
+				if (prog->i_pid == (ISDBT_ONESEG_PMT_BEGIN + i))
+				{
+					AM_DEBUG(1, "PMT(pid=0x%x) already in PAT, skip this.", prog->i_pid);
+					found = AM_TRUE;
+					break;
+				}
+			AM_SI_LIST_END()
+
+			if (found)
+				break;
+		AM_SI_LIST_END()
+
+		if (! found)
+		{
+			dvbpsi_PATAddProgram(new_pat, 0xffff/*Mark*/, ISDBT_ONESEG_PMT_BEGIN + i);
+		}
+	}
+
+	ts->digital.pats = new_pat;
+
+	return AM_SUCCESS;
+}
+
 /**\brief 启动DTV搜索*/
 static AM_ErrorCode_t am_scan_start_dtv(AM_SCAN_Scanner_t *scanner)
 {
@@ -4571,6 +4666,17 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 						scanner->curr_ts->digital.dvbt2_data_plps[i].sdts = NULL;
 					}
 					scanner->curr_plp = 0;
+				}
+				else if (IS_ISDBT())
+				{
+					int layer;
+					
+					if (dtv_start_para.mode&AM_SCAN_DTVMODE_ISDBT_ONESEG)
+						layer = Layer_A;
+					else
+						layer = Layer_A_B_C;
+
+					am_scan_isdbt_switch_layer(scanner, layer);
 				}
 
 				am_scan_tablectl_clear(&scanner->dtvctl.patctl);
