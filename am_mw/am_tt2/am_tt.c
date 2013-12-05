@@ -39,6 +39,7 @@ typedef struct
 	pthread_t          thread;
 	AM_TT2_CachedPage_t *cached_pages;
 	AM_TT2_CachedPage_t *cached_tail;
+	AM_TT2_CachedPage_t *display_page;
 }AM_TT2_Parser_t;
 
 enum systems {
@@ -151,9 +152,10 @@ static void tt2_check(AM_TT2_Parser_t *parser)
 			tt2_step_cached_page(parser);
 		}
 		else if (parser->cached_pages->pts <= tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16))
-		{
+		{	
 			AM_DEBUG(1, "show ttx page, remain cached %d pages", 
 				parser->cached_tail->count - parser->cached_pages->count);
+
 			if(parser->para.draw_begin)
 				parser->para.draw_begin(parser);
 	
@@ -171,7 +173,7 @@ static void tt2_check(AM_TT2_Parser_t *parser)
 					AM_DEBUG(1, "text %02d: %s", i, buf);
 				}
 			}*/
-	
+
 			vbi_draw_vt_page_region(&parser->cached_pages->page, 
 					VBI_PIXFMT_RGBA32_LE, parser->para.bitmap, parser->para.pitch,
 					0, 0, parser->cached_pages->page.columns, 
@@ -179,6 +181,9 @@ static void tt2_check(AM_TT2_Parser_t *parser)
 
 			if(parser->para.draw_end)
 				parser->para.draw_end(parser);
+
+			parser->display_page = parser->cached_pages;
+			
 			/* step to next cached page */
 			tt2_step_cached_page(parser);
 		}
@@ -187,6 +192,22 @@ static void tt2_check(AM_TT2_Parser_t *parser)
 			AM_DEBUG(2, "pts 0x%llx, pcrscr %llx, diff %lld", parser->cached_pages->pts,
 				tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16), 
 				parser->cached_pages->pts - tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16));
+		}
+	}
+	else if (parser->display_page != NULL)
+	{
+		uint64_t pts = tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16);
+		
+		if (pts == 0llu)
+		{
+			AM_DEBUG(1, "Teletext clear screen.");
+			/*clear the screen*/
+			if(parser->para.draw_begin)
+				parser->para.draw_begin(parser);
+			if(parser->para.draw_end)
+				parser->para.draw_end(parser);
+
+			parser->display_page = NULL;
 		}
 	}
 }

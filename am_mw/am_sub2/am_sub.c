@@ -68,17 +68,16 @@ static void sub2_check(AM_SUB2_Parser_t *parser)
 		if(parser->pic)
 		{
 			pts = parser->para.get_pts(parser, parser->pic->pts);
-			diff = pts - parser->pic->pts;
+			diff = llabs(pts - parser->pic->pts);
 			
 			if((diff > parser->pic->timeout * 90000ll) || pts == 0llu)
 			{
 				dvbsub_remove_display_picture(parser->handle, parser->pic);
-				parser->pic = NULL;
+				parser->pic = npic;
 			}
 		}
 	}
 	while(npic && !parser->pic && loop);
-	
 	if(parser->running && (old != parser->pic))
 	{
 		parser->para.show(parser, parser->pic);
