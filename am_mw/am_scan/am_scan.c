@@ -138,7 +138,7 @@
 		if (AM_SI_DecodeSection(scanner->dtvctl.hsi, sec_ctrl->pid, (uint8_t*)data, len, (void**)&p_table) == AM_SUCCESS)\
 		{\
 			p_table->p_next = NULL;\
-			ADD_TO_LIST(p_table, list); /*添加到搜索结果列表中*/\
+			APPEND_TO_LIST(type, p_table, list); /*添加到搜索结果列表中*/\
 			am_scan_tablectl_mark_section(sec_ctrl, &header); /*设置为已接收*/\
 		}else\
 		{\
@@ -1907,6 +1907,54 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 				/*Store this service*/
 				am_scan_update_service_info(stmts, result, &srv_info);
 			AM_SI_LIST_END()
+
+			/* All programs in PMTs added, now trying the programs in SDT but NOT in PMT */
+			dvbpsi_sdt_service_t *srv;
+			dvbpsi_sdt_t *sdt;
+
+			AM_SI_LIST_BEGIN(ts->digital.sdts, sdt)
+			AM_SI_LIST_BEGIN(sdt->p_first_service, srv)
+				AM_Bool_t found_in_pmt = AM_FALSE;
+
+				/* Is already added in PMT? */
+				AM_SI_LIST_BEGIN(ts->digital.pmts, pmt)
+					if (srv->i_service_id == pmt->i_program_number)
+					{
+						found_in_pmt = AM_TRUE;
+						break;
+					}
+				AM_SI_LIST_END()
+
+				if (found_in_pmt)
+					continue;
+
+				am_scan_init_service_info(&srv_info);
+				srv_info.satpara_dbid = satpara_dbid;
+				srv_info.srv_id = srv->i_service_id;
+				srv_info.src = src;
+
+				if (store)
+				{
+					srv_info.srv_dbid = insert_srv(stmts, net_dbid, dbid, srv_info.plp_id, srv_info.srv_id);
+					if (srv_info.srv_dbid == -1)
+					{
+						AM_DEBUG(1, "insert new srv error");
+						continue;
+					}
+
+					am_scan_rec_tab_add_srv(tab, srv_info.srv_dbid, ts);
+				}
+
+				am_scan_extract_srv_info_from_sdt(result, sdt_list, &srv_info);
+
+				am_scan_update_service_info(stmts, result, &srv_info);
+
+				/*as no pmt for this srv, set type to data for invisible*/
+				srv_info.srv_type = 0;
+
+			AM_SI_LIST_END()
+			AM_SI_LIST_END()
+
 		}
 	}
 }

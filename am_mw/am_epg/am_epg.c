@@ -1685,16 +1685,26 @@ static AM_ErrorCode_t am_epg_request_section(AM_EPG_Monitor_t *mon, AM_EPG_Table
 	{
 		if (mcl->subctl->ver != 0xff && mcl->subs == 1)
 		{
-			AM_DEBUG(1, "Start filtering new version (!=%d) for %s table", mcl->subctl->ver, mcl->tname);
-			/*Current next indicator must be 1*/
-			param.filter.filter[3] = (mcl->subctl->ver << 1) | 0x01;
-			param.filter.mask[3] = 0x3f;
-			param.filter.mode[3] = 0xff;
-
+			if(mcl->pid == AM_SI_PID_SDT)
+			{
+				AM_DEBUG(1, "Start filtering no version for %s table", mcl->tname);
+				/*Current next indicator must be 1*/
+				param.filter.filter[3] = 0x01;
+				param.filter.mask[3] = 0x01;
+			}
+			else
+			{
+				AM_DEBUG(1, "Start filtering new version (!=%d) for %s table", mcl->subctl->ver, mcl->tname);
+				/*Current next indicator must be 1*/
+				param.filter.filter[3] = (mcl->subctl->ver << 1) | 0x01;
+				param.filter.mask[3] = 0x3f;
+				param.filter.mode[3] = 0xff;
+			}
 			SUBCTL_CLEAR(mcl->subctl);
 		}
 		else
 		{
+			AM_DEBUG(1, "Start filtering no version for %s table", mcl->tname);
 			/*Current next indicator must be 1*/
 			param.filter.filter[3] = 0x01;
 			param.filter.mask[3] = 0x01;
@@ -1789,21 +1799,16 @@ static int insert_teletext(sqlite3 * hdb, int db_srv_id, int pid, dvbpsi_teletex
 	return 0;
 }
 
-
 /**\brief 插入一个网络记录，返回其索引*/
 static int insert_net(sqlite3 * hdb, int src, int orig_net_id)
 {
 	int db_id = -1;
 	int row;
 	char query_sql[256];
-	char insert_sql[256];
 	
 	snprintf(query_sql, sizeof(query_sql), 
 		"select db_id from net_table where src=%d and network_id=%d",
 		src, orig_net_id);
-	snprintf(insert_sql, sizeof(insert_sql), 
-		"insert into net_table(network_id, src, name) values(%d,%d,'')",
-		orig_net_id, src);
 
 	row = 1;
 	/*query wether it exists*/
@@ -1815,7 +1820,13 @@ static int insert_net(sqlite3 * hdb, int src, int orig_net_id)
 	/*if not exist , insert a new record*/
 	if (db_id == -1)
 	{
+		char insert_sql[256];
+
+		snprintf(insert_sql, sizeof(insert_sql), 
+			"insert into net_table(network_id, src, name) values(%d,%d,'')",
+			orig_net_id, src);
 		sqlite3_exec(hdb, insert_sql, NULL, NULL, NULL);
+
 		row = 1;
 		if (AM_DB_Select(hdb, query_sql, &row, "%d", &db_id) != AM_SUCCESS )
 		{
@@ -1960,9 +1971,82 @@ static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 		dvbpsi_sdt_service_t *srv;
 		dvbpsi_descriptor_t *descr;
 		char tmpsql[256];
-		int db_net_id;
+		int db_net_id, prev_db_net_id;
+		int prev_ts_id, prev_net_id;
+		int row;
 
 		db_ts_id = am_epg_get_current_db_ts_id(mon);
+		if (db_ts_id >= 0)
+		{
+			row = 1;
+			snprintf(tmpsql, sizeof(tmpsql), "select ts_id from ts_table where db_id=%d", db_ts_id);
+			AM_DB_Select(hdb, tmpsql, &row, "%d", &prev_ts_id);
+		}
+		else
+		{
+			AM_DEBUG(1, "SDT update: cannot get current ts(%d)!", db_ts_id);
+			return;
+		}
+
+		if(prev_ts_id != mon->sdts->i_ts_id)
+		{
+			AM_DEBUG(1, "TS id not match, current(%d), but got(%d)", prev_ts_id, mon->sdts->i_ts_id);
+			SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)db_ts_id);
+			return;
+		}
+
+		/* check if db_net_id needs update */
+		AM_DEBUG(1, "Checking for ts %d", db_ts_id);
+		row = 1;	
+		snprintf(tmpsql, sizeof(tmpsql), "select db_net_id from ts_table where db_id=%d", db_ts_id);
+		if (AM_DB_Select(hdb, tmpsql, &row, "%d", &prev_db_net_id) == AM_SUCCESS && row > 0)
+		{
+			AM_DEBUG(1, "Checking for network %d", prev_db_net_id);
+			if (prev_db_net_id < 0)
+			{
+				/* update this invalid db_net_id */
+				AM_DEBUG(1, "SDT Update: insert new network on source %d, orginal_network_id=%d",
+							mon->src, mon->sdts->i_network_id);
+				db_net_id = insert_net(hdb, mon->src, mon->sdts->i_network_id);
+				if (db_net_id >= 0)
+				{
+					AM_DEBUG(1, "SDT Update: ts %d's db_net_id changed: 0x%x -> 0x%x", 
+						db_ts_id, prev_db_net_id, db_net_id);
+					snprintf(tmpsql, sizeof(tmpsql), "update ts_table set db_net_id=%d where db_id=%d",
+						db_net_id, db_ts_id);
+					sqlite3_exec(hdb, tmpsql, NULL, NULL, NULL);
+					/* update services */
+					snprintf(tmpsql, sizeof(tmpsql), "update srv_table set db_net_id=%d where db_ts_id=%d",
+						db_net_id, db_ts_id);
+					sqlite3_exec(hdb, tmpsql, NULL, NULL, NULL);
+
+					update = AM_TRUE;
+				}
+				else
+				{
+					AM_DEBUG(1, "insert new network failed");
+				}
+			}
+			else
+			{
+				row = 1;	
+				snprintf(tmpsql, sizeof(tmpsql), "select network_id from net_table where db_id=%d", prev_db_net_id);
+				if (AM_DB_Select(hdb, tmpsql, &row, "%d", &prev_net_id) == AM_SUCCESS && row > 0)
+				{
+					if(prev_net_id != mon->sdts->i_network_id)
+					{
+						AM_DEBUG(1, "Network id not match, current(%d), but got(%d)", prev_net_id, mon->sdts->i_network_id);
+						SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)db_ts_id);
+						return;
+					}
+				}
+			}
+		}
+		else
+		{
+			AM_DEBUG(1, "select db_net_id failed");
+		}
+
 		if (sqlite3_prepare(hdb, sql, strlen(sql), &stmt, NULL) != SQLITE_OK)
 		{
 			AM_DEBUG(1, "Prepare sqlite3 failed for selecting service name");
@@ -1973,46 +2057,7 @@ static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 			AM_DEBUG(1, "Prepare sqlite3 failed for updating service name");
 			goto update_end;
 		}
-		db_net_id = insert_net(hdb, mon->src, mon->sdts->i_network_id);
-		AM_DEBUG(1, "SDT Update: insert new network on source %d, db_net_id=%d",mon->src, db_net_id);
-		if (db_net_id >= 0)
-		{
-			AM_DEBUG(1, "SDT Update: insert new network, orginal_network_id=%d",mon->sdts->i_network_id);
-			/* check if db_net_id needs update */
-			db_ts_id = am_epg_get_current_db_ts_id(mon);
-			if (db_ts_id >= 0)
-			{
-				int prev_net_id;
-				int row;
-				
-				AM_DEBUG(1, "Checking for ts %d", db_ts_id);
-				row = 1;	
-				snprintf(tmpsql, sizeof(tmpsql), "select db_net_id from ts_table where db_id=%d", db_ts_id);
-				if (AM_DB_Select(hdb, tmpsql, &row, "%d", &prev_net_id) == AM_SUCCESS && row > 0)
-				{
-					AM_DEBUG(1, "prev net id = %d", prev_net_id);
-					if (prev_net_id < 0)
-					{
-						/* Currently, we only update this invalid db_net_id */
-						AM_DEBUG(1, "SDT Update: ts %d's db_net_id changed: 0x%x -> 0x%x", 
-							db_ts_id, prev_net_id, db_net_id);
-						snprintf(tmpsql, sizeof(tmpsql), "update ts_table set db_net_id=%d where db_id=%d",
-							db_net_id, db_ts_id);
-						sqlite3_exec(hdb, tmpsql, NULL, NULL, NULL);
-						/* update services */
-						snprintf(tmpsql, sizeof(tmpsql), "update srv_table set db_net_id=%d where db_ts_id=%d",
-							db_net_id, db_ts_id);
-						sqlite3_exec(hdb, tmpsql, NULL, NULL, NULL);
-						
-						update = AM_TRUE;
-					}
-				}
-				else
-				{
-					AM_DEBUG(1, "select db_net_id failed");
-				}
-			}
-		}
+
 		AM_SI_LIST_BEGIN(mon->sdts, sdt)
 		AM_SI_LIST_BEGIN(sdt->p_first_service, srv)
 			/*从SDT表中查找该service名称*/
@@ -2051,13 +2096,15 @@ static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 						}
 						else
 						{
-							AM_DEBUG(1, "SDT Update: Program name '%s' not changed !", old_name);
+							//AM_DEBUG(1, "SDT Update: Program name '%s' not changed !", old_name);
 						}
 					}
 					else
 					{
 						AM_DEBUG(1, "SDT Update: Cannot find program for db_ts_id=%d  srv=%d",
 							db_ts_id,srv->i_service_id);
+						SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)db_ts_id);
+						goto update_end;
 					}
 					sqlite3_reset(stmt);
 				}

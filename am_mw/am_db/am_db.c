@@ -62,6 +62,9 @@ static AM_INLINE int db_get_##_f##_cnt(void)\
 	return AM_ARRAY_SIZE(_f);\
 }
 
+/**\brief busy timeout in ms*/
+#define DB_BUSY_TIMEOUT 5000
+
 /****************************************************************************
  * Static data
  ***************************************************************************/
@@ -404,6 +407,10 @@ static sqlite3 *db_open_db(const char *path)
 	{
 		AM_DEBUG(1, "DBase:Cannot open DB %s!", path);
 		return NULL;
+	}
+	if (sqlite3_busy_timeout(hdb, DB_BUSY_TIMEOUT) != SQLITE_OK)
+	{
+		AM_DEBUG(1, "DBase: [Warning] Set DB busy timeout(%dms) failed!", DB_BUSY_TIMEOUT);
 	}
 	return hdb;
 }
