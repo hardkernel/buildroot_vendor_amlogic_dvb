@@ -200,7 +200,7 @@ typedef struct
 	int service_id;
 	int service_type;	/**< See AM_SCAN_ServiceType*/
 	AM_Bool_t scrambled;
-	char name[AM_DB_MAX_SRV_NAME_LEN + 1];
+	char name[1024];
 }AM_SCAN_ProgramProgress_t;
 
 /**\brief 当前搜索的频点信号信息*/

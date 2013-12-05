@@ -1244,7 +1244,7 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 		pp.scrambled = !!srv_info->scrambled_flag;
 		pp.service_id = srv_info->srv_id;
 		pp.service_type = srv_info->srv_type;
-		strcpy(pp.name, srv_info->name);
+		snprintf(pp.name, sizeof(pp.name), "%s", srv_info->name);
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_NEW_PROGRAM, &pp);
 		return;
 	}
