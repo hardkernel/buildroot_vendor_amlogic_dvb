@@ -1359,6 +1359,11 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 						AM_DEBUG(1, "!!Found DTS Descriptor!!!");
 						afmt_tmp = AFORMAT_DTS;
 						break;
+                                        case AM_SI_DESCR_DRA:
+                                                 AM_DEBUG(1, "!!Found DRA Descriptor!!!");
+                                                 afmt_tmp = AFORMAT_DRA;
+                                                 break;
+
 					default:
 						break;
 				}

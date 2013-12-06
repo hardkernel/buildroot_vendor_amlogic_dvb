@@ -4743,6 +4743,8 @@ static AM_ErrorCode_t aml_get_astatus(AM_AV_Device_t *dev, AM_AV_AudioStatus_t *
 			para->aud_fmt = AFORMAT_RAAC;
 		else if(!strncmp(buf, "amadec_wma", 10))
 			para->aud_fmt = AFORMAT_WMA;
+                else if(!strncmp(buf,"amadec_dra",10))
+                        para->aud_fmt = AFORMAT_DRA;
 	}
 	
 	rc = ioctl(fd, AMSTREAM_IOC_AB_STATUS, (int)&astatus);
