@@ -290,6 +290,8 @@ typedef struct
 	AM_SCAN_DTVSatellitePara_t sat_para;	/**< 卫星参数配置,只有当source位Satellite时有效*/
  	AM_SCAN_DTVSortMethod_t sort_method;	/**< 频道排序方法*/
 	AM_Bool_t resort_all;					/**< 重新排列数据库中的所有service*/
+	AM_Bool_t clear_source;		/**< clear the source anyway in auto mode*/
+	AM_Bool_t mix_tv_radio;		/**< sort TV & radio together */
 	int fe_cnt;								/**< 前端参数个数*/
 	AM_FENDCTRL_DVBFrontendParameters_t *fe_paras;/**< 前端参数列表，自动搜索时对应主频点列表，手动搜索时为单个频点，
  														全频段搜索时可自定义频点列表或留空使用默认值*/

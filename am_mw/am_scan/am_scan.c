@@ -2356,118 +2356,154 @@ static void am_scan_dtv_default_sort_by_service_id(AM_SCAN_Result_t *result, sql
 
 		if(!result->start_para->dtv_para.resort_all)
 		{
-#ifndef SORT_TOGETHER
-			sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 1, 1);
-			sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 2, result->start_para->dtv_para.source);
-			r = sqlite3_step(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE]);
-			if(r==SQLITE_ROW)
+			if (! result->start_para->dtv_para.mix_tv_radio)
 			{
-				i = sqlite3_column_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 0)+1;
-			}
-			sqlite3_reset(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE]);
+				sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 1, 1);
+				sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 2, result->start_para->dtv_para.source);
+				r = sqlite3_step(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE]);
+				if(r==SQLITE_ROW)
+				{
+					/*Current max num for TV programs*/
+					i = sqlite3_column_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 0)+1;
+				}
+				sqlite3_reset(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE]);
 
-			sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 1, 2);
-			sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 2, result->start_para->dtv_para.source);
-			r = sqlite3_step(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE]);
-			if(r==SQLITE_ROW)
-			{
-				j = sqlite3_column_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 0)+1;
+				sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 1, 2);
+				sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 2, result->start_para->dtv_para.source);
+				r = sqlite3_step(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE]);
+				if(r==SQLITE_ROW)
+				{
+					/*Current max num for Radio programs*/
+					j = sqlite3_column_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE], 0)+1;
+				}
+				sqlite3_reset(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE]);
 			}
-			sqlite3_reset(stmts[QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE]);
-#else
-			sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM], 1, result->start_para->dtv_para.source);
-			r = sqlite3_step(stmts[QUERY_MAX_DEFAULT_CHAN_NUM]);
-			if(r==SQLITE_ROW)
+			else
 			{
-				i = j = sqlite3_column_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM], 0)+1;
+				sqlite3_bind_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM], 1, result->start_para->dtv_para.source);
+				r = sqlite3_step(stmts[QUERY_MAX_DEFAULT_CHAN_NUM]);
+				if(r==SQLITE_ROW)
+				{
+					i = j = sqlite3_column_int(stmts[QUERY_MAX_DEFAULT_CHAN_NUM], 0)+1;
+				}
+				sqlite3_reset(stmts[QUERY_MAX_DEFAULT_CHAN_NUM]);
 			}
-			sqlite3_reset(stmts[QUERY_MAX_DEFAULT_CHAN_NUM]);
 
-#endif
 			i = (i<=0) ? 1 : i;
 			j = (j<=0) ? 1 : j;
 		}
 
-		/*重新对srv_table排序以生成新的频道号*/
-		/*首先按频点排序*/
-		sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, result->start_para->dtv_para.source);
-		r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
 
-		while (r == SQLITE_ROW)
+		if (! result->start_para->dtv_para.mix_tv_radio)
 		{
-			/*同频点下按service_id排序*/
-			db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
-			sqlite3_bind_int(stmts[QUERY_SRV_BY_TYPE], 1, db_ts_id);
-			rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
-			while (rr == SQLITE_ROW)
-			{
-				db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 0);
-
-				if(result->start_para->dtv_para.resort_all || am_scan_rec_tab_have_src(srv_tab, db_id))
-				{
-					srv_type = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 1);
-					if (srv_type == 1)
-					{
-						/*电视节目*/
-						sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, i);
-						sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
-						sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
-						sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
-						i++;
-					}
-#ifndef SORT_TOGETHER 
-					else if (srv_type == 2)
-					{
-						/*广播节目*/
-						sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, j);
-						sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
-						sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
-						sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
-						j++;
-					}
-				}
-
-				rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
-			}
-			sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
-#else
-				}
-				rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
-			}
-			sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
+			sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, result->start_para->dtv_para.source);
 			r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+
+			while (r == SQLITE_ROW)
+			{
+				/*同频点下按service_id排序*/
+				db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
+				sqlite3_bind_int(stmts[QUERY_SRV_BY_TYPE], 1, db_ts_id);
+				rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
+				while (rr == SQLITE_ROW)
+				{
+					db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 0);
+
+					if(result->start_para->dtv_para.resort_all || am_scan_rec_tab_have_src(srv_tab, db_id))
+					{
+						srv_type = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 1);
+						if (srv_type == 1)
+						{
+							/*电视节目*/
+							sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, i);
+							sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
+							sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+							sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+							i++;
+						}
+						else if (srv_type == 2)
+						{
+							/*广播节目*/
+							sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, j);
+							sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
+							sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+							sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+							j++;
+						}
+					}
+
+					rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
+				}
+				sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
+				r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+			}
+			sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
 		}
-		sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
-		sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, result->start_para->dtv_para.source);
-		r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
-		while (r == SQLITE_ROW)
+		else
 		{
-			/*广播节目放到最后*/
-			db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
-			sqlite3_bind_int(stmts[QUERY_SRV_BY_TYPE], 1, db_ts_id);
-			rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
-			while (rr == SQLITE_ROW)
-			{
-				db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 0);
-				if(result->start_para->dtv_para.resort_all || am_scan_rec_tab_have_src(srv_tab, db_id))
-				{
-					srv_type = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 1);
-					if (srv_type == 2)
-					{
-						sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, i);
-						sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
-						sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
-						sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
-						i++;
-					}
-				}
-				rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
-			}
-			sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
-#endif
+			sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, result->start_para->dtv_para.source);
 			r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+
+			while (r == SQLITE_ROW)
+			{
+				/*同频点下按service_id排序*/
+				db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
+				sqlite3_bind_int(stmts[QUERY_SRV_BY_TYPE], 1, db_ts_id);
+				rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
+				while (rr == SQLITE_ROW)
+				{
+					db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 0);
+
+					if(result->start_para->dtv_para.resort_all || am_scan_rec_tab_have_src(srv_tab, db_id))
+					{
+						srv_type = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 1);
+						if (srv_type == 1)
+						{
+							/*电视节目*/
+							sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, i);
+							sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
+							sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+							sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+							i++;
+						}
+						}
+					rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
+				}
+				sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
+				r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+			}
+			sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
+			/* Radio programs */
+			sqlite3_bind_int(stmts[QUERY_TS_BY_FREQ_ORDER], 1, result->start_para->dtv_para.source);
+			r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+			while (r == SQLITE_ROW)
+			{
+				/*广播节目放到最后*/
+				db_ts_id = sqlite3_column_int(stmts[QUERY_TS_BY_FREQ_ORDER], 0);
+				sqlite3_bind_int(stmts[QUERY_SRV_BY_TYPE], 1, db_ts_id);
+				rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
+				while (rr == SQLITE_ROW)
+				{
+					db_id = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 0);
+					if(result->start_para->dtv_para.resort_all || am_scan_rec_tab_have_src(srv_tab, db_id))
+					{
+						srv_type = sqlite3_column_int(stmts[QUERY_SRV_BY_TYPE], 1);
+						if (srv_type == 2)
+						{
+							sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 1, i);
+							sqlite3_bind_int(stmts[UPDATE_DEFAULT_CHAN_NUM], 2, db_id);
+							sqlite3_step(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+							sqlite3_reset(stmts[UPDATE_DEFAULT_CHAN_NUM]);
+							i++;
+						}
+					}
+					rr = sqlite3_step(stmts[QUERY_SRV_BY_TYPE]);
+				}
+				sqlite3_reset(stmts[QUERY_SRV_BY_TYPE]);
+				r = sqlite3_step(stmts[QUERY_TS_BY_FREQ_ORDER]);
+			}
+			sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
 		}
-		sqlite3_reset(stmts[QUERY_TS_BY_FREQ_ORDER]);
 	}
 }
 
@@ -5099,7 +5135,19 @@ handle_events:
 			}
 		}
 	}
-	
+
+	/* need clear dtv source anyway ? */
+	if (dtv_start_para.clear_source &&
+		(GET_MODE(dtv_start_para.mode) != AM_SCAN_DTVMODE_MANUAL &&
+		GET_MODE(dtv_start_para.mode) != AM_SCAN_DTVMODE_NONE))
+	{
+		sqlite3 *hdb;
+		
+		AM_DB_HANDLE_PREPARE(hdb);
+		AM_DEBUG(1, "Clear DTV source %d ...", dtv_start_para.source);
+		am_scan_clear_source(hdb, dtv_start_para.source);
+	}
+		
 	/* need store ? */
 	if (scanner->result.tses/* && scanner->stage == AM_SCAN_STAGE_DONE*/ && scanner->store)
 	{
@@ -5362,6 +5410,10 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 	}
 	
 	AM_DEBUG(1, "Total fe_paras count %d", scanner->start_freqs_cnt);
+	AM_DEBUG(1, "dtv para: resort_all %d, clear_source %d, mixtvradio %d",
+		para->dtv_para.resort_all, 
+		para->dtv_para.clear_source, 
+		para->dtv_para.mix_tv_radio);
 	
 	scanner->start_para = *para;
 	if (para->mode == AM_SCAN_MODE_ADTV)
