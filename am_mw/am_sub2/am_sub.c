@@ -73,7 +73,10 @@ static void sub2_check(AM_SUB2_Parser_t *parser)
 			if((diff > parser->pic->timeout * 90000ll) || pts == 0llu)
 			{
 				dvbsub_remove_display_picture(parser->handle, parser->pic);
-				parser->pic = npic;
+				if (npic == parser->pic)
+					parser->pic = npic->p_next;
+				else
+					parser->pic = npic;
 			}
 		}
 	}
