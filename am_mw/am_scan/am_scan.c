@@ -1592,7 +1592,7 @@ static void store_analog_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_S
 	add_audio(&srv_info.aud_info, 0x1fff, -1, lang_tmp);
 	srv_info.chan_num = 0;
 	srv_info.srv_type = AM_SCAN_SRV_ATV; 
-	strcpy(srv_info.name, "ATV Program");
+	strcpy(srv_info.name, "xxxATV Program");
 	if (result->start_para->atv_para.mode == AM_SCAN_ATVMODE_MANUAL)
 	{
 		srv_info.chan_num = 1;

@@ -855,7 +855,7 @@ static void am_epg_gen_extended_event_text(ExtendedEventLanguage *all_langs, int
 					else
 						copy_len = pee->i_text_length;
 					
-					if (pdata[0] < 0x20)
+					if (pdata[0] < 0x20 && text_len > 0)
 					{
 						/*skip the first byte*/
 						copy_len--;
@@ -863,6 +863,7 @@ static void am_epg_gen_extended_event_text(ExtendedEventLanguage *all_langs, int
 					}
 					
 					memcpy(text_buffer+text_len, pdata, copy_len);
+					text_len += copy_len;
 				}
 			}
 		}
@@ -920,7 +921,7 @@ static void am_epg_gen_extended_event_text(ExtendedEventLanguage *all_langs, int
 		COPY_BYTES(ext_text, ext_len, all_langs[i].lang, 3, cur_text_len);
 		AM_SI_ConvertDVBTextCode((char*)text_buffer, text_len, desc, EXT_TEXT_LEN);
 		desc[EXT_TEXT_LEN] = 0;
-		tmp_len = strlen(item_char);
+		tmp_len = strlen(desc);
 		COPY_BYTES(ext_text, ext_len, desc, tmp_len, cur_text_len);
 	}
 
