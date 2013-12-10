@@ -271,6 +271,7 @@ const char *sql_stmts[MAX_STMT] =
 	"select db_id from ts_table where db_sat_para_id=? order by freq",
 	"select db_id,service_type from srv_table where src=? and chan_num>0 order by chan_order",
 	"select db_id,service_type from srv_table where db_ts_id=? and chan_num<=0 order by service_id",
+	"delete from booking_table where db_evt_id in (select db_id from evt_table where db_ts_id=?)",
 };
 
 /****************************************************************************
@@ -1138,6 +1139,11 @@ static void am_scan_update_ts_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *resul
 	sqlite3_step(stmts[DELETE_TS_SRVS]);
 	sqlite3_reset(stmts[DELETE_TS_SRVS]);
 
+	/*清除该TS下所有events所对应的booings*/
+	sqlite3_bind_int(stmts[DELETE_TS_EVTS_BOOKINGS], 1, dbid);
+	sqlite3_step(stmts[DELETE_TS_EVTS_BOOKINGS]);
+	sqlite3_reset(stmts[DELETE_TS_EVTS_BOOKINGS]);	
+
 	/*清除该TS下所有events*/
 	AM_DEBUG(1, "Delete all events in TS %d", dbid);
 	sqlite3_bind_int(stmts[DELETE_TS_EVTS], 1, dbid);
@@ -1976,6 +1982,9 @@ static void am_scan_clear_source(sqlite3 *hdb, int src)
 	/*清空SRV记录*/
 	snprintf(sqlstr, sizeof(sqlstr), "delete from srv_table where src=%d",src);
 	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
+	/*清空booking记录*/
+    snprintf(sqlstr, sizeof(sqlstr), "delete from booking_table where db_srv_id in (select db_srv_id from evt_table where src=%d)",src);
+    sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
 	/*清空event记录*/
 	snprintf(sqlstr, sizeof(sqlstr), "delete from evt_table where src=%d",src);
 	sqlite3_exec(hdb, sqlstr, NULL, NULL, NULL);
