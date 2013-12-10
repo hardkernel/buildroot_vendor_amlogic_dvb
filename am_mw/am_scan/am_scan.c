@@ -1231,7 +1231,7 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 			(srv_info->srv_type == AM_SCAN_SRV_DTV || 
 			srv_info->srv_type == AM_SCAN_SRV_DRADIO))
 		{
-			strcpy(srv_info->name, "No Name");
+			strcpy(srv_info->name, "xxxNo Name");
 		}
 	}
 

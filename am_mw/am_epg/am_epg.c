@@ -2066,15 +2066,17 @@ static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 			if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE)
 			{
 				dvbpsi_service_dr_t *psd = (dvbpsi_service_dr_t*)descr->p_decoded;
-				char name[AM_DB_MAX_SRV_NAME_LEN + 1];
+				char name[AM_DB_MAX_SRV_NAME_LEN + 4];
 				const unsigned char *old_name;
 
 				/*取节目名称*/
 				if (psd->i_service_name_length > 0)
 				{
+					/*default language code*/
+					strcpy(name, "xxx");
 					AM_SI_ConvertDVBTextCode((char*)psd->i_service_name, psd->i_service_name_length,\
-								name, AM_DB_MAX_SRV_NAME_LEN);
-					name[AM_DB_MAX_SRV_NAME_LEN] = 0;
+								name+3, AM_DB_MAX_SRV_NAME_LEN);
+					name[AM_DB_MAX_SRV_NAME_LEN+3] = 0;
 
 					sqlite3_bind_int(stmt, 1, db_ts_id);
 					sqlite3_bind_int(stmt, 2, srv->i_service_id);
@@ -2082,7 +2084,7 @@ static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 					{
 						db_srv_id = sqlite3_column_int(stmt, 0);
 						old_name = sqlite3_column_text(stmt, 1);
-						if (old_name != NULL && !strcmp((const char*)old_name, "No Name"))
+						if (old_name != NULL && !strcmp((const char*)old_name, "xxxNo Name"))
 						{
 							AM_DEBUG(1, "SDT Update: Program name changed: %s -> %s", old_name, name);
 							sqlite3_bind_text(update_stmt, 1, (const char*)name, -1, SQLITE_STATIC);
