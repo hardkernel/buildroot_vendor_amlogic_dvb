@@ -1686,21 +1686,12 @@ static AM_ErrorCode_t am_epg_request_section(AM_EPG_Monitor_t *mon, AM_EPG_Table
 	{
 		if (mcl->subctl->ver != 0xff && mcl->subs == 1)
 		{
-			if(mcl->pid == AM_SI_PID_SDT)
-			{
-				AM_DEBUG(1, "Start filtering no version for %s table", mcl->tname);
-				/*Current next indicator must be 1*/
-				param.filter.filter[3] = 0x01;
-				param.filter.mask[3] = 0x01;
-			}
-			else
-			{
-				AM_DEBUG(1, "Start filtering new version (!=%d) for %s table", mcl->subctl->ver, mcl->tname);
-				/*Current next indicator must be 1*/
-				param.filter.filter[3] = (mcl->subctl->ver << 1) | 0x01;
-				param.filter.mask[3] = 0x3f;
-				param.filter.mode[3] = 0xff;
-			}
+			AM_DEBUG(1, "Start filtering new version (!=%d) for %s table", mcl->subctl->ver, mcl->tname);
+			/*Current next indicator must be 1*/
+			param.filter.filter[3] = (mcl->subctl->ver << 1) | 0x01;
+			param.filter.mask[3] = 0x3f;
+			param.filter.mode[3] = 0xff;
+
 			SUBCTL_CLEAR(mcl->subctl);
 		}
 		else
