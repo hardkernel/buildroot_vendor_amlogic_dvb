@@ -247,6 +247,7 @@ typedef struct
 	AM_SI_AudioInfo_t aud_info;
 	AM_SI_SubtitleInfo_t sub_info;
 	AM_SI_TeletextInfo_t ttx_info;
+	int sdt_version;
 }AM_SCAN_ServiceInfo_t;
 
 /**\brief 搜索中间数据*/

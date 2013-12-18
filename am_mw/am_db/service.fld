@@ -65,3 +65,4 @@
 "hide_guide integer",									/**< ATSC 隐藏的节目是否可以在EPG中显示*/
 "source_id integer",								/**< ATSC program 的 source id，用于与EIT ETT中的source id对应*/
 
+"sdt_ver integer"									/*sdt version of current ts*/

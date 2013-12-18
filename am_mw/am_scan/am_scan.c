@@ -232,7 +232,7 @@ const char *sql_stmts[MAX_STMT] =
 	 current_ttx=-1,ttx_pids=?,ttx_types=?,ttx_magazine_nos=?,ttx_page_nos=?,ttx_langs=?,\
 	 skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,\
 	 hide_guide=?, source_id=?,favor=?,db_sat_para_id=?,scrambled_flag=?,lcn=-1,hd_lcn=-1,sd_lcn=-1,\
-	 default_chan_num=-1,chan_order=0,lcn_order=0,service_id_order=0,hd_sd_order=0,pmt_pid=?,dvbt2_plp_id=? where db_id=?",
+	 default_chan_num=-1,chan_order=0,lcn_order=0,service_id_order=0,hd_sd_order=0,pmt_pid=?,dvbt2_plp_id=?,sdt_ver=? where db_id=?",
 	"select db_id,service_type from srv_table where db_ts_id=? order by service_id",
 	"update srv_table set chan_num=? where db_id=?",
 	"delete  from evt_table where db_ts_id=?",
@@ -1163,6 +1163,7 @@ static void am_scan_init_service_info(AM_SCAN_ServiceInfo_t *srv_info)
 	srv_info->satpara_dbid = -1;
 	srv_info->pmt_pid = 0x1fff;
 	srv_info->plp_id = -1;
+	srv_info->sdt_version = 0xff;
 }
 
 /**\brief 更新一个service数据到数据库*/
@@ -1303,7 +1304,8 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 	sqlite3_bind_int(stmts[UPDATE_SRV], 34, srv_info->scrambled_flag);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 35, srv_info->pmt_pid);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 36, srv_info->plp_id);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 37, srv_info->srv_dbid);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 37, srv_info->sdt_version);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 38, srv_info->srv_dbid);
 	sqlite3_step(stmts[UPDATE_SRV]);
 	sqlite3_reset(stmts[UPDATE_SRV]);
 }
@@ -1354,8 +1356,8 @@ static void am_scan_extract_srv_info_from_sdt(AM_SCAN_Result_t *result, dvbpsi_s
 			srv_info->eit_pf = (uint8_t)srv->b_eit_present;
 			srv_info->rs = srv->i_running_status;
 			srv_info->free_ca = (uint8_t)srv->b_free_ca;
+			srv_info->sdt_version = sdt->i_version;
 
-			/* look up service_descr first, to ensure service name stored at first */
 			AM_SI_LIST_BEGIN(srv->p_first_descriptor, descr)
 			if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE)
 			{

@@ -1943,6 +1943,51 @@ static void am_epg_check_pmt_update(AM_EPG_Monitor_t *mon)
 }
 
 
+static int am_epg_check_sdt_update_stage_version(AM_EPG_Monitor_t *mon)
+{
+	char tmpsql[256];
+	int prev_sdt_ver, db_ts_id;
+	sqlite3 *hdb;
+	int row;
+	int db_srv_id;
+
+	AM_DB_HANDLE_PREPARE(hdb);
+
+	/* check sdt version for update,
+	     the scan proccess will be triggered if sdt 1st received after scanning or version changed.*/
+
+	AM_DEBUG(1, "Checking sdt version for service %d", mon->mon_service);
+	row = 1;
+	snprintf(tmpsql, sizeof(tmpsql), "select sdt_ver from srv_table where db_id=%d", mon->mon_service);
+	AM_DB_Select(hdb, tmpsql, &row, "%d", &prev_sdt_ver);
+	if((prev_sdt_ver != 0xff) && (prev_sdt_ver == mon->sdts->i_version))
+		return 1;
+
+	db_ts_id = am_epg_get_current_db_ts_id(mon);
+	if (db_ts_id < 0)
+	{
+		AM_DEBUG(1, "SDT update: cannot get current ts(%d)!", db_ts_id);
+		return 1;
+	}
+
+	/*update sdt_ver.*/
+	AM_DEBUG(1, "update sdt version for service in ts %d", db_ts_id);
+	do {
+		row=1;
+		snprintf(tmpsql, sizeof(tmpsql), "select db_id from srv_table where db_ts_id=%d and sdt_ver!=%d",
+						db_ts_id, mon->sdts->i_version);
+		AM_DB_Select(hdb, tmpsql, &row, "%d", &db_srv_id);
+
+		if(row) {
+			snprintf(tmpsql, sizeof(tmpsql), "update srv_table set sdt_ver=%d where db_id=%d",
+								mon->sdts->i_version, db_srv_id);
+			sqlite3_exec(hdb, tmpsql, NULL, NULL, NULL);
+		}
+	}while(row);
+
+	return 0;
+}
+
 static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 {
 	const char *sql = "select db_id,name from srv_table where db_ts_id=? \
@@ -1967,19 +2012,22 @@ static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 		int prev_ts_id, prev_net_id;
 		int row;
 
+		if(am_epg_check_sdt_update_stage_version(mon))
+			return ;
+
+		/*sdt version changed or no version stored before.*/
 		db_ts_id = am_epg_get_current_db_ts_id(mon);
-		if (db_ts_id >= 0)
-		{
-			row = 1;
-			snprintf(tmpsql, sizeof(tmpsql), "select ts_id from ts_table where db_id=%d", db_ts_id);
-			AM_DB_Select(hdb, tmpsql, &row, "%d", &prev_ts_id);
-		}
-		else
+		if (db_ts_id < 0)
 		{
 			AM_DEBUG(1, "SDT update: cannot get current ts(%d)!", db_ts_id);
 			return;
 		}
 
+		/* check ts_id for update */
+		AM_DEBUG(1, "Checking ts_id for ts %d", db_ts_id);
+		row = 1;
+		snprintf(tmpsql, sizeof(tmpsql), "select ts_id from ts_table where db_id=%d", db_ts_id);
+		AM_DB_Select(hdb, tmpsql, &row, "%d", &prev_ts_id);
 		if(prev_ts_id != mon->sdts->i_ts_id)
 		{
 			AM_DEBUG(1, "TS id not match, current(%d), but got(%d)", prev_ts_id, mon->sdts->i_ts_id);
