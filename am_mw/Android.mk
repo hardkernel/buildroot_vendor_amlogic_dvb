@@ -1,4 +1,5 @@
 LOCAL_PATH := $(call my-dir)
+AMLOGIC_LIBPLAYER :=y
 
 include $(CLEAR_VARS)
 
@@ -100,6 +101,10 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_cc/am_cc.c
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1 #
+ifeq ($(AMLOGIC_LIBPLAYER), y)
+LOCAL_CFLAGS+=-DAMLOGIC_LIBPLAYER
+endif
+
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw\
@@ -111,15 +116,21 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    packages/amlogic/LibPlayer/amadec/include\
 		    packages/amlogic/LibPlayer/amcodec/include\
-		    packages/amlogic/LibPlayer/amffmpeg\
-		    packages/amlogic/LibPlayer/amplayer\
 		    external/libzvbi/src\
 		    external/sqlite/dist\
 		    external/icu4c/common\
 		    $(LOCAL_PATH)/am_ci
 
-LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc 
+ifeq ($(AMLOGIC_LIBPLAYER), y)
+LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg
+LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amplayer
+endif
 
+ifeq ($(AMLOGIC_LIBPLAYER), y)
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc 
+else
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libc
+endif
 LOCAL_PRELINK_MODULE := false
 
 include $(BUILD_SHARED_LIBRARY)
@@ -225,6 +236,10 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1 #
+ifeq ($(AMLOGIC_LIBPLAYER), y)
+LOCAL_CFLAGS+=-DAMLOGIC_LIBPLAYER
+endif
+
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw\
@@ -236,16 +251,21 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    packages/amlogic/LibPlayer/amadec/include\
 		    packages/amlogic/LibPlayer/amcodec/include\
-		    packages/amlogic/LibPlayer/amffmpeg\
-		    packages/amlogic/LibPlayer/amplayer\
 		    external/libzvbi/src\
 		    external/sqlite/dist\
 		    external/icu4c/common\
 		    $(LOCAL_PATH)/am_ci
+ifeq ($(AMLOGIC_LIBPLAYER), y)
+LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg
+LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amplayer
+endif
 
-    
-LOCAL_SHARED_LIBRARIES += libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc  
 
+ifeq ($(AMLOGIC_LIBPLAYER), y)    
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc  
+else
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libc
+endif
 LOCAL_PRELINK_MODULE := false
 
 include $(BUILD_STATIC_LIBRARY)

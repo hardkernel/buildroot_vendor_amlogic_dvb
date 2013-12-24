@@ -105,6 +105,15 @@ void *adec_handle;
 #define VID_ASPECT_MATCH_FILE "/sys/class/video/matchmethod" 
 #endif
 
+#if !defined (AMLOGIC_LIBPLAYER)
+#define  AUDIO_CTRL_DEVICE    "/dev/amaudio_ctl"
+#define AMAUDIO_IOC_MAGIC  'A'
+#define AMAUDIO_IOC_SET_LEFT_MONO               _IOW(AMAUDIO_IOC_MAGIC, 0x0e, int)
+#define AMAUDIO_IOC_SET_RIGHT_MONO              _IOW(AMAUDIO_IOC_MAGIC, 0x0f, int)
+#define AMAUDIO_IOC_SET_STEREO                  _IOW(AMAUDIO_IOC_MAGIC, 0x10, int)
+#define AMAUDIO_IOC_SET_CHANNEL_SWAP            _IOW(AMAUDIO_IOC_MAGIC, 0x11, int)
+#endif
+
 #define VDEC_H264_ERROR_RECOVERY_MODE_FILE "/sys/module/amvdec_h264/parameters/error_recovery_mode"
 
 #define DISP_MODE_FILE      "/sys/class/display/mode"
@@ -619,8 +628,11 @@ static AM_ErrorCode_t amp_set_volume(AM_AOUT_Device_t *dev, int vol)
 #endif
 #ifdef PLAYER_API_NEW
 	int media_id = (int)dev->drv_data;
-
+#ifdef AMLOGIC_LIBPLAYER
 	if(audio_set_volume(media_id, vol)==-1)
+#else
+
+#endif
 	{
 		AM_DEBUG(1, "audio_set_volume failed");
 		return AM_AV_ERR_SYS;
@@ -644,7 +656,11 @@ static AM_ErrorCode_t amp_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 	int media_id = (int)dev->drv_data;
 
 	printf("audio_set_mute %d\n", mute);
+#ifdef AMLOGIC_LIBPLAYER
 	if(audio_set_mute(media_id, mute?0:1)==-1)
+#else
+
+#endif
 	{
 		AM_DEBUG(1, "audio_set_mute failed");
 		return AM_AV_ERR_SYS;
@@ -652,6 +668,46 @@ static AM_ErrorCode_t amp_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 #endif
 	return AM_SUCCESS;
 }
+
+#if !defined(AMLOGIC_LIBPLAYER)
+static int audio_hardware_ctrl( AM_AOUT_OutputMode_t mode)
+{
+    int fd;
+
+    fd = open(AUDIO_CTRL_DEVICE, O_RDONLY);
+    if (fd < 0) {
+        AM_DEBUG(1,"Open Device %s Failed!", AUDIO_CTRL_DEVICE);
+        return -1;
+    }
+
+    switch (mode) {
+    case AM_AOUT_OUTPUT_SWAP:
+        ioctl(fd, AMAUDIO_IOC_SET_CHANNEL_SWAP, 0);
+        break;
+
+    case AM_AOUT_OUTPUT_DUAL_LEFT:
+        ioctl(fd, AMAUDIO_IOC_SET_LEFT_MONO, 0);
+        break;
+
+    case AM_AOUT_OUTPUT_DUAL_RIGHT:
+        ioctl(fd, AMAUDIO_IOC_SET_RIGHT_MONO, 0);
+        break;
+
+    case AM_AOUT_OUTPUT_STEREO:
+        ioctl(fd, AMAUDIO_IOC_SET_STEREO, 0);
+        break;
+
+    default:
+        AM_DEBUG(1,"Unknow mode %d!", mode);
+        break;
+
+    };
+
+    close(fd);
+
+    return 0;
+}
+#endif
 
 static AM_ErrorCode_t amp_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_OutputMode_t mode)
 {
@@ -691,16 +747,32 @@ static AM_ErrorCode_t amp_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_OutputM
 	{
 		case AM_AOUT_OUTPUT_STEREO:
 		default:
-			ret = audio_stereo(media_id);
+#ifdef AMLOGIC_LIBPLAYER		
+                	ret = audio_stereo(media_id);
+#else
+                        ret = audio_hardware_ctrl(mode);
+#endif
 		break;
 		case AM_AOUT_OUTPUT_DUAL_LEFT:
+#ifdef AMLOGIC_LIBPLAYER
 			ret = audio_left_mono(media_id);
+#else
+                        ret = audio_hardware_ctrl(mode);
+#endif
 		break;
 		case AM_AOUT_OUTPUT_DUAL_RIGHT:
+#ifdef AMLOGIC_LIBPLAYER
 			ret = audio_right_mono(media_id);
+#else
+                        ret = audio_hardware_ctrl(mode);
+#endif
 		break;
 		case AM_AOUT_OUTPUT_SWAP:
+#ifdef AMLOGIC_LIBPLAYER
 			ret = audio_swap_left_right(media_id);
+#else
+                        ret = audio_hardware_ctrl(mode);
+#endif
 		break;
 	}
 	if(ret==-1)
@@ -999,7 +1071,9 @@ static void aml_destroy_fp(AV_FilePlayerData_t *fp)
 	/*等待播放器停止*/
 	if(fp->media_id >= 0)
 	{
+#ifdef AMLOGIC_LIBPLAYER
 		player_exit(fp->media_id);
+#endif
 	}
 	
 	pthread_mutex_destroy(&fp->lock);
@@ -1011,6 +1085,7 @@ static void aml_destroy_fp(AV_FilePlayerData_t *fp)
 /**\brief 创建文件播放器数据*/
 static AV_FilePlayerData_t* aml_create_fp(AM_AV_Device_t *dev)
 {
+#ifdef AMLOGIC_LIBPLAYER
 	AV_FilePlayerData_t *fp;
 	
 	fp = (AV_FilePlayerData_t*)malloc(sizeof(AV_FilePlayerData_t));
@@ -1035,6 +1110,11 @@ static AV_FilePlayerData_t* aml_create_fp(AM_AV_Device_t *dev)
 	fp->media_id = -1;
 	
 	return fp;
+#else
+        return NULL;
+
+#endif
+
 }
 
 static int aml_update_player_info_callback(int pid,player_info_t * info)
@@ -4039,9 +4119,9 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 			if(pp->start)
 			{
 				 memset((void*)&data->pctl,0,sizeof(play_control_t)); 
-    
+#ifdef AMLOGIC_LIBPLAYER    
 				player_register_update_callback(&data->pctl.callback_fn, aml_update_player_info_callback, PLAYER_INFO_POP_INTERVAL);
-
+#endif
 				data->pctl.file_name = strndup(pp->name,FILENAME_LENGTH_MAX);
 				data->pctl.video_index = -1;
 				data->pctl.audio_index = -1;
@@ -4056,16 +4136,19 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 				}
 				data->pctl.need_start = 1;
 				data->pctl.is_variable = 1;
-				
-				data->media_id = player_start(&data->pctl,0);
 
+#ifdef AMLOGIC_LIBPLAYER				
+				data->media_id = player_start(&data->pctl,0);
+#endif
 				if(data->media_id<0)
 				{
 					AM_DEBUG(1, "play file failed");
 					return AM_AV_ERR_SYS;
 				}
 
+#ifdef AMLOGIC_LIBPLAYER
 				player_start_play(data->media_id);
+#endif
 				AM_AOUT_SetDriver(AOUT_DEV_NO, &amplayer_aout_drv, (void*)data->media_id);
 			}
 #endif
@@ -4249,7 +4332,8 @@ static AM_ErrorCode_t aml_file_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *
 		AM_DEBUG(1, "player do not start");
 		return AM_AV_ERR_SYS;
 	}
-	
+
+#ifdef AMLOGIC_LIBPLAYER	
 	switch(cmd)
 	{
 		case AV_PLAY_START:
@@ -4276,6 +4360,7 @@ static AM_ErrorCode_t aml_file_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *
 			return AM_AV_ERR_NOT_SUPPORTED;
 		break;
 	}
+#endif
 #endif	
 
 	return AM_SUCCESS;
@@ -4366,8 +4451,9 @@ static AM_ErrorCode_t aml_file_status(AM_AV_Device_t *dev, AM_AV_PlayStatus_t *s
 	}
 #elif defined PLAYER_API_NEW
 	 player_info_t pinfo;
-	 
+#ifdef AMLOGIC_LIBPLAYER	 
 	if(player_get_play_info(data->media_id,&pinfo)<0)
+#endif
 	{
 		AM_DEBUG(1, "player_get_play_info failed");
 		return AM_AV_ERR_SYS;
@@ -4412,8 +4498,9 @@ static AM_ErrorCode_t aml_file_info(AM_AV_Device_t *dev, AM_AV_FileInfo_t *info)
 	}
 #elif defined PLAYER_API_NEW
 	 media_info_t minfo;
-	 
+#ifdef AMLOGIC_LIBPLAYER	 
 	if(player_get_media_info(data->media_id,&minfo)<0)
+#endif
 	{
 		AM_DEBUG(1, "player_get_media_info failed");
 		return AM_AV_ERR_SYS;

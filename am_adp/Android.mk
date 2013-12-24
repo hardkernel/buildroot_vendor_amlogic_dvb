@@ -1,5 +1,5 @@
 LOCAL_PATH := $(call my-dir)
-
+AMLOGIC_LIBPLAYER :=y
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libam_adp
@@ -24,17 +24,29 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 
 
 
-LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND
+LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND 
+ifeq ($(AMLOGIC_LIBPLAYER), y)
+LOCAL_CFLAGS+=-DAMLOGIC_LIBPLAYER
+endif
+
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    packages/amlogic/LibPlayer/amadec/include\
-		    packages/amlogic/LibPlayer/amcodec/include\
-		    packages/amlogic/LibPlayer/amffmpeg\
-		    packages/amlogic/LibPlayer/amplayer
+		    packages/amlogic/LibPlayer/amcodec/include
+
+ifeq ($(AMLOGIC_LIBPLAYER), y)
+LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg
+LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amplayer
+endif
 
 
-LOCAL_SHARED_LIBRARIES += libamplayer libcutils liblog libc
+ifeq ($(AMLOGIC_LIBPLAYER), y)
+LOCAL_SHARED_LIBRARIES+=libamplayer libcutils liblog libc
+else
+LOCAL_SHARED_LIBRARIES+=libcutils liblog libc libamadec libamcodec
+endif
+
 
 LOCAL_PRELINK_MODULE := false
 
@@ -64,16 +76,27 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 	   am_userdata/emu/emu.c
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND
+ifeq ($(AMLOGIC_LIBPLAYER), y)
+LOCAL_CFLAGS+=-DAMLOGIC_LIBPLAYER
+endif
+
 LOCAL_ARM_MODE := arm 
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
             $(LOCAL_PATH)/../android/ndk/include\
 	    packages/amlogic/LibPlayer/amadec/include\
-	    packages/amlogic/LibPlayer/amcodec/include\
-	    packages/amlogic/LibPlayer/amffmpeg\
-	    packages/amlogic/LibPlayer/amplayer
+	    packages/amlogic/LibPlayer/amcodec/include
 
-LOCAL_SHARED_LIBRARIES += libamplayer libcutils liblog libc
+ifeq ($(AMLOGIC_LIBPLAYER), y)
+LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg
+LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amplayer
+endif
 
+
+ifeq ($(AMLOGIC_LIBPLAYER), y)
+LOCAL_SHARED_LIBRARIES+=libamplayer libcutils liblog libc
+else
+LOCAL_SHARED_LIBRARIES+=libcutils liblog libc libamadec libamcodec
+endif
 LOCAL_PRELINK_MODULE := false
 
 include $(BUILD_STATIC_LIBRARY)

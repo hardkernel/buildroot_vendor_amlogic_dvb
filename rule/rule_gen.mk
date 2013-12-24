@@ -186,3 +186,6 @@ endif
 	LDFLAGS+=-lfreetype -lz
 endif
 
+ifeq ($(AMLOGIC_LIBPLAYER)), y)
+        CFLAGS+=-DAMLOGIC_LIBPLAYER
+endif
