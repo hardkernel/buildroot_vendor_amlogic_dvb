@@ -397,6 +397,9 @@ typedef struct tvin_parm_s {
     enum tvin_port_e            port;     // must set port in IOCTL
     struct tvin_info_s          info;
     struct tvin_cutwin_s        cutwin;
+	unsigned int                hist_pow;
+	unsigned int                luma_sum;
+	unsigned int                pixel_sum;
     unsigned short              histgram[64];
     unsigned int                flag;
     unsigned int                reserved;
