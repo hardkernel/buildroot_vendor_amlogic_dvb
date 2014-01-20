@@ -5279,6 +5279,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			//AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");
 			//AM_FileEcho("/sys/class/video/axis", "0 0 0 0");
 			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", AV_SMOOTH_SYNC_VAL);
+			AM_FileEcho("/sys/module/di/parameters/bypass_all","0");
 			usleep(2000*1000);
 		}
 #endif
