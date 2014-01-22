@@ -721,7 +721,7 @@ AM_ErrorCode_t AM_SMC_TransferT0(int dev_no, const uint8_t *send, int slen, uint
 				AM_TRY_FINAL(smc_read(dev, buf, rxlen, NULL, 5000*DELAY_MUL));
 				ringbuffer_write(&rxbuf,buf,rxlen);
 			}
-                }
+		}
 		else if((byte==(INS_BYTE^0xff))||(byte==(INS_BYTE^0xfe))) //0x01 0x00
 		{
 			AM_TRY_FINAL(smc_read(dev, buf, 1, NULL, 5000*DELAY_MUL));
@@ -742,6 +742,76 @@ final:
 	*rlen = ringbuffer_avail(&rxbuf);
 	ringbuffer_read(&rxbuf,dst,*rlen);
 	
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+/**\brief 按T1协议传输数据
+ * \param dev_no 智能卡设备号
+ * \param[in] send 发送数据缓冲区
+ * \param[in] slen 待发送的数据长度
+ * \param[out] recv 接收数据缓冲区
+ * \param[out] rlen 返回接收数据的长度
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_smc.h)
+ */
+AM_ErrorCode_t AM_SMC_TransferT1(int dev_no, const uint8_t *send, int slen, uint8_t *recv, int *rlen)
+{
+	AM_SMC_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	assert(send && recv && rlen);
+
+	AM_TRY(smc_get_openned_dev(dev_no, &dev));
+	
+	pthread_mutex_lock(&dev->lock);
+
+	AM_TRY_FINAL(smc_write(dev, send, slen, NULL, 1000));
+
+	AM_TRY_FINAL(smc_read(dev, recv, 3, NULL, 1000));
+
+	AM_TRY_FINAL(smc_read(dev, recv + 3, recv[2] + 1, NULL, 2000));
+
+	*rlen = recv[2] + 4;
+
+final:
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+/**\brief 按T14协议传输数据
+ * \param dev_no 智能卡设备号
+ * \param[in] send 发送数据缓冲区
+ * \param[in] slen 待发送的数据长度
+ * \param[out] recv 接收数据缓冲区
+ * \param[out] rlen 返回接收数据的长度
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_smc.h)
+ */
+AM_ErrorCode_t AM_SMC_TransferT14(int dev_no, const uint8_t *send, int slen, uint8_t *recv, int *rlen)
+{
+	AM_SMC_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	assert(send && recv && rlen);
+
+	AM_TRY(smc_get_openned_dev(dev_no, &dev));
+	
+	pthread_mutex_lock(&dev->lock);
+
+	AM_TRY_FINAL(smc_write(dev, send, slen, NULL, 1000));
+
+	AM_TRY_FINAL(smc_read(dev, recv, 8, NULL, 1000));
+
+	AM_TRY_FINAL(smc_read(dev, recv + 8, recv[7] + 1, NULL, 2000));
+
+	*rlen = recv[7] + 9;
+
+final:
 	pthread_mutex_unlock(&dev->lock);
 
 	return ret;
