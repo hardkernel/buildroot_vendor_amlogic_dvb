@@ -199,6 +199,30 @@ extern AM_ErrorCode_t AM_SMC_WriteEx(int dev_no, const uint8_t *data, int *act_l
  */
 extern AM_ErrorCode_t AM_SMC_TransferT0(int dev_no, const uint8_t *send, int slen, uint8_t *recv, int *rlen);
 
+/**\brief 按T1协议传输数据
+ * \param dev_no 智能卡设备号
+ * \param[in] send 发送数据缓冲区
+ * \param[in] slen 待发送的数据长度
+ * \param[out] recv 接收数据缓冲区
+ * \param[out] rlen 返回接收数据的长度
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_smc.h)
+ */
+extern AM_ErrorCode_t AM_SMC_TransferT1(int dev_no, const uint8_t *send, int slen, uint8_t *recv, int *rlen);
+
+/**\brief 按T14协议传输数据
+ * \param dev_no 智能卡设备号
+ * \param[in] send 发送数据缓冲区
+ * \param[in] slen 待发送的数据长度
+ * \param[out] recv 接收数据缓冲区
+ * \param[out] rlen 返回接收数据的长度
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_smc.h)
+ */
+extern AM_ErrorCode_t AM_SMC_TransferT14(int dev_no, const uint8_t *send, int slen, uint8_t *recv, int *rlen);
+
 /**\brief 取得当前的智能卡状态回调函数
  * \param dev_no 智能卡设备号
  * \param[out] cb 返回回调函数指针

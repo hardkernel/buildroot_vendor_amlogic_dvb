@@ -135,11 +135,17 @@ static AM_ErrorCode_t dvb_free_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *fil
 
 static AM_ErrorCode_t dvb_set_sec_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *filter, const struct dmx_sct_filter_params *params)
 {
+	struct dmx_sct_filter_params p;
 	int fd = (int)filter->drv_data;
 	int ret;
 
+	p = *params;
+	if(p.filter.mask[0] == 0){
+		p.filter.filter[0] = 0x00;
+		p.filter.mask[0]   = 0x80;
+	}
 	
-	ret = ioctl(fd, DMX_SET_FILTER, params);
+	ret = ioctl(fd, DMX_SET_FILTER, &p);
 	if(ret==-1)
 	{
 		AM_DEBUG(1, "set section filter failed (%s)", strerror(errno));
