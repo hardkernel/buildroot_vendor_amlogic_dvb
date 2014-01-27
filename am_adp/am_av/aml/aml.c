@@ -3648,7 +3648,7 @@ static void* aml_av_monitor_thread(void *arg)
 				vbuf_level, vpts ? dmx_vpts - vpts : dmx_vpts - first_dmx_vpts,
 				resample_type);
 #endif
-		if(has_audio && !adec_start && !av_paused){
+		if(has_audio && !adec_start){
 			adec_start = AM_TRUE;
 
 			if(abuf_level < ADEC_START_AUDIO_LEVEL)
@@ -3710,10 +3710,12 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 
 		if(av_paused){
-			if(has_video && (vbuf_level >= ADEC_START_VIDEO_LEVEL))
-				av_paused = AM_FALSE;
-			if(has_audio && adec_start && (abuf_level >= ADEC_START_AUDIO_LEVEL))
-				av_paused = AM_FALSE;
+			av_paused = AM_FALSE;
+
+			if(has_video && (vbuf_level < ADEC_START_VIDEO_LEVEL))
+				av_paused = AM_TRUE;
+			if(has_audio && (abuf_level < ADEC_START_AUDIO_LEVEL))
+				av_paused = AM_TRUE;
 
 			if(!av_paused){
 				if(has_audio && adec_start){
