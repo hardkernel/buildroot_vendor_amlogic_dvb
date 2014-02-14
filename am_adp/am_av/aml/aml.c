@@ -83,12 +83,13 @@ void *adec_handle = NULL;
 #define ADEC_START_AUDIO_LEVEL       256
 #define ADEC_START_VIDEO_LEVEL       2048
 #define ADEC_FORCE_START_AUDIO_LEVEL 1024
-#define DEC_STOP_AUDIO_LEVEL         32
+#define DEC_STOP_AUDIO_LEVEL         16
 #define DEC_STOP_VIDEO_LEVEL         512
 #define UP_RESAMPLE_AUDIO_LEVEL      128
 #define UP_RESAMPLE_VIDEO_LEVEL      1024
 #define DOWN_RESAMPLE_CACHE_TIME     90000*2
 #define NO_DATA_CHECK_TIME           4000
+#define VMASTER_REPLAY_TIME          4000
 
 #define STREAM_VBUF_FILE    "/dev/amstream_vbuf"
 #define STREAM_ABUF_FILE    "/dev/amstream_abuf"
@@ -132,6 +133,9 @@ void *adec_handle = NULL;
 #define VIDEO_DMX_PTS_FILE	"/sys/class/stb/video_pts"
 #define AUDIO_PTS_FILE	"/sys/class/tsync/pts_audio"
 #define VIDEO_PTS_FILE	"/sys/class/tsync/pts_video"
+#define TSYNC_MODE_FILE "/sys/class/tsync/mode"
+#define AV_THRESHOLD_MIN_FILE "/sys/class/tsync/av_threshold_min"
+#define AV_THRESHOLD_MAX_FILE "/sys/class/tsync/av_threshold_max"
 
 #define CANVAS_ALIGN(x)    (((x)+7)&~7)
 #define JPEG_WRTIE_UNIT    (32*1024)
@@ -2048,80 +2052,6 @@ inject_end:
 	return real_written;
 }
 
-static unsigned int aml_get_pts_video()
-{
-    int handle;
-    int size;
-    char s[16];
-    unsigned int value = 0;
-
-    handle = open("/sys/class/tsync/pts_video", O_RDONLY);
-    if (handle < 0) {
-        return -1;
-    }
-    size = read(handle, s, sizeof(s));
-    if (size > 0) {
-        value = strtoul(s, NULL, 16);
-    }
-    close(handle);
-
-    return value;
-}
-
-static unsigned int aml_get_pts_audio()
-{
-    int handle;
-    int size;
-    char s[16];
-    unsigned int value;
-
-    handle = open("/sys/class/tsync/pts_audio", O_RDONLY);
-    if (handle < 0) {
-        return -1;
-    }
-    size = read(handle, s, sizeof(s));
-    if (size > 0) {
-        value = strtoul(s, NULL, 16);
-    }
-    close(handle);
-
-    return value;
-}
-
-static int aml_set_black_policy(int blackout)
-{
-	int fd;
-	char  bcmd[16];
-
-	fd = open("/sys/class/video/blackout_policy", O_CREAT | O_RDWR | O_TRUNC, 0644);
-	if (fd >= 0)
-	{
-		sprintf(bcmd, "%d", blackout);
-		write(fd, bcmd, strlen(bcmd));
-		close(fd);
-		return 0;
-	}
-
-	return -1;
-}
-
-static int aml_get_black_policy()
-{
-    int fd;
-    int val = 0;
-    char  bcmd[16];
-
-    fd = open("/sys/class/video/blackout_policy", O_RDONLY);
-    if (fd >= 0)
-	{
-        read(fd, bcmd, sizeof(bcmd));
-        val = strtol(bcmd, NULL, 16);
-        close(fd);
-    }
-
-    return (val & 0x1);
-}
-
 static int aml_timeshift_get_trick_stat(AV_TimeshiftData_t *tshift)
 {
 	int state;
@@ -2588,7 +2518,6 @@ static void *aml_timeshift_thread(void *arg)
 	struct am_io_param astatus;
 	struct am_io_param vstatus;
 	AV_PlayCmd_t cmd;
-	int blackout = aml_get_black_policy();
 	int playback_alen=0, playback_vlen=0;
 	AM_Bool_t is_playback_mode = (tshift->para.mode == AM_AV_TIMESHIFT_MODE_PLAYBACK);
 
@@ -2599,7 +2528,7 @@ static void *aml_timeshift_thread(void *arg)
 	AM_EVT_Signal(0, AM_AV_EVT_PLAYER_UPDATE_INFO, (void*)&info);
 	AM_TIME_GetClock(&update_time);
 
-	aml_set_black_policy(0);
+	AM_FileEcho(VID_BLACKOUT_FILE, "0");
 	while (tshift->running||tshift->cmd!= tshift->last_cmd )
 	{
 		pthread_mutex_lock(&tshift->lock);
@@ -2785,7 +2714,7 @@ wait_for_next_loop:
 	aml_timeshift_update_info(tshift, &info);
 
 	ioctl(tshift->cntl_fd, AMSTREAM_IOC_TRICKMODE, TRICKMODE_NONE);
-	aml_set_black_policy(blackout);
+	AM_FileEcho(VID_BLACKOUT_FILE, tshift->dev->video_blackout ? "1" : "0");
 
 	return NULL;
 }
@@ -3576,6 +3505,7 @@ static void* aml_av_monitor_thread(void *arg)
 	AM_Bool_t audio_scrambled = AM_FALSE;
 	AM_Bool_t video_scrambled = AM_FALSE;
 	AM_Bool_t no_audio_data = AM_FALSE, no_video_data = AM_FALSE;
+	AM_Bool_t has_amaster = AM_FALSE;
 	AM_Bool_t need_replay;
 	int resample_type = 0;
 	int next_resample_type = resample_type;
@@ -3586,12 +3516,16 @@ static void* aml_av_monitor_thread(void *arg)
 	int dmx_apts, dmx_vpts, last_dmx_apts = 0, last_dmx_vpts = 0;
 	int apts_stop_time = 0, vpts_stop_time = 0, apts_stop_dur = 0, vpts_stop_dur = 0;
 	int dmx_apts_stop_time = 0, dmx_vpts_stop_time = 0, dmx_apts_stop_dur = 0, dmx_vpts_stop_dur = 0;
+	int tsync_mode, vmaster_time = 0, vmaster_dur = 0;
 	int down_audio_cache_time = 0, down_video_cache_time = 0;
 	struct am_io_param astatus;
 	struct am_io_param vstatus;
 	struct timespec rt;
 	char buf[32];
 	AV_TSData_t *ts;
+
+	property_set("sys.amplayer.drop_pcm", "1");
+	AM_FileEcho(VID_BLACKOUT_FILE, "0");
 
 	pthread_mutex_lock(&gAVMonLock);
 
@@ -3640,6 +3574,22 @@ static void* aml_av_monitor_thread(void *arg)
 		}else{
 			AM_DEBUG(1, "cannot read \"%s\"", VIDEO_PTS_FILE);
 			vpts = 0;
+		}
+
+		if(AM_FileRead(TSYNC_MODE_FILE, buf, sizeof(buf)) >= 0){
+			sscanf(buf, "%d", &tsync_mode);
+		}else{
+			tsync_mode = 1;
+		}
+
+		if(tsync_mode == 0){
+			if(vmaster_time == 0){
+				vmaster_time = now;
+			}
+			vmaster_dur = now - vmaster_time;
+		}else{
+			vmaster_time = 0;
+			has_amaster = AM_TRUE;
 		}
 
 		if(AM_FileRead(AUDIO_DMX_PTS_FILE, buf, sizeof(buf)) >= 0){
@@ -3698,7 +3648,7 @@ static void* aml_av_monitor_thread(void *arg)
 				vbuf_level, vpts ? dmx_vpts - vpts : dmx_vpts - first_dmx_vpts,
 				resample_type);
 #endif
-		if(has_audio && !adec_start && !av_paused){
+		if(has_audio && !adec_start){
 			adec_start = AM_TRUE;
 
 			if(abuf_level < ADEC_START_AUDIO_LEVEL)
@@ -3760,10 +3710,12 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 
 		if(av_paused){
-			if(has_video && (vbuf_level >= ADEC_START_VIDEO_LEVEL))
-				av_paused = AM_FALSE;
-			if(has_audio && adec_start && (abuf_level >= ADEC_START_AUDIO_LEVEL))
-				av_paused = AM_FALSE;
+			av_paused = AM_FALSE;
+
+			if(has_video && (vbuf_level < ADEC_START_VIDEO_LEVEL))
+				av_paused = AM_TRUE;
+			if(has_audio && (abuf_level < ADEC_START_AUDIO_LEVEL))
+				av_paused = AM_TRUE;
 
 			if(!av_paused){
 				if(has_audio && adec_start){
@@ -3867,37 +3819,13 @@ static void* aml_av_monitor_thread(void *arg)
 				drop_b_frame = AM_TRUE;
 			}
 
-			if(has_audio && AM_ABS(apts - vpts) > 45000){
+			if(has_audio && adec_start && has_amaster && AM_ABS(apts - vpts) > 45000){
 				drop_b_frame = AM_TRUE;
 			}
 
 			if(drop_b_frame){
 				AM_FileEcho(VIDEO_DROP_BFRAME_FILE ,"1");
 				AM_DEBUG(1, "drop B frame");
-			}
-		}
-#endif
-
-		if(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur > NO_DATA_CHECK_TIME) && (apts_stop_dur > NO_DATA_CHECK_TIME)){
-			AM_Bool_t sf[2];
-			AM_DMX_GetScrambleStatus(0, sf);
-			if(sf[0]){
-				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_SCAMBLED, NULL);
-			}else{
-				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
-			}
-
-			no_audio_data = AM_TRUE;
-			AM_DEBUG(1, "audio data stopped");
-		}
-
-		if(!no_video_data && !av_paused && (dmx_vpts_stop_dur > NO_DATA_CHECK_TIME) && (vpts_stop_dur > NO_DATA_CHECK_TIME)){
-			AM_Bool_t sf[2];
-			AM_DMX_GetScrambleStatus(0, sf);
-			if(sf[1]){
-				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_SCAMBLED, NULL);
-			}else{
-				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
 			}
 
 			no_video_data = AM_TRUE;
@@ -3948,6 +3876,82 @@ static void* aml_av_monitor_thread(void *arg)
 			down_video_cache_time = 0;
 			AM_DEBUG(1, "replay ts");
 		}
+#endif
+
+		if(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur > NO_DATA_CHECK_TIME) && (apts_stop_dur > NO_DATA_CHECK_TIME)){
+			AM_Bool_t sf[2];
+			AM_DMX_GetScrambleStatus(0, sf);
+			if(sf[0]){
+				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_SCAMBLED, NULL);
+			}else{
+				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
+			}
+
+			no_audio_data = AM_TRUE;
+			AM_DEBUG(1, "audio data stopped");
+		}
+
+		if(!no_video_data && !av_paused && (dmx_vpts_stop_dur > NO_DATA_CHECK_TIME) && (vpts_stop_dur > NO_DATA_CHECK_TIME)){
+			AM_Bool_t sf[2];
+			AM_DMX_GetScrambleStatus(0, sf);
+			if(sf[1]){
+				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_SCAMBLED, NULL);
+			}else{
+				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
+			}
+
+			no_video_data = AM_TRUE;
+			AM_DEBUG(1, "video data stopped");
+		}
+
+		if(no_audio_data && dmx_apts_stop_dur == 0){
+			no_audio_data = AM_FALSE;
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_DATA_RESUME, NULL);
+			AM_DEBUG(1, "audio data resumed");
+		}
+
+		if(no_video_data && dmx_vpts_stop_dur == 0){
+			no_video_data = AM_FALSE;
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_DATA_RESUME, NULL);
+			AM_DEBUG(1, "video data resumed");
+		}
+
+		need_replay = AM_FALSE;
+		if(/*(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur == 0) && (apts_stop_dur > NO_DATA_CHECK_TIME)) ||*/
+				(!no_video_data && !av_paused && (dmx_vpts_stop_dur == 0) && (vpts_stop_dur > NO_DATA_CHECK_TIME)))
+			need_replay = AM_TRUE;
+		if(vbuf_level * 6 > vbuf_size * 5)
+			need_replay = AM_TRUE;
+		if(abuf_level * 6 > abuf_size * 5)
+			need_replay = AM_TRUE;
+		if(adec_start && !av_paused && has_amaster && !apts_stop_dur && !vpts_stop_dur && (vmaster_dur > VMASTER_REPLAY_TIME))
+			need_replay = AM_TRUE;
+		
+		//AM_DEBUG(1, "vbuf_level--0x%08x---- abuf_level---0x%08x",vbuf_level,abuf_level);
+	
+		if(need_replay){
+			aml_close_ts_mode(dev, AM_FALSE);
+			aml_open_ts_mode(dev);
+			aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
+			adec_start = AM_FALSE;
+			av_paused  = AM_TRUE;
+			resample_type = 0;
+			next_resample_type = resample_type;
+			next_resample_start_time = 0;
+			last_apts = 0;
+			last_vpts = 0;
+			last_dmx_apts = 0;
+			last_dmx_vpts = 0;
+			apts_stop_time = 0;
+			vpts_stop_time = 0;
+			dmx_apts_stop_time = 0;
+			dmx_vpts_stop_time = 0;
+			vmaster_time = 0;
+			down_audio_cache_time = 0;
+			down_video_cache_time = 0;
+			has_amaster = AM_FALSE;
+			AM_DEBUG(1, "replay ts");
+		}
 	}
 
 	pthread_mutex_unlock(&gAVMonLock);
@@ -3963,6 +3967,8 @@ static void* aml_av_monitor_thread(void *arg)
 	if(drop_b_frame){
 		AM_FileEcho(VIDEO_DROP_BFRAME_FILE, "0");
 	}
+
+	AM_FileEcho(VID_BLACKOUT_FILE, dev->video_blackout ? "1" : "0");
 
 	AM_DEBUG(1, "AV  monitor thread exit now");
 	return NULL;
@@ -4560,8 +4566,10 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 			cmd = ((int)val)?"0":"1";
 		break;
 		case AV_VIDEO_PARA_BLACKOUT:
-			name = VID_BLACKOUT_FILE;
-			cmd = ((int)val)?"1":"0";
+			if(!(dev->mode & (AV_PLAY_TS|AV_TIMESHIFT))){
+				name = VID_BLACKOUT_FILE;
+				cmd = ((int)val)?"1":"0";
+			}
 #if 0
 #ifdef AMSTREAM_IOC_CLEAR_VBUF
 			if((int)val)
