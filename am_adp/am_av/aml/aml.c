@@ -5152,9 +5152,9 @@ aml_set_vpath(AM_AV_Device_t *dev)
 	int times = 10;
 
 	AM_DEBUG(1, "set video path fs:%d di:%d ppmgr:%d", dev->vpath_fs, dev->vpath_di, dev->vpath_ppmgr);
-	AM_FileEcho("/sys/class/deinterlace/di0/config", "disable");
 
-	/*
+	//AM_FileEcho("/sys/class/deinterlace/di0/config", "disable");
+	/*	
 	do{
 		ret = AM_FileEcho("/sys/class/vfm/map", "rm default");
 		if(ret!=AM_SUCCESS){
@@ -5175,30 +5175,30 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			int x, y, w, h;
 
 			AM_FileRead("/sys/class/display/mode", mode, sizeof(mode));
+
 			if(!strncmp(mode, "480i", 4)){
 				get_osd_rect("480i", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "480p", 4)){
 				get_osd_rect("480p", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "480cvbs", 7)){
-				get_osd_rect("480cvbs", &x, &y, &w, &h);
+				get_osd_rect("480cvbs", &x, &y, &w, &h);				
 			}else if(!strncmp(mode, "576i", 4)){
 				get_osd_rect("576i", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "576p", 4)){
 				get_osd_rect("576p", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "576cvbs", 7)){
-				get_osd_rect("576cvbs", &x, &y, &w, &h);
+				get_osd_rect("576cvbs", &x, &y, &w, &h);					
 			}else if(!strncmp(mode, "720p", 4)){
 				get_osd_rect("720p", &x, &y, &w, &h);
 				blank = AM_FALSE;
 			}else if(!strncmp(mode, "1080i", 5)){
 				get_osd_rect("1080i", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "1080p", 5)){
-				get_osd_rect("1080p", &x, &y, &w, &h);
+				get_osd_rect("1080p", &x, &y, &w, &h);			
 			}else{
 				get_osd_rect(NULL, &x, &y, &w, &h);
 			}
-
-			snprintf(ppr, sizeof(ppr), "%d %d %d %d 0", x, y, x+w, y+h);
+			snprintf(ppr, sizeof(ppr), "%d %d %d %d 0", x, y, x+w, y+h);			
 		}
 #endif
 		AM_FileRead("/sys/class/graphics/fb0/request2XScale", mode, sizeof(mode));
@@ -5214,6 +5214,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 		{
 			AM_FileEcho("/sys/class/graphics/fb0/request2XScale", "2");
 			AM_FileEcho("/sys/class/graphics/fb1/scale", "0");
+			
 			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "0");
 			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "0");
 
@@ -5232,8 +5233,8 @@ aml_set_vpath(AM_AV_Device_t *dev)
 #endif
 
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","1");
-			//AM_FileEcho("/sys/class/ppmgr/ppscaler_rect", ppr);
-			//AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", "0");
+
+			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", "0");
 			usleep(200*1000);
 		}
 #endif
@@ -5294,6 +5295,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 		if(blank && scale){
 			//AM_FileEcho("/sys/class/graphics/fb0/blank", "1");
 		}
+
 		AM_FileEcho("/sys/class/graphics/fb0/free_scale", "0");
 		AM_FileEcho("/sys/class/graphics/fb1/free_scale", "0");
 
@@ -5306,6 +5308,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 				}
 				AM_FileEcho("/sys/class/graphics/fb1/scale", osd1cmd);
 			}
+				
 
 			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "3");
 			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "62");
@@ -5336,9 +5339,11 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			//AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
 #endif
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","0");
+	
 			//AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");
 			//AM_FileEcho("/sys/class/video/axis", "0 0 0 0");
-			//AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", AV_SMOOTH_SYNC_VAL);
+			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", AV_SMOOTH_SYNC_VAL);
+			AM_FileEcho("/sys/module/di/parameters/bypass_all","0");
 			usleep(2000*1000);
 		}
 #endif
@@ -5430,9 +5435,11 @@ static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM
 	dev->ts_player.play_para.apid = apid;
 	dev->ts_player.play_para.afmt = afmt;
 
-
 	return AM_SUCCESS;
 }
+
+
+
 
 
 /**\brief set vdec_h264 error_recovery_mode :0 or 2 -> skip display Mosaic  ,3: display mosaic in case of vdec hit error*/

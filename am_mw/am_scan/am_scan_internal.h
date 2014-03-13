@@ -242,6 +242,7 @@ typedef struct
 	char str_apids[256];
 	char str_afmts[256];
 	char str_alangs[256];
+	char str_atypes[256];
 	char *default_text_lang;
 	char *text_langs;
 	AM_SI_AudioInfo_t aud_info;

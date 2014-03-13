@@ -211,6 +211,7 @@ typedef struct
 		int		pid;	/**< audio PID*/
 		int		fmt;	/**< audio format*/
 		char	lang[10];	/**< audio language*/	
+		int 		audio_type;   /**<audio type*/
 	}audios[AM_SI_MAX_AUD_CNT];
 }AM_SI_AudioInfo_t;
 

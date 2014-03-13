@@ -323,7 +323,7 @@ static void file_play(const char *name, int loop, int pos)
 		normal_help();
 		printf("********************\n");
 		
-		if(gets(buf))
+		if(fgets(buf, 256, stdin))
 		{
 			if(!strncmp(buf, "quit", 4))
 			{
@@ -384,7 +384,7 @@ static void file_play(const char *name, int loop, int pos)
 	AM_DMX_Close(DMX_DEV_NO);
 }
 
-static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq)
+static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src)
 {
 	int running = 1;
 	char buf[256];
@@ -393,8 +393,8 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq)
 	memset(&para, 0, sizeof(para));
 	
 	AM_DMX_Open(DMX_DEV_NO, &para);
-	AM_DMX_SetSource(DMX_DEV_NO, AM_DMX_SRC_TS2);
-	AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_TS2);
+	AM_DMX_SetSource(DMX_DEV_NO, src);
+	AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_DMX1);
 	
 	if(freq>0)
 	{
@@ -446,7 +446,7 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq)
 		normal_help();
 		printf("********************\n");
 		
-		if(gets(buf))
+		if(fgets(buf, 256, stdin))
 		{
 			if(!strncmp(buf, "quit", 4))
 			{
@@ -482,7 +482,7 @@ static void ves_play(const char *name, int vfmt)
 		normal_help();
 		printf("********************\n");
 		
-		if(gets(buf))
+		if(fgets(buf, 256, stdin))
 		{
 			if(!strncmp(buf, "quit", 4))
 			{
@@ -510,7 +510,7 @@ static void aes_play(const char *name, int afmt, int times)
 		printf("* quit\n");
 		printf("********************\n");
 		
-		if(gets(buf))
+		if(fgets(buf, 256, stdin))
 		{
 			if(!strncmp(buf, "quit", 4))
 			{
@@ -664,7 +664,7 @@ static void inject_play(struct in_addr *addr, int port, int vpid, int apid, int 
 		normal_help();
 		printf("********************\n");
 		
-		if(gets(buf))
+		if(fgets(buf, 256, stdin))
 		{
 			if(!strncmp(buf, "quit", 4))
 			{
@@ -721,6 +721,8 @@ int main(int argc, char **argv)
 	
 	if(strcmp(argv[1], "dvb")==0)
 	{
+		int tssrc=AM_DMX_SRC_TS0;
+
 		if(argc<3)
 			usage();
 		
@@ -737,8 +739,11 @@ int main(int argc, char **argv)
 		
 		if(argc>6)
 			freq = strtol(argv[6], NULL, 0);
-		
-		dvb_play(vpid, apid, vfmt, afmt, freq);
+
+		if(argc>7)
+			tssrc = strtol(argv[7], NULL, 0);
+	
+		dvb_play(vpid, apid, vfmt, afmt, freq, tssrc);
 	}
 	else if(strcmp(argv[1], "ves")==0)
 	{

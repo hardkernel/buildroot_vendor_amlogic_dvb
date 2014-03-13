@@ -13,6 +13,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_scan/am_scan.c\
 		   am_sub2/am_sub.c am_sub2/dvb_sub.c \
 		   am_tt2/am_tt.c \
+		   am_ad/am_ad.c\
 		   am_si/am_si.c\
 		   am_si/libdvbsi/tables/bat.c\
 		   am_si/libdvbsi/tables/sdt.c\
@@ -144,9 +145,10 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
 		   am_scan/libsigdetect/sigdetect.c \
-	           am_scan/libsigdetect/tvin/tvin_api.c \
+	       am_scan/libsigdetect/tvin/tvin_api.c \
 		   am_sub2/am_sub.c am_sub2/dvb_sub.c \
 		   am_tt2/am_tt.c \
+		   am_ad/am_ad.c \
 		   am_si/am_si.c\
 		   am_si/libdvbsi/tables/bat.c\
 		   am_si/libdvbsi/tables/sdt.c\

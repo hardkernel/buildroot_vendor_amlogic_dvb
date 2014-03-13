@@ -41,6 +41,7 @@ typedef struct
 		uint8_t		i_stream_type;
 		uint16_t	i_pid;
 		uint8_t		iso_639_code[3];    /*!< ISO_639_language_code */
+		uint8_t	i_audio_type;
 	} elem[44];
 
 } atsc_service_location_dr_t;

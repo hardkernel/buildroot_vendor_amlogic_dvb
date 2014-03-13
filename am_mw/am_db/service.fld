@@ -23,7 +23,7 @@
 "aud_pids text",                                                  /**< 音频PIDs，格式为[pid1, pid2,...]*/
 "aud_fmts text",                                                  /**< 音频压缩格式，格式为[fmt1, fmt2,...]*/
 "aud_langs text",                                                 /**< 音频语言，多语言支持，格式为[lang1, lang2,...]*/	
-
+"aud_types text",																									/**< 音频类型，多语言支持，格式为[type1,type2,...]*/
 "current_sub integer",                                            /**< 当前subtitle索引，0为第一个*/
 "sub_pids text",                                                  /**< Subtitle PID*/
 "sub_types text",                                                 /**< Subtitle type*/

@@ -41,8 +41,10 @@ typedef enum cm_hue_shape_e {
 } cm_hue_shape_t;
 
 typedef enum cm_demo_pos_e {
-    CM_DEMO_POS_RIGHT = 0,
+    CM_DEMO_POS_TOP = 0,
+    CM_DEMO_POS_BOTTOM,
     CM_DEMO_POS_LEFT,
+    CM_DEMO_POS_RIGHT,
 } cm_demo_pos_t;
 
 typedef enum cm_sat_sel_e {
@@ -109,12 +111,59 @@ typedef struct cm_top_s {
     enum cm_csc_e       csc_sel;
 } cm_top_t;
 
+typedef struct cm_cbar_s {
+    unsigned char en;
+    unsigned char wid;
+    unsigned char cr;
+    unsigned char cb;
+    unsigned char y;
+} cm_cbar_t;
 typedef struct cm_demo_s {
     unsigned char       en;
     enum cm_demo_pos_e  pos;
     unsigned char       hlight_adj;
     ushort              wid;
+    struct cm_cbar_s   cbar;
 } cm_demo_t;
 
+typedef struct cm_regmap_s {
+    ulong reg[50];
+} cm_regmap_t;
+
+#if defined(CONFIG_AM_VECM)
+typedef enum reg_bus_type_e {
+    REG_TYPE_PHY = 0,
+    REG_TYPE_CBUS,
+    REG_TYPE_APB,
+    REG_TYPE_AXI,
+    REG_TYPE_AHB,
+    REG_TYPE_MPEG,
+    REG_TYPE_INDEX_VPPCHROMA,
+    REG_TYPE_INDEX_GAMMA,
+    VALUE_TYPE_CONTRAST_BRIGHTNESS,
+    REG_TYPE_INDEX_VPP_COEF,
+    REG_TYPE_MAX,
+} reg_bus_type_t;
+
+/* Register table structure */
+typedef struct am_reg_s {
+    unsigned int type; //32-bits; 0: CBUS; 1: APB BUS...
+    unsigned int addr; //32-bits; Register address
+    unsigned int mask; //32-bits; Valid bits
+    unsigned int  val; //32-bits; Register Value
+} am_reg_t;
+
+#ifdef AMVIDEO_REG_TABLE_DYNAMIC
+typedef struct am_regs_s {
+    unsigned int    length; // Length of total am_reg
+    struct am_reg_s *am_reg;
+} am_regs_t;
+#else
+typedef struct am_regs_s {
+    unsigned int    length; // Length of total am_reg
+    struct am_reg_s am_reg[512];
+} am_regs_t;
+#endif
+#endif
 
 #endif  // _TVOUT_CM_H

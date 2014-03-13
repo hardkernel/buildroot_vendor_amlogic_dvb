@@ -225,7 +225,8 @@ int main(int argc, char **argv)
 	fe_status_t status;
 	int freq = 0;
 	int layer = -1;
-	
+	int src=0;
+
 	memset(&fpara, 0, sizeof(fpara));
 #if 1
 	if(argc>1)
@@ -234,7 +235,11 @@ int main(int argc, char **argv)
 	}
 	if(argc>2)
 	{
-		sscanf(argv[2], "%d", &layer);
+		sscanf(argv[2], "%d", &src);
+	}
+	if(argc>3)
+	{
+		sscanf(argv[3], "%d", &layer);
 	}
 	
 	if(!freq)
@@ -282,9 +287,8 @@ int main(int argc, char **argv)
 	AM_TRY(AM_DMX_Open(DMX_DEV_NO, &para));
 
 {
-	AM_DMX_Source_t s = AM_DMX_SRC_TS2;
-	AM_TRY(AM_DMX_SetSource(DMX_DEV_NO, s));
-	printf("TS SRC = %d\n", s);
+	AM_TRY(AM_DMX_SetSource(DMX_DEV_NO, src));
+	printf("TS SRC = %d\n", src);
 }
 
 	get_section();

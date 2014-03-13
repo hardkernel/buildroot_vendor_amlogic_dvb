@@ -66,6 +66,7 @@ enum AM_MOD_ID
 	AM_MOD_CI,
 	AM_MOD_USERDATA,
 	AM_MOD_CC,
+	AM_MOD_AD,
 	AM_MOD_MAX
 };
 

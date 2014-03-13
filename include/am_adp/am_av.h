@@ -1119,7 +1119,6 @@ extern AM_ErrorCode_t AM_AV_SetVPathPara(int dev_no, AM_AV_FreeScalePara_t fs, A
  */
 extern AM_ErrorCode_t AM_AV_SwitchTSAudio(int dev_no, uint16_t apid, AM_AV_AFormat_t afmt);
 
-
 /**\brief used to set /sys/module/amvdec_h264/parameters/error_recovery_mode to choose display mosaic or not
  * \param dev_no 音视频设备号
  * \param error_recovery_mode : 0 ,skip mosaic and reset vdec,2 skip mosaic ,3 display mosaic

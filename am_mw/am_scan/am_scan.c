@@ -227,7 +227,7 @@ const char *sql_stmts[MAX_STMT] =
 	"insert into srv_table(db_net_id, db_ts_id,dvbt2_plp_id,service_id) values(?,?,?,?)",
 	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?,\
 	 running_status=?,free_ca_mode=?,volume=?,aud_track=?,vid_pid=?,vid_fmt=?,\
-	 current_aud=-1,aud_pids=?,aud_fmts=?,aud_langs=?,\
+	 current_aud=-1,aud_pids=?,aud_fmts=?,aud_langs=?, aud_types=?,\
 	 current_sub=-1,sub_pids=?,sub_types=?,sub_composition_page_ids=?,sub_ancillary_page_ids=?,sub_langs=?,\
 	 current_ttx=-1,ttx_pids=?,ttx_types=?,ttx_magazine_nos=?,ttx_page_nos=?,ttx_langs=?,\
 	 skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,\
@@ -748,7 +748,7 @@ static int insert_srv(sqlite3_stmt **stmts, int db_net_id, int db_ts_id, int plp
 }
 
 /**\brief 将audio数据格式化成字符串已便存入数据库*/
-static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, char *langs)
+static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, char *langs,char *audio_type)
 {
 	int i;
 	
@@ -758,6 +758,7 @@ static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, 
 	pids[0] = 0;
 	fmts[0] = 0;
 	langs[0] = 0;
+	audio_type[0] = 0;
 	for (i=0; i<ai->audio_count; i++)
 	{
 		if (i == 0)
@@ -765,12 +766,14 @@ static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, 
 			sprintf(pids, "%d", ai->audios[i].pid);
 			sprintf(fmts, "%d", ai->audios[i].fmt);
 			sprintf(langs, "%s", ai->audios[i].lang);
+			sprintf(audio_type,"%d",ai->audios[i].audio_type);
 		}
 		else
 		{
 			sprintf(pids, "%s %d", pids, ai->audios[i].pid);
 			sprintf(fmts, "%s %d", fmts, ai->audios[i].fmt);
 			sprintf(langs, "%s %s", langs, ai->audios[i].lang);
+			sprintf(audio_type,"%s %d",audio_type,ai->audios[i].audio_type);
 		}
 	}
 }
@@ -1271,41 +1274,42 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 	AM_DEBUG(1, "Video: pid(%d), fmt(%d)", srv_info->vid,srv_info->vfmt);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 10, srv_info->vid);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 11, srv_info->vfmt);
-	format_audio_strings(&srv_info->aud_info, str(0), str(1), str(2));
+	format_audio_strings(&srv_info->aud_info, str(0), str(1), str(2),str(13));
 	AM_DEBUG(1, "Audios: pids(%s), fmts(%s), langs(%s)", str(0), str(1), str(2));
 	sqlite3_bind_text(stmts[UPDATE_SRV], 12, str(0), strlen(str(0)), SQLITE_STATIC);
 	sqlite3_bind_text(stmts[UPDATE_SRV], 13, str(1), strlen(str(1)), SQLITE_STATIC);
 	sqlite3_bind_text(stmts[UPDATE_SRV], 14, str(2), strlen(str(2)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 15, str(13), strlen(str(13)), SQLITE_STATIC);
 	format_subtitle_strings(&srv_info->sub_info, str(3), str(4), str(5), str(6), str(7));
 	AM_DEBUG(1, "Subtitles: pids(%s), types(%s), cids(%s), aids(%s), langs(%s)", 
 		str(3), str(4), str(5), str(6), str(7));
-	sqlite3_bind_text(stmts[UPDATE_SRV], 15, str(3), strlen(str(3)), SQLITE_STATIC);
-	sqlite3_bind_text(stmts[UPDATE_SRV], 16, str(4), strlen(str(4)), SQLITE_STATIC);
-	sqlite3_bind_text(stmts[UPDATE_SRV], 17, str(5), strlen(str(5)), SQLITE_STATIC);
-	sqlite3_bind_text(stmts[UPDATE_SRV], 18, str(6), strlen(str(6)), SQLITE_STATIC);
-	sqlite3_bind_text(stmts[UPDATE_SRV], 19, str(7), strlen(str(7)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 16, str(3), strlen(str(3)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 17, str(4), strlen(str(4)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 18, str(5), strlen(str(5)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 19, str(6), strlen(str(6)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 20, str(7), strlen(str(7)), SQLITE_STATIC);
 	format_teletext_strings(&srv_info->ttx_info, str(8), str(9), str(10), str(11), str(12));
 	AM_DEBUG(1, "Teletexts: pids(%s), types(%s), magnos(%s), pgnos(%s), langs(%s)", 
 		str(8), str(9), str(10), str(11), str(12));
-	sqlite3_bind_text(stmts[UPDATE_SRV], 20, str(8), strlen(str(8)), SQLITE_STATIC);
-	sqlite3_bind_text(stmts[UPDATE_SRV], 21, str(9), strlen(str(9)), SQLITE_STATIC);
-	sqlite3_bind_text(stmts[UPDATE_SRV], 22, str(10), strlen(str(10)), SQLITE_STATIC);
-	sqlite3_bind_text(stmts[UPDATE_SRV], 23, str(11), strlen(str(11)), SQLITE_STATIC);
-	sqlite3_bind_text(stmts[UPDATE_SRV], 24, str(12), strlen(str(12)), SQLITE_STATIC);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 25, srv_info->chan_num);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 26, srv_info->major_chan_num);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 27, srv_info->minor_chan_num);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 28, srv_info->access_controlled);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 29, srv_info->hidden);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 30, srv_info->hide_guide);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 31, srv_info->source_id);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 32, 0);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 33, srv_info->satpara_dbid);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 34, srv_info->scrambled_flag);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 35, srv_info->pmt_pid);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 36, srv_info->plp_id);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 37, srv_info->sdt_version);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 38, srv_info->srv_dbid);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 21, str(8), strlen(str(8)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 22, str(9), strlen(str(9)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 23, str(10), strlen(str(10)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 24, str(11), strlen(str(11)), SQLITE_STATIC);
+	sqlite3_bind_text(stmts[UPDATE_SRV], 25, str(12), strlen(str(12)), SQLITE_STATIC);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 26, srv_info->chan_num);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 27, srv_info->major_chan_num);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 28, srv_info->minor_chan_num);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 29, srv_info->access_controlled);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 30, srv_info->hidden);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 31, srv_info->hide_guide);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 32, srv_info->source_id);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 33, 0);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 34, srv_info->satpara_dbid);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 35, srv_info->scrambled_flag);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 36, srv_info->pmt_pid);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 37, srv_info->plp_id);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 38, srv_info->sdt_version);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 39, srv_info->srv_dbid);
 	sqlite3_step(stmts[UPDATE_SRV]);
 	sqlite3_reset(stmts[UPDATE_SRV]);
 }
@@ -3207,7 +3211,8 @@ NIT_END:
 	{
 		/*开始搜索TS*/
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_END, NULL);
-		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_NIT_END, NULL);
+		AM_DEBUG(1, "----------NIT VERSION = %d--------", scanner->result.nits->i_version);
+		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_NIT_END, scanner->result.nits->i_version);
 		scanner->stage = AM_SCAN_STAGE_TS;
 		am_scan_start_next_ts(scanner);
 	}
@@ -5163,10 +5168,19 @@ handle_events:
 	if (scanner->result.tses/* && scanner->stage == AM_SCAN_STAGE_DONE*/ && scanner->store)
 	{
 		AM_DEBUG(1, "Call store proc");
+		int nit_version = -1;
+		if(scanner->result.nits!=NULL){
+			AM_DEBUG(1, "Call store proc-----------%d",scanner->result.nits->i_version);
+			nit_version = scanner->result.nits->i_version;
+		}	
+		else
+			AM_DEBUG(1, "scanner->result.nits==NULL");
+		
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_STORE_BEGIN, NULL);
 		if (scanner->store_cb)
 			scanner->store_cb(&scanner->result);
-		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_STORE_END, NULL);
+		if(nit_version!=-1)
+			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_STORE_END, nit_version);
 	}
 	
 	am_scan_stop_atv(scanner);
