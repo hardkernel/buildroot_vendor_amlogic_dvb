@@ -21,6 +21,9 @@ extern "C"
 #ifdef ANDROID
 #include <unicode/ucnv.h>
 #include <android/log.h>
+#include <dlfcn.h>
+#include <assert.h>
+#include "am_util.h"
 
 typedef struct {
 	UConverter *target;
@@ -28,6 +31,39 @@ typedef struct {
 } AM_IConv_t;
 
 typedef AM_IConv_t* iconv_t;
+
+extern UConverter* (*am_ucnv_open_ptr)(const char *converterName, UErrorCode *err);
+extern void (*am_ucnv_close_ptr)(UConverter * converter);
+extern void (*am_ucnv_convertEx_ptr)(UConverter *targetCnv, UConverter *sourceCnv,
+		char **target, const char *targetLimit,
+		const char **source, const char *sourceLimit,
+		UChar *pivotStart, UChar **pivotSource,
+		UChar **pivotTarget, const UChar *pivotLimit,
+		UBool reset, UBool flush,
+		UErrorCode *pErrorCode);
+
+extern void am_ucnv_dlink(void);
+
+#define am_ucnv_open(conv, err)\
+	({\
+	 	UConverter *ret;\
+		if(!am_ucnv_open_ptr)\
+	 		am_ucnv_dlink();\
+	 	ret = am_ucnv_open_ptr(conv, err);\
+	 	ret;\
+	 })
+#define am_ucnv_close(conv)\
+	AM_MACRO_BEGIN\
+		if(!am_ucnv_close_ptr)\
+	 		am_ucnv_dlink();\
+		am_ucnv_close_ptr(conv);\
+	AM_MACRO_END
+#define am_ucnv_convertEx(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13)\
+	AM_MACRO_BEGIN\
+		if(!am_ucnv_convertEx_ptr)\
+	 		am_ucnv_dlink();\
+		am_ucnv_convertEx_ptr(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13);\
+	AM_MACRO_END
 
 static inline iconv_t
 iconv_open(const char *tocode, const char *fromcode)
@@ -39,8 +75,8 @@ iconv_open(const char *tocode, const char *fromcode)
 	if(!cd)
 		goto error;
 	
-	cd->target = ucnv_open(tocode, &err1);
-	cd->source = ucnv_open(fromcode, &err2);
+	cd->target = am_ucnv_open(tocode, &err1);
+	cd->source = am_ucnv_open(fromcode, &err2);
 	if((!U_SUCCESS(err1)) || (!U_SUCCESS(err2)))
 		goto error;
 	
@@ -49,9 +85,9 @@ error:
 	if(cd)
 	{
 		if(U_SUCCESS(err1))
-			ucnv_close(cd->target);
+			am_ucnv_close(cd->target);
 		if(U_SUCCESS(err2))
-			ucnv_close(cd->source);
+			am_ucnv_close(cd->source);
 		free(cd);
 	}
 	return (iconv_t)-1;
@@ -63,8 +99,8 @@ iconv_close(iconv_t cd)
 	if(!cd)
 		return 0;
 	
-	ucnv_close(cd->target);
-	ucnv_close(cd->source);
+	am_ucnv_close(cd->target);
+	am_ucnv_close(cd->source);
 	free(cd);
 
 	return 0;
@@ -85,7 +121,7 @@ iconv(iconv_t cd, char **inbuf, size_t *inbytesleft, char **outbuf, size_t *outb
 	tbegin = *outbuf;
 	tend   = tbegin + *outbytesleft;
 
-	ucnv_convertEx(cd->target, cd->source, &tbegin, tend, &sbegin, send,
+	am_ucnv_convertEx(cd->target, cd->source, &tbegin, tend, &sbegin, send,
 			NULL, NULL, NULL, NULL, FALSE, TRUE, &err);
 	if(!U_SUCCESS(err))
 		return -1;

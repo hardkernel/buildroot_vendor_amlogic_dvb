@@ -24,8 +24,8 @@
  * Macro definitions
  ***************************************************************************/
 #ifdef ANDROID
-#undef CLOCK_REALTIME
-#define CLOCK_REALTIME	CLOCK_MONOTONIC
+//#undef CLOCK_REALTIME
+//#define CLOCK_REALTIME	CLOCK_MONOTONIC
 #endif
 
 /****************************************************************************

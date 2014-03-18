@@ -12,7 +12,7 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_aout/am_aout.c\
 		   am_vout/am_vout.c\
 		   am_vout/aml/aml.c\
-		   am_misc/am_adplock.c am_misc/am_misc.c\
+		   am_misc/am_adplock.c am_misc/am_misc.c am_misc/am_iconv.c\
 		   am_time/am_time.c\
 		   am_evt/am_evt.c\
 		   am_dsc/am_dsc.c am_dsc/aml/aml.c\
@@ -33,7 +33,8 @@ LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    packages/amlogic/LibPlayer/amadec/include\
-		    packages/amlogic/LibPlayer/amcodec/include
+		    packages/amlogic/LibPlayer/amcodec/include\
+		    external/icu4c/common
 
 ifeq ($(AMLOGIC_LIBPLAYER), y)
 LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg
@@ -42,9 +43,9 @@ endif
 
 
 ifeq ($(AMLOGIC_LIBPLAYER), y)
-LOCAL_SHARED_LIBRARIES+=libamplayer libcutils liblog libc
+LOCAL_SHARED_LIBRARIES+=libamplayer libcutils liblog libdl libc
 else
-LOCAL_SHARED_LIBRARIES+=libcutils liblog libc libamadec libamcodec
+LOCAL_SHARED_LIBRARIES+=libcutils liblog libdl libc libamadec libamcodec
 endif
 
 
@@ -65,7 +66,7 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
            am_aout/am_aout.c\
            am_vout/am_vout.c\
            am_vout/aml/aml.c\
-           am_misc/am_adplock.c am_misc/am_misc.c\
+           am_misc/am_adplock.c am_misc/am_misc.c am_misc/am_iconv.c\
            am_time/am_time.c\
            am_evt/am_evt.c\
            am_dsc/am_dsc.c am_dsc/aml/aml.c\
@@ -84,7 +85,8 @@ LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
             $(LOCAL_PATH)/../android/ndk/include\
 	    packages/amlogic/LibPlayer/amadec/include\
-	    packages/amlogic/LibPlayer/amcodec/include
+	    packages/amlogic/LibPlayer/amcodec/include\
+	    external/icu4c/common
 
 ifeq ($(AMLOGIC_LIBPLAYER), y)
 LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg
@@ -93,9 +95,9 @@ endif
 
 
 ifeq ($(AMLOGIC_LIBPLAYER), y)
-LOCAL_SHARED_LIBRARIES+=libamplayer libcutils liblog libc
+LOCAL_SHARED_LIBRARIES+=libamplayer libcutils liblog libdl libc
 else
-LOCAL_SHARED_LIBRARIES+=libcutils liblog libc libamadec libamcodec
+LOCAL_SHARED_LIBRARIES+=libcutils liblog libdl libc libamadec libamcodec
 endif
 LOCAL_PRELINK_MODULE := false
 

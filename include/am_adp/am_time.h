@@ -23,11 +23,12 @@ extern "C"
  * Macro definitions
  ***************************************************************************/
 #ifdef ANDROID
-extern int  __pthread_cond_timedwait(pthread_cond_t*, 
+/*extern int  __pthread_cond_timedwait(pthread_cond_t*, 
                                      pthread_mutex_t*,
                                      const struct timespec*, 
                                      clockid_t);
 #define pthread_cond_timedwait(c, m, a) __pthread_cond_timedwait(c, m, a, CLOCK_MONOTONIC);
+*/
 #endif
 
 /****************************************************************************

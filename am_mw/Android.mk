@@ -128,9 +128,9 @@ LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amplayer
 endif
 
 ifeq ($(AMLOGIC_LIBPLAYER), y)
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc 
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamplayer liblog libdl libc 
 else
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libc
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libdl libc
 endif
 LOCAL_PRELINK_MODULE := false
 
@@ -264,9 +264,9 @@ endif
 
 
 ifeq ($(AMLOGIC_LIBPLAYER), y)    
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamplayer liblog libc  
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamplayer liblog libdl libc  
 else
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libc
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libdl libc
 endif
 LOCAL_PRELINK_MODULE := false
 
