@@ -3178,7 +3178,7 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 
 				scanner->start_freqs[scanner->start_freqs_cnt].fe_para.m_type = FE_OFDM;
 				param = &scanner->start_freqs[scanner->start_freqs_cnt].fe_para.terrestrial.para;
-				param->frequency = pcd->i_centre_frequency/1000;
+				param->frequency = pcd->i_centre_frequency*10;
 				param->u.ofdm.bandwidth = pcd->i_bandwidth;
 				scanner->start_freqs_cnt++;
 				AM_DEBUG(1, "Add frequency %u, bw %u, onid %d, ts_id %d", param->frequency,
