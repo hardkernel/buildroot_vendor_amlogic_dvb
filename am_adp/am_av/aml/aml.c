@@ -2630,6 +2630,7 @@ static void *aml_timeshift_thread(void *arg)
 			ioctl(tshift->av_fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1)
 			{
 				update_time = now;
+				AM_DEBUG(1, "is_playback_mode = %d,tshift->file.loop = %d",is_playback_mode,tshift->file.loop);
 
 				if (is_playback_mode || tshift->file.loop)
 					info.full_time = tshift->duration;
@@ -2641,9 +2642,9 @@ static void *aml_timeshift_thread(void *arg)
 				if (!is_playback_mode && !tshift->file.loop)
 					tshift->duration = info.full_time;
 
-				AM_DEBUG(1, "total %lld, avail %lld, alen %d, vlen %d, duration %d, size %lld",
+				AM_DEBUG(1, "total %lld, avail %lld, alen %d, vlen %d, duration %d, size %lld , tshift rate = %d",
 					tshift->file.total , tshift->file.avail , astatus.status.data_len ,
-					vstatus.status.data_len, tshift->duration, tshift->file.size);
+					vstatus.status.data_len, tshift->duration, tshift->file.size,tshift->rate);
 
 				if (tshift->rate)
 				{

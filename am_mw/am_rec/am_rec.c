@@ -217,7 +217,7 @@ static AM_ErrorCode_t am_rec_update_record_time(AM_REC_Recorder_t *rec)
 	off64_t cur_pos;
 	uint8_t buf[4];
 
-	if (rec->rec_start_time > 0)
+	if (rec->rec_start_time != 0)
 	{
 		cur_pos = lseek64(rec->rec_fd, 0, SEEK_CUR);
 		
@@ -416,10 +416,9 @@ static void *am_rec_record_thread(void* arg)
 	/*从DVR设备读取数据并存入文件*/
 	while (rec->stat_flag & REC_STAT_FL_RECORDING)
 	{
-		if (rec->rec_start_time > 0)
+		if (rec->rec_start_time != 0)
 		{
 			AM_TIME_GetClock(&check_time);
-			
 			if (rec->rec_para.total_time > 0 && 
 				(check_time-rec->rec_start_time) >= (rec->rec_para.total_time*1000))
 			{
@@ -434,7 +433,7 @@ static void *am_rec_record_thread(void* arg)
 				update_time = check_time;
 			}
 		}
-			
+		
 		cnt = AM_DVR_Read(rec->create_para.dvr_dev, buf, sizeof(buf), 1000);
 		if (cnt <= 0)
 		{
@@ -487,7 +486,7 @@ close_file:
 	{
 		int duration = 0;
 	
-		if (rec->rec_start_time > 0)
+		if (rec->rec_start_time != 0)
 		{
 			AM_TIME_GetClock(&check_time);
 			duration = check_time - rec->rec_start_time;
