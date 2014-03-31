@@ -2040,6 +2040,7 @@ static int aml_timeshift_inject(AV_TimeshiftData_t *tshift, uint8_t *data, int s
 		}
 		else if((ret==-1) && (errno==EAGAIN))
 		{
+			AM_DEBUG(1, "ret=%d,inject data failed errno:%d msg:%s",ret, errno, strerror(errno));		
 			real_written = 0;
 		}
 		else if (ret >= 0)
@@ -2249,6 +2250,15 @@ static int am_timeshift_reset(AV_TimeshiftData_t *tshift, int deinterlace_val, A
 
 	/*Set the left to 0, we will read from the new point*/
 	tshift->left = 0;
+
+	return 0;
+}
+
+static int am_timeshift_reset_continue(AV_TimeshiftData_t *tshift, int deinterlace_val, AM_Bool_t start_audio)
+{
+	aml_destroy_timeshift_data(tshift, AM_FALSE);
+
+	aml_start_timeshift(tshift, &tshift->para, AM_FALSE, start_audio);
 
 	return 0;
 }
@@ -2520,6 +2530,9 @@ static void *aml_timeshift_thread(void *arg)
 	AV_PlayCmd_t cmd;
 	int playback_alen=0, playback_vlen=0;
 	AM_Bool_t is_playback_mode = (tshift->para.mode == AM_AV_TIMESHIFT_MODE_PLAYBACK);
+	int vbuf_len = 0;
+	int abuf_len = 0;
+	int skip_flag_count = 0;
 
 	memset(&info, 0, sizeof(info));
 	tshift->last_cmd = -1;
@@ -2666,6 +2679,28 @@ static void *aml_timeshift_thread(void *arg)
 					aml_timeshift_file_seek(&tshift->file, 0);
 					am_timeshift_reset(tshift, -1, AM_TRUE);
 					info.current_time = 0;
+				}
+
+				/********Skip inject error*********/			
+				if(abuf_len!=astatus.status.data_len){
+					abuf_len = astatus.status.data_len;
+					skip_flag_count=0;
+				}
+				if(vbuf_len!=vstatus.status.data_len){
+					vbuf_len =vstatus.status.data_len;
+					skip_flag_count=0;
+				}	
+
+				if(info.current_time>0&&astatus.status.data_len==abuf_len&&vstatus.status.data_len==vbuf_len){
+					skip_flag_count++;	
+				}
+
+				if(skip_flag_count>=4){
+					aml_timeshift_file_seek(&tshift->file,tshift->file.total - tshift->file.avail);
+					am_timeshift_reset_continue(tshift, -1, AM_TRUE);
+					vbuf_len = 0;
+					abuf_len = 0;
+					skip_flag_count=0;
 				}
 
 				info.status = tshift->state;
