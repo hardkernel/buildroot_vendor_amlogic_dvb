@@ -4606,6 +4606,7 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 				name = VID_BLACKOUT_FILE;
 				cmd = ((int)val)?"1":"0";
 			}
+			dev->video_blackout = (int)val;
 #if 0
 #ifdef AMSTREAM_IOC_CLEAR_VBUF
 			if((int)val)
