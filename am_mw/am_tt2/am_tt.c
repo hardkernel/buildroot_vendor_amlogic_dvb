@@ -20,7 +20,7 @@ typedef struct AM_TT2_CachedPage_s
 {
 	int			count;
 	vbi_page	page;
-	uint64_t	pts;
+	int      	pts;
 	struct AM_TT2_CachedPage_s *next;
 }AM_TT2_CachedPage_t;
 
@@ -97,7 +97,7 @@ static void tt2_add_cached_page(AM_TT2_Parser_t *parser, vbi_page *vp)
 	}
 	tmp->page = *vp;
 	tmp->pts = tt2_get_pts("/sys/class/stb/video_pts", 10);
-	AM_DEBUG(1, "Cache page, pts 0x%llx, total cache %d pages", tmp->pts,
+	AM_DEBUG(1, "Cache page, pts 0x%x, total cache %d pages", tmp->pts,
 		parser->cached_tail->count - parser->cached_pages->count);
 }
 
@@ -692,6 +692,42 @@ AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir)
 	subno = parser->sub_page_no;
 
 	if(vbi_get_next_pgno(parser->dec, dir, &pgno, &subno))
+	{
+		parser->page_no = vbi_bcd2dec(pgno);
+		parser->sub_page_no = subno;
+
+		parser->disp_update = AM_TRUE;
+		pthread_cond_signal(&parser->cond);
+	}
+
+	pthread_mutex_unlock(&parser->lock);
+
+	return AM_SUCCESS;
+}
+
+/**\brief 跳转到下一子页
+ * \param handle 句柄
+ * \param dir 搜索方向，+1为正向，-1为反向
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_tt2.h)
+ */
+AM_ErrorCode_t AM_TT2_NextSubPage(AM_TT2_Handle_t handle, int dir)
+{
+	AM_TT2_Parser_t *parser = (AM_TT2_Parser_t*)handle;
+	int pgno, subno;
+
+	if(!parser)
+	{
+		return AM_TT2_ERR_INVALID_HANDLE;
+	}
+
+	pthread_mutex_lock(&parser->lock);
+
+	pgno  = vbi_dec2bcd(parser->page_no);
+	subno = parser->sub_page_no;
+
+	if(vbi_get_next_sub_pgno(parser->dec, dir, &pgno, &subno))
 	{
 		parser->page_no = vbi_bcd2dec(pgno);
 		parser->sub_page_no = subno;

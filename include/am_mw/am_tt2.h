@@ -160,6 +160,15 @@ extern AM_ErrorCode_t AM_TT2_GoHome(AM_TT2_Handle_t handle);
  */
 extern AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir);
 
+/**\brief 跳转到下一子页
+ * \param handle 句柄
+ * \param dir 搜索方向，+1为正向，-1为反向
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_tt2.h)
+ */
+extern AM_ErrorCode_t AM_TT2_NextSubPage(AM_TT2_Handle_t handle, int dir);
+
 /**\brief 根据颜色跳转到指定链接
  * \param handle 句柄
  * \param color 颜色
