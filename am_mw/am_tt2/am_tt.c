@@ -33,7 +33,7 @@ typedef struct
 	int                sub_page_no;
 	AM_Bool_t          disp_update;
 	AM_Bool_t          running;
-	uint64_t           pts;
+	int                pts;
 	pthread_mutex_t    lock;
 	pthread_cond_t     cond;
 	pthread_t          thread;
@@ -47,22 +47,20 @@ enum systems {
 	SYSTEM_625
 };
 
-static uint64_t tt2_get_pts(const char *pts_file, int base)
+static int tt2_get_pts(const char *pts_file, int base)
 {
 	char buf[32];
 	AM_ErrorCode_t ret;
 	uint32_t v;
-	uint64_t r;
 	
 	ret=AM_FileRead(pts_file, buf, sizeof(buf));
 	if(!ret){
 		v = strtoul(buf, 0, base);
-		r = (uint64_t)v;
 	}else{
-		r = 0LL;
+		v = 0;
 	}
 
-	return r;
+	return v;
 }
 
 static void tt2_add_cached_page(AM_TT2_Parser_t *parser, vbi_page *vp)
@@ -151,7 +149,7 @@ static void tt2_check(AM_TT2_Parser_t *parser)
 			/* step to next cached page */
 			tt2_step_cached_page(parser);
 		}
-		else if (parser->cached_pages->pts <= tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16))
+		else if (!parser->para.is_subtitle || ((parser->cached_pages->pts - tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16)) <= 0))
 		{	
 			AM_DEBUG(1, "show ttx page, remain cached %d pages", 
 				parser->cached_tail->count - parser->cached_pages->count);
@@ -189,16 +187,16 @@ static void tt2_check(AM_TT2_Parser_t *parser)
 		}
 		else
 		{
-			AM_DEBUG(2, "pts 0x%llx, pcrscr %llx, diff %lld", parser->cached_pages->pts,
+			AM_DEBUG(2, "pts 0x%x, pcrscr %x, diff %d", parser->cached_pages->pts,
 				tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16), 
 				parser->cached_pages->pts - tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16));
 		}
 	}
 	else if (parser->display_page != NULL)
 	{
-		uint64_t pts = tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16);
+		int pts = tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16);
 		
-		if (pts == 0llu)
+		if (pts == 0)
 		{
 			AM_DEBUG(1, "Teletext clear screen.");
 			/*clear the screen*/
