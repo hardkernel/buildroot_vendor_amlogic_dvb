@@ -63,11 +63,15 @@ typedef void (*AM_TT2_DrawEnd_t)(AM_TT2_Handle_t handle);
 /**\brief 取得当前PTS*/
 typedef uint64_t (*AM_TT2_GetPTS_t)(AM_TT2_Handle_t handle, uint64_t pts);
 
+/**\brief 获取新页回调*/
+typedef void (*AM_TT2_NewPage_t)(AM_TT2_Handle_t handle, int pgno, int sub_pgno);
+
 /**\brief Teletext参数*/
 typedef struct
 {
 	AM_TT2_DrawBegin_t draw_begin;   /**< 开始绘制*/
 	AM_TT2_DrawEnd_t   draw_end;     /**< 结束绘制*/
+	AM_TT2_NewPage_t   new_page;     /**< 取得新页回调*/
 	AM_Bool_t        is_subtitle;    /**< 是否为字幕*/
 	uint8_t         *bitmap;         /**< 绘图缓冲区*/
 	int              pitch;          /**< 绘图缓冲区每行字节数*/
@@ -159,6 +163,26 @@ extern AM_ErrorCode_t AM_TT2_GoHome(AM_TT2_Handle_t handle);
  *   - 其他值 错误代码(见am_tt2.h)
  */
 extern AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir);
+
+/**\brief 跳转到下一子页
+ * \param handle 句柄
+ * \param dir 搜索方向，+1为正向，-1为反向
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_tt2.h)
+ */
+extern AM_ErrorCode_t AM_TT2_NextSubPage(AM_TT2_Handle_t handle, int dir);
+
+/**\brief 获取子页信息
+ * \param handle 句柄
+ * \param pgno 页号
+ * \param[out] subs 返回子页号
+ * \param[inout] len 输入数组subs长度，返回实际子页数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_tt2.h)
+ */
+extern AM_ErrorCode_t AM_TT2_GetSubPageInfo(AM_TT2_Handle_t handle, int pgno, int *subs, int *len);
 
 /**\brief 根据颜色跳转到指定链接
  * \param handle 句柄

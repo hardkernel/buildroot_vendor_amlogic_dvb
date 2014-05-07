@@ -20,7 +20,7 @@ typedef struct AM_TT2_CachedPage_s
 {
 	int			count;
 	vbi_page	page;
-	uint64_t	pts;
+	int      	pts;
 	struct AM_TT2_CachedPage_s *next;
 }AM_TT2_CachedPage_t;
 
@@ -31,6 +31,7 @@ typedef struct
 	AM_TT2_Para_t      para;
 	int                page_no;
 	int                sub_page_no;
+	int                accept_sub_page;
 	AM_Bool_t          disp_update;
 	AM_Bool_t          running;
 	int                pts;
@@ -97,7 +98,7 @@ static void tt2_add_cached_page(AM_TT2_Parser_t *parser, vbi_page *vp)
 	}
 	tmp->page = *vp;
 	tmp->pts = tt2_get_pts("/sys/class/stb/video_pts", 10);
-	AM_DEBUG(1, "Cache page, pts 0x%llx, total cache %d pages", tmp->pts,
+	AM_DEBUG(1, "Cache page, pts 0x%x, total cache %d pages", tmp->pts,
 		parser->cached_tail->count - parser->cached_pages->count);
 }
 
@@ -269,11 +270,15 @@ static void tt2_event_handler(vbi_event *ev, void *user_data)
 		pgno, subno, parser->page_no, parser->sub_page_no	);
 	AM_DEBUG(2, "header_update %d, clock_update %d, roll_header %d", 
 		ev->ev.ttx_page.header_update, ev->ev.ttx_page.clock_update, ev->ev.ttx_page.roll_header);
-	if(ev->ev.ttx_page.clock_update || ((pgno==parser->page_no) && (parser->sub_page_no==AM_TT2_ANY_SUBNO || parser->sub_page_no==subno)))
+	if(ev->ev.ttx_page.clock_update || ((pgno==parser->page_no) && (parser->accept_sub_page==AM_TT2_ANY_SUBNO || parser->sub_page_no==subno)))
 	{
+		parser->sub_page_no = subno;
 		parser->disp_update = AM_TRUE;
 		pthread_cond_signal(&parser->cond);
 	}
+
+	if(parser->para.new_page)
+		parser->para.new_page((AM_TT2_Handle_t)parser, pgno, subno);
 }
 
 /**\brief 创建teletext解析句柄
@@ -317,6 +322,7 @@ AM_ErrorCode_t AM_TT2_Create(AM_TT2_Handle_t *handle, AM_TT2_Para_t *para)
 
 	parser->page_no = 100;
 	parser->sub_page_no = AM_TT2_ANY_SUBNO;
+	parser->accept_sub_page = AM_TT2_ANY_SUBNO;
 	parser->para    = *para;
 
 	*handle = parser;
@@ -620,6 +626,7 @@ AM_ErrorCode_t AM_TT2_GotoPage(AM_TT2_Handle_t handle, int page_no, int sub_page
 
 	parser->page_no = page_no;
 	parser->sub_page_no = sub_page_no;
+	parser->accept_sub_page = sub_page_no;
 	parser->disp_update = AM_TRUE;
 
 	pthread_mutex_unlock(&parser->lock);
@@ -653,10 +660,13 @@ AM_ErrorCode_t AM_TT2_GoHome(AM_TT2_Handle_t handle)
 	if(cached)
 	{
 		vbi_resolve_home(&page, &link);
-		if(link.type == VBI_LINK_PAGE)
+		if(link.type == VBI_LINK_PAGE){
 			parser->page_no = vbi_bcd2dec(link.pgno);
-		else if(link.type == VBI_LINK_SUBPAGE)
+			parser->accept_sub_page = AM_TT2_ANY_SUBNO;
+		}else if(link.type == VBI_LINK_SUBPAGE){
 			parser->sub_page_no = link.subno;
+			parser->accept_sub_page = link.subno;
+		}
 
 		vbi_unref_page(&page);
 
@@ -695,9 +705,84 @@ AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir)
 	{
 		parser->page_no = vbi_bcd2dec(pgno);
 		parser->sub_page_no = subno;
+		parser->accept_sub_page = AM_TT2_ANY_SUBNO;
 
 		parser->disp_update = AM_TRUE;
 		pthread_cond_signal(&parser->cond);
+	}
+
+	pthread_mutex_unlock(&parser->lock);
+
+	return AM_SUCCESS;
+}
+
+/**\brief 跳转到下一子页
+ * \param handle 句柄
+ * \param dir 搜索方向，+1为正向，-1为反向
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_tt2.h)
+ */
+AM_ErrorCode_t AM_TT2_NextSubPage(AM_TT2_Handle_t handle, int dir)
+{
+	AM_TT2_Parser_t *parser = (AM_TT2_Parser_t*)handle;
+	int pgno, subno;
+
+	if(!parser)
+	{
+		return AM_TT2_ERR_INVALID_HANDLE;
+	}
+
+	pthread_mutex_lock(&parser->lock);
+
+	pgno  = vbi_dec2bcd(parser->page_no);
+	subno = parser->sub_page_no;
+
+	if(vbi_get_next_sub_pgno(parser->dec, dir, &pgno, &subno))
+	{
+		parser->page_no = vbi_bcd2dec(pgno);
+		parser->sub_page_no = subno;
+		parser->accept_sub_page = subno;
+
+		parser->disp_update = AM_TRUE;
+		pthread_cond_signal(&parser->cond);
+	}
+
+	pthread_mutex_unlock(&parser->lock);
+
+	return AM_SUCCESS;
+}
+
+/**\brief 获取子页信息
+ * \param handle 句柄
+ * \param pgno 页号
+ * \param[out] subs 返回子页号
+ * \param[inout] len 输入数组subs长度，返回实际子页数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_tt2.h)
+ */
+AM_ErrorCode_t
+AM_TT2_GetSubPageInfo(AM_TT2_Handle_t handle, int pgno, int *subs, int *len)
+{
+	AM_TT2_Parser_t *parser = (AM_TT2_Parser_t*)handle;
+
+	if(!parser)
+	{
+		return AM_TT2_ERR_INVALID_HANDLE;
+	}
+
+	if(!subs || !len)
+		return AM_TT2_ERR_INVALID_PARAM;
+
+	if(*len <= 0)
+		return AM_TT2_ERR_INVALID_PARAM;
+
+	pthread_mutex_lock(&parser->lock);
+
+	pgno  = vbi_dec2bcd(pgno);
+	if(!vbi_get_sub_info(parser->dec, pgno, subs, len)){
+		*len = 0;
 	}
 
 	pthread_mutex_unlock(&parser->lock);
@@ -735,6 +820,8 @@ AM_ErrorCode_t AM_TT2_ColorLink(AM_TT2_Handle_t handle, AM_TT2_Color_t color)
 	{
 		parser->page_no = vbi_bcd2dec(page.nav_link[color].pgno);
 		parser->sub_page_no = page.nav_link[color].subno;
+		parser->accept_sub_page = page.nav_link[color].subno;
+
 		vbi_unref_page(&page);
 
 		parser->disp_update = AM_TRUE;
@@ -808,6 +895,7 @@ AM_ErrorCode_t AM_TT2_Search(AM_TT2_Handle_t handle, int dir)
 		if(status == VBI_SEARCH_SUCCESS){
 			parser->page_no = vbi_bcd2dec(page->pgno);
 			parser->sub_page_no = page->subno;
+			parser->accept_sub_page = page->subno;
 
 			parser->disp_update = AM_TRUE;
 			pthread_cond_signal(&parser->cond);

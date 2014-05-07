@@ -3625,6 +3625,7 @@ static void* aml_av_monitor_thread(void *arg)
 			vmaster_dur = now - vmaster_time;
 		}else{
 			vmaster_time = 0;
+			vmaster_dur = 0;
 			has_amaster = AM_TRUE;
 		}
 
@@ -3648,6 +3649,7 @@ static void* aml_av_monitor_thread(void *arg)
 			apts_stop_dur = now - apts_stop_time;
 		}else{
 			last_apts = apts;
+			apts_stop_time = 0;
 			apts_stop_dur = 0;
 		}
 
@@ -3657,6 +3659,7 @@ static void* aml_av_monitor_thread(void *arg)
 			vpts_stop_dur = now - vpts_stop_time;
 		}else{
 			last_vpts = vpts;
+			vpts_stop_time = 0;
 			vpts_stop_dur = 0;
 		}
 
@@ -3667,6 +3670,7 @@ static void* aml_av_monitor_thread(void *arg)
 		}else{
 			last_dmx_apts = dmx_apts;
 			dmx_apts_stop_dur = 0;
+			dmx_apts_stop_time = 0;
 		}
 
 		if(dmx_vpts == last_dmx_vpts){
@@ -3676,6 +3680,7 @@ static void* aml_av_monitor_thread(void *arg)
 		}else{
 			last_dmx_vpts = dmx_vpts;
 			dmx_vpts_stop_dur = 0;
+			dmx_vpts_stop_time = 0;
 		}
 
 #if 0
@@ -3723,7 +3728,7 @@ static void* aml_av_monitor_thread(void *arg)
 				AM_FileEcho(ENABLE_RESAMPLE_FILE, "0");
 				AM_FileEcho(RESAMPLE_TYPE_FILE, "0");
 
-				AM_DEBUG(1, "start audio decoder");
+				AM_DEBUG(1, "start audio decoder vlevel %d alevel %d", vbuf_level, abuf_level);
 			}
 		}
 
@@ -3741,7 +3746,7 @@ static void* aml_av_monitor_thread(void *arg)
 					ioctl(ts->vid_fd, AMSTREAM_IOC_VPAUSE, 1);
 				}
 
-				AM_DEBUG(1, "pause av play");
+				AM_DEBUG(1, "pause av play vlevel %d alevel %d", vbuf_level, abuf_level);
 			}
 		}
 
@@ -3769,7 +3774,7 @@ static void* aml_av_monitor_thread(void *arg)
 				down_video_cache_time = 0;
 				AM_FileEcho(ENABLE_RESAMPLE_FILE, "0");
 				AM_FileEcho(RESAMPLE_TYPE_FILE, "0");
-				AM_DEBUG(1, "resume av play");
+				AM_DEBUG(1, "resume av play vlevel %d alevel %d", vbuf_level, abuf_level);
 			}
 		}
 
@@ -3833,7 +3838,8 @@ static void* aml_av_monitor_thread(void *arg)
 #ifdef ENABLE_AUDIO_RESAMPLE
 					AM_FileEcho(ENABLE_RESAMPLE_FILE, resample?"1":"0");
 					AM_FileEcho(RESAMPLE_TYPE_FILE, cmd);
-					AM_DEBUG(1, "audio resample %d", resample);
+					AM_DEBUG(1, "audio resample %d vlevel %d alevel %d",
+						resample, vbuf_level, abuf_level);
 #endif
 					next_resample_start_time = 0;
 				}
@@ -3845,7 +3851,7 @@ static void* aml_av_monitor_thread(void *arg)
 		if(has_video && is_hd_video && !bypass_di && (vbuf_level * 6 > vbuf_size * 5)){
 			AM_FileEcho(DI_BYPASS_FILE, "1");
 			bypass_di = AM_TRUE;
-			AM_DEBUG(1, "bypass HD deinterlace");
+			AM_DEBUG(1, "bypass HD deinterlace vlevel %d", vbuf_level);
 		}
 #endif
 
@@ -3861,56 +3867,8 @@ static void* aml_av_monitor_thread(void *arg)
 
 			if(drop_b_frame){
 				AM_FileEcho(VIDEO_DROP_BFRAME_FILE ,"1");
-				AM_DEBUG(1, "drop B frame");
+				AM_DEBUG(1, "drop B frame vlevel %d", vbuf_level);
 			}
-
-			no_video_data = AM_TRUE;
-			AM_DEBUG(1, "video data stopped");
-		}
-
-		if(no_audio_data && dmx_apts_stop_dur == 0){
-			no_audio_data = AM_FALSE;
-			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_DATA_RESUME, NULL);
-			AM_DEBUG(1, "audio data resumed");
-		}
-
-		if(no_video_data && dmx_vpts_stop_dur == 0){
-			no_video_data = AM_FALSE;
-			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_DATA_RESUME, NULL);
-			AM_DEBUG(1, "video data resumed");
-		}
-
-		need_replay = AM_FALSE;
-		if(/*(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur == 0) && (apts_stop_dur > NO_DATA_CHECK_TIME)) ||*/
-				(!no_video_data && !av_paused && (dmx_vpts_stop_dur == 0) && (vpts_stop_dur > NO_DATA_CHECK_TIME)))
-			need_replay = AM_TRUE;
-		if(vbuf_level * 6 > vbuf_size * 5)
-			need_replay = AM_TRUE;
-		if(abuf_level * 6 > abuf_size * 5)
-			need_replay = AM_TRUE;
-		
-		//AM_DEBUG(1, "vbuf_level--0x%08x---- abuf_level---0x%08x",vbuf_level,abuf_level);
-	
-		if(need_replay){
-			aml_close_ts_mode(dev, AM_FALSE);
-			aml_open_ts_mode(dev);
-			aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
-			adec_start = AM_FALSE;
-			av_paused  = AM_TRUE;
-			resample_type = 0;
-			next_resample_type = resample_type;
-			next_resample_start_time = 0;
-			last_apts = 0;
-			last_vpts = 0;
-			last_dmx_apts = 0;
-			last_dmx_vpts = 0;
-			apts_stop_time = 0;
-			vpts_stop_time = 0;
-			dmx_apts_stop_time = 0;
-			dmx_vpts_stop_time = 0;
-			down_audio_cache_time = 0;
-			down_video_cache_time = 0;
-			AM_DEBUG(1, "replay ts");
 		}
 #endif
 
@@ -3960,12 +3918,15 @@ static void* aml_av_monitor_thread(void *arg)
 			need_replay = AM_TRUE;
 		if(abuf_level * 6 > abuf_size * 5)
 			need_replay = AM_TRUE;
-		if(adec_start && !av_paused && has_amaster && !apts_stop_dur && !vpts_stop_dur && (vmaster_dur > VMASTER_REPLAY_TIME))
-			need_replay = AM_TRUE;
+		//if(adec_start && !av_paused && has_amaster && !apts_stop_dur && !vpts_stop_dur && (vmaster_dur > VMASTER_REPLAY_TIME))
+			//need_replay = AM_TRUE;
 		
 		//AM_DEBUG(1, "vbuf_level--0x%08x---- abuf_level---0x%08x",vbuf_level,abuf_level);
 	
 		if(need_replay){
+			AM_DEBUG(1, "replay ts vlevel %d alevel %d vpts_stop %d vmaster %d",
+				vbuf_level, abuf_level, vpts_stop_dur, vmaster_dur);
+
 			aml_close_ts_mode(dev, AM_FALSE);
 			aml_open_ts_mode(dev);
 			aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
@@ -3986,7 +3947,6 @@ static void* aml_av_monitor_thread(void *arg)
 			down_audio_cache_time = 0;
 			down_video_cache_time = 0;
 			has_amaster = AM_FALSE;
-			AM_DEBUG(1, "replay ts");
 		}
 	}
 
@@ -5179,6 +5139,7 @@ get_osd_rect(const char *mode, int *x, int *y, int *w, int *h)
 static AM_ErrorCode_t
 aml_set_vpath(AM_AV_Device_t *dev)
 {
+#if 0
 	static char s_bypass_hd[2];
 	static char s_bypass_hd_prog[2];
 	static char s_bypass_prog[2];
@@ -5409,7 +5370,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 
 	AM_FileEcho("/sys/class/video/axis", video_axis);
 	AM_FileRead("/sys/class/video/axis", video_axis, sizeof(video_axis));
-
+#endif
 	return AM_SUCCESS;
 }
 
