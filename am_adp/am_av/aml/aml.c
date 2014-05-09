@@ -78,7 +78,9 @@ void *adec_handle = NULL;
 #define AOUT_DEV_NO 0
 
 #define ENABLE_AUDIO_RESAMPLE
+#if 0
 #define ENABLE_DROP_BFRAME
+#endif
 #define ENABLE_BYPASS_DI
 #define ADEC_START_AUDIO_LEVEL       256
 #define ADEC_START_VIDEO_LEVEL       2048
