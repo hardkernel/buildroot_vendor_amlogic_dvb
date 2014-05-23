@@ -4682,7 +4682,8 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 		prop.props = &property;
 
 		memset(&property, 0, sizeof(property));
-		property.cmd = DTV_DVBT2_DATA_PLPS;
+		property.cmd = DTV_DVBT2_PLP_ID;
+		property.u.buffer.reserved1[1] = UINT_MAX;/*get plps*/
 		property.u.buffer.reserved2 = plp_ids;
 		AM_FEND_GetProp(scanner->start_para.fend_dev_id, &prop);
 		plp_num = property.u.buffer.reserved1[0];
