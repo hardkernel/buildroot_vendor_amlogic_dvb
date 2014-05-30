@@ -4074,6 +4074,12 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 	AM_AV_TimeshiftPara_t *tshift_p;
 	AV_TimeshiftData_t *tshift;
 
+	int ctrl_fd = open("/dev/amvideo", O_RDWR);
+	if(ctrl_fd>=0){
+		ioctl(ctrl_fd, AMSTREAM_IOC_SET_VSYNC_UPINT, 0);
+		close(ctrl_fd);
+	}
+
 	switch(mode)
 	{
 		case AV_PLAY_VIDEO_ES:
