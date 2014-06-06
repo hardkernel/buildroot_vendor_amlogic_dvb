@@ -2240,6 +2240,13 @@ static void aml_destroy_timeshift_data(AV_TimeshiftData_t *tshift, AM_Bool_t des
 
 	AM_FileEcho("/sys/class/stb/source", tshift->last_stb_src);
 
+	char buf[32];
+	if(AM_FileRead("/sys/module/di/parameters/bypass_all", buf, sizeof(buf))==AM_SUCCESS){
+		if (!strncmp(buf, "1", 1)){
+			AM_FileEcho("/sys/module/di/parameters/bypass_all","0");
+		}
+	}
+
 	if (destroy_thread)
 		free(tshift);
 }
