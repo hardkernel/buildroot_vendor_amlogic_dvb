@@ -232,7 +232,7 @@ const char *sql_stmts[MAX_STMT] =
 	 current_ttx=-1,ttx_pids=?,ttx_types=?,ttx_magazine_nos=?,ttx_page_nos=?,ttx_langs=?,\
 	 skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,\
 	 hide_guide=?, source_id=?,favor=?,db_sat_para_id=?,scrambled_flag=?,lcn=-1,hd_lcn=-1,sd_lcn=-1,\
-	 default_chan_num=-1,chan_order=0,lcn_order=0,service_id_order=0,hd_sd_order=0,pmt_pid=?,dvbt2_plp_id=?,sdt_ver=? where db_id=?",
+	 default_chan_num=-1,chan_order=0,lcn_order=0,service_id_order=0,hd_sd_order=0,pmt_pid=?,dvbt2_plp_id=?,sdt_ver=?,pcr_pid=? where db_id=?",
 	"select db_id,service_type from srv_table where db_ts_id=? order by service_id",
 	"update srv_table set chan_num=? where db_id=?",
 	"delete  from evt_table where db_ts_id=?",
@@ -1309,7 +1309,8 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 	sqlite3_bind_int(stmts[UPDATE_SRV], 36, srv_info->pmt_pid);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 37, srv_info->plp_id);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 38, srv_info->sdt_version);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 39, srv_info->srv_dbid);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 39, srv_info->pcr_pid);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 40, srv_info->srv_dbid);
 	sqlite3_step(stmts[UPDATE_SRV]);
 	sqlite3_reset(stmts[UPDATE_SRV]);
 }
@@ -1672,6 +1673,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 		srv_info.srv_id = pmt->i_program_number;
 		srv_info.src = src;
 		srv_info.pmt_pid = get_pmt_pid(ts->digital.pats, pmt->i_program_number);
+		srv_info.pcr_pid = pmt->i_pcr_pid;
 
 		if (store)
 		{
@@ -1875,6 +1877,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 				srv_info.srv_id = pmt->i_program_number;
 				srv_info.src = src;
 				srv_info.pmt_pid = get_pmt_pid(pat_list, pmt->i_program_number);
+				srv_info.pcr_pid = pmt->i_pcr_pid;
 				srv_info.plp_id  = plp_id;
 
 				if (store)

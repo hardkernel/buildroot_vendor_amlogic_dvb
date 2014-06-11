@@ -15,6 +15,7 @@
 "pmt_pid integer",                                               /**< PMT PID*/
 "vid_pid integer", 									/**< 视频PID*/
 "vid_fmt integer",									/**< 视频压缩格式*/
+"pcr_pid integer", 									/**< PCR PID*/
 "scrambled_flag integer",							/**< 加扰标识，0-无加扰，1-有加扰*/
 
 /**< 以下audio,subtitle,teletext的字段中，text型字段以字符串形式存储多个数值，每个数值用','分开，

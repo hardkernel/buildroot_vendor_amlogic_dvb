@@ -235,7 +235,7 @@ typedef struct
 typedef struct
 {
 	uint8_t srv_type, eit_sche, eit_pf, rs, free_ca, access_controlled, hidden, hide_guide, plp_id;
-	int vid, aid1, aid2, srv_id, pmt_pid;
+	int vid, aid1, aid2, srv_id, pmt_pid, pcr_pid;
 	int vfmt, chan_num, afmt_tmp, vfmt_tmp, scrambled_flag, major_chan_num, minor_chan_num, source_id;
 	int src, srv_dbid, satpara_dbid;
 	char name[(AM_DB_MAX_SRV_NAME_LEN+4)*AM_SCAN_MAX_SRV_NAME_LANG + 1];

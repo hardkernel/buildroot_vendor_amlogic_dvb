@@ -82,6 +82,8 @@ void *adec_handle = NULL;
 #define ENABLE_DROP_BFRAME
 #endif
 #define ENABLE_BYPASS_DI
+#define ENABLE_PCR
+
 #define ADEC_START_AUDIO_LEVEL       256
 #define ADEC_START_VIDEO_LEVEL       2048
 #define ADEC_FORCE_START_AUDIO_LEVEL 1024
@@ -92,6 +94,12 @@ void *adec_handle = NULL;
 #define DOWN_RESAMPLE_CACHE_TIME     90000*2
 #define NO_DATA_CHECK_TIME           4000
 #define VMASTER_REPLAY_TIME          4000
+
+#ifdef ENABLE_PCR
+#ifndef AMSTREAM_IOC_PCRID
+#define AMSTREAM_IOC_PCRID        _IOW(AMSTREAM_IOC_MAGIC, 0x4f, int)
+#endif
+#endif
 
 #define STREAM_VBUF_FILE    "/dev/amstream_vbuf"
 #define STREAM_ABUF_FILE    "/dev/amstream_abuf"
@@ -3345,9 +3353,11 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 
 	ts = (AV_TSData_t*)dev->ts_player.drv_data;
 	
+#ifndef ENABLE_PCR
 	if (ts->vid_fd != -1){
 		ioctl(ts->vid_fd, AMSTREAM_IOC_VPAUSE, 1);
 	}
+#endif
 	
 #ifdef MPTSONLYAUDIOVIDEO
 	if(ts->fd == -1)
@@ -3447,20 +3457,35 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 		}
 
 		val = tp->afmt;
-		AM_DEBUG(1, "set audio format %d %d", ts->fd, val);
 		if(ioctl(ts->fd, AMSTREAM_IOC_AFORMAT, val)==-1)
 		{
 			AM_DEBUG(1, "set audio format failed");
 			return AM_AV_ERR_SYS;
 		}
 		val = tp->apid;
-		AM_DEBUG(1, "set audio PID %d %d", ts->fd, val);
 		if(ioctl(ts->fd, AMSTREAM_IOC_AID, val)==-1)
 		{
 			AM_DEBUG(1, "set audio PID failed");
 			return AM_AV_ERR_SYS;
 		}
 	}
+
+#ifdef ENABLE_PCR
+	if(tp->pcrpid && (tp->pcrpid<0x1fff)){
+		val = tp->pcrpid;
+		if(ioctl(ts->fd, AMSTREAM_IOC_PCRID, val)==-1)
+		{
+			AM_DEBUG(1, "set PCR PID failed");
+			return AM_AV_ERR_SYS;
+		}
+	}
+
+	property_set("sys.amplayer.drop_pcm", "1");
+	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
+	AM_FileEcho(TSYNC_MODE_FILE, "2");
+
+	adec_start_decode(ts->fd, tp->afmt);
+#endif /*ENABLE_PCR*/
 
 	if(ioctl(ts->fd, AMSTREAM_IOC_PORT_INIT, 0)==-1)
 	{
@@ -3514,6 +3539,12 @@ static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 	free(ts);
 
 	dev->ts_player.drv_data = NULL;
+
+#ifdef ENABLE_PCR
+	property_set("sys.amplayer.drop_pcm", "0");
+	AM_FileEcho(ENABLE_RESAMPLE_FILE, "0");
+	AM_FileEcho(TSYNC_MODE_FILE, "0");
+#endif /*ENABLE_PCR*/
 
 	//set_arc_freq(0);
 
@@ -3569,8 +3600,13 @@ static void* aml_av_monitor_thread(void *arg)
 	char buf[32];
 	AV_TSData_t *ts;
 
+#ifndef ENABLE_PCR
 	property_set("sys.amplayer.drop_pcm", "1");
 	AM_FileEcho(VID_BLACKOUT_FILE, "0");
+#else
+	av_paused  = AM_FALSE;
+	adec_start = AM_TRUE;
+#endif
 
 	pthread_mutex_lock(&gAVMonLock);
 
@@ -3660,6 +3696,7 @@ static void* aml_av_monitor_thread(void *arg)
 			last_apts = apts;
 			apts_stop_time = 0;
 			apts_stop_dur = 0;
+			apts_stop_time = 0;
 		}
 
 		if(vpts == last_vpts){
@@ -3670,6 +3707,7 @@ static void* aml_av_monitor_thread(void *arg)
 			last_vpts = vpts;
 			vpts_stop_time = 0;
 			vpts_stop_dur = 0;
+			vpts_stop_time = 0;
 		}
 
 		if(dmx_apts == last_dmx_apts){
@@ -3698,6 +3736,8 @@ static void* aml_av_monitor_thread(void *arg)
 				vbuf_level, vpts ? dmx_vpts - vpts : dmx_vpts - first_dmx_vpts,
 				resample_type);
 #endif
+
+#ifndef ENABLE_PCR
 		if(has_audio && !adec_start){
 			adec_start = AM_TRUE;
 
@@ -3849,12 +3889,14 @@ static void* aml_av_monitor_thread(void *arg)
 					AM_FileEcho(RESAMPLE_TYPE_FILE, cmd);
 					AM_DEBUG(1, "audio resample %d vlevel %d alevel %d",
 						resample, vbuf_level, abuf_level);
+					resample_type = resample;
 #endif
 					next_resample_start_time = 0;
 				}
 			}
 #endif
 		}
+#endif /*!defined ENABLE_PCR*/
 
 #ifdef ENABLE_BYPASS_DI
 		if(has_video && is_hd_video && !bypass_di && (vbuf_level * 6 > vbuf_size * 5)){
@@ -3920,9 +3962,11 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 
 		need_replay = AM_FALSE;
+#ifndef ENABLE_PCR
 		if(/*(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur == 0) && (apts_stop_dur > NO_DATA_CHECK_TIME)) ||*/
 				(!no_video_data && !av_paused && (dmx_vpts_stop_dur == 0) && (vpts_stop_dur > NO_DATA_CHECK_TIME)))
 			need_replay = AM_TRUE;
+#endif
 		if(vbuf_level * 6 > vbuf_size * 5)
 			need_replay = AM_TRUE;
 		if(abuf_level * 6 > abuf_size * 5)
@@ -3961,9 +4005,13 @@ static void* aml_av_monitor_thread(void *arg)
 
 	pthread_mutex_unlock(&gAVMonLock);
 
+#ifndef ENABLE_PCR
 	if(resample_type){
 		AM_FileEcho(ENABLE_RESAMPLE_FILE, "0");
 	}
+
+	AM_FileEcho(VID_BLACKOUT_FILE, dev->video_blackout ? "1" : "0");
+#endif
 
 	if(bypass_di){
 		AM_FileEcho(DI_BYPASS_FILE, "0");
@@ -3972,8 +4020,6 @@ static void* aml_av_monitor_thread(void *arg)
 	if(drop_b_frame){
 		AM_FileEcho(VIDEO_DROP_BFRAME_FILE, "0");
 	}
-
-	AM_FileEcho(VID_BLACKOUT_FILE, dev->video_blackout ? "1" : "0");
 
 	AM_DEBUG(1, "AV  monitor thread exit now");
 	return NULL;

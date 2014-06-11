@@ -480,6 +480,19 @@ extern AM_ErrorCode_t AM_AV_SetTSSource(int dev_no, AM_AV_TSSource_t src);
  * \param dev_no 音视频设备号
  * \param vpid 视频流PID
  * \param apid 音频流PID
+ * \param pcrpid PCR PID
+ * \param vfmt 视频压缩格式
+ * \param afmt 音频压缩格式
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+extern AM_ErrorCode_t AM_AV_StartTSWithPCR(int dev_no, uint16_t vpid, uint16_t apid, uint16_t pcrpid, AM_AV_VFormat_t vfmt, AM_AV_AFormat_t afmt);
+
+/**\brief 开始解码TS流
+ * \param dev_no 音视频设备号
+ * \param vpid 视频流PID
+ * \param apid 音频流PID
  * \param vfmt 视频压缩格式
  * \param afmt 音频压缩格式
  * \return
@@ -487,6 +500,7 @@ extern AM_ErrorCode_t AM_AV_SetTSSource(int dev_no, AM_AV_TSSource_t src);
  *   - 其他值 错误代码(见am_av.h)
  */
 extern AM_ErrorCode_t AM_AV_StartTS(int dev_no, uint16_t vpid, uint16_t apid, AM_AV_VFormat_t vfmt, AM_AV_AFormat_t afmt);
+
 
 /**\brief 停止TS流解码
  * \param dev_no 音视频设备号

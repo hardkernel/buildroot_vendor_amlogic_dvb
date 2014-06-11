@@ -40,6 +40,7 @@ typedef struct
 {
 	uint16_t        vpid;            /**< 视频流PID*/
 	uint16_t        apid;            /**< 音频流PID*/
+	uint16_t        pcrpid;          /**< PCR PID*/
 	AM_AV_VFormat_t vfmt;            /**< 视频流格式*/
 	AM_AV_AFormat_t afmt;            /**< 音频流格式*/
 } AV_TSPlayPara_t;
