@@ -609,6 +609,9 @@ static int lock_fend(int id, int mode)
 		printf("BW[8/7/6/5(AUTO) MHz]: ");
 		scanf("%d", &bw);
 
+		printf("T2?[0/1]: ");
+		scanf("%d", &p.u.ofdm.ofdm_mode);
+
 		p.frequency = freq;
 		switch(bw)
 		{
