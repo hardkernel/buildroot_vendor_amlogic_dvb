@@ -3636,11 +3636,16 @@ static void* aml_av_monitor_thread(void *arg)
 		if(ioctl(ts->fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1){
 			vbuf_size  = vstatus.status.size;
 			vbuf_level = vstatus.status.data_len;
-			is_hd_video = vstatus.vstatus.width > 720;
+			//is_hd_video = vstatus.vstatus.width > 720;
 		}else{
 			//AM_DEBUG(1, "cannot get video buffer status");
 			vbuf_size  = 0;
 			vbuf_level = 0;
+		}
+		
+		memset(&vstatus, 0, sizeof(vstatus));
+		if(ioctl(ts->fd, AMSTREAM_IOC_VDECSTAT, (unsigned long)&vstatus) != -1){
+			is_hd_video = (vstatus.vstatus.width > 720)? 1 : 0;
 		}
 
 		if(AM_FileRead(AUDIO_PTS_FILE, buf, sizeof(buf)) >= 0){
