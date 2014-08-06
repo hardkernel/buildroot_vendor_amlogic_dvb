@@ -82,7 +82,7 @@ void *adec_handle = NULL;
 #define ENABLE_DROP_BFRAME
 #endif
 #define ENABLE_BYPASS_DI
-#define ENABLE_PCR
+//#define ENABLE_PCR
 
 #define ADEC_START_AUDIO_LEVEL       256
 #define ADEC_START_VIDEO_LEVEL       2048
