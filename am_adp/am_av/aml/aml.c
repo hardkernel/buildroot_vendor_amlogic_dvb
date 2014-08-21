@@ -2698,26 +2698,29 @@ static void *aml_timeshift_thread(void *arg)
 					info.current_time = 0;
 				}
 
-				/********Skip inject error*********/			
-				if(abuf_len!=astatus.status.data_len){
-					abuf_len = astatus.status.data_len;
-					skip_flag_count=0;
-				}
-				if(vbuf_len!=vstatus.status.data_len){
-					vbuf_len =vstatus.status.data_len;
-					skip_flag_count=0;
-				}	
+				if(tshift->state == AV_TIMESHIFT_STAT_PLAY)
+				{
+					/********Skip inject error*********/
+					if(abuf_len!=astatus.status.data_len){
+						abuf_len = astatus.status.data_len;
+						skip_flag_count=0;
+					}
+					if(vbuf_len!=vstatus.status.data_len){
+						vbuf_len =vstatus.status.data_len;
+						skip_flag_count=0;
+					}
 
-				if(info.current_time>0&&astatus.status.data_len==abuf_len&&vstatus.status.data_len==vbuf_len){
-					skip_flag_count++;	
-				}
+					if(info.current_time>0&&astatus.status.data_len==abuf_len&&vstatus.status.data_len==vbuf_len){
+						skip_flag_count++;
+					}
 
-				if(skip_flag_count>=4){
-					aml_timeshift_file_seek(&tshift->file,tshift->file.total - tshift->file.avail);
-					am_timeshift_reset_continue(tshift, -1, AM_TRUE);
-					vbuf_len = 0;
-					abuf_len = 0;
-					skip_flag_count=0;
+					if(skip_flag_count>=4){
+						aml_timeshift_file_seek(&tshift->file,tshift->file.total - tshift->file.avail);
+						am_timeshift_reset_continue(tshift, -1, AM_TRUE);
+						vbuf_len = 0;
+						abuf_len = 0;
+						skip_flag_count=0;
+					}
 				}
 
 				info.status = tshift->state;
