@@ -125,6 +125,7 @@ void dvbpsi_DetachPAT(dvbpsi_handle h_dvbpsi)
 void dvbpsi_InitPAT(dvbpsi_pat_t* p_pat, uint16_t i_ts_id, uint8_t i_version,
                     int b_current_next)
 {
+  p_pat->i_table_id = 0;
   p_pat->i_ts_id = i_ts_id;
   p_pat->i_version = i_version;
   p_pat->b_current_next = b_current_next;
