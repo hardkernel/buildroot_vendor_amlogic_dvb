@@ -2139,12 +2139,12 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 
 	if(para->media_info.aud_cnt > 0)
 	{
-		if(ioctl(tshift->av_fd, AMSTREAM_IOC_AFORMAT, tshift->aud_fmt)==-1)
+		if(ioctl(tshift->av_fd, AMSTREAM_IOC_AFORMAT, para->media_info.audios[0].fmt)==-1)
 		{
 			AM_DEBUG(1, "set audio format failed");
 			return AM_AV_ERR_SYS;
 		}
-		if(ioctl(tshift->av_fd, AMSTREAM_IOC_AID, tshift->aud_pid)==-1)
+		if(ioctl(tshift->av_fd, AMSTREAM_IOC_AID, para->media_info.audios[0].pid)==-1)
 		{
 			AM_DEBUG(1, "set audio PID failed");
 			return AM_AV_ERR_SYS;
