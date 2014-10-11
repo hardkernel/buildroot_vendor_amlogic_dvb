@@ -478,6 +478,7 @@ static int check_sec(AM_DMX_Device_t *dev, DVR_Channel *ch, uint8_t *data, int l
 
 static void parse_sec(AM_DMX_Device_t *dev, DVR_Channel *ch, uint8_t *data, int left, AM_Bool_t p_start)
 {
+	int first = 1;
 	int slen;
 
 	if(p_start){
@@ -498,12 +499,13 @@ static void parse_sec(AM_DMX_Device_t *dev, DVR_Channel *ch, uint8_t *data, int 
 		ch->size = 0;
 	}
 
-	while((left>0) && (data[0]!=0xFF)){
+	while((left>0) && (first || data[0]!=0xFF)){
 		int cnt;
 
 		cnt = check_sec(dev, ch, data, left);
 		data += cnt;
 		left -= cnt;
+		first = 0;
 	}
 }
 
