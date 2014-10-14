@@ -157,7 +157,7 @@ void *adec_handle = NULL;
 #ifdef ANDROID
 #define audio_decode_start(h)\
 	AM_MACRO_BEGIN\
-	audio_decode_start(h);\
+	/*audio_decode_start(h);*/\
 	audio_decode_set_volume(h, 1.);\
 	AM_MACRO_END
 
