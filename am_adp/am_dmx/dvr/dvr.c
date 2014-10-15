@@ -65,7 +65,7 @@ struct DVR_Filter_s
 #define DVR_PID_COUNT     32
 
 typedef struct{
-	uint8_t      buf[4096];
+	uint8_t      buf[256*1024];
 	size_t       start;
 	DVR_Channel  dvr_channels[DVR_CHANNEL_COUNT];
 	DVR_Filter   dvr_filters[DVR_FILTER_COUNT];
@@ -632,10 +632,10 @@ static AM_ErrorCode_t dvr_poll(AM_DMX_Device_t *dev, AM_DMX_FilterMask_t *mask, 
 			left -= cnt;
 		}while(cnt && left);
 		
-		if(left){
+		if(left)
 			memmove(dmx->buf, dmx->buf + total - left, left);
-			dmx->start = left;
-		}
+
+		dmx->start = left;
 	}
 
 	return AM_SUCCESS;
