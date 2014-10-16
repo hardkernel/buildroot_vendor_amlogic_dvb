@@ -1576,6 +1576,20 @@ AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_Teletex
 	dvbpsi_descriptor_t *descr;
 	
 	AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+		if (descr->p_decoded==NULL && descr->i_tag == AM_SI_DESCR_TELETEXT){
+			if(descr->i_length == 0){
+				if (ttx_info->teletext_count < 0)
+					ttx_info->teletext_count = 0;
+				ttx_info->teletexts[ttx_info->teletext_count].pid          = es->i_pid;
+				ttx_info->teletexts[ttx_info->teletext_count].type         = 0x0;
+				ttx_info->teletexts[ttx_info->teletext_count].magazine_no  = 1;
+				ttx_info->teletexts[ttx_info->teletext_count].page_no      = 100;
+				sprintf(ttx_info->teletexts[ttx_info->teletext_count].lang, "Teletext%d", ttx_info->teletext_count+1);
+				ttx_info->teletext_count++;
+				return AM_SUCCESS;
+			}
+		}
+
 		if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_TELETEXT)
 		{
 			int itel, i;
