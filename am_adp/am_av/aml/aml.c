@@ -3906,6 +3906,17 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 #endif /*!defined ENABLE_PCR*/
 
+		int status = audio_decoder_get_enable_status(adec_handle);
+		if(status==1){
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_AC3_LICENCE_RESUME, NULL);
+		}
+		else if(status==0){
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_AC3_NO_LICENCE, NULL);
+		}
+		else if(status==-1){
+
+		}
+
 #ifdef ENABLE_BYPASS_DI
 		if(has_video && is_hd_video && !bypass_di && (vbuf_level * 6 > vbuf_size * 5)){
 			AM_FileEcho(DI_BYPASS_FILE, "1");
