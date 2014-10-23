@@ -155,12 +155,6 @@ void *adec_handle = NULL;
 #define AV_SMOOTH_SYNC_VAL "100"
 
 #ifdef ANDROID
-#define audio_decode_start(h)\
-	AM_MACRO_BEGIN\
-	/*audio_decode_start(h);*/\
-	audio_decode_set_volume(h, 1.);\
-	AM_MACRO_END
-
 #define open(a...)\
 	({\
 	 int ret, times=300;\
@@ -511,7 +505,7 @@ static void adec_start_decode(int fd, int fmt)
 		param.format = fmt;
 		audio_decode_init(&adec_handle, &param);
 		audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
-		audio_decode_start(adec_handle);
+		audio_decode_set_volume(adec_handle, 1.);
 #endif
 		AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv, NULL);
 }
@@ -3605,11 +3599,12 @@ static void* aml_av_monitor_thread(void *arg)
 
 #ifndef ENABLE_PCR
 	property_set("sys.amplayer.drop_pcm", "1");
-	AM_FileEcho(VID_BLACKOUT_FILE, "0");
 #else
 	av_paused  = AM_FALSE;
 	adec_start = AM_TRUE;
 #endif
+
+	AM_FileEcho(VID_BLACKOUT_FILE, "0");
 
 	pthread_mutex_lock(&gAVMonLock);
 
