@@ -4023,9 +4023,9 @@ static void* aml_av_monitor_thread(void *arg)
 	if(resample_type){
 		AM_FileEcho(ENABLE_RESAMPLE_FILE, "0");
 	}
+#endif
 
 	AM_FileEcho(VID_BLACKOUT_FILE, dev->video_blackout ? "1" : "0");
-#endif
 
 	if(bypass_di){
 		AM_FileEcho(DI_BYPASS_FILE, "0");
