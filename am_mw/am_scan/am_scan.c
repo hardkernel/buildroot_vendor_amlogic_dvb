@@ -4819,11 +4819,12 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 				am_scan_request_section(scanner, &scanner->dtvctl.patctl);
 				/*am_scan_request_section(scanner, &scanner->dtvctl.catctl);*/
 				am_scan_request_section(scanner, &scanner->dtvctl.sdtctl);
-
-				if (dtv_start_para.source != FE_QPSK)
+				
+				am_scan_tablectl_clear(&scanner->dtvctl.nitctl);
+				//if (dtv_start_para.source != FE_QPSK||dtv_start_para.source !=FE_QAM)
+				if ((cur_fe_para.m_type!= FE_QPSK)&&(cur_fe_para.m_type !=FE_QAM))
 				{
 					/*In order to support lcn, we need scan NIT for each TS */
-					am_scan_tablectl_clear(&scanner->dtvctl.nitctl);
 					am_scan_request_section(scanner, &scanner->dtvctl.nitctl);
 				}
 			}
@@ -5054,8 +5055,11 @@ static void am_scan_get_wait_timespec(AM_SCAN_Scanner_t *scanner, struct timespe
 	else
 	{
 		TIMEOUT_CHECK(sdtctl);
-		TIMEOUT_CHECK(nitctl);
-		TIMEOUT_CHECK(batctl);
+		if ((cur_fe_para.m_type!= FE_QPSK)&&(cur_fe_para.m_type !=FE_QAM)){
+			TIMEOUT_CHECK(nitctl);
+		}
+		if (dtv_start_para.mode & AM_SCAN_DTVMODE_SEARCHBAT)
+			TIMEOUT_CHECK(batctl);
 	}
 	
 	/* All tables complete, try next ts */
