@@ -14,6 +14,7 @@
 #define AM_DEBUG_LEVEL 1
 
 
+#include <signal.h>
 #include <string.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -85,59 +86,63 @@ static void pes_cbf(int dev_no, int fid, const uint8_t *data, int len, void *use
 static void display_usage(void)
 {
 	printf("usages:\n");
-	printf("\tsetsrc\t[dvr_no async_fifo_no]\n");
-	printf("\tstart\t[dvr_no FILE pid_cnt pids]\n");
+	printf("\tsetsrc\t[dvr_no async_fifo_no ts_src]\n");
+	printf("\tstart\t[dvr_no FILE pid_cnt pid0...pidN]\n");
 	printf("\tstop\t[dvr_no]\n");
 	printf("\thelp\n");
 	printf("\tquit\n");
 }
 
-static void start_si(void)
+static void start_si(int dmx)
 {
-#if 0
+#if 1
 	struct dmx_sct_filter_params param;
 
 #define SET_FILTER(f, p, t)\
-	AM_DMX_AllocateFilter(DMX_DEV_NO, &(f));\
-	AM_DMX_SetCallback(DMX_DEV_NO, f, section_cbf, NULL);\
+	AM_DMX_AllocateFilter(dmx, &(f));\
+	AM_DMX_SetCallback(dmx, f, section_cbf, NULL);\
 	memset(&param, 0, sizeof(param));\
 	param.pid = p;\
-	param.filter.filter[0] = t;\
-	param.filter.mask[0] = 0xff;\
-	param.flags = DMX_CHECK_CRC;\
-	AM_DMX_SetSecFilter(DMX_DEV_NO, f, &param);\
-	AM_DMX_SetBufferSize(DMX_DEV_NO, f, 32*1024);\
-	AM_DMX_StartFilter(DMX_DEV_NO, f);
+	AM_DMX_SetSecFilter(dmx, f, &param);\
+	AM_DMX_SetBufferSize(dmx, f, 32*1024);\
+	AM_DMX_StartFilter(dmx, f);
 		
+//		param.filter.filter[0] = t;\
+//		param.filter.mask[0] = 0xff;\
+//		param.flags = DMX_CHECK_CRC;\
 	if (pat_fid == -1)
 	{
-		SET_FILTER(pat_fid, 0, 0)
+		SET_FILTER(pat_fid, 0x10, 0x40)
 	}
-	if (sdt_fid == -1)
+/*	if (sdt_fid == -1)
 	{
 		SET_FILTER(sdt_fid, 0x11, 0x42)
 	}
+*/
+	printf("si started.\n");
 #endif
 }
 
-static void stop_si(void)
+static void stop_si(int dmx)
 {
-#if 0
+#if 1
 #define FREE_FILTER(f)\
-	AM_DMX_StopFilter(DMX_DEV_NO, f);\
-	AM_DMX_FreeFilter(DMX_DEV_NO, f);
+	AM_DMX_StopFilter(dmx, f);\
+	AM_DMX_FreeFilter(dmx, f);
 	
 	if (pat_fid != -1)
 	{
 		FREE_FILTER(pat_fid)
 		pat_fid = -1;
 	}
-
+/*
 	if (sdt_fid != -1)
 	{
 		FREE_FILTER(sdt_fid)
 		sdt_fid = -1;
 	}
+*/
+	printf("si stopped.\n");
 #endif
 }
 
@@ -184,7 +189,7 @@ static int dvr_data_write(int fd, uint8_t *buf, int size)
 		{
 			if (errno != EINTR)
 			{
-				AM_DEBUG(0, "Write DVR data failed: %s", strerror(errno));
+				printf("\nWrite DVR data failed: %s\n", strerror(errno));
 				break;
 			}
 			ret = 0;
@@ -201,22 +206,32 @@ static void* dvr_data_thread(void *arg)
 	DVRData *dd = (DVRData*)arg;
 	int cnt;
 	uint8_t buf[256*1024];
+	uint32_t size=0;
+	int nodata = 0;
 
-	AM_DEBUG(1, "Data thread for DVR%d start ,record file will save to '%s'", dd->id, dd->file_name);
-	
+	printf("Data thread for DVR%d start ,record file will save to '%s'\n", dd->id, dd->file_name);
+
 	while (dd->running)
 	{
 		cnt = AM_DVR_Read(dd->id, buf, sizeof(buf), 1000);
 		if (cnt <= 0)
 		{
-			AM_DEBUG(1, "No data available from DVR%d", dd->id);
+			if(!nodata) { printf("\n"); nodata = 1; }
+
+			printf("\rNo data available from DVR%d", dd->id);
+			fflush(stdout);
 			usleep(200*1000);
 			continue;
 		}
-		//AM_DEBUG(1, "read from DVR%d return %d bytes", dd->id, cnt);
+		//printf("read from DVR%d return %d bytes\n", dd->id, cnt);
 		if (dd->fd != -1)
 		{
-			dvr_data_write(dd->fd, buf, cnt);
+			size += dvr_data_write(dd->fd, buf, cnt);
+
+			if(nodata) { printf("\n"); nodata = 0; }
+
+			printf("\r[%d] recorded", size);
+			fflush(stdout);
 		}
 	}
 
@@ -225,7 +240,7 @@ static void* dvr_data_thread(void *arg)
 		close(dd->fd);
 		dd->fd = -1;
 	}
-	AM_DEBUG(1, "Data thread for DVR%d now exit", dd->id);
+	printf("Data thread for DVR%d now exit\n", dd->id);
 
 	return NULL;
 }
@@ -239,7 +254,7 @@ static void start_data_thread(int dev_no)
 	dd->fd = open(dd->file_name, O_TRUNC | O_WRONLY | O_CREAT, 0666);
 	if (dd->fd == -1)
 	{
-		AM_DEBUG(1, "Cannot open record file '%s' for DVR%d", dd->file_name, dd->id);
+		printf("Cannot open record file '%s' for DVR%d\n", dd->file_name, dd->id);
 		return;
 	}
 	dd->running = 1;
@@ -254,7 +269,7 @@ static void stop_data_thread(int dev_no)
 		return;
 	dd->running = 0;
 	pthread_join(dd->thread, NULL);
-	AM_DEBUG(1, "Data thread for DVR%d has exit", dd->id);
+	printf("Data thread for DVR%d has exit\n", dd->id);
 }
 
 int start_dvr_test(void)
@@ -288,7 +303,7 @@ int start_dvr_test(void)
 
 				if (dev_no < 0 || dev_no >= DVR_DEV_COUNT)
 				{
-					AM_DEBUG(1, "Invalid DVR dev no, must [%d-%d]", 0, DVR_DEV_COUNT-1);
+					printf("Invalid DVR dev no, must [%d-%d]\n", 0, DVR_DEV_COUNT-1);
 					continue;
 				}
 				if (pid_cnt > 8)
@@ -310,12 +325,12 @@ int start_dvr_test(void)
 				sscanf(buf + 4, "%d", &dev_no);
 				if (dev_no < 0 || dev_no >= DVR_DEV_COUNT)
 				{
-					AM_DEBUG(1, "Invalid DVR dev no, must [%d-%d]", 0, DVR_DEV_COUNT-1);
+					printf("Invalid DVR dev no, must [%d-%d]\n", 0, DVR_DEV_COUNT-1);
 					continue;
 				}
-				AM_DEBUG(1, "stop record for %d", dev_no);
+				printf("stop record for %d\n", dev_no);
 				AM_DVR_StopRecord(dev_no);
-				AM_DEBUG(1, "stop data thread for %d", dev_no);
+				printf("stop data thread for %d\n", dev_no);
 				stop_data_thread(dev_no);
 			}
 			else if (!strncmp(buf, "help", 4))
@@ -324,19 +339,25 @@ int start_dvr_test(void)
 			}
 			else if (!strncmp(buf, "sistart", 7))
 			{
-				start_si();
+				int dmx;
+				sscanf(buf + 7, "%d", &dmx);
+				start_si(dmx);
 			}
 			else if (!strncmp(buf, "sistop", 6))
 			{
-				stop_si();
+				int dmx;
+				sscanf(buf + 6, "%d", &dmx);
+				stop_si(dmx);
 			}
 			else if (!strncmp(buf, "setsrc", 6))
 			{
 				int dev_no, fifo_id;
-				
-				sscanf(buf + 6, "%d %d", &dev_no, &fifo_id);
+				int tssrc=0;
+
+				sscanf(buf + 6, "%d %d %d", &dev_no, &fifo_id, &tssrc);
 
 				AM_DVR_SetSource(dev_no, fifo_id);
+				AM_DMX_SetSource(dev_no, tssrc);
 			}
 			else if (!strncmp(buf, "dscstart", 8))
 			{
@@ -363,6 +384,34 @@ int start_dvr_test(void)
 	return 0;
 }
 
+void close_all(void) {
+	int i;
+	for (i=0; i< DVR_DEV_COUNT; i++)
+	{
+		printf( "Closing DVR%d...\n", i);
+		if (data_threads[i].running)
+			stop_data_thread(i);
+		AM_DVR_Close(i);
+		printf("Closing DMX%d...\n", i);
+		AM_DMX_Close(i);
+	}
+
+	AM_FEND_Close(FEND_DEV_NO);
+}
+
+void sigroutine(int sig) {
+	switch (sig) {
+		case 1: //printf("Get a signal -- SIGHUP ");
+		case 2: //printf("Get a signal -- SIGINT ");
+		case 3: //printf("Get a signal -- SIGQUIT ");
+			close_all();
+			exit(0);
+		break;
+	}
+	return;
+}
+
+
 int main(int argc, char **argv)
 {
 	AM_FEND_OpenPara_t fpara;
@@ -372,13 +421,14 @@ int main(int argc, char **argv)
 	fe_status_t status;
 	int freq = 0;
 	int i;
-	
+	AM_ErrorCode_t err = 0;
+
 	if(argc>1)
 	{
 		sscanf(argv[1], "%d", &freq);
 	}
 	
-	if(freq)
+	if(freq>0)
 	{
 		memset(&fpara, 0, sizeof(fpara));
 		AM_TRY(AM_FEND_Open(FEND_DEV_NO, &fpara));
@@ -413,28 +463,31 @@ int main(int argc, char **argv)
 
 	for (i=0; i< DVR_DEV_COUNT; i++)
 	{
-		AM_DEBUG(1, "Openning DMX%d...", i);
+		printf("Openning DMX%d...", i);
 		memset(&para, 0, sizeof(para));
-		AM_TRY(AM_DMX_Open(i, &para));
-		AM_DMX_SetSource(i, AM_DMX_SRC_TS0);
-		AM_DEBUG(1, "Openning DVR%d...", i);
-		memset(&dpara, 0, sizeof(dpara));
-		AM_TRY(AM_DVR_Open(i, &dpara));
+		err = AM_DMX_Open(i, &para);
+		printf("[err=%d]\n", err);
 
+		printf("Openning DVR%d...", i);
+		memset(&dpara, 0, sizeof(dpara));
+		err = AM_DVR_Open(i, &dpara);
+		printf("[err=%d]\n", err);
 		data_threads[i].id = i;
 		data_threads[i].fd = -1;
 		data_threads[i].running = 0;
 	}
-	
+
+	signal(SIGINT, sigroutine);
+
 	start_dvr_test();
 
 	for (i=0; i< DVR_DEV_COUNT; i++)
 	{
-		AM_DEBUG(1, "Closing DVR%d...", i);
+		printf( "Closing DVR%d...\n", i);
 		if (data_threads[i].running)
 			stop_data_thread(i);
 		AM_DVR_Close(i);
-		AM_DEBUG(1, "Closing DMX%d...", i);
+		printf("Closing DMX%d...\n", i);
 		AM_DMX_Close(i);
 	}
 	
