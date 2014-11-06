@@ -1339,6 +1339,8 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 
 	if(para->vid_id>=0)
 	{
+		dec_sysinfo_t am_sysinfo;
+
 		if(ioctl(vfd, AMSTREAM_IOC_VFORMAT, para->vid_fmt)==-1)
 		{
 			AM_DEBUG(1, "set video format failed");
@@ -1349,6 +1351,33 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 			AM_DEBUG(1, "set video PID failed");
 			return AM_AV_ERR_SYS;
 		}
+
+		memset(&am_sysinfo,0,sizeof(dec_sysinfo_t));
+		if(para->vid_fmt == VFORMAT_VC1)
+		{
+			am_sysinfo.format = VIDEO_DEC_FORMAT_WVC1;
+			am_sysinfo.width  = 1920;
+			am_sysinfo.height = 1080;
+		}
+		else if(para->vid_fmt == VFORMAT_H264)
+		{
+			am_sysinfo.format = VIDEO_DEC_FORMAT_H264;
+			am_sysinfo.width  = 1920;
+			am_sysinfo.height = 1080;
+		}
+		else if(para->vid_fmt == VFORMAT_AVS)
+		{
+			am_sysinfo.format = VIDEO_DEC_FORMAT_AVS;
+			am_sysinfo.width  = 1920;
+			am_sysinfo.height = 1080;
+		}
+
+		if(ioctl(vfd, AMSTREAM_IOC_SYSINFO, (unsigned long)&am_sysinfo)==-1)
+		{
+			AM_DEBUG(1, "set AMSTREAM_IOC_SYSINFO");
+			return AM_AV_ERR_SYS;
+		}
+
 	}
 
 	if(para->aud_id>=0)
@@ -3440,6 +3469,18 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 			am_sysinfo.width  = 1920;
 			am_sysinfo.height = 1080;
 		}
+		else if(tp->vfmt == VFORMAT_H264)
+		{
+			am_sysinfo.format = VIDEO_DEC_FORMAT_H264;
+			am_sysinfo.width  = 1920;
+			am_sysinfo.height = 1080;
+		}
+		else if(tp->vfmt == VFORMAT_AVS)
+		{
+			am_sysinfo.format = VIDEO_DEC_FORMAT_AVS;
+			am_sysinfo.width  = 1920;
+			am_sysinfo.height = 1080;
+		}
 
 		if(ioctl(ts->fd, AMSTREAM_IOC_SYSINFO, (unsigned long)&am_sysinfo)==-1)
 		{
@@ -3593,6 +3634,8 @@ static void* aml_av_monitor_thread(void *arg)
 	int down_audio_cache_time = 0, down_video_cache_time = 0;
 	struct am_io_param astatus;
 	struct am_io_param vstatus;
+	struct am_io_param vdec_param;
+	int vdec_status, frame_width, frame_height;
 	struct timespec rt;
 	char buf[32];
 	AV_TSData_t *ts;
@@ -3644,6 +3687,13 @@ static void* aml_av_monitor_thread(void *arg)
 		memset(&vstatus, 0, sizeof(vstatus));
 		if(ioctl(ts->fd, AMSTREAM_IOC_VDECSTAT, (unsigned long)&vstatus) != -1){
 			is_hd_video = (vstatus.vstatus.width > 720)? 1 : 0;
+			vdec_status = vdec_param.vstatus.status;
+			frame_width = vdec_param.vstatus.width;
+			frame_height= vdec_param.vstatus.height;
+		}else{
+			vdec_status = 0;
+			frame_width = 0;
+			frame_height= 0;
 		}
 
 		if(AM_FileRead(AUDIO_PTS_FILE, buf, sizeof(buf)) >= 0){
@@ -3987,7 +4037,12 @@ static void* aml_av_monitor_thread(void *arg)
 			need_replay = AM_TRUE;
 		//if(adec_start && !av_paused && has_amaster && !apts_stop_dur && !vpts_stop_dur && (vmaster_dur > VMASTER_REPLAY_TIME))
 			//need_replay = AM_TRUE;
-		
+		if(has_video && (dev->ts_player.play_para.vfmt == VFORMAT_H264_4K2K) && ((vdec_status >> 16) == 0x10))
+			need_replay = AM_TRUE;
+		if(has_video && (dev->ts_player.play_para.vfmt == VFORMAT_H264) && ((frame_width > 1920) || (frame_height > 1080))){
+			dev->ts_player.play_para.vfmt = VFORMAT_H264_4K2K;
+			need_replay = AM_TRUE;
+		}
 		//AM_DEBUG(1, "vbuf_level--0x%08x---- abuf_level---0x%08x",vbuf_level,abuf_level);
 	
 		if(need_replay){
