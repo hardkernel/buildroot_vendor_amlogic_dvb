@@ -3690,6 +3690,8 @@ static void* aml_av_monitor_thread(void *arg)
 			vdec_status = vdec_param.vstatus.status;
 			frame_width = vdec_param.vstatus.width;
 			frame_height= vdec_param.vstatus.height;
+
+			AM_DEBUG(1, "vdec width %d height %d status 0x%08x", frame_width, frame_height, vdec_status);
 		}else{
 			vdec_status = 0;
 			frame_width = 0;
@@ -4037,8 +4039,13 @@ static void* aml_av_monitor_thread(void *arg)
 			need_replay = AM_TRUE;
 		//if(adec_start && !av_paused && has_amaster && !apts_stop_dur && !vpts_stop_dur && (vmaster_dur > VMASTER_REPLAY_TIME))
 			//need_replay = AM_TRUE;
-		if(has_video && (dev->ts_player.play_para.vfmt == VFORMAT_H264_4K2K) && ((vdec_status >> 16) == 0x10))
+#ifdef DECODER_FATAL_ERROR_SIZE_OVERFLOW
+		if(has_video && (dev->ts_player.play_para.vfmt == VFORMAT_H264) && (vdec_status & DECODER_FATAL_ERROR_SIZE_OVERFLOW)){
+			AM_DEBUG(1, "switch to h264 4K/2K");
+			dev->ts_player.play_para.vfmt = VFORMAT_H264_4K2K;
 			need_replay = AM_TRUE;
+		}
+#endif
 		if(has_video && (dev->ts_player.play_para.vfmt == VFORMAT_H264) && ((frame_width > 1920) || (frame_height > 1080))){
 			dev->ts_player.play_para.vfmt = VFORMAT_H264_4K2K;
 			need_replay = AM_TRUE;
