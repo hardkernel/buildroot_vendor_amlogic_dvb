@@ -5559,6 +5559,18 @@ static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM
 
 	AM_TIME_GetClock(&dev->ts_player.av_start_time);
 
+	dev->ts_player.play_para.apid = apid;
+	dev->ts_player.play_para.afmt = afmt;
+
+#ifdef ENABLE_PCR
+	property_set("sys.amplayer.drop_pcm", "1");
+	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
+	AM_FileEcho(TSYNC_MODE_FILE, "2");
+
+	adec_start_decode(fd, afmt);
+#endif /*ENABLE_PCR*/
+
+
 	/*Start Audio*/
 	dev->ts_player.av_thread_running = AM_TRUE;
 	if(pthread_create(&dev->ts_player.av_mon_thread, NULL, aml_av_monitor_thread, (void*)dev))
@@ -5566,9 +5578,6 @@ static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM
 		AM_DEBUG(1, "create the av buf monitor thread failed");
 		dev->ts_player.av_thread_running = AM_FALSE;
 	}
-
-	dev->ts_player.play_para.apid = apid;
-	dev->ts_player.play_para.afmt = afmt;
 
 	return AM_SUCCESS;
 }
