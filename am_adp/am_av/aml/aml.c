@@ -2409,9 +2409,9 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 				ioctl(tshift->cntl_fd, AMSTREAM_IOC_TRICKMODE, TRICKMODE_NONE);
 				am_timeshift_reset(tshift, 2, AM_TRUE);
 
-				if (tshift->last_cmd == AV_PLAY_FF || tshift->last_cmd == AV_PLAY_FB)
+				//if (tshift->last_cmd == AV_PLAY_FF || tshift->last_cmd == AV_PLAY_FB)
 				{
-					usleep(200*1000);
+					//usleep(200*1000);
 					AM_DEBUG(1, "set di bypass_all to 0");
 					AM_FileEcho("/sys/module/di/parameters/bypass_all","0");
 				}
