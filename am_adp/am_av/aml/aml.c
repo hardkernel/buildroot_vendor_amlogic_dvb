@@ -3634,7 +3634,6 @@ static void* aml_av_monitor_thread(void *arg)
 	int down_audio_cache_time = 0, down_video_cache_time = 0;
 	struct am_io_param astatus;
 	struct am_io_param vstatus;
-	struct am_io_param vdec_param;
 	int vdec_status, frame_width, frame_height;
 	struct timespec rt;
 	char buf[32];
@@ -3687,9 +3686,9 @@ static void* aml_av_monitor_thread(void *arg)
 		memset(&vstatus, 0, sizeof(vstatus));
 		if(ioctl(ts->fd, AMSTREAM_IOC_VDECSTAT, (unsigned long)&vstatus) != -1){
 			is_hd_video = (vstatus.vstatus.width > 720)? 1 : 0;
-			vdec_status = vdec_param.vstatus.status;
-			frame_width = vdec_param.vstatus.width;
-			frame_height= vdec_param.vstatus.height;
+			vdec_status = vstatus.vstatus.status;
+			frame_width = vstatus.vstatus.width;
+			frame_height= vstatus.vstatus.height;
 
 			AM_DEBUG(1, "vdec width %d height %d status 0x%08x", frame_width, frame_height, vdec_status);
 		}else{
