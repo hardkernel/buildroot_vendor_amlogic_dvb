@@ -1708,13 +1708,17 @@ static int aml_timeshift_subfile_open(AV_TimeshiftFile_t *tfile)
 			sub_file = aml_timeshift_new_subfile(tfile);
 			if (sub_file != NULL)
 			{
+				off64_t size;
+				
 				if (prev_sub_file == NULL)
 					tfile->sub_files = sub_file;
 				else
 					prev_sub_file->next = sub_file;
 				prev_sub_file = sub_file;
 
-				tfile->size += lseek64(sub_file->rfd, 0, SEEK_END);
+				size = lseek64(sub_file->rfd, 0, SEEK_END);
+				tfile->sub_file_size = AM_MAX(tfile->sub_file_size, size);
+				tfile->size += size;
 				lseek64(sub_file->rfd, 0, SEEK_SET);
 			}
 		}while(sub_file != NULL);
@@ -2704,7 +2708,7 @@ static void *aml_timeshift_thread(void *arg)
 					/* approximate, not accurate */
 					loff_t buffered_es_len = astatus.status.data_len+vstatus.status.data_len;
 					loff_t buffered_ts_en = 188*buffered_es_len/184;
-
+					
 					info.current_time = (tshift->file.total - tshift->file.avail - buffered_ts_en)
 										* (loff_t)tshift->duration / tshift->file.size;
 				}
