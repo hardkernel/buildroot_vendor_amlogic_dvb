@@ -4060,10 +4060,6 @@ static void* aml_av_monitor_thread(void *arg)
 			need_replay = AM_TRUE;
 		}
 #endif
-		if(has_video && (dev->ts_player.play_para.vfmt == VFORMAT_H264) && ((frame_width > 1920) || (frame_height > 1080))){
-			dev->ts_player.play_para.vfmt = VFORMAT_H264_4K2K;
-			need_replay = AM_TRUE;
-		}
 		//AM_DEBUG(1, "vbuf_level--0x%08x---- abuf_level---0x%08x",vbuf_level,abuf_level);
 	
 		if(need_replay){
