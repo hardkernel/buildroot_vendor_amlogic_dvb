@@ -2757,7 +2757,7 @@ static void *aml_timeshift_thread(void *arg)
 				aml_timeshift_update_info(tshift, &info);
 
 				/*If there is no data available in playback only mode, we send exit event*/
-				if (is_playback_mode && !tshift->file.avail)
+				if (is_playback_mode && !tshift->file.avail&&tshift->state != AV_TIMESHIFT_STAT_PAUSE)
 				{
 					if (playback_alen == astatus.status.data_len &&
 						playback_vlen == vstatus.status.data_len)
@@ -3693,8 +3693,7 @@ static void* aml_av_monitor_thread(void *arg)
 			vdec_status = vstatus.vstatus.status;
 			frame_width = vstatus.vstatus.width;
 			frame_height= vstatus.vstatus.height;
-
-			AM_DEBUG(1, "vdec width %d height %d status 0x%08x", frame_width, frame_height, vdec_status);
+			//AM_DEBUG(1, "vdec width %d height %d status 0x%08x", frame_width, frame_height, vdec_status);
 		}else{
 			vdec_status = 0;
 			frame_width = 0;
