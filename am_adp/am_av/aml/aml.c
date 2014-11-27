@@ -2117,7 +2117,8 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 	}
 
 	AM_FileRead("/sys/class/stb/source", tshift->last_stb_src, 16);
-	AM_FileEcho("/sys/class/stb/source", "hiu");
+	snprintf(buf, sizeof(buf), "dmx%d", para->dmx_id);
+	AM_FileEcho("/sys/class/stb/source", buf);
 	snprintf(buf, sizeof(buf), "/sys/class/stb/demux%d_source", para->dmx_id);
 	AM_FileEcho(buf, "hiu");
 
