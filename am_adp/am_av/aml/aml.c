@@ -94,6 +94,7 @@ void *adec_handle = NULL;
 #define DOWN_RESAMPLE_CACHE_TIME     90000*2
 #define NO_DATA_CHECK_TIME           4000
 #define VMASTER_REPLAY_TIME          4000
+#define SCRAMBLE_CHECK_TIME          1000
 
 #ifdef ENABLE_PCR
 #ifndef AMSTREAM_IOC_PCRID
@@ -3991,30 +3992,32 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 #endif
 
-		if(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur > NO_DATA_CHECK_TIME) && (apts_stop_dur > NO_DATA_CHECK_TIME)){
+		if(!audio_scrambled && adec_start && !av_paused && (dmx_apts_stop_dur > SCRAMBLE_CHECK_TIME) && (apts_stop_dur > SCRAMBLE_CHECK_TIME)){
+			AM_Bool_t sf[2];
+			AM_DMX_GetScrambleStatus(0, sf);
+			if(sf[1]){
+				audio_scrambled = AM_TRUE;
+			}
+			AM_DEBUG(1, "audio scrambled");
+		}
+
+		if(!video_scrambled && !av_paused && (dmx_vpts_stop_dur > SCRAMBLE_CHECK_TIME) && (vpts_stop_dur > SCRAMBLE_CHECK_TIME)){
 			AM_Bool_t sf[2];
 			AM_DMX_GetScrambleStatus(0, sf);
 			if(sf[0]){
-				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_SCAMBLED, NULL);
 				video_scrambled = AM_TRUE;
-			}else{
-				//AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
 			}
 
+			AM_DEBUG(1, "video scrambled");
+		}
+
+
+		if(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur > NO_DATA_CHECK_TIME) && (apts_stop_dur > NO_DATA_CHECK_TIME)){
 			no_audio_data = AM_TRUE;
 			AM_DEBUG(1, "audio data stopped");
 		}
 
 		if(!no_video_data && !av_paused && (dmx_vpts_stop_dur > NO_DATA_CHECK_TIME) && (vpts_stop_dur > NO_DATA_CHECK_TIME)){
-			AM_Bool_t sf[2];
-			AM_DMX_GetScrambleStatus(0, sf);
-			if(sf[1]){
-				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_SCAMBLED, NULL);
-				audio_scrambled = AM_TRUE;
-			}else{
-				//AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
-			}
-
 			no_video_data = AM_TRUE;
 			AM_DEBUG(1, "video data stopped");
 		}
@@ -4022,7 +4025,7 @@ static void* aml_av_monitor_thread(void *arg)
 		if(audio_scrambled)	
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_SCAMBLED, NULL);
 		else if(video_scrambled)
-			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_SCAMBLED, NULL);
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_SCAMBLED, NULL);
 		else if(no_audio_data&&no_video_data)
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
 		else
@@ -4030,12 +4033,14 @@ static void* aml_av_monitor_thread(void *arg)
 		
 		if(no_audio_data && dmx_apts_stop_dur == 0){
 			no_audio_data = AM_FALSE;
+			audio_scrambled = AM_FALSE;
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_DATA_RESUME, NULL);
 			AM_DEBUG(1, "audio data resumed");
 		}
 
 		if(no_video_data && dmx_vpts_stop_dur == 0){
 			no_video_data = AM_FALSE;
+			video_scrambled = AM_FALSE;
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_DATA_RESUME, NULL);
 			AM_DEBUG(1, "video data resumed");
 		}
