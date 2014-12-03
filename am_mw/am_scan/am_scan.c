@@ -3168,7 +3168,8 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 
 				scanner->start_freqs[scanner->start_freqs_cnt].fe_para.m_type = FE_QAM;
 				param = &scanner->start_freqs[scanner->start_freqs_cnt].fe_para.cable.para;
-				param->frequency = pcd->i_frequency/1000;
+				//param->frequency = pcd->i_frequency/1000;
+				param->frequency = pcd->i_frequency;
 				param->u.qam.modulation = pcd->i_modulation_type;
 				param->u.qam.symbol_rate = pcd->i_symbol_rate;
 				scanner->start_freqs_cnt++;
