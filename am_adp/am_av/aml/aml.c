@@ -95,6 +95,7 @@ void *adec_handle = NULL;
 #define NO_DATA_CHECK_TIME           4000
 #define VMASTER_REPLAY_TIME          4000
 #define SCRAMBLE_CHECK_TIME          1000
+#define TIMESHIFT_INJECT_DIFF_TIME	 1.5
 
 #ifdef ENABLE_PCR
 #ifndef AMSTREAM_IOC_PCRID
@@ -121,7 +122,7 @@ void *adec_handle = NULL;
 #define VID_SCREEN_MODE_FILE  "/sys/class/video/screen_mode"
 #define VID_SCREEN_MODE_FILE  "/sys/class/video/screen_mode"
 #define VID_ASPECT_RATIO_FILE "/sys/class/video/aspect_ratio"
-#define VID_ASPECT_MATCH_FILE "/sys/class/video/matchmethod" 
+#define VID_ASPECT_MATCH_FILE "/sys/class/video/matchmethod"
 
 #if !defined (AMLOGIC_LIBPLAYER)
 #define  AUDIO_CTRL_DEVICE    "/dev/amaudio_ctl"
@@ -781,7 +782,7 @@ static AM_ErrorCode_t amp_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_OutputM
 	{
 		case AM_AOUT_OUTPUT_STEREO:
 		default:
-#ifdef AMLOGIC_LIBPLAYER		
+#ifdef AMLOGIC_LIBPLAYER
                 	ret = audio_stereo(media_id);
 #else
                         ret = audio_hardware_ctrl(mode);
@@ -1710,7 +1711,7 @@ static int aml_timeshift_subfile_open(AV_TimeshiftFile_t *tfile)
 			if (sub_file != NULL)
 			{
 				off64_t size;
-				
+
 				if (prev_sub_file == NULL)
 					tfile->sub_files = sub_file;
 				else
@@ -2078,7 +2079,7 @@ static int aml_timeshift_inject(AV_TimeshiftData_t *tshift, uint8_t *data, int s
 		}
 		else if((ret==-1) && (errno==EAGAIN))
 		{
-			AM_DEBUG(1, "ret=%d,inject data failed errno:%d msg:%s",ret, errno, strerror(errno));		
+			AM_DEBUG(1, "ret=%d,inject data failed errno:%d msg:%s",ret, errno, strerror(errno));
 			real_written = 0;
 		}
 		else if (ret >= 0)
@@ -2579,7 +2580,11 @@ static void *aml_timeshift_thread(void *arg)
 	int vbuf_len = 0;
 	int abuf_len = 0;
 	int skip_flag_count = 0;
+	int dmx_vpts = 0,  vpts = 0;
+	char pts_buf[32];
+	float diff = 0, last_diff = 0;
 
+	memset(pts_buf, 0, sizeof(pts_buf));
 	memset(&info, 0, sizeof(info));
 	tshift->last_cmd = -1;
 	AM_DEBUG(1, "Starting timeshift player thread ...");
@@ -2601,6 +2606,44 @@ static void *aml_timeshift_thread(void *arg)
 		len = sizeof(buf) - tshift->left;
 		if (len > 0)
 		{
+			/*
+			 *	$ID: 100351, fixed timeshift switch subtitle too slow.
+			 */
+			if(AM_FileRead(VIDEO_DMX_PTS_FILE, pts_buf, sizeof(pts_buf)) >= 0){
+				sscanf(pts_buf, "%d", &dmx_vpts);
+			}else{
+				AM_DEBUG(1, "cannot read \"%s\"", VIDEO_DMX_PTS_FILE);
+				dmx_vpts = 0;
+			}
+			if(AM_FileRead(VIDEO_PTS_FILE, pts_buf, sizeof(pts_buf)) >= 0){
+				sscanf(pts_buf+2, "%x", &vpts);
+			}else{
+				AM_DEBUG(1, "cannot read \"%s\"", VIDEO_PTS_FILE);
+				vpts = 0;
+			}
+			if (tshift->state == AV_TIMESHIFT_STAT_PLAY &&
+				ioctl(tshift->av_fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1)
+			{
+				AM_DEBUG(1, "vstat_len:%d , file_avail:%lld", vstatus.status.data_len , tshift->file.avail);
+			}
+			else
+			{
+				AM_DEBUG(1,"get v_stat_len fiiled");
+			}
+
+			diff = (dmx_vpts - vpts)*1.0/90000;
+			AM_DEBUG(1, "#### vpts:%#x, dmx_vpts:%x, diff:%.3f, %s, %s\n",
+			 vpts, dmx_vpts, diff, diff>TIMESHIFT_INJECT_DIFF_TIME?"large":"small", (diff==last_diff)?"equal":"not equal");
+			if(vpts != 0 && dmx_vpts != 0 && diff > TIMESHIFT_INJECT_DIFF_TIME && vstatus.status.data_len > DEC_STOP_VIDEO_LEVEL)//
+			{
+				last_diff = diff;
+				tshift->timeout = 10;
+				goto wait_for_next_loop;
+			}
+			/*
+			 *	## end of 100351
+			 */
+
 			ret = aml_timeshift_file_read(&tshift->file, buf+tshift->left, len, 100);
 			if (ret > 0)
 			{
@@ -2710,7 +2753,7 @@ static void *aml_timeshift_thread(void *arg)
 					/* approximate, not accurate */
 					loff_t buffered_es_len = astatus.status.data_len+vstatus.status.data_len;
 					loff_t buffered_ts_en = 188*buffered_es_len/184;
-					
+
 					info.current_time = (tshift->file.total - tshift->file.avail - buffered_ts_en)
 										* (loff_t)tshift->duration / tshift->file.size;
 				}
@@ -3359,10 +3402,10 @@ static AM_ErrorCode_t aml_open_ts_mode(AM_AV_Device_t *dev)
 		AM_DEBUG(1, "not enough memory");
 		return AM_AV_ERR_NO_MEM;
 	}
-	
+
 	ts->fd     = -1;
 	ts->vid_fd = open(AMVIDEO_FILE, O_RDWR);
-	
+
 	#ifndef MPTSONLYAUDIOVIDEO
 	ts->fd = open(STREAM_TS_FILE, O_RDWR);
 	if(ts->fd==-1)
@@ -3372,7 +3415,7 @@ static AM_ErrorCode_t aml_open_ts_mode(AM_AV_Device_t *dev)
 		return AM_AV_ERR_CANNOT_OPEN_DEV;
 	}
 	#endif
-	
+
 	dev->ts_player.drv_data = (void*)ts;
 
 	return AM_SUCCESS;
@@ -3384,13 +3427,13 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	int val;
 
 	ts = (AV_TSData_t*)dev->ts_player.drv_data;
-	
+
 #ifndef ENABLE_PCR
 	if (ts->vid_fd != -1){
 		ioctl(ts->vid_fd, AMSTREAM_IOC_VPAUSE, 1);
 	}
 #endif
-	
+
 #ifdef MPTSONLYAUDIOVIDEO
 	if(ts->fd == -1)
 	{
@@ -3658,7 +3701,7 @@ static void* aml_av_monitor_thread(void *arg)
 
 	while(dev->ts_player.av_thread_running){
 		ts = (AV_TSData_t*)dev->ts_player.drv_data;
-		
+
 		if (!adec_start)
 			AM_TIME_GetTimeSpecTimeout(20, &rt);
 		else
@@ -3688,7 +3731,7 @@ static void* aml_av_monitor_thread(void *arg)
 			vbuf_size  = 0;
 			vbuf_level = 0;
 		}
-		
+
 		memset(&vstatus, 0, sizeof(vstatus));
 		if(ioctl(ts->fd, AMSTREAM_IOC_VDECSTAT, (unsigned long)&vstatus) != -1){
 			is_hd_video = (vstatus.vstatus.width > 720)? 1 : 0;
@@ -4023,7 +4066,7 @@ static void* aml_av_monitor_thread(void *arg)
 			AM_DEBUG(1, "video data stopped");
 		}
 
-		if(audio_scrambled)	
+		if(audio_scrambled)
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_SCAMBLED, NULL);
 		else if(video_scrambled)
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_SCAMBLED, NULL);
@@ -4031,7 +4074,7 @@ static void* aml_av_monitor_thread(void *arg)
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
 		else
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_DATA_RESUME, NULL);
-		
+
 		if(no_audio_data && dmx_apts_stop_dur == 0){
 			no_audio_data = AM_FALSE;
 			audio_scrambled = AM_FALSE;
@@ -4066,7 +4109,7 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 #endif
 		//AM_DEBUG(1, "vbuf_level--0x%08x---- abuf_level---0x%08x",vbuf_level,abuf_level);
-	
+
 		if(need_replay){
 			AM_DEBUG(1, "replay ts vlevel %d alevel %d vpts_stop %d vmaster %d",
 				vbuf_level, abuf_level, vpts_stop_dur, vmaster_dur);
@@ -5304,7 +5347,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 	AM_DEBUG(1, "set video path fs:%d di:%d ppmgr:%d", dev->vpath_fs, dev->vpath_di, dev->vpath_ppmgr);
 
 	//AM_FileEcho("/sys/class/deinterlace/di0/config", "disable");
-	/*	
+	/*
 	do{
 		ret = AM_FileEcho("/sys/class/vfm/map", "rm default");
 		if(ret!=AM_SUCCESS){
@@ -5331,24 +5374,24 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			}else if(!strncmp(mode, "480p", 4)){
 				get_osd_rect("480p", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "480cvbs", 7)){
-				get_osd_rect("480cvbs", &x, &y, &w, &h);				
+				get_osd_rect("480cvbs", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "576i", 4)){
 				get_osd_rect("576i", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "576p", 4)){
 				get_osd_rect("576p", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "576cvbs", 7)){
-				get_osd_rect("576cvbs", &x, &y, &w, &h);					
+				get_osd_rect("576cvbs", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "720p", 4)){
 				get_osd_rect("720p", &x, &y, &w, &h);
 				blank = AM_FALSE;
 			}else if(!strncmp(mode, "1080i", 5)){
 				get_osd_rect("1080i", &x, &y, &w, &h);
 			}else if(!strncmp(mode, "1080p", 5)){
-				get_osd_rect("1080p", &x, &y, &w, &h);			
+				get_osd_rect("1080p", &x, &y, &w, &h);
 			}else{
 				get_osd_rect(NULL, &x, &y, &w, &h);
 			}
-			snprintf(ppr, sizeof(ppr), "%d %d %d %d 0", x, y, x+w, y+h);			
+			snprintf(ppr, sizeof(ppr), "%d %d %d %d 0", x, y, x+w, y+h);
 		}
 #endif
 		AM_FileRead("/sys/class/graphics/fb0/request2XScale", mode, sizeof(mode));
@@ -5364,7 +5407,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 		{
 			AM_FileEcho("/sys/class/graphics/fb0/request2XScale", "2");
 			AM_FileEcho("/sys/class/graphics/fb1/scale", "0");
-			
+
 			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "0");
 			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "0");
 
@@ -5458,7 +5501,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 				}
 				AM_FileEcho("/sys/class/graphics/fb1/scale", osd1cmd);
 			}
-				
+
 
 			AM_FileEcho("/sys/module/amvdec_h264/parameters/dec_control", "3");
 			AM_FileEcho("/sys/module/amvdec_mpeg12/parameters/dec_control", "62");
@@ -5489,7 +5532,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			//AM_FileEcho("/sys/module/di/parameters/bypass_hd","1");
 #endif
 			AM_FileEcho("/sys/class/ppmgr/ppscaler","0");
-	
+
 			//AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");
 			//AM_FileEcho("/sys/class/video/axis", "0 0 0 0");
 			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", AV_SMOOTH_SYNC_VAL);
