@@ -3168,7 +3168,6 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 
 				scanner->start_freqs[scanner->start_freqs_cnt].fe_para.m_type = FE_QAM;
 				param = &scanner->start_freqs[scanner->start_freqs_cnt].fe_para.cable.para;
-				//param->frequency = pcd->i_frequency/1000;
 				param->frequency = pcd->i_frequency;
 				param->u.qam.modulation = pcd->i_modulation_type;
 				param->u.qam.symbol_rate = pcd->i_symbol_rate;
@@ -3961,14 +3960,14 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 				AM_DEBUG(1, "All TSes Complete!");
 				return am_scan_all_done(scanner);
 			}
-
+			
 			if (scanner->curr_freq >= (scanner->atvctl.start_idx + atv_start_para.fe_cnt) && 
 				! scanner->dtvctl.start)
 			{
 				return am_scan_start_dtv(scanner);
 			}
 			else if (scanner->curr_freq >= (scanner->dtvctl.start_idx + dtv_start_para.fe_cnt) && 
-				! scanner->atvctl.start)
+				! scanner->atvctl.start&&atv_start_para.mode!= AM_SCAN_ATVMODE_NONE)
 			{
 				return am_scan_start_atv(scanner);
 			}
