@@ -1372,6 +1372,12 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 			am_sysinfo.width  = 1920;
 			am_sysinfo.height = 1080;
 		}
+		else if(para->vid_fmt == VFORMAT_HEVC)
+		{
+			am_sysinfo.format = VIDEO_DEC_FORMAT_HEVC;
+			am_sysinfo.width  = 3840;
+			am_sysinfo.height = 2160;
+		}
 
 		if(ioctl(vfd, AMSTREAM_IOC_SYSINFO, (unsigned long)&am_sysinfo)==-1)
 		{
@@ -3487,6 +3493,12 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 			am_sysinfo.width  = 1920;
 			am_sysinfo.height = 1080;
 		}
+		else if(tp->vfmt == VFORMAT_HEVC)
+		{
+			am_sysinfo.format = VIDEO_DEC_FORMAT_HEVC;
+			am_sysinfo.width  = 3840;
+			am_sysinfo.height = 2160;
+		}
 
 		if(ioctl(ts->fd, AMSTREAM_IOC_SYSINFO, (unsigned long)&am_sysinfo)==-1)
 		{
@@ -4047,11 +4059,9 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 
 		need_replay = AM_FALSE;
-#ifndef ENABLE_PCR
-		if(/*(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur == 0) && (apts_stop_dur > NO_DATA_CHECK_TIME)) ||*/
+		if((!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur == 0) && (apts_stop_dur > NO_DATA_CHECK_TIME)) ||
 				(!no_video_data && !av_paused && (dmx_vpts_stop_dur == 0) && (vpts_stop_dur > NO_DATA_CHECK_TIME)))
 			need_replay = AM_TRUE;
-#endif
 		if(vbuf_level * 6 > vbuf_size * 5)
 			need_replay = AM_TRUE;
 		if(abuf_level * 6 > abuf_size * 5)
@@ -4074,8 +4084,13 @@ static void* aml_av_monitor_thread(void *arg)
 			aml_close_ts_mode(dev, AM_FALSE);
 			aml_open_ts_mode(dev);
 			aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
+#ifndef ENABLE_PCR
 			adec_start = AM_FALSE;
 			av_paused  = AM_TRUE;
+#else
+			adec_start = AM_TRUE;
+			av_paused  = AM_FALSE;
+#endif
 			resample_type = 0;
 			next_resample_type = resample_type;
 			next_resample_start_time = 0;
