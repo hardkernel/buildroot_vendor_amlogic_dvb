@@ -4010,8 +4010,9 @@ static void* aml_av_monitor_thread(void *arg)
 			AM_DMX_GetScrambleStatus(0, sf);
 			if(sf[1]){
 				audio_scrambled = AM_TRUE;
+				AM_DEBUG(1, "audio scrambled");
 			}
-			AM_DEBUG(1, "audio scrambled");
+			
 		}
 
 		if(!video_scrambled && !av_paused && (dmx_vpts_stop_dur > SCRAMBLE_CHECK_TIME) && (vpts_stop_dur > SCRAMBLE_CHECK_TIME)){
@@ -4019,9 +4020,8 @@ static void* aml_av_monitor_thread(void *arg)
 			AM_DMX_GetScrambleStatus(0, sf);
 			if(sf[0]){
 				video_scrambled = AM_TRUE;
-			}
-
-			AM_DEBUG(1, "video scrambled");
+				AM_DEBUG(1, "video scrambled");
+			}			
 		}
 
 
@@ -4033,6 +4033,29 @@ static void* aml_av_monitor_thread(void *arg)
 		if(!no_video_data && !av_paused && (dmx_vpts_stop_dur > NO_DATA_CHECK_TIME) && (vpts_stop_dur > NO_DATA_CHECK_TIME)){
 			no_video_data = AM_TRUE;
 			AM_DEBUG(1, "video data stopped");
+		}
+
+		if(audio_scrambled){
+			AM_Bool_t sf[2];
+			AM_DMX_GetScrambleStatus(0, sf);
+			if(sf[1]){
+				audio_scrambled = AM_TRUE;
+				AM_DEBUG(1, "audio scrambled");
+			}
+			else
+				audio_scrambled = AM_FALSE;
+		}
+		
+
+		if(video_scrambled){
+			AM_Bool_t sf[2];
+			AM_DMX_GetScrambleStatus(0, sf);
+			if(sf[0]){
+				video_scrambled = AM_TRUE;
+				AM_DEBUG(1, "video scrambled");
+			}
+			else
+				video_scrambled = AM_FALSE;
 		}
 
 		if(audio_scrambled)	
