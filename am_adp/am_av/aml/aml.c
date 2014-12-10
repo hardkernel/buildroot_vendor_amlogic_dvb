@@ -4152,8 +4152,8 @@ static void* aml_av_monitor_thread(void *arg)
 			AM_DEBUG(1, "video data resumed");
 		}
 
-		AM_DEBUG(1, "apts_dmx_stop: %d arp_stop: %d vpts_dmx_stop: %d vrp_stop: %d",
-					dmx_apts_stop_dur, arp_stop_dur, dmx_vpts_stop_dur, vrp_stop_dur);
+		/*AM_DEBUG(1, "apts_dmx_stop: %d arp_stop: %d vpts_dmx_stop: %d vrp_stop: %d",
+					dmx_apts_stop_dur, arp_stop_dur, dmx_vpts_stop_dur, vrp_stop_dur);*/
 		need_replay = AM_FALSE;
 		if((!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur == 0) && (arp_stop_dur > NO_DATA_CHECK_TIME)) ||
 				(!no_video_data && !av_paused && (dmx_vpts_stop_dur == 0) && (vrp_stop_dur > NO_DATA_CHECK_TIME)))
