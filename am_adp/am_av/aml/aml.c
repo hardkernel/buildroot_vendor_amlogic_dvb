@@ -3687,6 +3687,10 @@ static void* aml_av_monitor_thread(void *arg)
 	int now, next_resample_start_time = 0;
 	int abuf_level, vbuf_level;
 	int abuf_size, vbuf_size;
+	unsigned int abuf_read_ptr, vbuf_read_ptr;
+	unsigned int last_abuf_read_ptr = 0, last_vbuf_read_ptr = 0;
+	int arp_stop_time = 0, vrp_stop_time = 0;
+	int arp_stop_dur = 0, vrp_stop_dur = 0;
 	int apts, vpts, last_apts = 0, last_vpts = 0;
 	int dmx_apts, dmx_vpts, last_dmx_apts = 0, last_dmx_vpts = 0;
 	int apts_stop_time = 0, vpts_stop_time = 0, apts_stop_dur = 0, vpts_stop_dur = 0;
@@ -3728,21 +3732,45 @@ static void* aml_av_monitor_thread(void *arg)
 		if(ioctl(ts->fd, AMSTREAM_IOC_AB_STATUS, (unsigned long)&astatus) != -1){
 			abuf_size  = astatus.status.size;
 			abuf_level = astatus.status.data_len;
+			abuf_read_ptr = astatus.status.read_pointer;
 		}else{
 			//AM_DEBUG(1, "cannot get audio buffer status");
 			abuf_size  = 0;
 			abuf_level = 0;
+			abuf_read_ptr = 0;
 		}
 
 		if(ioctl(ts->fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1){
 			vbuf_size  = vstatus.status.size;
 			vbuf_level = vstatus.status.data_len;
+			vbuf_read_ptr = vstatus.status.read_pointer;
 			//is_hd_video = vstatus.vstatus.width > 720;
 		}else{
 			//AM_DEBUG(1, "cannot get video buffer status");
 			vbuf_size  = 0;
 			vbuf_level = 0;
+			vbuf_read_ptr = 0;
 		}
+
+		if(abuf_read_ptr == last_abuf_read_ptr){
+			if(!arp_stop_time)
+				arp_stop_time = now;
+			arp_stop_dur = now - arp_stop_time;
+		}else{
+			arp_stop_time = 0;
+			arp_stop_dur  = 0;
+		}
+		last_abuf_read_ptr = abuf_read_ptr;
+
+		if(vbuf_read_ptr == last_vbuf_read_ptr){
+			if(!vrp_stop_time)
+				vrp_stop_time = now;
+			vrp_stop_dur = now - vrp_stop_time;
+		}else{
+			vrp_stop_time = 0;
+			vrp_stop_dur  = 0;
+		}
+		last_vbuf_read_ptr = vbuf_read_ptr;
 
 		memset(&vstatus, 0, sizeof(vstatus));
 		if(ioctl(ts->fd, AMSTREAM_IOC_VDECSTAT, (unsigned long)&vstatus) != -1){
@@ -4124,11 +4152,11 @@ static void* aml_av_monitor_thread(void *arg)
 			AM_DEBUG(1, "video data resumed");
 		}
 
-		/*AM_DEBUG(1, "apts_dmx_stop: %d apts_stop: %d vpts_dmx_stop: %d vpts_stop: %d",
-					dmx_apts_stop_dur, apts_stop_dur, dmx_vpts_stop_dur, vpts_stop_dur);*/
+		AM_DEBUG(1, "apts_dmx_stop: %d arp_stop: %d vpts_dmx_stop: %d vrp_stop: %d",
+					dmx_apts_stop_dur, arp_stop_dur, dmx_vpts_stop_dur, vrp_stop_dur);
 		need_replay = AM_FALSE;
-		if(/*(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur == 0) && (apts_stop_dur > NO_DATA_CHECK_TIME)) ||*/
-				(!no_video_data && !av_paused && (dmx_vpts_stop_dur == 0) && (vpts_stop_dur > NO_DATA_CHECK_TIME)))
+		if((!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur == 0) && (arp_stop_dur > NO_DATA_CHECK_TIME)) ||
+				(!no_video_data && !av_paused && (dmx_vpts_stop_dur == 0) && (vrp_stop_dur > NO_DATA_CHECK_TIME)))
 			need_replay = AM_TRUE;
 		if(vbuf_level * 6 > vbuf_size * 5)
 			need_replay = AM_TRUE;
