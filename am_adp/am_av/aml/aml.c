@@ -2634,13 +2634,14 @@ static void *aml_timeshift_thread(void *arg)
 			}
 			else
 			{
-				AM_DEBUG(1,"get v_stat_len fiiled");
+				AM_DEBUG(1,"get v_stat_len failed");
 			}
 
 			diff = (dmx_vpts - vpts)*1.0/90000;
-			AM_DEBUG(1, "#### vpts:%#x, dmx_vpts:%x, diff:%.3f, %s, %s\n",
-			 vpts, dmx_vpts, diff, diff>TIMESHIFT_INJECT_DIFF_TIME?"large":"small", (diff==last_diff)?"equal":"not equal");
-			if(vpts != 0 && dmx_vpts != 0 && diff > TIMESHIFT_INJECT_DIFF_TIME && vstatus.status.data_len > DEC_STOP_VIDEO_LEVEL)//
+			AM_DEBUG(1, "#### vpts:%#x, dmx_vpts:%x, diff:%.3f, %s, %s, play_stat:%d\n",
+			 vpts, dmx_vpts, diff, diff>TIMESHIFT_INJECT_DIFF_TIME?"large":"small", (diff==last_diff)?"equal":"not equal", tshift->state);
+			if(vpts > 0 && dmx_vpts > 0 && diff > TIMESHIFT_INJECT_DIFF_TIME &&
+				vstatus.status.data_len > DEC_STOP_VIDEO_LEVEL && tshift->state == AV_TIMESHIFT_STAT_PLAY)
 			{
 				last_diff = diff;
 				tshift->timeout = 10;
@@ -4083,7 +4084,7 @@ static void* aml_av_monitor_thread(void *arg)
 				audio_scrambled = AM_TRUE;
 				AM_DEBUG(1, "audio scrambled");
 			}
-			
+
 		}
 
 		if(!video_scrambled && !av_paused && (dmx_vpts_stop_dur > SCRAMBLE_CHECK_TIME) && (vpts_stop_dur > SCRAMBLE_CHECK_TIME)){
@@ -4092,7 +4093,7 @@ static void* aml_av_monitor_thread(void *arg)
 			if(sf[0]){
 				video_scrambled = AM_TRUE;
 				AM_DEBUG(1, "video scrambled");
-			}			
+			}
 		}
 
 
@@ -4116,7 +4117,7 @@ static void* aml_av_monitor_thread(void *arg)
 			else
 				audio_scrambled = AM_FALSE;
 		}
-		
+
 
 		if(video_scrambled){
 			AM_Bool_t sf[2];
@@ -4129,7 +4130,7 @@ static void* aml_av_monitor_thread(void *arg)
 				video_scrambled = AM_FALSE;
 		}
 
-		if(audio_scrambled)	
+		if(audio_scrambled)
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_SCAMBLED, NULL);
 		else if(video_scrambled)
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_SCAMBLED, NULL);
