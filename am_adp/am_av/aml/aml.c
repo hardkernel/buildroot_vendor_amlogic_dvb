@@ -95,7 +95,7 @@ void *adec_handle = NULL;
 #define NO_DATA_CHECK_TIME           4000
 #define VMASTER_REPLAY_TIME          4000
 #define SCRAMBLE_CHECK_TIME          1000
-#define TIMESHIFT_INJECT_DIFF_TIME	 1.5
+#define TIMESHIFT_INJECT_DIFF_TIME	 3.0
 
 #ifdef ENABLE_PCR
 #ifndef AMSTREAM_IOC_PCRID
