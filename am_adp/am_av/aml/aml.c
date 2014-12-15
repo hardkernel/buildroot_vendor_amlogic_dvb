@@ -95,7 +95,7 @@ void *adec_handle = NULL;
 #define NO_DATA_CHECK_TIME           4000
 #define VMASTER_REPLAY_TIME          4000
 #define SCRAMBLE_CHECK_TIME          1000
-#define TIMESHIFT_INJECT_DIFF_TIME	 3.0
+#define TIMESHIFT_INJECT_DIFF_TIME	 3
 
 #ifdef ENABLE_PCR
 #ifndef AMSTREAM_IOC_PCRID
@@ -2588,7 +2588,7 @@ static void *aml_timeshift_thread(void *arg)
 	int skip_flag_count = 0;
 	int dmx_vpts = 0,  vpts = 0;
 	char pts_buf[32];
-	float diff = 0, last_diff = 0;
+	int diff = 0, last_diff = 0;
 
 	memset(pts_buf, 0, sizeof(pts_buf));
 	memset(&info, 0, sizeof(info));
@@ -2637,10 +2637,10 @@ static void *aml_timeshift_thread(void *arg)
 				AM_DEBUG(1,"get v_stat_len failed");
 			}
 
-			diff = (dmx_vpts - vpts)*1.0/90000;
-			AM_DEBUG(1, "#### vpts:%#x, dmx_vpts:%x, diff:%.3f, %s, %s, play_stat:%d\n",
+			diff = (dmx_vpts - vpts)/90000;
+			AM_DEBUG(1, "#### vpts:%#x, dmx_vpts:%x, diff:%d, %s, %s, play_stat:%d\n",
 			 vpts, dmx_vpts, diff, diff>TIMESHIFT_INJECT_DIFF_TIME?"large":"small", (diff==last_diff)?"equal":"not equal", tshift->state);
-			if(vpts > 0 && dmx_vpts > 0 && diff > TIMESHIFT_INJECT_DIFF_TIME &&
+			if(vpts != 0 && dmx_vpts != 0 && diff > TIMESHIFT_INJECT_DIFF_TIME &&
 				vstatus.status.data_len > DEC_STOP_VIDEO_LEVEL && tshift->state == AV_TIMESHIFT_STAT_PLAY)
 			{
 				last_diff = diff;
