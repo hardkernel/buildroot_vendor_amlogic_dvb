@@ -96,6 +96,7 @@ void *adec_handle = NULL;
 #define VMASTER_REPLAY_TIME          4000
 #define SCRAMBLE_CHECK_TIME          1000
 #define TIMESHIFT_INJECT_DIFF_TIME	 3
+#define TIMESHIFT_FFFB_ERROR_CNT	 5
 
 #ifdef ENABLE_PCR
 #ifndef AMSTREAM_IOC_PCRID
@@ -2589,6 +2590,7 @@ static void *aml_timeshift_thread(void *arg)
 	int dmx_vpts = 0,  vpts = 0;
 	char pts_buf[32];
 	int diff = 0, last_diff = 0;
+	int error_cnt = 0;
 
 	memset(pts_buf, 0, sizeof(pts_buf));
 	memset(&info, 0, sizeof(info));
@@ -2711,6 +2713,22 @@ static void *aml_timeshift_thread(void *arg)
 		/*Update the playing info*/
 		if (tshift->state == AV_TIMESHIFT_STAT_FFFB)
 		{
+			if(vpts == 0)
+			{
+				AM_DEBUG(1, "@@@ FF_OR_FB get vpts==0");
+				error_cnt++;
+			}
+			else
+			{
+				error_cnt = 0;
+			}
+			if(error_cnt > TIMESHIFT_FFFB_ERROR_CNT)
+			{
+				AM_DEBUG(1, "@@@ FF_OR_FB error_cnt is overflow, reset trick_mode");
+				ioctl(tshift->cntl_fd, AMSTREAM_IOC_TRICKMODE, TRICKMODE_NONE);
+				ioctl(tshift->cntl_fd, AMSTREAM_IOC_TRICKMODE, TRICKMODE_FFFB);
+				error_cnt = 0;
+			}
 			tshift->timeout = 0;
 			if (tshift->para.media_info.vid_pid < 0x1fff)
 				trick_stat = aml_timeshift_get_trick_stat(tshift);
