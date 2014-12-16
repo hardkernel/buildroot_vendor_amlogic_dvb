@@ -2606,6 +2606,15 @@ static void *aml_timeshift_thread(void *arg)
 		speed = tshift->speed;
 		pthread_mutex_unlock(&tshift->lock);
 
+		if((tshift->last_cmd == AV_PLAY_FF || tshift->last_cmd == AV_PLAY_FB) && cmd == AV_PLAY_PAUSE)
+		{
+			/*
+			 * $ID: 101093,Fixed, timeshift resume decoder is stop when status from FastForward(or FastBack) to Pause directly
+			 */
+			AM_DEBUG(1, "@@@last cmd is %s, cur_cmd is AV_PLAY_PAUSE, do AV_PLAY_START first",
+					(tshift->last_cmd == AV_PLAY_FF)? "AV_PLAY_FF" : "AV_PLAY_FB");
+			aml_timeshift_do_play_cmd(tshift, AV_PLAY_START, &info);
+		}
 		aml_timeshift_do_play_cmd(tshift, cmd, &info);
 
 		/*read some bytes*/
@@ -2638,7 +2647,7 @@ static void *aml_timeshift_thread(void *arg)
 			}
 
 			diff = (dmx_vpts - vpts)/90000;
-			AM_DEBUG(1, "#### vpts:%#x, dmx_vpts:%x, diff:%d, %s, %s, play_stat:%d\n",
+			AM_DEBUG(1, "#### vpts:%#x, dmx_vpts:%#x, diff:%d, %s, %s, play_stat:%d\n",
 			 vpts, dmx_vpts, diff, diff>TIMESHIFT_INJECT_DIFF_TIME?"large":"small", (diff==last_diff)?"equal":"not equal", tshift->state);
 			if(vpts != 0 && dmx_vpts != 0 && diff > TIMESHIFT_INJECT_DIFF_TIME &&
 				vstatus.status.data_len > DEC_STOP_VIDEO_LEVEL && tshift->state == AV_TIMESHIFT_STAT_PLAY)
