@@ -135,6 +135,7 @@ void *adec_handle = NULL;
 #endif
 
 #define VDEC_H264_ERROR_RECOVERY_MODE_FILE "/sys/module/amvdec_h264/parameters/error_recovery_mode"
+#define VDEC_H264_FATAL_ERROR_RESET_FILE "/sys/module/amvdec_h264/parameters/fatal_error_reset"
 #define DISP_MODE_FILE      "/sys/class/display/mode"
 #define ASTREAM_FORMAT_FILE "/sys/class/astream/format"
 #define VIDEO_DROP_BFRAME_FILE  "/sys/module/amvdec_h264/parameters/enable_toggle_drop_B_frame"
@@ -1371,8 +1372,8 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 		else if(para->vid_fmt == VFORMAT_AVS)
 		{
 			am_sysinfo.format = VIDEO_DEC_FORMAT_AVS;
-			am_sysinfo.width  = 1920;
-			am_sysinfo.height = 1080;
+			/*am_sysinfo.width  = 1920;
+			am_sysinfo.height = 1080;*/
 		}
 		else if(para->vid_fmt == VFORMAT_HEVC)
 		{
@@ -3561,8 +3562,8 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 		else if(tp->vfmt == VFORMAT_AVS)
 		{
 			am_sysinfo.format = VIDEO_DEC_FORMAT_AVS;
-			am_sysinfo.width  = 1920;
-			am_sysinfo.height = 1080;
+			/*am_sysinfo.width  = 1920;
+			am_sysinfo.height = 1080;*/
 		}
 		else if(tp->vfmt == VFORMAT_HEVC)
 		{
@@ -3740,6 +3741,7 @@ static void* aml_av_monitor_thread(void *arg)
 #endif
 
 	AM_FileEcho(VID_BLACKOUT_FILE, "0");
+	AM_FileEcho(VDEC_H264_FATAL_ERROR_RESET_FILE, "1");
 
 	pthread_mutex_lock(&gAVMonLock);
 
@@ -4192,6 +4194,7 @@ static void* aml_av_monitor_thread(void *arg)
 			need_replay = AM_TRUE;
 		//if(adec_start && !av_paused && has_amaster && !apts_stop_dur && !vpts_stop_dur && (vmaster_dur > VMASTER_REPLAY_TIME))
 			//need_replay = AM_TRUE;
+		AM_DEBUG(0, "vdec status %08x", vdec_status);
 #ifdef DECODER_FATAL_ERROR_SIZE_OVERFLOW
 		if(has_video && (dev->ts_player.play_para.vfmt == VFORMAT_H264) && (vdec_status & DECODER_FATAL_ERROR_SIZE_OVERFLOW)){
 			AM_DEBUG(1, "switch to h264 4K/2K");
@@ -4241,6 +4244,7 @@ static void* aml_av_monitor_thread(void *arg)
 	}
 #endif
 
+	AM_FileEcho(VDEC_H264_FATAL_ERROR_RESET_FILE, "0");
 	AM_FileEcho(VID_BLACKOUT_FILE, dev->video_blackout ? "1" : "0");
 
 	if(bypass_di){
