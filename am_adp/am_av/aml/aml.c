@@ -4194,7 +4194,7 @@ static void* aml_av_monitor_thread(void *arg)
 			need_replay = AM_TRUE;
 		//if(adec_start && !av_paused && has_amaster && !apts_stop_dur && !vpts_stop_dur && (vmaster_dur > VMASTER_REPLAY_TIME))
 			//need_replay = AM_TRUE;
-		AM_DEBUG(0, "vdec status %08x", vdec_status);
+		//AM_DEBUG(0, "vdec status %08x", vdec_status);
 #ifdef DECODER_FATAL_ERROR_SIZE_OVERFLOW
 		if(has_video && (dev->ts_player.play_para.vfmt == VFORMAT_H264) && (vdec_status & DECODER_FATAL_ERROR_SIZE_OVERFLOW)){
 			AM_DEBUG(1, "switch to h264 4K/2K");

@@ -85,7 +85,7 @@ dvbpsi_cable_delivery_dr_t * dvbpsi_DecodeCableDeliveryDr(
   p_decoded->i_frequency         =   DVBPSI_BCD2VALUE(p_descriptor->p_data[0]) * 100000000 +
   									 DVBPSI_BCD2VALUE(p_descriptor->p_data[1]) * 1000000 +
   									 DVBPSI_BCD2VALUE(p_descriptor->p_data[2]) * 10000 +
-  									 DVBPSI_BCD2VALUE(p_descriptor->p_data[0]) * 100;
+  									 DVBPSI_BCD2VALUE(p_descriptor->p_data[3]) * 100;
   p_decoded->i_fec_outer		 = p_descriptor->p_data[5] & 0x0f;
   p_decoded->i_modulation_type	 = p_descriptor->p_data[6];
   p_decoded->i_symbol_rate       =   DVBPSI_BCD2VALUE(p_descriptor->p_data[7]) * 10000000 +
