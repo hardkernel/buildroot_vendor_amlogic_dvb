@@ -450,6 +450,7 @@ const AM_AOUT_Driver_t amplayer_aout_drv =
 /*监控AV buffer, PTS 操作*/
 static pthread_mutex_t gAVMonLock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t gAVMonCond = PTHREAD_COND_INITIALIZER;
+static AM_Bool_t	gAVPcrEnable = AM_FALSE;
 
 static void* aml_av_monitor_thread(void *arg);
 static AM_ErrorCode_t aml_get_pts(const char *class_file,  uint32_t *pts);
@@ -3463,6 +3464,18 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 
 	ts = (AV_TSData_t*)dev->ts_player.drv_data;
 
+	if((tp->vpid > 0) && (tp->vpid<0x1fff)
+			&& (tp->apid > 0) && (tp->apid<0x1fff))
+	{
+		AM_DEBUG(1, "%s, enable pcr_master", __FUNCTION__);
+		gAVPcrEnable = AM_TRUE;
+	}
+	else
+	{
+		AM_DEBUG(1, "%s, disable pcr_master", __FUNCTION__);
+		gAVPcrEnable = AM_FALSE;
+	}
+
 #ifndef ENABLE_PCR
 	if (ts->vid_fd != -1){
 		ioctl(ts->vid_fd, AMSTREAM_IOC_VPAUSE, 1);
@@ -3598,22 +3611,22 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 		}
 	}
 
-#ifdef ENABLE_PCR
-	if(tp->pcrpid && (tp->pcrpid<0x1fff)){
-		val = tp->pcrpid;
-		if(ioctl(ts->fd, AMSTREAM_IOC_PCRID, val)==-1)
-		{
-			AM_DEBUG(1, "set PCR PID failed");
-			return AM_AV_ERR_SYS;
+//#ifdef ENABLE_PCR
+	if(gAVPcrEnable == AM_TRUE){
+		if(tp->pcrpid && (tp->pcrpid<0x1fff)){
+			val = tp->pcrpid;
+			if(ioctl(ts->fd, AMSTREAM_IOC_PCRID, val)==-1)
+			{
+				AM_DEBUG(1, "set PCR PID failed");
+				return AM_AV_ERR_SYS;
+			}
 		}
+		AM_FileEcho(TSYNC_MODE_FILE, "2");
 	}
-
 	property_set("sys.amplayer.drop_pcm", "1");
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
-	AM_FileEcho(TSYNC_MODE_FILE, "2");
-
 	adec_start_decode(ts->fd, tp->afmt);
-#endif /*ENABLE_PCR*/
+//#endif /*ENABLE_PCR*/
 
 	if(ioctl(ts->fd, AMSTREAM_IOC_PORT_INIT, 0)==-1)
 	{
@@ -3668,11 +3681,14 @@ static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 
 	dev->ts_player.drv_data = NULL;
 
-#ifdef ENABLE_PCR
+//#ifdef ENABLE_PCR
 	property_set("sys.amplayer.drop_pcm", "0");
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "0");
-	AM_FileEcho(TSYNC_MODE_FILE, "0");
-#endif /*ENABLE_PCR*/
+	if(gAVPcrEnable == AM_TRUE)
+	{
+		AM_FileEcho(TSYNC_MODE_FILE, "0");
+	}
+//#endif /*ENABLE_PCR*/
 
 	//set_arc_freq(0);
 
