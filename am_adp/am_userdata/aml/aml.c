@@ -270,7 +270,7 @@ static int aml_extract_package(uint8_t *user_data, int ud_size, uint8_t *cc_data
 	while (left_size >= (int)sizeof(aml_ud_header_t))
 	{
 		uh = (aml_ud_header_t*)p;
-		if (uh->atsc_id == 0x47413934)
+		if (uh->atsc_id == 0x47413934 && uh->cc_data_start[3] == 0x3)//only process 0x3(ATSC CC)
 		{
 			if (atsc_id_count == 0)
 			{
