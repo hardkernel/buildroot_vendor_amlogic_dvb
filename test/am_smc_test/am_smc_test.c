@@ -67,7 +67,7 @@ static int smc_test(AM_Bool_t sync)
 		printf("%02x ", atr[i]);
 	}
 	printf("\n");
-	
+/*	
 	AM_TRY(AM_SMC_TransferT0(SMC_DEV_NO, sbuf, sizeof(sbuf), rbuf, &rlen));
 	printf("send: ");
 	for(i=0; i<sizeof(sbuf); i++)
@@ -82,19 +82,64 @@ static int smc_test(AM_Bool_t sync)
 		printf("%02x ", rbuf[i]);
 	}
 	printf("\n");
-	
+*/	
 	AM_TRY(AM_SMC_Close(SMC_DEV_NO));
 	
 	return 0;
 }
 
+int get_para(char *argv, AM_SMC_Param_t *ppara)
+{
+	#define CASE(name, len) \
+		if(!strncmp(argv, #name"=", (len)+1)) { \
+			sscanf(&argv[(len)+1], "%i", &ppara->name); \
+			printf("param["#name"] => %d\n", ppara->name); \
+		}
+
+	CASE(f, 1)
+	else CASE(d, 1)
+	else CASE(n, 1)
+	else CASE(bwi, 3)
+	else CASE(cwi, 3)
+	else CASE(bgt, 3)
+	else CASE(freq, 4)
+	else CASE(recv_invert, 10)
+	else CASE(recv_lsb_msb, 12)
+	else CASE(recv_parity, 11)
+	else CASE(recv_no_parity, 14)
+	else CASE(xmit_invert, 10)
+	else CASE(xmit_lsb_msb, 11)
+	else CASE(xmit_retries, 11)
+	else CASE(xmit_repeat_dis, 15)
+
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
+	AM_SMC_Param_t para;	
+	AM_SMC_OpenPara_t openpara;
+
+	int i;
+
+	memset(&openpara, 0, sizeof(openpara));
+	memset(&para, 0, sizeof(para));
+
+	AM_TRY(AM_SMC_Open(SMC_DEV_NO, &openpara));
+	AM_TRY(AM_SMC_GetParam(SMC_DEV_NO, &para));
+
+	for(i=1; i< argc; i++)
+		get_para(argv[i], &para);
+
+	AM_TRY(AM_SMC_SetParam(SMC_DEV_NO, &para));
+	AM_TRY(AM_SMC_Close(SMC_DEV_NO));
+
 	printf("sync mode test\n");
 	smc_test(AM_TRUE);
-	
+/*	
 	printf("async mode test\n");
 	smc_test(AM_FALSE);
+*/
 	return 0;
 }
 
