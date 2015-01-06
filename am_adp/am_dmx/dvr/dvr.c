@@ -579,7 +579,7 @@ static int parse_ts_packet(AM_DMX_Device_t *dev, uint8_t *buf, int left)
 			plen = 188-4;
 
 			if(ap_flags & 0x20){
-				int alen = p[0] + 1;
+				int alen = payload[0] + 1;
 
 				payload += alen;
 				plen -= alen;
