@@ -5058,7 +5058,7 @@ static void am_scan_get_wait_timespec(AM_SCAN_Scanner_t *scanner, struct timespe
 	{
 		TIMEOUT_CHECK(sdtctl);
 		if(scanner->curr_freq>=0){
-			if ((cur_fe_para.m_type!= FE_QPSK)&&(cur_fe_para.m_type !=FE_QAM)){
+			if ((cur_fe_para.m_type!= FE_QPSK)/*&&(cur_fe_para.m_type !=FE_QAM)*/){
 				TIMEOUT_CHECK(nitctl);
 			}
 		}
