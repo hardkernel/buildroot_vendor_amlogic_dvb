@@ -4122,7 +4122,7 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 #endif
 
-		if(!audio_scrambled && adec_start && !av_paused && (dmx_apts_stop_dur > SCRAMBLE_CHECK_TIME) && (apts_stop_dur > SCRAMBLE_CHECK_TIME)){
+		if(has_audio && !audio_scrambled && adec_start && !av_paused && (dmx_apts_stop_dur > SCRAMBLE_CHECK_TIME) && (apts_stop_dur > SCRAMBLE_CHECK_TIME)){
 			AM_Bool_t sf[2];
 			AM_DMX_GetScrambleStatus(0, sf);
 			if(sf[1]){
@@ -4132,7 +4132,7 @@ static void* aml_av_monitor_thread(void *arg)
 
 		}
 
-		if(!video_scrambled && !av_paused && (dmx_vpts_stop_dur > SCRAMBLE_CHECK_TIME) && (vpts_stop_dur > SCRAMBLE_CHECK_TIME)){
+		if(has_video && !video_scrambled && !av_paused && (dmx_vpts_stop_dur > SCRAMBLE_CHECK_TIME) && (vpts_stop_dur > SCRAMBLE_CHECK_TIME)){
 			AM_Bool_t sf[2];
 			AM_DMX_GetScrambleStatus(0, sf);
 			if(sf[0]){
