@@ -238,7 +238,7 @@ int start_dvr_test(void)
 	
 	while (go)
 	{
-		if (gets(buf))
+		if (fgets(buf, sizeof(buf), stdin))
 		{
 			if(!strncmp(buf, "quit", 4))
 			{
@@ -333,12 +333,7 @@ int main(int argc, char **argv)
 		sscanf(argv[1], "%d", &freq);
 	}
 	
-	if(!freq)
-	{
-		freq = 427000;
-	}
-
-	if(freq!=-1)
+	if(freq)
 	{
 		memset(&fpara, 0, sizeof(fpara));
 		AM_TRY(AM_FEND_Open(FEND_DEV_NO, &fpara));
