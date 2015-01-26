@@ -2133,6 +2133,9 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 	snprintf(buf, sizeof(buf), "/sys/class/stb/demux%d_source", para->dmx_id);
 	AM_FileEcho(buf, "hiu");
 
+	snprintf(buf, sizeof(buf), "%d", 32*1024);
+	AM_FileEcho("/sys/class/stb/asyncfifo0_flush_size", buf);
+
 	AM_DEBUG(1, "Openning mpts");
 	tshift->av_fd = open(STREAM_TS_FILE, O_RDWR);
 	if(tshift->av_fd==-1)

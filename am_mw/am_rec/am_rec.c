@@ -565,6 +565,10 @@ static int am_rec_start_record(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start_p
 			goto start_end;
 		}
 
+		char buf[64];
+		snprintf(buf, sizeof(buf), "%d", 32*1024);
+		AM_FileEcho("/sys/class/stb/asyncfifo0_flush_size", buf);
+
 		am_rec_insert_file_header(rec);
 		am_rec_insert_pat(rec);
 	}
