@@ -26,10 +26,15 @@
  * Type definitions
  ***************************************************************************/
 #define AMSTREAM_IOC_MAGIC  'S'
-#define AMSTREAM_IOC_UD_PICTYPE _IOR(AMSTREAM_IOC_MAGIC, 0x55, unsigned long)
+//#define AMSTREAM_IOC_UD_PICTYPE _IOR(AMSTREAM_IOC_MAGIC, 0x55, unsigned long)
 #define AMSTREAM_IOC_UD_LENGTH _IOR(AMSTREAM_IOC_MAGIC, 0x54, unsigned long)
+#define AMSTREAM_IOC_UD_POC _IOR(AMSTREAM_IOC_MAGIC, 0x55, unsigned long)
 
 #define DMA_BLOCK_LEN 8
+#define INVALID_POC 0xFFFFFFF
+
+#define USE_MAX_CACHE 1
+#define MAX_POC_CACHE 5
 
 enum user_data_type {
 	INVALID_TYPE = 0,
@@ -52,6 +57,12 @@ enum picture_structure {
 	BOTTOM_FIELD = 2,
 	FRAME_PICTURE = 3
 };
+
+typedef struct
+{
+     unsigned int poc_info;
+     unsigned int poc_number;
+}userdata_poc_info_t;
 
 typedef struct
 {
@@ -85,6 +96,16 @@ struct aml_ud_reorder {
 
 	aml_ud_drv_data_t *drv_data;
 };
+struct aml_cc_block_s
+{
+	int 	i_poc;
+	int 	i_pic_type;
+	int 	i_len;
+	uint8_t * p_buf;
+	struct aml_cc_block_s * p_prev;
+	struct aml_cc_block_s * p_next;
+};
+typedef struct aml_cc_block_s aml_cc_block_t;
 
 /****************************************************************************
  * Static data definitions
@@ -188,6 +209,238 @@ static void aml_reorder_decode_cc_data	(struct aml_ud_reorder *vd,
 
 	default: /* invalid */
 		break;
+	}
+}
+static int aml_h264_get_min_poc(aml_cc_block_t * p_header)
+{
+	int min_poc = INVALID_POC;
+	aml_cc_block_t * p_block = p_header->p_next;
+	while(p_block != NULL)
+	{
+		min_poc = min_poc<p_block->i_poc?min_poc:p_block->i_poc;
+		p_block = p_block->p_next;
+	}
+	return min_poc;
+}
+static int aml_h264_get_poc_num(aml_cc_block_t * p_header)
+{
+	int num = 0;
+	aml_cc_block_t * p_block = p_header->p_next;
+	while(p_block != NULL)
+	{
+		num++;
+		p_block = p_block->p_next;
+	}
+	return num;
+}
+static int aml_h264_get_max_poc(aml_cc_block_t * p_header)
+{
+	int max_poc = 0;
+	aml_cc_block_t * p_block = p_header->p_next;
+	while(p_block != NULL)
+	{
+		max_poc = max_poc>p_block->i_poc?max_poc:p_block->i_poc;
+		p_block = p_block->p_next;
+	}
+	return max_poc;
+}
+static void aml_h264_userdata_del(aml_cc_block_t * p_header)
+{
+	aml_cc_block_t * p_block , * p_next_block;
+	for(p_block = p_header; p_block != NULL; p_block = p_next_block)
+	{
+		p_next_block = p_block->p_next;
+		if(p_block->p_buf)
+		{
+			free(p_block->p_buf);
+			p_block->p_buf = NULL;
+		}
+		free(p_block);
+	}
+	p_header = NULL;
+}
+static void aml_h264_userdata_add(aml_cc_block_t * p_header,
+	 int poc, int pic_type, unsigned int min_bytes_valid, const uint8_t * buf)
+{
+	aml_cc_block_t * p_prev_block = NULL, * p_block = NULL;
+	for(p_block = p_header; p_block != NULL; p_block = p_block->p_next)
+	{
+		p_prev_block = p_block;
+	}
+
+	p_block = malloc(sizeof(aml_cc_block_t));
+	p_block->i_poc = poc;
+	p_block->i_pic_type = pic_type;
+	p_block->i_len = min_bytes_valid;
+	p_block->p_buf = malloc(p_block->i_len);
+	memcpy(p_block->p_buf, buf, min_bytes_valid);
+	p_block->p_prev = p_prev_block;
+	p_block->p_next = NULL;
+	p_prev_block->p_next = p_block;
+
+}
+static void aml_h264_userdata_push(AM_USERDATA_Device_t *dev,
+	aml_cc_block_t * p_header, int min_poc)
+{
+	int debug_flag = 0;
+	aml_cc_block_t * p_block = p_header->p_next;
+	while(p_block != NULL)
+	{
+		if(min_poc == p_block->i_poc)
+		{
+			debug_flag = 1;
+			break;
+		}
+		p_block = p_block->p_next;
+	}
+	if(debug_flag == 1)
+	{
+		//AM_DEBUG(1, "####aml_h264_userdata_push find min_poc sucess, push %d ", min_poc);
+	}
+	else
+	{
+		//AM_DEBUG(1, "####aml_h264_userdata_push find min_poc failed ");
+	}
+	if(p_block->p_buf == NULL)
+	{
+		//AM_DEBUG(1, "####aml_h264_userdata_push error write pBUff is NULL ");
+	}
+	AM_DEBUG(1, "####push poc:%d, len:%d, %02x, %02x, %02x, %02x",
+		p_block->i_poc, p_block->i_len, p_block->p_buf[0], p_block->p_buf[1], p_block->p_buf[2], p_block->p_buf[3]);
+	dev->write_package(dev, p_block->p_buf, p_block->i_len);
+	if(p_block->p_prev != NULL)
+	{
+		p_block->p_prev->p_next = p_block->p_next;
+	}
+	else
+	{
+		//AM_DEBUG(1, "####aml_h264_userdata_push error p_block->p_prev is NULL ");
+	}
+	if(p_block->p_next != NULL)
+	{
+		p_block->p_next->p_prev = p_block->p_prev;
+	}
+	else
+	{
+		//AM_DEBUG(1, "####aml_h264_userdata_push error p_block->p_next is NULL ");
+	}
+
+	if(p_block->p_buf) free(p_block->p_buf);
+	if(p_block) free(p_block);
+}
+
+static void aml_h264_reorder_user_data			(struct aml_ud_reorder *vd,
+				 const uint8_t *	buf,
+				 unsigned int		min_bytes_valid,
+				 int poc,
+				 aml_cc_block_t * 	p_header)
+{
+	aml_ud_drv_data_t *drv_data = vd->drv_data;
+	AM_USERDATA_Device_t *dev = drv_data->dev;
+	int max_poc, min_poc, poc_num;
+
+	/*if(poc < 0)
+	{
+		//AM_DEBUG(1, "####poc < 0 , drop it");
+		return;
+	}*/
+
+	/*
+	//old IDR proc
+	if(poc == 0)
+	{
+		//AM_DEBUG(1, "####find IDR , pic_type is %s", vd->picture_coding_type==I_TYPE ? "I_FRAME" : "NOT_I_FRAME_??");
+		if(p_header->p_next == NULL)
+		{
+			AM_DEBUG(1, "####No cache user_data, push IDR");
+			dev->write_package(dev, buf, min_bytes_valid);
+		}
+		else
+		{
+			//AM_DEBUG(1, "####has cache user_data, push by reorder");
+			while(p_header->p_next != NULL)
+			{
+				//max_poc = aml_get_max_poc();
+				min_poc = aml_h264_get_min_poc(p_header);
+				aml_h264_userdata_push(dev, p_header, min_poc);
+			}
+			AM_DEBUG(1, "####push cache user_data end, push IDR");
+			dev->write_package(dev, buf, min_bytes_valid);
+		}
+	}*/
+	if(poc == 0)
+	{
+		//AM_DEBUG(1, "####find IDR , pic_type is %s", vd->picture_coding_type==I_TYPE ? "I_FRAME" : "NOT_I_FRAME_??");
+		if(p_header->p_next == NULL)
+		{
+			AM_DEBUG(1, "####No cache user_data, cache IDR");
+			aml_h264_userdata_add(p_header, poc, vd->picture_coding_type, min_bytes_valid, buf);
+		}
+		else
+		{
+			//AM_DEBUG(1, "####has cache user_data, push by reorder");
+			while(p_header->p_next != NULL)
+			{
+				//max_poc = aml_get_max_poc();
+				min_poc = aml_h264_get_min_poc(p_header);
+				aml_h264_userdata_push(dev, p_header, min_poc);
+			}
+			AM_DEBUG(1, "####push cache user_data end, cache IDR");
+			aml_h264_userdata_add(p_header, poc, vd->picture_coding_type, min_bytes_valid, buf);
+		}
+	}
+	else
+	{
+		//AM_DEBUG(1, "####reciver a poc:%d", poc);
+		#if USE_MAX_CACHE
+			poc_num = aml_h264_get_poc_num(p_header);
+			if(poc_num > MAX_POC_CACHE)
+			{
+				//AM_DEBUG(1, "####recv a poc bigger than max_poc, push min_poc data, poc:%d, max_poc:%d, min_poc:%d", poc, max_poc, min_poc);
+				min_poc = aml_h264_get_min_poc(p_header);
+				if(min_poc != INVALID_POC) aml_h264_userdata_push(dev, p_header, min_poc);
+				aml_h264_userdata_add(p_header, poc, vd->picture_coding_type, min_bytes_valid, buf);
+			}
+			else
+			{
+				//AM_DEBUG(1, "####recv a poc smaller than max_poc, cache it, poc:%d, max_poc:%d", poc, max_poc);
+				aml_h264_userdata_add(p_header, poc, vd->picture_coding_type, min_bytes_valid, buf);
+			}
+		#else
+			max_poc = aml_h264_get_max_poc(p_header);
+			min_poc = aml_h264_get_min_poc(p_header);
+			if(poc > max_poc && max_poc != INVALID_POC && min_poc != INVALID_POC)
+			{
+				//AM_DEBUG(1, "####recv a poc bigger than max_poc, push min_poc data, poc:%d, max_poc:%d, min_poc:%d", poc, max_poc, min_poc);
+				aml_h264_userdata_push(dev, p_header, min_poc);
+				aml_h264_userdata_add(p_header, poc, vd->picture_coding_type, min_bytes_valid, buf);
+			}
+			else
+			{
+				//AM_DEBUG(1, "####recv a poc smaller than max_poc, cache it, poc:%d, max_poc:%d", poc, max_poc);
+				aml_h264_userdata_add(p_header, poc, vd->picture_coding_type, min_bytes_valid, buf);
+			}
+		#endif
+
+
+		/*
+		if(p_header->p_next == NULL)
+		{
+
+			aml_cc_block_t * p_block = malloc(sizeof(aml_cc_block_t));
+			p_block->poc = i_poc;
+			p_block->i_pic_type = vd->picture_coding_type;
+			p_block->i_len = min_bytes_valid;
+			p_block->p_buf = malloc(p_block->i_len);
+			p_block->p_prev = p_header;
+			p_block->p_next = NULL;
+
+		}
+		else
+		{
+
+		}
+		*/
 	}
 }
 
@@ -412,7 +665,7 @@ static unsigned int aml_get_pic_type(unsigned int slice_type)
     AM_DEBUG(3, "get slice_type:%d, slice_id:%d, pic_type:%d", slice_type&0xFF, slice_type>>8, pic_type);
     return pic_type;
 }
-/**\brief CC data thread*/
+
 static void *aml_userdata_thread(void *arg)
 {
 	AM_USERDATA_Device_t *dev = (AM_USERDATA_Device_t*)arg;
@@ -421,12 +674,15 @@ static void *aml_userdata_thread(void *arg)
 	uint8_t *p;
 	uint8_t cc_data[256];/*In fact, 99 is enough*/
 	uint8_t cc_data_cnt;
-	int cnt, left, fd, ud_format = INVALID_TYPE, min_bytes_valid = 0;
+	int cnt, left, fd, ud_format = INVALID_TYPE, min_bytes_valid = 0, poc;
 	struct pollfd fds;
 	aml_ud_header_t pheader;
 	struct aml_ud_reorder reorder;
 	int last_pkg_idx = -1;
 	unsigned int slice_type, pic_type;
+	aml_cc_block_t * 	p_header;
+	int first_check = 0;
+	userdata_poc_info_t poc_block;
 
     AM_DEBUG(1, "user data thread start.");
 
@@ -436,6 +692,10 @@ static void *aml_userdata_thread(void *arg)
 
 	memset(&reorder, 0, sizeof(reorder));
 	memset(&pheader, 0, sizeof(pheader));
+	p_header = malloc(sizeof(aml_cc_block_t));
+	p_header->i_poc = INVALID_POC;
+	p_header->p_prev = p_header;
+	p_header->p_next = NULL;
 
 	while (drv_data->running)
 	{
@@ -444,7 +704,7 @@ static void *aml_userdata_thread(void *arg)
 		if (poll(&fds, 1, 100) > 0)
 		{
 			cnt = read(fd, buf+left, sizeof(buf)-left);
-			while(ud_format == INVALID_TYPE && drv_data->running)
+			while(cnt > 0 && ud_format == INVALID_TYPE && drv_data->running)
 			{
 				ud_format = aml_check_userdata_format(buf, cnt);
 			}
@@ -486,6 +746,8 @@ static void *aml_userdata_thread(void *arg)
 				}
 				else if(ud_format == H264_CC_TYPE)
 				{
+					cnt += left;
+					left = 0;
 					aml_swap_data(buf, cnt);
 					p = buf;
 					while(cnt > 0)
@@ -493,20 +755,52 @@ static void *aml_userdata_thread(void *arg)
 						if(p[0] == 0xb5 && p[3] == 0x47 && p[4] == 0x41
 							&& p[5] == 0x39 && p[6] == 0x34)
 						{
-							min_bytes_valid = 11 + (buf[8] & 0x1F)*3;
-							//AM_DEBUG(1, "==============================================min_bytes_valid:%d", min_bytes_valid);
-							slice_type = 0;
-							ioctl(fd, AMSTREAM_IOC_UD_PICTYPE, &slice_type);
-							pic_type = aml_get_pic_type(slice_type);
 
-						    reorder.drv_data = drv_data;
-							reorder.picture_coding_type = pic_type;
-							reorder.picture_structure = FRAME_PICTURE;
-							reorder.picture_temporal_reference = 2;
-							if(cnt >= min_bytes_valid)
-								aml_reorder_user_data(&reorder, p+3, min_bytes_valid-3);//skip 0xb5 0x00 0x31
-							else
-								aml_reorder_user_data(&reorder, p+3, cnt-3);//skip 0xb5 0x00 0x31
+							if(cnt >= 72)
+							{
+								memset(&poc_block, 0, sizeof(userdata_poc_info_t));
+								min_bytes_valid = 11 + (buf[8] & 0x1F)*3;
+								slice_type = 0;
+								ioctl(fd, AMSTREAM_IOC_UD_POC, &poc_block);
+								if(first_check == 0)
+								{
+									AM_DEBUG(1,"@@@ check_first pocinfo:%#x, poc:%d ,jump %d %d data\n",
+										poc_block.poc_info&0xFFFF, poc_block.poc_number,
+										(poc_block.poc_info&0xFFFF)/71, ((poc_block.poc_info&0xFFFF)/71-1)*72);
+									if(cnt>72 && (poc_block.poc_info&0xFFFF) > 0x47)
+									{
+
+										AM_DEBUG(1,"break, pocinfo:%#x, poc:%d ,jump %d %d data\n",
+											poc_block.poc_info&0xFFFF, poc_block.poc_number,
+											(poc_block.poc_info&0xFFFF)/71, ((poc_block.poc_info&0xFFFF)/71-1)*72);
+										cnt = 0;
+										break;
+									}
+									first_check = 1;
+								}
+							    reorder.drv_data = drv_data;
+								reorder.picture_coding_type = 0;
+								reorder.picture_structure = FRAME_PICTURE;
+								reorder.picture_temporal_reference = 2;
+								#if 1
+								if(cnt >= min_bytes_valid)
+									aml_h264_reorder_user_data(&reorder, p+3, min_bytes_valid-3, poc_block.poc_number, p_header);//skip 0xb5 0x00 0x31
+								else
+									aml_h264_reorder_user_data(&reorder, p+3, cnt-3, poc_block.poc_number, p_header);//skip 0xb5 0x00 0x31
+								#endif
+								cnt -= 72;
+								p += 72;
+								continue;
+							}
+							else if(cnt > 0)
+							{
+								left = cnt;
+								memmove(buf, p, left);
+								aml_swap_data(buf, left);
+								AM_DEBUG(1, "memmove %d buf", left);
+								break;
+							}
+
 						}
 						cnt -= DMA_BLOCK_LEN;
 						p += DMA_BLOCK_LEN;
@@ -516,7 +810,7 @@ static void *aml_userdata_thread(void *arg)
 		}
 	}
 
-
+	aml_h264_userdata_del(p_header);
 	AM_DEBUG(1, "user data thread exit now");
 	return NULL;
 }
