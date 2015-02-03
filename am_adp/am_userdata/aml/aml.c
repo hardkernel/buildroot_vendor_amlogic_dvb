@@ -293,20 +293,13 @@ static void aml_h264_userdata_push(AM_USERDATA_Device_t *dev,
 		}
 		p_block = p_block->p_next;
 	}
-	if(debug_flag == 1)
-	{
-		//AM_DEBUG(1, "####aml_h264_userdata_push find min_poc sucess, push %d ", min_poc);
-	}
-	else
-	{
-		//AM_DEBUG(1, "####aml_h264_userdata_push find min_poc failed ");
-	}
 	if(p_block->p_buf == NULL)
 	{
 		//AM_DEBUG(1, "####aml_h264_userdata_push error write pBUff is NULL ");
 	}
-	AM_DEBUG(1, "####push poc:%d, len:%d, %02x, %02x, %02x, %02x",
-		p_block->i_poc, p_block->i_len, p_block->p_buf[0], p_block->p_buf[1], p_block->p_buf[2], p_block->p_buf[3]);
+	//AM_DEBUG(1, "####push poc:%d, len:%d, %02x, %02x, %02x, %02x",
+		//p_block->i_poc, p_block->i_len, p_block->p_buf[0], p_block->p_buf[1], p_block->p_buf[2], p_block->p_buf[3]);
+
 	dev->write_package(dev, p_block->p_buf, p_block->i_len);
 	if(p_block->p_prev != NULL)
 	{
@@ -339,71 +332,35 @@ static void aml_h264_reorder_user_data			(struct aml_ud_reorder *vd,
 	AM_USERDATA_Device_t *dev = drv_data->dev;
 	int max_poc, min_poc, poc_num;
 
-	/*if(poc < 0)
-	{
-		//AM_DEBUG(1, "####poc < 0 , drop it");
-		return;
-	}*/
 
-	/*
-	//old IDR proc
 	if(poc == 0)
 	{
-		//AM_DEBUG(1, "####find IDR , pic_type is %s", vd->picture_coding_type==I_TYPE ? "I_FRAME" : "NOT_I_FRAME_??");
 		if(p_header->p_next == NULL)
 		{
-			AM_DEBUG(1, "####No cache user_data, push IDR");
-			dev->write_package(dev, buf, min_bytes_valid);
-		}
-		else
-		{
-			//AM_DEBUG(1, "####has cache user_data, push by reorder");
-			while(p_header->p_next != NULL)
-			{
-				//max_poc = aml_get_max_poc();
-				min_poc = aml_h264_get_min_poc(p_header);
-				aml_h264_userdata_push(dev, p_header, min_poc);
-			}
-			AM_DEBUG(1, "####push cache user_data end, push IDR");
-			dev->write_package(dev, buf, min_bytes_valid);
-		}
-	}*/
-	if(poc == 0)
-	{
-		//AM_DEBUG(1, "####find IDR , pic_type is %s", vd->picture_coding_type==I_TYPE ? "I_FRAME" : "NOT_I_FRAME_??");
-		if(p_header->p_next == NULL)
-		{
-			AM_DEBUG(1, "####No cache user_data, cache IDR");
 			aml_h264_userdata_add(p_header, poc, vd->picture_coding_type, min_bytes_valid, buf);
 		}
 		else
 		{
-			//AM_DEBUG(1, "####has cache user_data, push by reorder");
 			while(p_header->p_next != NULL)
 			{
-				//max_poc = aml_get_max_poc();
 				min_poc = aml_h264_get_min_poc(p_header);
 				aml_h264_userdata_push(dev, p_header, min_poc);
 			}
-			AM_DEBUG(1, "####push cache user_data end, cache IDR");
 			aml_h264_userdata_add(p_header, poc, vd->picture_coding_type, min_bytes_valid, buf);
 		}
 	}
 	else
 	{
-		//AM_DEBUG(1, "####reciver a poc:%d", poc);
 		#if USE_MAX_CACHE
 			poc_num = aml_h264_get_poc_num(p_header);
 			if(poc_num > MAX_POC_CACHE)
 			{
-				//AM_DEBUG(1, "####recv a poc bigger than max_poc, push min_poc data, poc:%d, max_poc:%d, min_poc:%d", poc, max_poc, min_poc);
 				min_poc = aml_h264_get_min_poc(p_header);
 				if(min_poc != INVALID_POC) aml_h264_userdata_push(dev, p_header, min_poc);
 				aml_h264_userdata_add(p_header, poc, vd->picture_coding_type, min_bytes_valid, buf);
 			}
 			else
 			{
-				//AM_DEBUG(1, "####recv a poc smaller than max_poc, cache it, poc:%d, max_poc:%d", poc, max_poc);
 				aml_h264_userdata_add(p_header, poc, vd->picture_coding_type, min_bytes_valid, buf);
 			}
 		#else
@@ -411,36 +368,14 @@ static void aml_h264_reorder_user_data			(struct aml_ud_reorder *vd,
 			min_poc = aml_h264_get_min_poc(p_header);
 			if(poc > max_poc && max_poc != INVALID_POC && min_poc != INVALID_POC)
 			{
-				//AM_DEBUG(1, "####recv a poc bigger than max_poc, push min_poc data, poc:%d, max_poc:%d, min_poc:%d", poc, max_poc, min_poc);
 				aml_h264_userdata_push(dev, p_header, min_poc);
 				aml_h264_userdata_add(p_header, poc, vd->picture_coding_type, min_bytes_valid, buf);
 			}
 			else
 			{
-				//AM_DEBUG(1, "####recv a poc smaller than max_poc, cache it, poc:%d, max_poc:%d", poc, max_poc);
 				aml_h264_userdata_add(p_header, poc, vd->picture_coding_type, min_bytes_valid, buf);
 			}
 		#endif
-
-
-		/*
-		if(p_header->p_next == NULL)
-		{
-
-			aml_cc_block_t * p_block = malloc(sizeof(aml_cc_block_t));
-			p_block->poc = i_poc;
-			p_block->i_pic_type = vd->picture_coding_type;
-			p_block->i_len = min_bytes_valid;
-			p_block->p_buf = malloc(p_block->i_len);
-			p_block->p_prev = p_header;
-			p_block->p_next = NULL;
-
-		}
-		else
-		{
-
-		}
-		*/
 	}
 }
 
