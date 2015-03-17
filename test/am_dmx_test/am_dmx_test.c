@@ -20,11 +20,11 @@
 #include <unistd.h>
 
 #define FEND_DEV_NO   (0)
-#define DMX_DEV_NO    (0)
 
-//#define  PMT_TEST
 #define  PAT_TEST
 #define  EIT_TEST
+#define  NIT_TEST
+#define  BAT_TEST
 
 #if 0
 static FILE *fp;
@@ -39,96 +39,183 @@ typedef struct {
 static Section sections[255];
 #endif
 
+static int s_last_num =-1;
+
+int freq = 0;
+int layer = -1;
+int src=0;
+int dmx=0;
+int timeout = 60*3;
+
+static int bat=0;
+static int nit=0;
+static int user=0;
+static int pat=0;
+static int eit=0;
+static int pall=0;
+
+#define USER_MAX 10
+static int u_pid[USER_MAX]={[0 ... USER_MAX-1] = -1};
+static int u_para[USER_MAX]={[0 ... USER_MAX-1] = 0};
+static int u_para_g;
+static FILE *fp[USER_MAX];
+/*
+   u_para format:
+	d1 - 0:sec 1:pes
+	d2 - 1:crc : sec only
+	d3 - 1:print
+	d5 - 1:swfilter
+	d6 - 1:ts_tap :pes only
+	d4 - 1:w2file
+*/
+#define UPARA_TYPE     0xf
+#define UPARA_CRC      0xf0
+#define UPARA_PR       0xf00
+#define UPARA_SF       0xf000
+#define UPARA_DMX_TAP  0xf0000
+#define UPARA_FILE     0xf00000
+
+#define get_upara(_i) (u_para[(_i)]? u_para[(_i)] : u_para_g)
+
 static void dump_bytes(int dev_no, int fid, const uint8_t *data, int len, void *user_data)
 {
-	FILE *fp;
-	int did = data[8];
-	int sec = data[6];
-	
-	
-#if 0
-	if(did!=3)
-		return;
-	
-	if(sections[sec].got)
-	{
-		if((sections[sec].len!=len) || memcmp(sections[sec].data, data, len))
+	int u = (int)user_data;
+
+	if(pall) {
+		int i;
+		printf("data:\n");
+		for(i=0;i<len;i++)
 		{
-			AM_DEBUG(1, "SECTION %d MISMATCH LEN: %d", sec, len);
+			printf("%02x ", data[i]);
+			if(((i+1)%16)==0) printf("\n");
+		}
+		if((i%16)!=0) printf("\n");
+	}
+#if 1
+	if(bat&UPARA_PR) {
+		if(data[0]==0x4a) {
+			printf("sec:tabid:0x%02x,bunqid:0x%02x%02x,section num:%4d,lat_section_num:%4d\n",data[0],
+				data[3],data[4],data[6],data[7]);
+		}
+
+	}
+	else if(nit&UPARA_PR) {
+
+		if(data[0]==0x40) {
+			printf("section:%8d,max:%8d\n",data[6],data[7]);
+			if((data[6] !=s_last_num+1)&&(s_last_num!=-1))//第一个或者不连续
+			{
+				if(s_last_num ==data[7])//上一个是MAX
+				{
+					if(data[6] != 0)//上一个MAX 这个不是 0
+					{
+						printf("##drop packet,tabid:0x%4x,cur:%8d,last:%8d,max:%8d\n",data[0],
+						data[6],s_last_num,data[7]);
+						//stop_section_flag =1;
+					}
+					else
+					{
+					}
+				}
+				else//上一个不是
+				{
+					printf("##drop packet,tabid:%4x,cur:%8d,last:%8d,max:%8d\n",data[0],
+					data[6],s_last_num,data[7]);
+					//stop_section_flag =1;
+				}
+
+				
+			}
+			else
+			{
+				//printf("section:%8d,",sectiondata->m_pucData[6]);
+			}
+			s_last_num = data[6];
 		}
 	}
-	else
-	{
-		sections[sec].len = len;
-		sections[sec].got = 1;
-		memcpy(sections[sec].data, data, len);
-		AM_DEBUG(1, "GET SECTION %d LEN: %d", sec, len);
+	else if(pat&UPARA_PR) {
+		if(data[0]==0x0)
+			printf("%02x: %02x %02x %02x %02x %02x %02x %02x %02x\n", data[0], data[1], data[2], data[3], data[4],
+				data[5], data[6], data[7], data[8]);
 	}
-#endif
-#if 0
-	int did = data[8];
-	int bid = (data[9]<<24)|(data[10]<<16)|(data[11]<<8)|data[12];
-	int sec = data[6];
-	
-	if(did!=3)
-		return;
-	if(sec_mask[sec])
-		return;
-	
-	sec_mask[sec] = 1;
-	AM_DEBUG(1, "get section %d", sec);
-	
-	fseek(fp, bid*4030, SEEK_SET);
-	fwrite(data+13, 1, len-17, fp);
-#endif
-#if 1
-	int i;
-	
-	printf("section:\n");
-	for(i=0;i<len;i++)
-	{
-		printf("%02x ", data[i]);
-		if(((i+1)%16)==0) printf("\n");
+	else {
+		if(!user_data) {
+			printf("%02x %02x %02x %02x %02x %02x %02x %02x %02x\n", data[0], data[1], data[2], data[3], data[4],
+				data[5], data[6], data[7], data[8]);
+			return;
+		}
+		
+		if(get_upara(u-1)&UPARA_PR)
+			printf("[%d:%d] %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", u-1, u_pid[u-1],
+				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+		if(get_upara(u-1)&UPARA_FILE){
+			int ret = fwrite(data, 1, len, fp[(int)user_data-1]);
+			if(ret!=len)
+				printf("data w lost\n");
+		}
 	}
-	
-	if((i%16)!=0) printf("\n");
 #endif
 }
 
-static int get_section()
+static int get_section(int dmx, int timeout)
 {
 #ifdef PAT_TEST
 	int fid;
-#endif
-
-#ifdef PMT_TEST
-	int fid_pmt;
 #endif
 
 #ifdef EIT_TEST
 	int fid_eit_pf, fid_eit_opf;
 #endif
 
+#ifdef NIT_TEST
+	int fid_nit;
+#endif
+#ifdef BAT_TEST
+	int fid_bat;
+#endif
+
+	int fid_user[USER_MAX];
+	int i;
+
 	struct dmx_sct_filter_params param;
 	struct dmx_pes_filter_params pparam;
 #ifdef PAT_TEST
-	AM_TRY(AM_DMX_AllocateFilter(DMX_DEV_NO, &fid));
-	AM_TRY(AM_DMX_SetCallback(DMX_DEV_NO, fid, dump_bytes, NULL));
-#endif
-
-#ifdef PMT_TEST
-	AM_TRY(AM_DMX_AllocateFilter(DMX_DEV_NO, &fid_pmt));
-	AM_TRY(AM_DMX_SetCallback(DMX_DEV_NO, fid_pmt, dump_bytes, NULL));
+	if(pat&0xf) {
+	printf("start pat...\n");
+	AM_TRY(AM_DMX_AllocateFilter(dmx, &fid));
+	AM_TRY(AM_DMX_SetCallback(dmx, fid, dump_bytes, NULL));
+	}
 #endif
 
 #ifdef EIT_TEST
-	AM_TRY(AM_DMX_AllocateFilter(DMX_DEV_NO, &fid_eit_pf));
-	AM_TRY(AM_DMX_SetCallback(DMX_DEV_NO, fid_eit_pf, dump_bytes, NULL));
-	AM_TRY(AM_DMX_AllocateFilter(DMX_DEV_NO, &fid_eit_opf));
-	AM_TRY(AM_DMX_SetCallback(DMX_DEV_NO, fid_eit_opf, dump_bytes, NULL));
+	if(eit&0xf) {
+	printf("start eit...\n");
+	AM_TRY(AM_DMX_AllocateFilter(dmx, &fid_eit_pf));
+	AM_TRY(AM_DMX_SetCallback(dmx, fid_eit_pf, dump_bytes, NULL));
+	AM_TRY(AM_DMX_AllocateFilter(dmx, &fid_eit_opf));
+	AM_TRY(AM_DMX_SetCallback(dmx, fid_eit_opf, dump_bytes, NULL));
+	}
 #endif
 
+#ifdef NIT_TEST
+	if(nit&0xf) {
+	printf("start nit...\n");
+	AM_TRY(AM_DMX_AllocateFilter(dmx, &fid_nit));
+	AM_TRY(AM_DMX_SetCallback(dmx, fid_nit, dump_bytes, NULL));
+	}
+#endif
+
+#ifdef BAT_TEST
+	if(bat&0xf) {
+	printf("start bat...\n");
+	AM_TRY(AM_DMX_AllocateFilter(dmx, &fid_bat));
+	AM_TRY(AM_DMX_SetCallback(dmx, fid_bat, dump_bytes, NULL));
+	}
+#endif
+
+	
 #ifdef PAT_TEST
+	if(pat&0xf) {
 	memset(&param, 0, sizeof(param));
 	param.pid = 0;
 	param.filter.filter[0] = 0;
@@ -137,71 +224,173 @@ static int get_section()
 	//param.filter.mask[2] = 0xff;
 
 	param.flags = DMX_CHECK_CRC;
-	
-	AM_TRY(AM_DMX_SetSecFilter(DMX_DEV_NO, fid, &param));
-#endif
-	//pmt
-#ifdef PMT_TEST
-	memset(&param, 0, sizeof(param));
-	param.pid = 0x3f2;
-	param.filter.filter[0] = 0x2;
-	param.filter.mask[0] = 0xff;
-	param.filter.filter[1] = 0x0;
-	param.filter.mask[1] = 0xff;
-	param.filter.filter[2] = 0x65;
-	param.filter.mask[2] = 0xff;
-	param.flags = DMX_CHECK_CRC;
-	
-	AM_TRY(AM_DMX_SetSecFilter(DMX_DEV_NO, fid_pmt, &param));
+	if(pat&UPARA_SF)
+		param.flags |= 0x100;
+	AM_TRY(AM_DMX_SetSecFilter(dmx, fid, &param));
+	}
 #endif
 
 #ifdef EIT_TEST
+	if(eit&0xf) {
 	memset(&param, 0, sizeof(param));
 	param.pid = 0x12;
 	param.filter.filter[0] = 0x4E;
 	param.filter.mask[0] = 0xff;
-	param.flags = DMX_CHECK_CRC;
-	AM_TRY(AM_DMX_SetSecFilter(DMX_DEV_NO, fid_eit_pf, &param));
+	param.flags = DMX_CHECK_CRC;	
+	if(eit&UPARA_SF)
+		param.flags |= 0x100;
+	AM_TRY(AM_DMX_SetSecFilter(dmx, fid_eit_pf, &param));
 	
 	memset(&param, 0, sizeof(param));
 	param.pid = 0x12;
 	param.filter.filter[0] = 0x4F;
 	param.filter.mask[0] = 0xff;
-	param.flags = DMX_CHECK_CRC;
-	AM_TRY(AM_DMX_SetSecFilter(DMX_DEV_NO, fid_eit_opf, &param));
+	param.flags = DMX_CHECK_CRC;	
+	if(eit&UPARA_SF)
+		param.flags |= 0x100;
+	AM_TRY(AM_DMX_SetSecFilter(dmx, fid_eit_opf, &param));
+	}
 #endif
 
-#ifdef PAT_TEST
-	AM_TRY(AM_DMX_SetBufferSize(DMX_DEV_NO, fid, 32*1024));
-	AM_TRY(AM_DMX_StartFilter(DMX_DEV_NO, fid));
+#ifdef NIT_TEST
+	if(nit&0xF) {
+	memset(&param, 0, sizeof(param));
+	param.pid = 0x10;
+	param.filter.filter[0] = 0x40;
+	param.filter.mask[0] = 0xff;
+	if(nit&UPARA_CRC)
+		param.flags = DMX_CHECK_CRC;	
+	if(nit&UPARA_SF)
+		param.flags |= 0x100;
+	AM_TRY(AM_DMX_SetSecFilter(dmx, fid_nit, &param));
+	}
 #endif
-#ifdef PMT_TEST
-	AM_TRY(AM_DMX_SetBufferSize(DMX_DEV_NO, fid_pmt, 32*1024));
-	AM_TRY(AM_DMX_StartFilter(DMX_DEV_NO, fid_pmt));
+
+#ifdef BAT_TEST
+	if(bat&0xF) {
+	memset(&param, 0, sizeof(param));
+	param.pid = 0x11;
+	param.filter.filter[0] = 0x4a;
+	param.filter.mask[0] = 0xff;
+	if(bat&UPARA_CRC)
+		param.flags = DMX_CHECK_CRC;	
+	if(bat&UPARA_SF)
+		param.flags |= 0x100;
+	AM_TRY(AM_DMX_SetSecFilter(dmx, fid_bat, &param));
+	}
+#endif
+
+
+#ifdef PAT_TEST
+	if(pat&0xF) {
+	AM_TRY(AM_DMX_SetBufferSize(dmx, fid, 32*1024));
+	AM_TRY(AM_DMX_StartFilter(dmx, fid));
+	}
 #endif
 #ifdef EIT_TEST
-	AM_TRY(AM_DMX_SetBufferSize(DMX_DEV_NO, fid_eit_pf, 32*1024));
-	AM_TRY(AM_DMX_StartFilter(DMX_DEV_NO, fid_eit_pf));
-	AM_TRY(AM_DMX_SetBufferSize(DMX_DEV_NO, fid_eit_opf, 32*1024));
-	//AM_TRY(AM_DMX_StartFilter(DMX_DEV_NO, fid_eit_opf));
+	if(eit&0xF) {
+	AM_TRY(AM_DMX_SetBufferSize(dmx, fid_eit_pf, 32*1024));
+	AM_TRY(AM_DMX_StartFilter(dmx, fid_eit_pf));
+	AM_TRY(AM_DMX_SetBufferSize(dmx, fid_eit_opf, 32*1024));
+	//AM_TRY(AM_DMX_StartFilter(dmx, fid_eit_opf));
+	}
 #endif
-	
-	sleep(100);
+
+#ifdef NIT_TEST
+	if(nit&0xF) {
+	AM_TRY(AM_DMX_SetBufferSize(dmx, fid_nit, 32*1024));
+	AM_TRY(AM_DMX_StartFilter(dmx, fid_nit));
+	}
+#endif
+
+#ifdef BAT_TEST
+	if(bat&0xF) {
+	AM_TRY(AM_DMX_SetBufferSize(dmx, fid_bat, 64*1024));
+	AM_TRY(AM_DMX_StartFilter(dmx, fid_bat));
+	}
+#endif
+
+	for(i=0; i<USER_MAX; i++) {
+		if(u_pid[i]!=-1) {
+			AM_TRY(AM_DMX_AllocateFilter(dmx, &fid_user[i]));
+
+			AM_TRY(AM_DMX_SetCallback(dmx, fid_user[i], dump_bytes, (void*)(i+1)));
+		
+			if(get_upara(i)&UPARA_TYPE) {/*pes*/
+				memset(&pparam, 0, sizeof(pparam));
+				pparam.pid = u_pid[i];
+				pparam.pes_type = DMX_PES_OTHER;
+				pparam.input = DMX_IN_FRONTEND;
+				pparam.output = DMX_OUT_TAP;
+				if(get_upara(i)&UPARA_DMX_TAP)
+					pparam.output = DMX_OUT_TSDEMUX_TAP;
+				if(get_upara(i)&UPARA_SF)
+					pparam.flags |= 0x100;
+				AM_TRY(AM_DMX_SetPesFilter(dmx, fid_user[i], &pparam));
+
+			} else {/*sct*/
+				memset(&param, 0, sizeof(param));
+				param.pid = u_pid[i];
+			/*	param.filter.filter[0] = 0xa2;
+				param.filter.mask[0] = 0xff;*/
+				if(get_upara(i)&UPARA_CRC)
+					param.flags = DMX_CHECK_CRC;
+				if(get_upara(i)&UPARA_SF)
+					param.flags |= 0x100;
+				AM_TRY(AM_DMX_SetSecFilter(dmx, fid_user[i], &param));
+			}
+
+			AM_TRY(AM_DMX_SetBufferSize(dmx, fid_user[i], 64*1024));
+
+			if(get_upara(i)&UPARA_FILE) {
+				char name[32];
+				sprintf(name, "/storage/external_storage/u_%d.dump", i);
+				fp[i] = fopen(name, "wb");
+				if(fp[i])
+					printf("file open:[%s]\n", name);
+			}
+
+			AM_TRY(AM_DMX_StartFilter(dmx, fid_user[i]));
+		}
+	}
+
+	sleep(timeout);
+
 #ifdef PAT_TEST
-	AM_TRY(AM_DMX_StopFilter(DMX_DEV_NO, fid));
-	AM_TRY(AM_DMX_FreeFilter(DMX_DEV_NO, fid));
+	if(pat&0xF) {
+	AM_TRY(AM_DMX_StopFilter(dmx, fid));
+	AM_TRY(AM_DMX_FreeFilter(dmx, fid));
+	}
 #endif	
-#ifdef PMT_TEST
-	AM_TRY(AM_DMX_StopFilter(DMX_DEV_NO, fid_pmt));
-	AM_TRY(AM_DMX_FreeFilter(DMX_DEV_NO, fid_pmt));
-#endif
 #ifdef EIT_TEST
-	AM_TRY(AM_DMX_StopFilter(DMX_DEV_NO, fid_eit_pf));
-	AM_TRY(AM_DMX_FreeFilter(DMX_DEV_NO, fid_eit_pf));
-	AM_TRY(AM_DMX_StopFilter(DMX_DEV_NO, fid_eit_opf));
-	AM_TRY(AM_DMX_FreeFilter(DMX_DEV_NO, fid_eit_opf));
+	if(eit&0xF) {
+	AM_TRY(AM_DMX_StopFilter(dmx, fid_eit_pf));
+	AM_TRY(AM_DMX_FreeFilter(dmx, fid_eit_pf));
+	AM_TRY(AM_DMX_StopFilter(dmx, fid_eit_opf));
+	AM_TRY(AM_DMX_FreeFilter(dmx, fid_eit_opf));
+	}
 #endif
-	//fclose(fp);
+#ifdef NIT_TEST
+	if(nit&0xF){
+	AM_TRY(AM_DMX_StopFilter(dmx, fid_nit));
+	AM_TRY(AM_DMX_FreeFilter(dmx, fid_nit));
+	}
+#endif	
+#ifdef BAT_TEST
+	if(bat&0xF) {
+	AM_TRY(AM_DMX_StopFilter(dmx, fid_bat));
+	AM_TRY(AM_DMX_FreeFilter(dmx, fid_bat));
+	}
+#endif	
+	
+	for(i=0; i<USER_MAX; i++) {
+		if(u_pid[i]!=-1) {
+			AM_TRY(AM_DMX_StopFilter(dmx, fid_user[i]));
+			AM_TRY(AM_DMX_FreeFilter(dmx, fid_user[i]));
+			if((get_upara(i)&UPARA_FILE) && fp[i])
+				fclose(fp[i]);
+		}
+	}
 	
 	return 0;
 }
@@ -217,37 +406,73 @@ static int setlayer(int layer/*1/2/4/7*/)
 	return 0;
 }
 
+int get_para(char *argv)
+{
+	#define CASE(name, len, type, var) \
+		if(!strncmp(argv, name"=", (len)+1)) { \
+			sscanf(&argv[(len)+1], type, &var); \
+			printf("param["name"] => "type"\n", var); \
+		}
+
+	CASE("freq",      4, "%i", freq)
+	else CASE("src",  3, "%i", src)
+	else CASE("dmx",  3, "%i", dmx)
+	else CASE("pat",  3, "%x", pat)
+	else CASE("eit",  3, "%x", eit)
+	else CASE("layer",5, "%i", layer)
+	else CASE("bat",  3, "%x", bat)
+	else CASE("nit",  3, "%x", nit)
+	else CASE("timeout", 7, "%i", timeout)
+	else CASE("pall", 4, "%i", pall)
+	else CASE("pid0", 4, "%x", u_pid[0])
+	else CASE("pid1", 4, "%x", u_pid[1])
+	else CASE("pid2", 4, "%x", u_pid[2])
+	else CASE("pid3", 4, "%x", u_pid[3])
+	else CASE("pid4", 4, "%x", u_pid[4])
+	else CASE("para0", 5, "%x", u_para[0])
+	else CASE("para1", 5, "%x", u_para[1])
+	else CASE("para2", 5, "%x", u_para[2])
+	else CASE("para3", 5, "%x", u_para[3])
+	else CASE("para4", 5, "%x", u_para[4])
+	else CASE("para", 4, "%x", u_para_g)
+
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	AM_DMX_OpenPara_t para;
 	AM_FEND_OpenPara_t fpara;
 	struct dvb_frontend_parameters p;
 	fe_status_t status;
-	int freq = 0;
-	int layer = -1;
-	int src=0;
+	int ret=0;
+	int i;
 
 	memset(&fpara, 0, sizeof(fpara));
 #if 1
-	if(argc>1)
+
+	if(argc==1)
 	{
-		sscanf(argv[1], "%d", &freq);
-	}
-	if(argc>2)
-	{
-		sscanf(argv[2], "%d", &src);
-	}
-	if(argc>3)
-	{
-		sscanf(argv[3], "%d", &layer);
+		printf(
+			"Usage:%s [freq=] [src=] [dmx=] [layer=] [timeout=] [pat=] [eit=] [bat=] [nit=] [pidx=] [parax=] [para=]\n"
+			"  default   - src:0 dmx:0 layer:-1 uparax:0\n"
+			"  x         - 0~5\n"
+			"  upara     - d6->|111111|<-d1\n"
+			"    d1 - 0:sec 1:pes (means enable for pat/eit/bat/nit)\n"
+			"    d2 - 1:crc : sec only\n"
+			"    d3 - 1:print\n"
+			"    d4 - 1:swfilter\n"
+			"    d5 - 1:ts tap : pes only\n"
+			"    d6 - 1:w2file\n"
+			, argv[0]);
+		return 0;
 	}
 	
-	if(!freq)
-	{
-		freq = 618000000;
-	}
+	for(i=1; i< argc; i++)
+		get_para(argv[i]);
 
-	if(freq!=-1)
+
+	if(freq>0)
 	{
 		AM_TRY(AM_FEND_Open(FEND_DEV_NO, &fpara));
 
@@ -270,13 +495,9 @@ int main(int argc, char **argv)
 		AM_TRY(AM_FEND_Lock(FEND_DEV_NO, &p, &status));
 		
 		if(status&FE_HAS_LOCK)
-		{
 			printf("locked\n");
-		}
 		else
-		{
 			printf("unlocked\n");
-		}
 	}
 	
 	if(layer!=-1)
@@ -284,19 +505,19 @@ int main(int argc, char **argv)
 
 #endif	
 	memset(&para, 0, sizeof(para));
-	AM_TRY(AM_DMX_Open(DMX_DEV_NO, &para));
+	//para.use_sw_filter = AM_TRUE;
+	//para.dvr_fifo_no = 1;
+	AM_TRY(AM_DMX_Open(dmx, &para));
 
-{
-	AM_TRY(AM_DMX_SetSource(DMX_DEV_NO, src));
+	AM_TRY(AM_DMX_SetSource(dmx, src));
 	printf("TS SRC = %d\n", src);
-}
 
-	get_section();
+	get_section(dmx, timeout);
 	
-	AM_DMX_Close(DMX_DEV_NO);
-	if(freq!=-1)
+	AM_DMX_Close(dmx);
+	if(freq)
 		AM_FEND_Close(FEND_DEV_NO);
 	
-	return 0;
+	return ret;
 }
 

@@ -356,6 +356,7 @@ typedef struct
 	AM_AV_Device_t       *dev;
 	AM_AV_TimeshiftInfo_t	info;
 	char 				last_stb_src[16];
+	char 				last_dmx_src[16];
 } AV_TimeshiftData_t;
 
 /**\brief TS player 相关数据*/
@@ -2130,7 +2131,9 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 	AM_FileRead("/sys/class/stb/source", tshift->last_stb_src, 16);
 	snprintf(buf, sizeof(buf), "dmx%d", para->dmx_id);
 	AM_FileEcho("/sys/class/stb/source", buf);
+
 	snprintf(buf, sizeof(buf), "/sys/class/stb/demux%d_source", para->dmx_id);
+	AM_FileRead(buf, tshift->last_dmx_src, 16);
 	AM_FileEcho(buf, "hiu");
 
 	snprintf(buf, sizeof(buf), "%d", 32*1024);
@@ -2265,6 +2268,8 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 /**\brief 释放Timeshift相关数据*/
 static void aml_destroy_timeshift_data(AV_TimeshiftData_t *tshift, AM_Bool_t destroy_thread)
 {
+	char buf[64];
+
 	if (tshift->running && destroy_thread)
 	{
 		tshift->running = 0;
@@ -2289,8 +2294,9 @@ static void aml_destroy_timeshift_data(AV_TimeshiftData_t *tshift, AM_Bool_t des
 		close(tshift->cntl_fd);
 
 	AM_FileEcho("/sys/class/stb/source", tshift->last_stb_src);
+	snprintf(buf, sizeof(buf), "/sys/class/stb/demux%d_source", tshift->para.dmx_id);
+	AM_FileEcho(buf, tshift->last_dmx_src);
 
-	char buf[32];
 	if(AM_FileRead("/sys/module/di/parameters/bypass_all", buf, sizeof(buf))==AM_SUCCESS){
 		if (!strncmp(buf, "1", 1)){
 			AM_FileEcho("/sys/module/di/parameters/bypass_all","0");
