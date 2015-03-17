@@ -93,10 +93,12 @@ typedef struct
 	int     recv_invert;       /**<*/
 	int     recv_lsb_msb;      /**<*/
 	int     recv_no_parity;    /**<*/
+	int     recv_parity;
 	int     xmit_invert;       /**<*/
 	int     xmit_lsb_msb;      /**<*/
 	int     xmit_retries;      /**<*/
 	int     xmit_repeat_dis;   /**<*/
+	int     xmit_parity;
 }AM_SMC_Param_t;
 
 /****************************************************************************
