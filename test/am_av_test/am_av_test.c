@@ -417,7 +417,7 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src)
 	
 		
 		p.frequency = freq;
-#if 1	
+#if 0	
 		p.inversion = INVERSION_AUTO;
 		p.u.ofdm.bandwidth = BANDWIDTH_8_MHZ;
 		p.u.ofdm.code_rate_HP = FEC_AUTO;

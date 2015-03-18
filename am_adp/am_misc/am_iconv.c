@@ -46,5 +46,6 @@ am_ucnv_dlink(void)
 	LOAD_UCNV_SYMBOLS("")
 	LOAD_UCNV_SYMBOLS("_48")
 	LOAD_UCNV_SYMBOLS("_51")
+	LOAD_UCNV_SYMBOLS("_53")
 }
 

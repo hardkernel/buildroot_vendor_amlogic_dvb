@@ -477,7 +477,7 @@ int main(int argc, char **argv)
 		AM_TRY(AM_FEND_Open(FEND_DEV_NO, &fpara));
 
 		p.frequency = freq;
-#if 1
+#if 0
 		p.inversion = INVERSION_AUTO;
 		p.u.ofdm.bandwidth = BANDWIDTH_8_MHZ;
 		p.u.ofdm.code_rate_HP = FEC_AUTO;

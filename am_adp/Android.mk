@@ -34,7 +34,12 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    packages/amlogic/LibPlayer/amadec/include\
 		    packages/amlogic/LibPlayer/amcodec/include\
-		    external/icu4c/common
+		    external/icu4c/common\
+		    vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
+		    vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
+                    vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
+		    external/icu/icu4c/source/common\
+                    common/include/linux/amlogic
 
 ifeq ($(AMLOGIC_LIBPLAYER), y)
 LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg
@@ -86,7 +91,12 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
             $(LOCAL_PATH)/../android/ndk/include\
 	    packages/amlogic/LibPlayer/amadec/include\
 	    packages/amlogic/LibPlayer/amcodec/include\
-	    external/icu4c/common
+	    external/icu4c/common\
+ vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
+                    vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
+                    vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
+                    external/icu/icu4c/source/common\
+                    common/include/linux/amlogic
 
 ifeq ($(AMLOGIC_LIBPLAYER), y)
 LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg

@@ -13,7 +13,12 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../include/am_adp $(LOCAL_PATH)/../../andro
 			$(LOCAL_PATH)/../../../../packages/amlogic/LibPlayer/amadec/include\
 		    $(LOCAL_PATH)/../../../../packages/amlogic/LibPlayer/amcodec/include\
 		    $(LOCAL_PATH)/../../../../packages/amlogic/LibPlayer/amffmpeg\
-		    $(LOCAL_PATH)/../../../../packages/amlogic/LibPlayer/amplayer
+		    $(LOCAL_PATH)/../../../../packages/amlogic/LibPlayer/amplayer\
+		    $(LOCAL_PATH)/../../../../vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
+                    $(LOCAL_PATH)/../../../../vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
+                    $(LOCAL_PATH)/../../../../vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
+				
+
 
 
 LOCAL_STATIC_LIBRARIES := libam_adp
