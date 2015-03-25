@@ -4227,6 +4227,15 @@ static void* aml_av_monitor_thread(void *arg)
 			need_replay = AM_TRUE;
 		}
 #endif
+		if(AM_FileRead("/sys/class/tsync_pcr/tsync_pcr_reset_flag", buf, sizeof(buf)) >= 0){
+			int val = 0;
+			sscanf(buf, "%d", &val);
+			if(val == 1){
+				need_replay = AM_TRUE;
+				AM_DEBUG(1, "pcr need reset");
+			}
+		}
+
 		//AM_DEBUG(1, "vbuf_level--0x%08x---- abuf_level---0x%08x",vbuf_level,abuf_level);
 
 		if(need_replay){
