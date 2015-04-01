@@ -5070,8 +5070,10 @@ static void am_scan_get_wait_timespec(AM_SCAN_Scanner_t *scanner, struct timespe
 	if (scanner->stage == AM_SCAN_STAGE_TS && \
 		scanner->recv_status == AM_SCAN_RECVING_COMPLETE)
 	{
-		if (IS_DVBT2())
+		if (IS_DVBT2()){
 			am_scan_dvbt2_start_next_data_plp(scanner);
+			TIMEOUT_CHECK(patctl);
+		}
 		else
 			am_scan_start_next_ts(scanner);
 	}	
