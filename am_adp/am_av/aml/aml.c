@@ -459,6 +459,8 @@ static AM_ErrorCode_t aml_get_pts(const char *class_file,  uint32_t *pts);
 /*Timeshift 操作*/
 static void *aml_timeshift_thread(void *arg);
 
+static AV_TimeshiftData_t *m_tshift = NULL;
+
 /****************************************************************************
  * Static functions
  ***************************************************************************/
@@ -1464,7 +1466,30 @@ static void aml_destroy_inject_data(AV_InjectData_t *inj)
 	}
 	free(inj);
 }
+void aml_term_signal_handler(int signo)
+{
+	AM_DEBUG(1,"PVR_DEBUG recive a signal:%d", signo);
+	if(signo == SIGTERM)
+	{
+		AM_DEBUG(1,"PVR_DEBUG recive SIGTERM");
+		AV_TimeshiftFile_t *tfile = &m_tshift->file;
+		struct stat tfile_stat;
 
+		if(tfile){
+			if(tfile->opened == 1)
+			{
+				AM_DEBUG(1, "PVR_DEBUG in timeshift mode, fd:%d ,fname:%s", tfile->sub_files->rfd, tfile->name);
+			}
+			else{
+				AM_DEBUG(1, "PVR_DEBUG timeshift file was not open");
+			}
+		}
+		else
+		{
+			AM_DEBUG(1, "PVR_DEBUG tfile is NULL");
+		}
+	}
+}
 static int aml_timeshift_data_write(int fd, uint8_t *buf, int size)
 {
 	int ret;
@@ -2260,6 +2285,8 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 			pthread_mutex_init(&tshift->lock, NULL);
 			pthread_cond_init(&tshift->cond, NULL);
 		}
+		AM_DEBUG(1, "PVR_DEBUG create aml_term_signal_handler");
+		signal(SIGTERM, &aml_term_signal_handler);
 	}
 
 	return AM_SUCCESS;
@@ -2660,8 +2687,8 @@ static void *aml_timeshift_thread(void *arg)
 			}
 
 			diff = (dmx_vpts - vpts)/90000;
-			AM_DEBUG(1, "#### vpts:%#x, dmx_vpts:%#x, diff:%d, %s, %s, play_stat:%d\n",
-			 vpts, dmx_vpts, diff, diff>TIMESHIFT_INJECT_DIFF_TIME?"large":"small", (diff==last_diff)?"equal":"not equal", tshift->state);
+			//AM_DEBUG(1, "#### vpts:%#x, dmx_vpts:%#x, diff:%d, %s, %s, play_stat:%d\n",
+			// vpts, dmx_vpts, diff, diff>TIMESHIFT_INJECT_DIFF_TIME?"large":"small", (diff==last_diff)?"equal":"not equal", tshift->state);
 			if(vpts != 0 && dmx_vpts != 0 && diff > TIMESHIFT_INJECT_DIFF_TIME &&
 				vstatus.status.data_len > DEC_STOP_VIDEO_LEVEL && tshift->state == AV_TIMESHIFT_STAT_PLAY)
 			{
@@ -4503,6 +4530,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 		case AV_TIMESHIFT:
 			tshift_p = (AM_AV_TimeshiftPara_t*)para;
 			tshift = dev->timeshift_player.drv_data;
+			m_tshift = tshift;
 			if(aml_start_timeshift(tshift, tshift_p, AM_TRUE, AM_TRUE)!=AM_SUCCESS)
 				return AM_AV_ERR_SYS;
 		break;
@@ -4561,6 +4589,7 @@ static AM_ErrorCode_t aml_close_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 			tshift = dev->timeshift_player.drv_data;
 			aml_destroy_timeshift_data(tshift, AM_TRUE);
 			dev->timeshift_player.drv_data = NULL;
+			m_tshift = NULL;
 		break;
 		default:
 		break;
