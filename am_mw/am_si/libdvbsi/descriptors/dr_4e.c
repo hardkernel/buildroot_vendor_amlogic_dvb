@@ -42,6 +42,7 @@
 #include "../descriptor.h"
 
 #include "dr_4e.h"
+#include <am_debug.h>
 
 /*****************************************************************************
  * dvbpsi_DecodeExtendedEventDr
@@ -53,13 +54,56 @@ dvbpsi_extended_event_dr_t * dvbpsi_DecodeExtendedEventDr(dvbpsi_descriptor_t * 
   int i_pos;
   uint8_t *p;
 
-  /* Check the tag */
+ /* Check the tag */
   if(p_descriptor->i_tag != 0x4e ||
      p_descriptor->i_length < 6 )
   {
     DVBPSI_ERROR_ARG("dr_4e decoder", "bad tag or corrupted(0x%x)", p_descriptor->i_tag);
     return NULL;
   }
+
+  /*
+   * $:Bug 105997
+   */
+  int length_of_item = p_descriptor->p_data[4];
+
+  if(p_descriptor->i_length < length_of_item + 6)
+  {
+  	AM_DEBUG(0, "dr_4e decoder check length_of_item error, sub_len:%d, length_of_item:%d",
+    	p_descriptor->i_length, length_of_item);
+    return NULL;
+  }
+
+  int text_len = p_descriptor->p_data[5+length_of_item];
+
+  if(p_descriptor->i_length < length_of_item + text_len + 6)
+  {
+  	AM_DEBUG(0, "dr_4e decoder check sub_len error, sub_len:%d, text_len:%d",
+    	p_descriptor->i_length, text_len);
+    return NULL;
+  }
+  AM_DEBUG(0, "dr_4e decoder,sub_len:%d, length_of_item:%d, text_len:%d",
+  	p_descriptor->i_length, length_of_item, text_len);
+  //check length_of_item
+  int check_item = 0;
+  for( p = &p_descriptor->p_data[5]; p < &p_descriptor->p_data[5+length_of_item]; )
+  {
+  	  AM_DEBUG(0, "dr_4e, ==>1 item_description_length:%d",  p[0]);
+      p += 1 + p[0];
+	  check_item += (p[0]+1);
+
+
+	  AM_DEBUG(0, "dr_4e, ==>2 item_length:%d", p[0]);
+      p += 1 + p[0];
+	  check_item += (p[0]+1);
+  }
+  AM_DEBUG(0, "dr_4e, ==> check_item:%d, length_of_item:%d", check_item, length_of_item);
+  if(length_of_item < check_item)
+  {
+	AM_DEBUG(0, "dr_4e check length_of_item error");
+	return NULL;
+  }
+
 
   /* Don't decode twice */
   if(p_descriptor->p_decoded)
@@ -100,9 +144,10 @@ dvbpsi_extended_event_dr_t * dvbpsi_DecodeExtendedEventDr(dvbpsi_descriptor_t * 
   }
 
   p_decoded->i_text_length = p_descriptor->p_data[5+i_len];
-  if( p_decoded->i_text_length > 0 )
-      memcpy( &p_decoded->i_buffer[i_pos],
+  if( p_decoded->i_text_length > 0 ){
+  	 memcpy( &p_decoded->i_buffer[i_pos],
               &p_descriptor->p_data[5+i_len+1], p_decoded->i_text_length );
+  }
   p_decoded->i_text = &p_decoded->i_buffer[i_pos];
 
   p_descriptor->p_decoded = (void*)p_decoded;
