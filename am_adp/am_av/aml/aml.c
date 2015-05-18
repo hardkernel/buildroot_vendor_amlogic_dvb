@@ -4252,8 +4252,13 @@ static void* aml_av_monitor_thread(void *arg)
 			AM_DEBUG(1, "switch to h264 4K/2K");
 			dev->ts_player.play_para.vfmt = VFORMAT_H264_4K2K;
 			need_replay = AM_TRUE;
-		}
+		}else
 #endif
+		if(has_video && (dev->ts_player.play_para.vfmt == VFORMAT_H264) && ((vdec_status >> 16) & 0xFFFF)){
+			AM_DEBUG(1, "H264 fatal error");
+			need_replay = AM_TRUE;
+		}
+
 		if(AM_FileRead("/sys/class/tsync_pcr/tsync_pcr_reset_flag", buf, sizeof(buf)) >= 0){
 			int val = 0;
 			sscanf(buf, "%d", &val);
