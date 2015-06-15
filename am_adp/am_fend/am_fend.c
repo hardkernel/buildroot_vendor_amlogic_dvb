@@ -1035,6 +1035,7 @@ AM_ErrorCode_t AM_FEND_SetActionCallback(int dev_no, AM_Bool_t enable_cb)
 	
 	if(enable_cb != dev->enable_cb)
 	{
+#if 0
 		if(dev->enable_thread && (dev->thread!=pthread_self()))
 		{
 			/*等待回调函数执行完*/
@@ -1043,7 +1044,7 @@ AM_ErrorCode_t AM_FEND_SetActionCallback(int dev_no, AM_Bool_t enable_cb)
 				pthread_cond_wait(&dev->cond, &dev->lock);
 			}
 		}
-		
+#endif
 		dev->enable_cb = enable_cb;
 	}
 	
