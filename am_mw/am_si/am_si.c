@@ -23,7 +23,15 @@
 #include <am_av.h>
 #include <am_iconv.h>
 #include <errno.h>
+#include <freesat.h>
 
+
+#include <cutils/properties.h>
+
+#ifdef ANDROID
+#include <sys/system_properties.h>
+
+#endif
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
@@ -1201,6 +1209,7 @@ AM_ErrorCode_t AM_SI_GetSectionHeader(int handle, uint8_t *buf, uint16_t len, AM
  */
 void AM_SI_SetDefaultDVBTextCoding(const char *coding)
 {
+	AM_DEBUG(1, "AM_SI_SetDefaultDVBTextCoding coding == %s \n",coding);
 	snprintf(forced_dvb_text_coding, sizeof(forced_dvb_text_coding), "%s", coding);
 }
 
@@ -1219,14 +1228,20 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
     char **pin=&in_code;
     char **pout=&out_code;
     char fbyte;
+	char fbyte_temp;
     char cod[32];
     
-	if (!in_code || !out_code || in_len <= 0 || out_len <= 0)
+	if (!in_code || !out_code || in_len <= 0 || out_len <= 0){
+		AM_DEBUG(1,"---%s--AM_FAILURE--\n",__FUNCTION__);
 		return AM_FAILURE;
+	}
 
 	memset(out_code,0,out_len);
 	 
 	/*查找输入编码方式*/
+	AM_DEBUG(1, "AM_SI_ConvertDVBTextCode in_len == %d \n",in_len);
+	
+	int so_num = atoi(&fbyte_temp);
 	if (in_len <= 1)
 	{
 		pin = &in_code;
@@ -1235,6 +1250,8 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 	else
 	{
 		fbyte = in_code[0];
+		AM_DEBUG(1, "AM_SI_ConvertDVBTextCode fbyte == 0x%x \n",fbyte);
+		//log_print("AM_SI_ConvertDVBTextCode fbyte == 0x%x \n",fbyte);
 		if (fbyte >= 0x01 && fbyte <= 0x0B)
 			sprintf(cod, "ISO-8859-%d", fbyte + 4);
 		else if (fbyte >= 0x0C && fbyte <= 0x0F)
@@ -1267,25 +1284,33 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 			strcpy(cod, "utf-8");
 		else if (fbyte >= 0x20)
 		{
+			AM_DEBUG(1, "AM_SI_ConvertDVBTextCode fbyte >= 0x20 \n");
 			if (strcmp(forced_dvb_text_coding, ""))
 			{
 				/*强制将输入按默认编码处理*/
+				AM_DEBUG(1,"-fbyte >= 0x20-forced_dvb_text_coding---cod=%s--\n",cod);
 				strcpy(cod, forced_dvb_text_coding);
 			}
 			else
 			{
+				AM_DEBUG(1,"-fbyte >= 0x20---ISO6937--\n");
 				strcpy(cod, "ISO6937");
 			}
+		}else if(fbyte == 0x1f){
+		
+			strcpy(cod,"FreesatHuffuman");
+			
 		}
 		else
 			return AM_FAILURE;
 
 		/*调整输入*/
-		if (fbyte < 0x20)
+		if (fbyte < 0x1f)
 		{
 			in_code++;
 			in_len--;
 		}
+		AM_DEBUG(1,"AM_SI_ConvertDVBTextCode in_code[0]=0x%x-\n",in_code[0]);
 		pin = &in_code;
 		
 	}
@@ -1298,6 +1323,20 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 	{
 		return AM_Check_UTF8(in_code,in_len,out_code,&out_len);
 		
+	}
+	else if(! strcmp(cod, "FreesatHuffuman")){
+
+		char *temp = freesat_huffman_decode((unsigned char*)in_code,in_len);
+		if (temp ) {
+           int len = strlen(temp);
+           len = len < out_len ? len : out_len;
+           strncpy(out_code, temp, len);
+           free(temp);
+		   temp = NULL;
+        }
+		AM_DEBUG(1,"--pp-out_code=%s--\n",out_code);
+		return 0;
+
 	}
 	else
 	{

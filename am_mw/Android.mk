@@ -100,7 +100,8 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_ci/am_ci.c \
 		   am_ci/ca_ci.c \
 		   am_cc/am_cc.c \
-		   am_upd/am_upd.c
+		   am_upd/am_upd.c \
+		   am_freesat/freesat.c
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1 #
 ifeq ($(AMLOGIC_LIBPLAYER), y)
@@ -133,9 +134,9 @@ LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amplayer
 endif
 
 ifeq ($(AMLOGIC_LIBPLAYER), y)
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamplayer liblog libdl libc 
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamplayer liblog libdl libc libcutils
 else
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libdl libc
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libdl libc libcutils
 endif
 LOCAL_PRELINK_MODULE := false
 
@@ -274,9 +275,9 @@ endif
 
 
 ifeq ($(AMLOGIC_LIBPLAYER), y)    
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamplayer liblog libdl libc  
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamplayer liblog libdl libc libcutils 
 else
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libdl libc
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libdl libc libcutils
 endif
 LOCAL_PRELINK_MODULE := false
 
