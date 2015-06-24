@@ -4500,19 +4500,27 @@ static AM_ErrorCode_t am_scan_stop_dtv(AM_SCAN_Scanner_t *scanner)
 		{
 			tnext = ts->p_next;
 			//AM_DEBUG(1, "hsi is %d, ts->digital.pats is %p", scanner->dtvctl.hsi, ts->digital.pats);
+			
+			for (i=0; i<ts->digital.dvbt2_data_plp_num; i++)
+			{
+				if(ts->digital.dvbt2_data_plps[i].pats == ts->digital.pats)
+					ts->digital.pats = NULL;
+				if(ts->digital.dvbt2_data_plps[i].pmts == ts->digital.pmts)
+					ts->digital.pmts = NULL;
+				if(ts->digital.dvbt2_data_plps[i].sdts == ts->digital.sdts)
+					ts->digital.sdts = NULL;
+
+				RELEASE_TABLE_FROM_LIST(dvbpsi_pat_t, ts->digital.dvbt2_data_plps[i].pats);
+				RELEASE_TABLE_FROM_LIST(dvbpsi_pmt_t, ts->digital.dvbt2_data_plps[i].pmts);
+				RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.dvbt2_data_plps[i].sdts);
+			}
+
 			RELEASE_TABLE_FROM_LIST(dvbpsi_pat_t, ts->digital.pats);
 			RELEASE_TABLE_FROM_LIST(dvbpsi_pmt_t, ts->digital.pmts);
 			RELEASE_TABLE_FROM_LIST(dvbpsi_cat_t, ts->digital.cats);
 			RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.sdts);
 			RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.vcts);
 			RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.mgts);
-
-			for (i=0; i<ts->digital.dvbt2_data_plp_num; i++)
-			{
-				RELEASE_TABLE_FROM_LIST(dvbpsi_pat_t, ts->digital.dvbt2_data_plps[i].pats);
-				RELEASE_TABLE_FROM_LIST(dvbpsi_pmt_t, ts->digital.dvbt2_data_plps[i].pmts);
-				RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.dvbt2_data_plps[i].sdts);
-			}
 
 			free(ts);
 
@@ -5070,6 +5078,19 @@ static void am_scan_get_wait_timespec(AM_SCAN_Scanner_t *scanner, struct timespe
 	if (scanner->stage == AM_SCAN_STAGE_TS && \
 		scanner->recv_status == AM_SCAN_RECVING_COMPLETE)
 	{
+		/*Stop filters*/
+		for (i=0; i<(int)AM_ARRAY_SIZE(scanner->dtvctl.pmtctl); i++)
+		{
+			am_scan_free_filter(scanner, &scanner->dtvctl.pmtctl[i].fid);
+		}
+		am_scan_free_filter(scanner, &scanner->dtvctl.patctl.fid);
+		am_scan_free_filter(scanner, &scanner->dtvctl.catctl.fid);
+		am_scan_free_filter(scanner, &scanner->dtvctl.sdtctl.fid);
+		am_scan_free_filter(scanner, &scanner->dtvctl.batctl.fid);
+		am_scan_free_filter(scanner, &scanner->dtvctl.nitctl.fid);
+		am_scan_free_filter(scanner, &scanner->dtvctl.mgtctl.fid);
+		am_scan_free_filter(scanner, &scanner->dtvctl.vctctl.fid);
+
 		if (IS_DVBT2()){
 			am_scan_dvbt2_start_next_data_plp(scanner);
 			TIMEOUT_CHECK(patctl);
