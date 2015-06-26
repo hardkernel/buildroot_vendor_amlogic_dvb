@@ -25,9 +25,14 @@
 #ifndef FREESAT_DATA_DIRECTORY
 #define FREESAT_DATA_DIRECTORY       "/data/"
 #endif
+
+#if 0
 #define TABLE1_FILENAME FREESAT_DATA_DIRECTORY "freesat.t1"
 #define TABLE2_FILENAME FREESAT_DATA_DIRECTORY "freesat.t2"
+#endif
 
+#include "freesat_t1.h"
+#include "freesat_t2.h"
 
 //#define FREESAT_PRINT_MISSED_DECODING
 
@@ -48,7 +53,7 @@ static struct hufftab *tables[2][256];
 static int             table_size[2][256];
 static time_t          load_time = 0;
 
-static void load_file(int tableid, char *filename);
+static void load_file(int tableid, const char *input);
 
 
 static void freesat_table_load()
@@ -60,6 +65,7 @@ static void freesat_table_load()
 
     /* Only reload if we've never loaded, or it's more than 10 minutes away */
     if ( load_time != 0 ) {
+#if 0
         int reload = 1;
         if ( now - load_time < RELOAD_TIME ) {
             return;
@@ -76,6 +82,9 @@ static void freesat_table_load()
         if ( reload == 0 ) {
             return;
         }
+#else
+		return;
+#endif
     } 
 
     /* Reset the load time */
@@ -97,8 +106,8 @@ static void freesat_table_load()
     }
 
     /* And load the files up */
-    load_file(1, TABLE1_FILENAME);
-    load_file(2, TABLE2_FILENAME);
+    load_file(1, freesat_table1);
+    load_file(2, freesat_table2);
 }
 
 
@@ -149,54 +158,72 @@ static unsigned long decode_binary(char *binary)
     return val;
 }
 
+static char*
+input_gets(const char *input, int *ppos, char *buf)
+{
+	const char *ptr;
+	int pos = *ppos;
+	int cnt;
+
+	if(input[pos] == 0)
+		return NULL;
+
+	ptr = strchr(input + pos, '\n');
+	if(ptr){
+		cnt = ptr - input - pos + 1;
+	}else{
+		cnt = strlen(input + pos);
+	}
+
+	memcpy(buf, input + pos, cnt);
+	*ppos = pos + cnt;
+
+	return buf;
+}
+
 /** \brief Load an individual freesat data file
  *
  *  \param tableid   - Table id that should be loaded
- *  \param filename  - Filename to load
+ *  \param input     - Input data buffer
  */
-static void load_file(int tableid, char *filename)
+static void load_file(int tableid, const char *input)
 {
     char     buf[1024];
+	int      pos = 0;
     //char    *from, *to, *binary; 
-
-    FILE    *fp;
 
     tableid--;
 
-    if ( ( fp = fopen(filename,"r") ) != NULL ) {
-        AM_DEBUG(1,"Loading table %d Filename <%s>",tableid + 1, filename);
+	AM_DEBUG(1,"Loading table %d",tableid + 1);
 
-        while ( fgets(buf,sizeof(buf),fp) != NULL ) {
-            //from = binary = to = NULL;
-            char from[128]={0};
-	        char to[128]={0};
-	        char binary[128]={0};
-            
-			
-            int elems = sscanf(buf,"%[^:]:%[^:]:%[^:]:",from, binary, to);
-			
-			//AM_DEBUG(1,"--elems=%d,tableid=%d,buf=%s-\n",elems,tableid,buf);
-			//AM_DEBUG(1,"--from=%s,binary=%s,to=%s\n",from,binary,to);
-           if ( elems == 3 ) {
-                int bin_len = strlen(binary);
-                int from_char = resolve_char(from);
-                char to_char = resolve_char(to);
-                unsigned long bin = decode_binary(binary);
-                int i = table_size[tableid][from_char]++;
+	while ( input_gets(input, &pos, buf) != NULL ) {
+		//from = binary = to = NULL;
+		char from[128]={0};
+		char to[128]={0};
+		char binary[128]={0};
+		
+		
+		int elems = sscanf(buf,"%[^:]:%[^:]:%[^:]:",from, binary, to);
+		
+		//AM_DEBUG(1,"--elems=%d,tableid=%d,buf=%s-\n",elems,tableid,buf);
+		//AM_DEBUG(1,"--from=%s,binary=%s,to=%s\n",from,binary,to);
+	   if ( elems == 3 ) {
+			int bin_len = strlen(binary);
+			int from_char = resolve_char(from);
+			char to_char = resolve_char(to);
+			unsigned long bin = decode_binary(binary);
+			int i = table_size[tableid][from_char]++;
 
-                tables[tableid][from_char] = (struct hufftab *)realloc(tables[tableid][from_char], (i+1) * sizeof(tables[tableid][from_char][0]));
-                tables[tableid][from_char][i].value = bin;
-                tables[tableid][from_char][i].next = to_char;
-                tables[tableid][from_char][i].bits = bin_len;
-				
-               // free(from);
-               // free(to);
-               // free(binary);
-            }
-        }
-    } else {
-        AM_DEBUG(1,"Cannot load <%s> for table %d",filename,tableid + 1);
-    }
+			tables[tableid][from_char] = (struct hufftab *)realloc(tables[tableid][from_char], (i+1) * sizeof(tables[tableid][from_char][0]));
+			tables[tableid][from_char][i].value = bin;
+			tables[tableid][from_char][i].next = to_char;
+			tables[tableid][from_char][i].bits = bin_len;
+			
+		   // free(from);
+		   // free(to);
+		   // free(binary);
+		}
+	}
 }
 
 #ifdef FREESAT_ARCHIVE_MESSAGES

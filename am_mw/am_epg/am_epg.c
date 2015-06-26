@@ -978,6 +978,8 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 		AM_DEBUG(1, "EPG: current ts not set, skip this section");
 		return;
 	}
+
+	AM_DEBUG(0, "process EIT section");
 	
 	/*查询service*/
 	snprintf(sql, sizeof(sql), "select db_net_id,db_ts_id,db_id from srv_table where db_ts_id=%d \

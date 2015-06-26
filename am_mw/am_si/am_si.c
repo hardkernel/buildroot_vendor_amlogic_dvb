@@ -25,13 +25,6 @@
 #include <errno.h>
 #include <freesat.h>
 
-
-#include <cutils/properties.h>
-
-#ifdef ANDROID
-#include <sys/system_properties.h>
-
-#endif
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
@@ -1228,8 +1221,10 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
     char **pin=&in_code;
     char **pout=&out_code;
     char fbyte;
-	char fbyte_temp;
     char cod[32];
+
+	AM_DEBUG(0, "DVB convert text code");
+
     
 	if (!in_code || !out_code || in_len <= 0 || out_len <= 0){
 		AM_DEBUG(1,"---%s--AM_FAILURE--\n",__FUNCTION__);
@@ -1241,7 +1236,6 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 	/*查找输入编码方式*/
 	AM_DEBUG(1, "AM_SI_ConvertDVBTextCode in_len == %d \n",in_len);
 	
-	int so_num = atoi(&fbyte_temp);
 	if (in_len <= 1)
 	{
 		pin = &in_code;
