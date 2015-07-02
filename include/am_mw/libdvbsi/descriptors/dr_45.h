@@ -99,7 +99,7 @@ typedef struct dvbpsi_vbidata_s
 typedef struct dvbpsi_vbi_dr_s
 {
   uint8_t          i_services_number;
-  dvbpsi_vbidata_t p_services[85];
+  dvbpsi_vbidata_t p_services[127];
 
 } dvbpsi_vbi_dr_t;
 

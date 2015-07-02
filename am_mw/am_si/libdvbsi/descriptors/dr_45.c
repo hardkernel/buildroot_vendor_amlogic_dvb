@@ -48,8 +48,10 @@
 dvbpsi_vbi_dr_t * dvbpsi_DecodeVBIDataDr(
                                         dvbpsi_descriptor_t * p_descriptor)
 {
-  int i_services_number, i;
+  int i;
+  int left;
   dvbpsi_vbi_dr_t * p_decoded;
+  uint8_t *pdata;
 
   /* Check the tag */
   if( p_descriptor->i_tag != 0x45 )
@@ -62,6 +64,7 @@ dvbpsi_vbi_dr_t * dvbpsi_DecodeVBIDataDr(
   if(p_descriptor->p_decoded)
     return p_descriptor->p_decoded;
 
+#if 0
   /* Decode data and check the length */
   if(p_descriptor->i_length < 3)
   {
@@ -76,8 +79,7 @@ dvbpsi_vbi_dr_t * dvbpsi_DecodeVBIDataDr(
                      p_descriptor->i_length);
     return NULL;
   }
-
-  i_services_number = p_descriptor->i_length / 2;
+#endif
 
   /* Allocate memory */
   p_decoded =
@@ -88,28 +90,43 @@ dvbpsi_vbi_dr_t * dvbpsi_DecodeVBIDataDr(
     return NULL;
   }
 
-  p_decoded->i_services_number = i_services_number;
+  i     = 0;
+  left  = p_descriptor->i_length;
+  pdata = p_descriptor->p_data + 2;
 
-  for(i=0; i < i_services_number; i++)
+  while(left >= 2)
   {
     int n, i_lines = 0, i_data_service_id;
 
-    i_data_service_id = ((uint8_t)(p_descriptor->p_data[3 * i + 2 + i_lines]));
+    i_data_service_id = ((uint8_t)pdata[0]);
     p_decoded->p_services[i].i_data_service_id = i_data_service_id;
 
-    i_lines = ((uint8_t)(p_descriptor->p_data[3 * i + 3]));
+    i_lines = ((uint8_t)pdata[1]);
     p_decoded->p_services[i].i_lines = i_lines;
+
+	left  -= 2;
+	pdata += 2;
+
+	if(left < i_lines)
+		break;
+
     for(n=0; n < i_lines; n++ )
     {
       if( (i_data_service_id >= 0x01) && (i_data_service_id <= 0x07) )
       {
         p_decoded->p_services[i].p_lines[n].i_parity =
-               ((uint8_t)((p_descriptor->p_data[3 * i + 3 + n])&0x20)>>5);
+               ((uint8_t)((pdata[n])&0x20)>>5);
         p_decoded->p_services[i].p_lines[n].i_line_offset =
-               ((uint8_t)(p_descriptor->p_data[3 * i + 3 + n])&0x1f);
+               ((uint8_t)(pdata[n])&0x1f);
       }
     }
+
+	left  -= i_lines;
+	pdata += i_lines;
+    i++;
   }
+
+  p_decoded->i_services_number = i;
 
   p_descriptor->p_decoded = (void*)p_decoded;
 
