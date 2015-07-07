@@ -79,7 +79,7 @@ static FILE *fp[USER_MAX];
 
 static void dump_bytes(int dev_no, int fid, const uint8_t *data, int len, void *user_data)
 {
-	int u = (int)user_data;
+	int u = (int)(long)user_data;
 
 	if(pall) {
 		int i;
@@ -149,7 +149,7 @@ static void dump_bytes(int dev_no, int fid, const uint8_t *data, int len, void *
 			printf("[%d:%d] %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", u-1, u_pid[u-1],
 				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
 		if(get_upara(u-1)&UPARA_FILE){
-			int ret = fwrite(data, 1, len, fp[(int)user_data-1]);
+			int ret = fwrite(data, 1, len, fp[(int)(long)user_data-1]);
 			if(ret!=len)
 				printf("data w lost\n");
 		}
@@ -314,7 +314,7 @@ static int get_section(int dmx, int timeout)
 		if(u_pid[i]!=-1) {
 			AM_TRY(AM_DMX_AllocateFilter(dmx, &fid_user[i]));
 
-			AM_TRY(AM_DMX_SetCallback(dmx, fid_user[i], dump_bytes, (void*)(i+1)));
+			AM_TRY(AM_DMX_SetCallback(dmx, fid_user[i], dump_bytes, (void*)(long)(i+1)));
 		
 			if(get_upara(i)&UPARA_TYPE) {/*pes*/
 				memset(&pparam, 0, sizeof(pparam));
@@ -449,7 +449,6 @@ int main(int argc, char **argv)
 	int i;
 
 	memset(&fpara, 0, sizeof(fpara));
-#if 1
 
 	if(argc==1)
 	{
@@ -471,7 +470,7 @@ int main(int argc, char **argv)
 	for(i=1; i< argc; i++)
 		get_para(argv[i]);
 
-
+#if 1
 	if(freq>0)
 	{
 		AM_TRY(AM_FEND_Open(FEND_DEV_NO, &fpara));
@@ -515,9 +514,10 @@ int main(int argc, char **argv)
 	get_section(dmx, timeout);
 	
 	AM_DMX_Close(dmx);
+#if 0
 	if(freq)
 		AM_FEND_Close(FEND_DEV_NO);
-	
+#endif	
 	return ret;
 }
 

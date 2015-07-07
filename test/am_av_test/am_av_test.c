@@ -572,7 +572,7 @@ static void jpeg_show(const char *name)
 static int inject_running;
 static void* inject_entry(void *arg)
 {
-	int sock = (int)arg;
+	int sock = (int)(long)arg;
 	static uint8_t buf[32*1024];
 	int len, left=0, send, ret;
 	
@@ -654,7 +654,7 @@ static void inject_play(struct in_addr *addr, int port, int vpid, int apid, int 
 	AM_AV_StartInject(AV_DEV_NO, &para);
 	
 	inject_running = 1;
-	pthread_create(&th, NULL, inject_entry, (void*)sock);
+	pthread_create(&th, NULL, inject_entry, (void*)(long)sock);
 	
 	while(running)
 	{

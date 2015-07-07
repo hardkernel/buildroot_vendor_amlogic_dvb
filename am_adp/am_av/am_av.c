@@ -248,7 +248,7 @@ static AM_ErrorCode_t av_start(AM_AV_Device_t *dev, AV_PlayMode_t mode, void *pa
 }
 
 /**\brief 视频输出模式变化事件回调*/
-static void av_vout_format_changed(int dev_no, int event_type, void *param, void *data)
+static void av_vout_format_changed(long dev_no, int event_type, void *param, void *data)
 {
 	AM_AV_Device_t *dev = (AM_AV_Device_t*)data;
 	
@@ -377,13 +377,13 @@ extern AM_ErrorCode_t av_set_vpath(AM_AV_Device_t *dev, AM_AV_FreeScalePara_t fs
 		}else if(mode&AV_PLAY_TS){
 		}else if(mode&AV_PLAY_FILE){
 			if(para.start && dev->drv->file_cmd){
-				dev->drv->file_cmd(dev, AV_PLAY_SEEK, (void*)para.pos);
+				dev->drv->file_cmd(dev, AV_PLAY_SEEK, (void*)(long)para.pos);
 				if(para.pause)
 					dev->drv->file_cmd(dev, AV_PLAY_PAUSE, NULL);
 				else if(para.speed>0)
-					dev->drv->file_cmd(dev, AV_PLAY_FF, (void*)para.speed);
+					dev->drv->file_cmd(dev, AV_PLAY_FF, (void*)(long)para.speed);
 				else if(para.speed<0)
-					dev->drv->file_cmd(dev, AV_PLAY_FB, (void*)para.speed);
+					dev->drv->file_cmd(dev, AV_PLAY_FB, (void*)(long)para.speed);
 			}
 		}else if(mode&AV_INJECT){
 			if(para.pause){
@@ -965,12 +965,12 @@ AM_ErrorCode_t AM_AV_FastForwardFile(int dev_no, int speed)
 	{
 		if(dev->drv->file_cmd && (dev->file_player.speed!=speed))
 		{
-			ret = dev->drv->file_cmd(dev, AV_PLAY_FF, (void*)speed);
+			ret = dev->drv->file_cmd(dev, AV_PLAY_FF, (void*)(long)speed);
 			if(ret==AM_SUCCESS)
 			{
 				dev->file_player.speed = speed;
 				dev->curr_para.speed = speed;
-				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_PLAYER_SPEED_CHANGED, (void*)speed);
+				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_PLAYER_SPEED_CHANGED, (void*)(long)speed);
 			}
 		}
 	}
@@ -1012,12 +1012,12 @@ AM_ErrorCode_t AM_AV_FastBackwardFile(int dev_no, int speed)
 	{
 		if(dev->drv->file_cmd && (dev->file_player.speed!=-speed))
 		{
-			ret = dev->drv->file_cmd(dev, AV_PLAY_FB, (void*)speed);
+			ret = dev->drv->file_cmd(dev, AV_PLAY_FB, (void*)(long)speed);
 			if(ret==AM_SUCCESS)
 			{
 				dev->file_player.speed = -speed;
 				dev->curr_para.speed = -speed;
-				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_PLAYER_SPEED_CHANGED, (void*)-speed);
+				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_PLAYER_SPEED_CHANGED, (void*)(long)-speed);
 			}
 		}
 	}
@@ -1824,13 +1824,13 @@ AM_ErrorCode_t AM_AV_SetVideoContrast(int dev_no, int val)
 	{
 		if(dev->drv->set_video_para)
 		{
-			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_CONTRAST, (void*)val);
+			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_CONTRAST, (void*)(long)val);
 		}
 	
 		if(ret==AM_SUCCESS)
 		{
 			dev->video_contrast = val;
-			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_CONTRAST_CHANGED, (void*)val);
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_CONTRAST_CHANGED, (void*)(long)val);
 		}
 	}
 	
@@ -1886,13 +1886,13 @@ AM_ErrorCode_t AM_AV_SetVideoSaturation(int dev_no, int val)
 	{
 		if(dev->drv->set_video_para)
 		{
-			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_SATURATION, (void*)val);
+			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_SATURATION, (void*)(long)val);
 		}
 	
 		if(ret==AM_SUCCESS)
 		{
 			dev->video_saturation = val;
-			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_SATURATION_CHANGED, (void*)val);
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_SATURATION_CHANGED, (void*)(long)val);
 		}
 	}
 	
@@ -1948,13 +1948,13 @@ AM_ErrorCode_t AM_AV_SetVideoBrightness(int dev_no, int val)
 	{
 		if(dev->drv->set_video_para)
 		{
-			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_BRIGHTNESS, (void*)val);
+			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_BRIGHTNESS, (void*)(long)val);
 		}
 	
 		if(ret==AM_SUCCESS)
 		{
 			dev->video_brightness = val;
-			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_BRIGHTNESS_CHANGED, (void*)val);
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_BRIGHTNESS_CHANGED, (void*)(long)val);
 		}
 	}
 	
@@ -2671,7 +2671,7 @@ AM_ErrorCode_t AM_AV_FastForwardTimeshift(int dev_no, int speed)
 	{
 		if(dev->drv->timeshift_cmd)
 		{
-			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_FF, (void*)speed);
+			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_FF, (void*)(long)speed);
 			if(ret==AM_SUCCESS){
 				dev->curr_para.speed = speed;
 			}
@@ -2715,7 +2715,7 @@ AM_ErrorCode_t AM_AV_FastBackwardTimeshift(int dev_no, int speed)
 	{
 		if(dev->drv->timeshift_cmd)
 		{
-			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_FB, (void*)-speed);
+			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_FB, (void*)(long)-speed);
 			if(ret==AM_SUCCESS){
 				dev->curr_para.speed = -speed;
 			}
@@ -2873,7 +2873,7 @@ AM_ErrorCode_t AM_AV_SetVdecErrorRecoveryMode(int dev_no, uint8_t error_recovery
 	
 	if(dev->drv->set_video_para)
 	{
-		ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_ERROR_RECOVERY_MODE, (void*)(int)error_recovery_mode);
+		ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_ERROR_RECOVERY_MODE, (void*)(long)error_recovery_mode);
 	}
 	
 	pthread_mutex_unlock(&dev->lock);

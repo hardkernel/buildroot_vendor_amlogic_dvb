@@ -78,13 +78,13 @@ AM_ErrorCode_t aml_open (AM_SMC_Device_t *dev, const AM_SMC_OpenPara_t *para)
 		return AM_SMC_ERR_CANNOT_OPEN_DEV;
 	}
 	
-	dev->drv_data = (void*)fd;
+	dev->drv_data = (void*)(long)fd;
 	return AM_SUCCESS;
 }
 
 AM_ErrorCode_t aml_close (AM_SMC_Device_t *dev)
 {
-	int fd = (int)dev->drv_data;
+	int fd = (long)dev->drv_data;
 	
 	close(fd);
 	return AM_SUCCESS;
@@ -92,7 +92,7 @@ AM_ErrorCode_t aml_close (AM_SMC_Device_t *dev)
 
 AM_ErrorCode_t aml_get_status (AM_SMC_Device_t *dev, AM_SMC_CardStatus_t *status)
 {
-	int fd = (int)dev->drv_data;
+	int fd = (long)dev->drv_data;
 	int ds;
 	
 	if(ioctl(fd, AMSMC_IOC_GET_STATUS, &ds))
@@ -108,7 +108,7 @@ AM_ErrorCode_t aml_get_status (AM_SMC_Device_t *dev, AM_SMC_CardStatus_t *status
 
 AM_ErrorCode_t aml_reset (AM_SMC_Device_t *dev, uint8_t *atr, int *len)
 {
-	int fd = (int)dev->drv_data;
+	int fd = (long)dev->drv_data;
 	struct am_smc_atr abuf;
 	
 	if(ioctl(fd, AMSMC_IOC_RESET, &abuf))
@@ -126,7 +126,7 @@ AM_ErrorCode_t aml_reset (AM_SMC_Device_t *dev, uint8_t *atr, int *len)
 AM_ErrorCode_t aml_read (AM_SMC_Device_t *dev, uint8_t *data, int *len, int timeout)
 {
 	struct pollfd pfd;
-	int fd = (int)dev->drv_data;
+	int fd = (long)dev->drv_data;
 	int ret;
 	
 	pfd.fd = fd;
@@ -152,7 +152,7 @@ AM_ErrorCode_t aml_read (AM_SMC_Device_t *dev, uint8_t *data, int *len, int time
 AM_ErrorCode_t aml_write (AM_SMC_Device_t *dev, const uint8_t *data, int *len, int timeout)
 {
 	struct pollfd pfd;
-	int fd = (int)dev->drv_data;
+	int fd = (long)dev->drv_data;
 	int ret;
 	
 	pfd.fd = fd;
@@ -177,7 +177,7 @@ AM_ErrorCode_t aml_write (AM_SMC_Device_t *dev, const uint8_t *data, int *len, i
 
 AM_ErrorCode_t aml_get_param (AM_SMC_Device_t *dev, AM_SMC_Param_t *para)
 {
-	int fd = (int)dev->drv_data;
+	int fd = (long)dev->drv_data;
 	
 	if(ioctl(fd, AMSMC_IOC_GET_PARAM, para))
 	{
@@ -190,7 +190,7 @@ AM_ErrorCode_t aml_get_param (AM_SMC_Device_t *dev, AM_SMC_Param_t *para)
 
 AM_ErrorCode_t aml_set_param (AM_SMC_Device_t *dev, const AM_SMC_Param_t *para)
 {
-	int fd = (int)dev->drv_data;
+	int fd = (long)dev->drv_data;
 	
 	if(ioctl(fd, AMSMC_IOC_SET_PARAM, para))
 	{
@@ -203,7 +203,7 @@ AM_ErrorCode_t aml_set_param (AM_SMC_Device_t *dev, const AM_SMC_Param_t *para)
 
 AM_ErrorCode_t aml_active (AM_SMC_Device_t *dev)
 {
-	int fd = (int)dev->drv_data;
+	int fd = (long)dev->drv_data;
 	
 	if(ioctl(fd, AMSMC_IOC_ACTIVE, 0))
 	{
@@ -216,7 +216,7 @@ AM_ErrorCode_t aml_active (AM_SMC_Device_t *dev)
 
 AM_ErrorCode_t aml_deactive (AM_SMC_Device_t *dev)
 {
-	int fd = (int)dev->drv_data;
+	int fd = (long)dev->drv_data;
 	
 	if(ioctl(fd, AMSMC_IOC_DEACTIVE, 0))
 	{

@@ -10,13 +10,13 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../include/am_adp $(LOCAL_PATH)/../../android/ndk/include \
-			$(LOCAL_PATH)/../../../../packages/amlogic/LibPlayer/amadec/include\
-		    $(LOCAL_PATH)/../../../../packages/amlogic/LibPlayer/amcodec/include\
-		    $(LOCAL_PATH)/../../../../packages/amlogic/LibPlayer/amffmpeg\
-		    $(LOCAL_PATH)/../../../../packages/amlogic/LibPlayer/amplayer\
-		    $(LOCAL_PATH)/../../../../vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
-                    $(LOCAL_PATH)/../../../../vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
-                    $(LOCAL_PATH)/../../../../vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
+			packages/amlogic/LibPlayer/amadec/include\
+		    packages/amlogic/LibPlayer/amcodec/include\
+		    packages/amlogic/LibPlayer/amffmpeg\
+		    packages/amlogic/LibPlayer/amplayer\
+		    vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
+                    vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
+                    vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
 				
 
 

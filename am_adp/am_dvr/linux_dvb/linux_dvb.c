@@ -71,13 +71,13 @@ static AM_ErrorCode_t dvb_open(AM_DVR_Device_t *dev, const AM_DVR_OpenPara_t *pa
 		return AM_DVR_ERR_CANNOT_OPEN_DEV;
 	}
 	fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK, 0);
-	dev->drv_data = (void*)fd;
+	dev->drv_data = (void*)(long)fd;
 	return AM_SUCCESS;
 }
 
 static AM_ErrorCode_t dvb_close(AM_DVR_Device_t *dev)
 {
-	int fd = (int)dev->drv_data;
+	int fd = (long)dev->drv_data;
 	
 	close(fd);
 	return AM_SUCCESS;
@@ -85,7 +85,7 @@ static AM_ErrorCode_t dvb_close(AM_DVR_Device_t *dev)
 
 static AM_ErrorCode_t dvb_set_buf_size(AM_DVR_Device_t *dev, int size)
 {
-	int fd = (int)dev->drv_data;
+	int fd = (long)dev->drv_data;
 	int ret;
 	
 	ret = ioctl(fd, DMX_SET_BUFFER_SIZE, size);
@@ -100,7 +100,7 @@ static AM_ErrorCode_t dvb_set_buf_size(AM_DVR_Device_t *dev, int size)
 
 static AM_ErrorCode_t dvb_poll(AM_DVR_Device_t *dev, int timeout)
 {
-	int fd = (int)dev->drv_data;
+	int fd = (long)dev->drv_data;
 	struct pollfd fds;
 	int ret;
 	
@@ -118,7 +118,7 @@ static AM_ErrorCode_t dvb_poll(AM_DVR_Device_t *dev, int timeout)
 
 static AM_ErrorCode_t dvb_read(AM_DVR_Device_t *dev, uint8_t *buf, int *size)
 {
-	int fd = (int)dev->drv_data;
+	int fd = (long)dev->drv_data;
 	int len = *size;
 	int ret;
 	

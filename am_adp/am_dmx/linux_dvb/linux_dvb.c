@@ -117,7 +117,7 @@ static AM_ErrorCode_t dvb_alloc_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *fi
 	
 	dmx->fd[filter->id] = fd;
 
-	filter->drv_data = (void*)fd;
+	filter->drv_data = (void*)(long)fd;
 	
 	return AM_SUCCESS;
 }
@@ -125,7 +125,7 @@ static AM_ErrorCode_t dvb_alloc_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *fi
 static AM_ErrorCode_t dvb_free_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *filter)
 {
 	DVBDmx_t *dmx = (DVBDmx_t*)dev->drv_data;
-	int fd = (int)filter->drv_data;
+	int fd = (long)filter->drv_data;
 
 	close(fd);
 	dmx->fd[filter->id] = -1;
@@ -136,7 +136,7 @@ static AM_ErrorCode_t dvb_free_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *fil
 static AM_ErrorCode_t dvb_set_sec_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *filter, const struct dmx_sct_filter_params *params)
 {
 	struct dmx_sct_filter_params p;
-	int fd = (int)filter->drv_data;
+	int fd = (long)filter->drv_data;
 	int ret;
 
 	p = *params;
@@ -157,7 +157,7 @@ static AM_ErrorCode_t dvb_set_sec_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *
 
 static AM_ErrorCode_t dvb_set_pes_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *filter, const struct dmx_pes_filter_params *params)
 {
-	int fd = (int)filter->drv_data;
+	int fd = (long)filter->drv_data;
 	int ret;
 
 	fcntl(fd,F_SETFL,O_NONBLOCK);
@@ -174,7 +174,7 @@ static AM_ErrorCode_t dvb_set_pes_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *
 
 static AM_ErrorCode_t dvb_enable_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *filter, AM_Bool_t enable)
 {
-	int fd = (int)filter->drv_data;
+	int fd = (long)filter->drv_data;
 	int ret;
 	
 	if(enable)
@@ -193,7 +193,7 @@ static AM_ErrorCode_t dvb_enable_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *f
 
 static AM_ErrorCode_t dvb_set_buf_size(AM_DMX_Device_t *dev, AM_DMX_Filter_t *filter, int size)
 {
-	int fd = (int)filter->drv_data;
+	int fd = (long)filter->drv_data;
 	int ret;
 	
 	ret = ioctl(fd, DMX_SET_BUFFER_SIZE, size);
@@ -246,7 +246,7 @@ static AM_ErrorCode_t dvb_poll(AM_DMX_Device_t *dev, AM_DMX_FilterMask_t *mask, 
 
 static AM_ErrorCode_t dvb_read(AM_DMX_Device_t *dev, AM_DMX_Filter_t *filter, uint8_t *buf, int *size)
 {
-	int fd = (int)filter->drv_data;
+	int fd = (long)filter->drv_data;
 	int len = *size;
 	int ret;
 	struct pollfd pfd;

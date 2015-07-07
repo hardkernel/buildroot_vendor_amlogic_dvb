@@ -533,7 +533,7 @@ static int lock_fend(int id, int mode)
 		scanf("%d", &blind_scan);
 		if(blind_scan == 1)
 		{
-			AM_FEND_BlindScan(id, blindscan_cb, (void *)id, 950000000, 2150000000);
+			AM_FEND_BlindScan(id, blindscan_cb, (void *)(long)id, 950000000, 2150000000);
 			while(1){
 				if(blindscan_process == 100){
 					break;

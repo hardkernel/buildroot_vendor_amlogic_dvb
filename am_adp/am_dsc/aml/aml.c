@@ -78,13 +78,13 @@ static AM_ErrorCode_t aml_alloc_chan (AM_DSC_Device_t *dev, AM_DSC_Channel_t *ch
 		AM_DEBUG(2, "open DSC %d", chan->id);
 	}
 	
-	chan->drv_data = (void*)fd;
+	chan->drv_data = (void*)(long)fd;
 	return AM_SUCCESS;
 }
 
 static AM_ErrorCode_t aml_free_chan (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan)
 {
-	int fd = (int)chan->drv_data;
+	int fd = (long)chan->drv_data;
 	
 	AM_DEBUG(2, "close DSC %d", chan->id);
 	close(fd);
@@ -93,7 +93,7 @@ static AM_ErrorCode_t aml_free_chan (AM_DSC_Device_t *dev, AM_DSC_Channel_t *cha
 
 static AM_ErrorCode_t aml_set_pid (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan, uint16_t pid)
 {
-	int fd = (int)chan->drv_data;
+	int fd = (long)chan->drv_data;
 	
 	if(ioctl(fd, AMDSC_IOC_SET_PID, pid)==-1)
 	{
@@ -111,7 +111,7 @@ static AM_ErrorCode_t aml_set_pid (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan,
 static AM_ErrorCode_t aml_set_key (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan, AM_DSC_KeyType_t type, const uint8_t *key)
 {
 	struct am_dsc_key dkey;
-	int fd = (int)chan->drv_data;
+	int fd = (long)chan->drv_data;
 	
 	dkey.type = type;
 	memcpy(dkey.key, key, sizeof(dkey.key));

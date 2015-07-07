@@ -375,7 +375,7 @@ static AM_ErrorCode_t AM_FEND_BlindDump(int dev_no)
 /**\brief 前端设备盲扫处理线程*/
 static void* fend_blindscan_thread(void *arg)
 {
-	int dev_no = (int)arg;
+	int dev_no = (long)arg;
 	AM_FEND_Device_t *dev = NULL;
 	struct dvbsx_blindscanevent cur_bsevent;
 	AM_FEND_BlindEvent_t evt;
@@ -1601,7 +1601,7 @@ AM_ErrorCode_t AM_FEND_BlindScan(int dev_no, AM_FEND_BlindCallback_t cb, void *u
 
 	dev->enable_blindscan_thread = AM_TRUE;
 	
-	rc = pthread_create(&dev->blindscan_thread, NULL, fend_blindscan_thread, (void *)dev_no);
+	rc = pthread_create(&dev->blindscan_thread, NULL, fend_blindscan_thread, (void *)(long)dev_no);
 	if(rc)
 	{
 		AM_DEBUG(1, "%s", strerror(rc));

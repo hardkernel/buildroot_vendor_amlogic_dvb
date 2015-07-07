@@ -219,8 +219,8 @@ static void* dmx_data_thread(void *arg)
 				if(cb)
 				{
 					if(id && sec)
-					AM_DEBUG(2, "filter %d data callback len fd:%d len:%d, %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
-						id, (int)filter->drv_data, sec_len,
+					AM_DEBUG(2, "filter %d data callback len fd:%ld len:%d, %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
+						id, (long)filter->drv_data, sec_len,
 						sec[0], sec[1], sec[2], sec[3], sec[4],
 						sec[5], sec[6], sec[7], sec[8], sec[9]);
 					cb(dev->dev_no, id, sec, sec_len, data);

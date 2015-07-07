@@ -198,7 +198,7 @@ AM_ErrorCode_t AM_AOUT_SetVolume(int dev_no, int vol)
 		{
 			dev->volume = vol;
 			
-			AM_EVT_Signal(dev_no, AM_AOUT_EVT_VOLUME_CHANGED, (void*)vol);
+			AM_EVT_Signal(dev_no, AM_AOUT_EVT_VOLUME_CHANGED, (void*)(long)vol);
 		}
 	}
 	
@@ -256,7 +256,7 @@ AM_ErrorCode_t AM_AOUT_SetMute(int dev_no, AM_Bool_t mute)
 		{
 			dev->mute = mute;
 			
-			AM_EVT_Signal(dev_no, AM_AOUT_EVT_MUTE_CHANGED, (void*)(int)mute);
+			AM_EVT_Signal(dev_no, AM_AOUT_EVT_MUTE_CHANGED, (void*)(long)mute);
 		}
 	}
 	
@@ -316,7 +316,7 @@ AM_ErrorCode_t AM_AOUT_SetOutputMode(int dev_no, AM_AOUT_OutputMode_t mode)
 		if(ret==AM_SUCCESS)
 		{
 			dev->mode = mode;
-			AM_EVT_Signal(dev_no, AM_AOUT_EVT_OUTPUT_MODE_CHANGED, (void*)mode);
+			AM_EVT_Signal(dev_no, AM_AOUT_EVT_OUTPUT_MODE_CHANGED, (void*)(long)mode);
 		}
 	}
 	

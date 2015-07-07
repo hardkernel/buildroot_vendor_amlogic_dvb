@@ -675,7 +675,7 @@ static AM_ErrorCode_t amp_set_volume(AM_AOUT_Device_t *dev, int vol)
 	}
 #endif
 #ifdef PLAYER_API_NEW
-	int media_id = (int)dev->drv_data;
+	int media_id = (long)dev->drv_data;
 
 	if(audio_set_volume(media_id, vol)==-1)
 	{
@@ -698,7 +698,7 @@ static AM_ErrorCode_t amp_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 	}
 #endif
 #ifdef PLAYER_API_NEW
-	int media_id = (int)dev->drv_data;
+	int media_id = (long)dev->drv_data;
 
 	AM_DEBUG(1, "audio_set_mute %d\n", mute);
 	if(audio_set_mute(media_id, mute?0:1)==-1)
@@ -781,7 +781,7 @@ static AM_ErrorCode_t amp_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_OutputM
 	}
 #endif
 #ifdef PLAYER_API_NEW
-	int media_id = (int)dev->drv_data;
+	int media_id = (long)dev->drv_data;
 	int ret=0;
 
 	switch(mode)
@@ -2985,7 +2985,7 @@ static AM_ErrorCode_t aml_timeshift_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, v
 	data->cmd = cmd;
 	if (cmd == AV_PLAY_FF || cmd == AV_PLAY_FB)
 	{
-		data->speed = (int)para;
+		data->speed = (long)para;
 	}
 	else if (cmd == AV_PLAY_SEEK)
 	{
@@ -4437,7 +4437,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 	{
 		case AV_PLAY_VIDEO_ES:
 			src = dev->vid_player.drv_data;
-			val = (int)para;
+			val = (long)para;
 			if(ioctl(src->fd, AMSTREAM_IOC_VFORMAT, val)==-1)
 			{
 				AM_DEBUG(1, "set video format failed");
@@ -4447,7 +4447,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 		break;
 		case AV_PLAY_AUDIO_ES:
 			src = dev->aud_player.drv_data;
-			val = (int)para;
+			val = (long)para;
 			if(ioctl(src->fd, AMSTREAM_IOC_AFORMAT, val)==-1)
 			{
 				AM_DEBUG(1, "set audio format failed");
@@ -4517,7 +4517,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 				}
 
 				player_start_play(data->media_id);
-				AM_AOUT_SetDriver(AOUT_DEV_NO, &amplayer_aout_drv, (void*)data->media_id);
+				AM_AOUT_SetDriver(AOUT_DEV_NO, &amplayer_aout_drv, (void*)(long)data->media_id);
 			}
 #endif
 		break;
@@ -4709,10 +4709,10 @@ static AM_ErrorCode_t aml_file_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *
 			player_resume(data->media_id);
 		break;
 		case AV_PLAY_FF:
-			player_forward(data->media_id, (int)para);
+			player_forward(data->media_id, (long)para);
 		break;
 		case AV_PLAY_FB:
-			player_backward(data->media_id, (int)para);
+			player_backward(data->media_id, (long)para);
 		break;
 		case AV_PLAY_SEEK:
 			sp = (AV_FileSeekPara_t*)para;
@@ -4907,29 +4907,29 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 		break;
 		case AV_VIDEO_PARA_CONTRAST:
 			name = VID_CONTRAST_FILE;
-			snprintf(buf, sizeof(buf), "%d", (int)val);
+			snprintf(buf, sizeof(buf), "%d", (long)val);
 			cmd = buf;
 		break;
 		case AV_VIDEO_PARA_SATURATION:
 			name = VID_SATURATION_FILE;
-			snprintf(buf, sizeof(buf), "%d", (int)val);
+			snprintf(buf, sizeof(buf), "%d", (long)val);
 			cmd = buf;
 		break;
 		case AV_VIDEO_PARA_BRIGHTNESS:
 			name = VID_BRIGHTNESS_FILE;
-			snprintf(buf, sizeof(buf), "%d", (int)val);
+			snprintf(buf, sizeof(buf), "%d", (long)val);
 			cmd = buf;
 		break;
 		case AV_VIDEO_PARA_ENABLE:
 			name = VID_DISABLE_FILE;
-			cmd = ((int)val)?"0":"1";
+			cmd = ((long)val)?"0":"1";
 		break;
 		case AV_VIDEO_PARA_BLACKOUT:
 			if(!(dev->mode & (AV_PLAY_TS|AV_TIMESHIFT))){
 				name = VID_BLACKOUT_FILE;
-				cmd = ((int)val)?"1":"0";
+				cmd = ((long)val)?"1":"0";
 			}
-			dev->video_blackout = (int)val;
+			dev->video_blackout = (long)val;
 #if 0
 #ifdef AMSTREAM_IOC_CLEAR_VBUF
 			if((int)val)
@@ -4947,7 +4947,7 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 		case AV_VIDEO_PARA_RATIO:
 #ifndef 	CHIP_8226H
 			name = VID_SCREEN_MODE_FILE;
-			switch((int)val)
+			switch((long)val)
 			{
 				case AM_AV_VIDEO_ASPECT_AUTO:
 					cmd = "0";
@@ -4961,7 +4961,7 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 			}
 #else
 			name = VID_ASPECT_RATIO_FILE;
-			switch((int)val)
+			switch((long)val)
 			{
 				case AM_AV_VIDEO_ASPECT_AUTO:
 					cmd = "auto";
@@ -4978,7 +4978,7 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 		case AV_VIDEO_PARA_RATIO_MATCH:
 			name = VID_ASPECT_MATCH_FILE;
 #ifndef 	CHIP_8226H
-			switch((int)val)
+			switch((long)val)
 			{
 				case AM_AV_VIDEO_ASPECT_MATCH_IGNORE:
 					cmd = "1";
@@ -4994,7 +4994,7 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 				break;
 			}
 #else
-			switch((int)val)
+			switch((long)val)
 			{
 				case AM_AV_VIDEO_ASPECT_MATCH_IGNORE:
 					cmd = "ignore";
@@ -5033,7 +5033,7 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 		break;
 		case AV_VIDEO_PARA_ERROR_RECOVERY_MODE:
 			name = VDEC_H264_ERROR_RECOVERY_MODE_FILE;
-			snprintf(buf, sizeof(buf), "%d", (int)val);
+			snprintf(buf, sizeof(buf), "%d", (long)val);
 			cmd = buf;
 		break;
 	}
@@ -5254,7 +5254,7 @@ static AM_ErrorCode_t aml_get_astatus(AM_AV_Device_t *dev, AM_AV_AudioStatus_t *
 		goto get_fail;
 	}
 
-	rc = ioctl(fd, AMSTREAM_IOC_AB_STATUS, (int)&astatus);
+	rc = ioctl(fd, AMSTREAM_IOC_AB_STATUS, (long)&astatus);
 	if(rc==-1)
 	{
 		AM_DEBUG(1, "AMSTREAM_IOC_AB_STATUS failed");
@@ -5335,7 +5335,7 @@ static AM_ErrorCode_t aml_get_vstatus(AM_AV_Device_t *dev, AM_AV_VideoStatus_t *
        }
 #endif
 
-	rc = ioctl(fd, AMSTREAM_IOC_VB_STATUS, (int)&vstatus);
+	rc = ioctl(fd, AMSTREAM_IOC_VB_STATUS, (long)&vstatus);
 	if(rc==-1)
 	{
 		AM_DEBUG(1, "AMSTREAM_IOC_VB_STATUS failed");

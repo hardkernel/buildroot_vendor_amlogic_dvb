@@ -126,6 +126,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
                     vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
                     vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
                     external/icu/icu4c/source/common\
+		    vendor/amlogic/external/libzvbi/src\
 		    $(LOCAL_PATH)/am_ci
 
 ifeq ($(AMLOGIC_LIBPLAYER), y)
@@ -267,6 +268,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
                     vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
                     vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
                     external/icu/icu4c/source/common\
+		    vendor/amlogic/external/libzvbi/src\
 		    $(LOCAL_PATH)/am_ci
 ifeq ($(AMLOGIC_LIBPLAYER), y)
 LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg
