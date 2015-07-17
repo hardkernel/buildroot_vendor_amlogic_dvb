@@ -179,13 +179,11 @@ void atsc_decode_multiple_string_structure(INT8U *buffer_data, atsc_multiple_str
 
 INT8U *audio_stream_desc_parse(INT8U *ptrData)
 {
-	UNUSED(ptrData);
 	return NULL;
 }
 
 INT8U *caption_service_desc_parse(INT8U *ptrData)
 {
-	UNUSED(ptrData);
 	return NULL;
 }
 
@@ -216,8 +214,6 @@ INT8U *content_advisory_desc_parse(INT8U *ptrData)
 		ptr += rating_desc_length;
 		AM_TRACE("%s\n", str);
 	}
-#else
-	UNUSED(ptrData);
 #endif
 	return NULL;
 }

@@ -174,7 +174,6 @@ extern "C"
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
-typedef void* AM_SI_Handle_t;
 
 /**\brief SI模块错误代码*/
 enum AM_SI_ErrorCode
@@ -252,7 +251,7 @@ typedef struct
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-extern AM_ErrorCode_t AM_SI_Create(AM_SI_Handle_t *handle);
+extern AM_ErrorCode_t AM_SI_Create(int *handle);
 
 /**\brief 销毀一个SI解析器
  * \param handle SI解析句柄
@@ -260,7 +259,7 @@ extern AM_ErrorCode_t AM_SI_Create(AM_SI_Handle_t *handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-extern AM_ErrorCode_t AM_SI_Destroy(AM_SI_Handle_t handle);
+extern AM_ErrorCode_t AM_SI_Destroy(int handle);
 
 /**\brief 解析一个section,并返回解析数据
  * 支持的表(相应返回结构):CAT(dvbpsi_cat_t) PAT(dvbpsi_pat_t) PMT(dvbpsi_pmt_t) 
@@ -279,7 +278,7 @@ extern AM_ErrorCode_t AM_SI_Destroy(AM_SI_Handle_t handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-extern AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, uint8_t *buf, uint16_t len, void **sec);
+extern AM_ErrorCode_t AM_SI_DecodeSection(int handle, uint16_t pid, uint8_t *buf, uint16_t len, void **sec);
 
 /**\brief 释放一个从 AM_SI_DecodeSection()返回的section
  * \param handle SI解析句柄
@@ -289,7 +288,7 @@ extern AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, u
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-extern AM_ErrorCode_t AM_SI_ReleaseSection(AM_SI_Handle_t handle, uint8_t table_id, void *sec);
+extern AM_ErrorCode_t AM_SI_ReleaseSection(int handle, uint8_t table_id, void *sec);
 
 /**\brief 获得一个section头信息
  * \param handle SI解析句柄
@@ -300,7 +299,7 @@ extern AM_ErrorCode_t AM_SI_ReleaseSection(AM_SI_Handle_t handle, uint8_t table_
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-extern AM_ErrorCode_t AM_SI_GetSectionHeader(AM_SI_Handle_t handle, uint8_t *buf, uint16_t len, AM_SI_SectionHeader_t *sec_header);
+extern AM_ErrorCode_t AM_SI_GetSectionHeader(int handle, uint8_t *buf, uint16_t len, AM_SI_SectionHeader_t *sec_header);
 
 /**\brief 设置默认的DVB编码方式，当前端流未按照DVB标准，即第一个
  * 字符没有指定编码方式时，可以调用该函数来指定一个强制转换的编码。
@@ -342,9 +341,6 @@ extern AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *
  */
 extern AM_ErrorCode_t AM_SI_ExtractAVFromATSCVC(vct_channel_info_t *vcinfo, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info);
 
-extern AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_SubtitleInfo_t *sub_info);
-
-extern AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_TeletextInfo_t *ttx_info);
 
 #ifdef __cplusplus
 }

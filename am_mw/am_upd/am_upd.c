@@ -128,7 +128,7 @@ struct table_s{
 
 	int dmx;
 
-	AM_SI_Handle_t si;
+	int si;
 
 	int fid;
 
@@ -167,25 +167,25 @@ struct table_s{
 typedef struct 
 {
 	uint8_t		table_id;			/**< table_id*/
-	uint8_t		syntax_indicator;		/**< section_syntax_indicator*/
-	uint8_t		private_indicator;		/**< private_indicator*/
+	uint8_t		syntax_indicator;	/**< section_syntax_indicator*/
+	uint8_t		private_indicator;	/**< private_indicator*/
 	uint16_t	length;				/**< section_length*/
 
 	union {
 		struct {
 			uint16_t	extension;			/**< table_id_extension*/
-									/**< transport_stream_id for a
-						                                             PAT section */
-			uint8_t		version;			/**< version_number*/
-			uint8_t		cur_next_indicator;		/**< current_next_indicator*/
+											/**< transport_stream_id for a
+		                                             PAT section */
+		    uint8_t		version;			/**< version_number*/
+		    uint8_t		cur_next_indicator;	/**< current_next_indicator*/
 		}u1;
 		struct {
 			uint16_t    user1;
 			uint16_t    user2;
 		}u2;
 	}u;
-	uint8_t		sec_num;			/**< section_number*/
-	uint8_t		last_sec_num;			/**< last_section_number*/
+    uint8_t		sec_num;			/**< section_number*/
+    uint8_t		last_sec_num;		/**< last_section_number*/
 }section_header_t;
 
 
@@ -896,7 +896,7 @@ static void *updm_thread(void *para)
 #define CHECKMID(_id, _updm, _upd) \
 	_CHECKID(_id, _updm, _upd, tsupdm_t, _UPDM_MAGIC)
 
-AM_ErrorCode_t AM_TSUPD_OpenMonitor(AM_TSUPD_OpenMonitorParam_t *para, AM_TSUPD_MonHandle_t *mid)
+AM_ErrorCode_t AM_TSUPD_OpenMonitor(AM_TSUPD_OpenMonitorParam_t *para, int *mid)
 {
 	if(!mid)
 		return AM_UPD_ERROR_BADPARA;
@@ -913,13 +913,13 @@ AM_ErrorCode_t AM_TSUPD_OpenMonitor(AM_TSUPD_OpenMonitorParam_t *para, AM_TSUPD_
 	tsupdm.upd.dmx = para->dmx;
 	tsupdm.upd.magic = _UPDM_MAGIC;
 
-	*mid = &tsupdm;
+	*mid = (int)&tsupdm;
 
 	AM_DEBUG(2, "open monitor");
 	return AM_SUCCESS;
 }
 
-AM_ErrorCode_t AM_TSUPD_StartMonitor(AM_TSUPD_MonHandle_t mid, AM_TSUPD_MonitorParam_t *para)
+AM_ErrorCode_t AM_TSUPD_StartMonitor(int mid, AM_TSUPD_MonitorParam_t *para)
 {
 #define NIT_TIMEOUT_DEFAULT 10000 //10s
 #define NIT_MONITOR_INTERVAL_DEFAULT 20000 //20s
@@ -972,7 +972,7 @@ AM_ErrorCode_t AM_TSUPD_StartMonitor(AM_TSUPD_MonHandle_t mid, AM_TSUPD_MonitorP
 	return AM_SUCCESS;
 }
 
-AM_ErrorCode_t AM_TSUPD_StopMonitor(AM_TSUPD_MonHandle_t mid)
+AM_ErrorCode_t AM_TSUPD_StopMonitor(int mid)
 {
 	tsupdm_t *updm;
 	tsupd_t *upd;
@@ -1008,7 +1008,7 @@ AM_ErrorCode_t AM_TSUPD_StopMonitor(AM_TSUPD_MonHandle_t mid)
 	return AM_SUCCESS;
 }
 
-AM_ErrorCode_t AM_TSUPD_InjectNIT(AM_TSUPD_MonHandle_t mid, unsigned char* p_nit, unsigned int len)
+AM_ErrorCode_t AM_TSUPD_InjectNIT(int mid, unsigned char* p_nit, unsigned int len)
 {
 	tsupdm_t *updm;
 	tsupd_t *upd;
@@ -1024,7 +1024,7 @@ AM_ErrorCode_t AM_TSUPD_InjectNIT(AM_TSUPD_MonHandle_t mid, unsigned char* p_nit
 	return AM_SUCCESS;
 }
 
-AM_ErrorCode_t AM_TSUPD_CloseMonitor(AM_TSUPD_MonHandle_t mid)
+AM_ErrorCode_t AM_TSUPD_CloseMonitor(int mid)
 {
 	tsupdm_t *updm;
 	tsupd_t *upd;
@@ -1251,7 +1251,7 @@ static void *updd_thread(void *para)
 #define CHECKDID(_id, _updd, _upd) \
 	_CHECKID(_id, _updd, _upd, tsupdd_t, _UPDD_MAGIC)
 
-AM_ErrorCode_t AM_TSUPD_OpenDownloader(AM_TSUPD_OpenDownloaderParam_t *para, AM_TSUPD_DlHandle_t *did)
+AM_ErrorCode_t AM_TSUPD_OpenDownloader(AM_TSUPD_OpenDownloaderParam_t *para, int *did)
 {
 	tsupdd_t *tsupdd;
 
@@ -1269,12 +1269,12 @@ AM_ErrorCode_t AM_TSUPD_OpenDownloader(AM_TSUPD_OpenDownloaderParam_t *para, AM_
 	tsupdd->upd.dmx = para->dmx;
 	tsupdd->upd.magic = _UPDD_MAGIC;
 
-	*did = tsupdd;
+	*did = (int)tsupdd;
 
 	return AM_SUCCESS;
 }
 
-AM_ErrorCode_t AM_TSUPD_StartDownloader(AM_TSUPD_DlHandle_t did, AM_TSUPD_DownloaderParam_t *para)
+AM_ErrorCode_t AM_TSUPD_StartDownloader(int did, AM_TSUPD_DownloaderParam_t *para)
 {
 #define DLT_TIMEOUT_DEFAULT 20000 //20s
 
@@ -1321,7 +1321,7 @@ AM_ErrorCode_t AM_TSUPD_StartDownloader(AM_TSUPD_DlHandle_t did, AM_TSUPD_Downlo
 }
 
 //data valid before stopDownloader called
-AM_ErrorCode_t AM_TSUPD_GetDownloaderData(AM_TSUPD_DlHandle_t did, unsigned char **ppdata, unsigned int *len)
+AM_ErrorCode_t AM_TSUPD_GetDownloaderData(int did, unsigned char **ppdata, unsigned int *len)
 {
 	tsupdd_t *updd;
 	tsupd_t *upd;
@@ -1340,7 +1340,7 @@ AM_ErrorCode_t AM_TSUPD_GetDownloaderData(AM_TSUPD_DlHandle_t did, unsigned char
 	return AM_SUCCESS;
 }
 
-AM_ErrorCode_t AM_TSUPD_StopDownloader(AM_TSUPD_DlHandle_t did)
+AM_ErrorCode_t AM_TSUPD_StopDownloader(int did)
 {
 	tsupdd_t *updd;
 	tsupd_t *upd;
@@ -1367,7 +1367,7 @@ AM_ErrorCode_t AM_TSUPD_StopDownloader(AM_TSUPD_DlHandle_t did)
 	return AM_SUCCESS;
 }
 
-AM_ErrorCode_t AM_TSUPD_CloseDownloader(AM_TSUPD_DlHandle_t did)
+AM_ErrorCode_t AM_TSUPD_CloseDownloader(int did)
 {
 	tsupdd_t *updd;
 	tsupd_t *upd;

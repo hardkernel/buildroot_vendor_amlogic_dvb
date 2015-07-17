@@ -649,11 +649,8 @@ static AM_ErrorCode_t AM_Sec_AsyncWait(void)
 }
 
 /**\brief 设置卫星设备控制事件信息*/
-static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, 
-						const AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t *b_para,
-						const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para,
-						fe_status_t *status,
-						unsigned int tunetimeout)
+static AM_ErrorCode_t AM_Sec_SetAsyncInfo(int dev_no, const AM_FENDCTRL_DVBFrontendParametersBlindSatellite_t *b_para,
+												const AM_FENDCTRL_DVBFrontendParametersSatellite_t *para, fe_status_t *status, unsigned int tunetimeout)
 {
 	AM_SEC_AsyncInfo_t *p_sec_asyncinfo = &(sec_control.m_sec_asyncinfo);
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -2043,8 +2040,6 @@ static AM_ErrorCode_t AM_SEC_DeInit(void)
  */
 AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEquipmentControl_t *para)
 {
-	UNUSED(dev_no);
-
 	assert(para);
 	
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -2124,8 +2119,6 @@ AM_ErrorCode_t AM_SEC_SetSetting(int dev_no, const AM_SEC_DVBSatelliteEquipmentC
  */
 AM_ErrorCode_t AM_SEC_GetSetting(int dev_no, AM_SEC_DVBSatelliteEquipmentControl_t *para)
 {
-	UNUSED(dev_no);
-
 	assert(para);
 	
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -2147,8 +2140,6 @@ AM_ErrorCode_t AM_SEC_GetSetting(int dev_no, AM_SEC_DVBSatelliteEquipmentControl
  */
 AM_ErrorCode_t AM_SEC_ResetRotorStatusCache(int dev_no)
 {
-	UNUSED(dev_no);
-
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
 	pthread_mutex_lock(&(sec_control.m_lnbs.lock));
@@ -2171,8 +2162,6 @@ AM_ErrorCode_t AM_SEC_ResetRotorStatusCache(int dev_no)
  */
 void  AM_SEC_Cache_Reset(int dev_no)
 {
-	UNUSED(dev_no);
-
 	AM_SEC_Invalid_CurPara();
 
 	return;
@@ -2222,8 +2211,6 @@ AM_ErrorCode_t AM_SEC_PrepareBlindScan(int dev_no)
  */
 AM_ErrorCode_t AM_SEC_FreqConvert(int dev_no, unsigned int centre_freq, unsigned int *tp_freq)
 {
-	UNUSED(dev_no);
-
 	assert(tp_freq);
 
 	AM_ErrorCode_t ret = AM_FENDCTRL_ERROR_BASE;
@@ -2299,8 +2286,6 @@ AM_Bool_t AM_SEC_FilterInvalidTp(int dev_no, unsigned int tp_freq)
 {
 	AM_Bool_t ret = AM_FALSE;
 	AM_FEND_Localoscollatorfreq_t cur_ocaloscollatorfreq = AM_FEND_LOCALOSCILLATORFREQ_H;
-
-	UNUSED(dev_no);
 
 	pthread_mutex_lock(&(sec_control.m_lnbs.lock));
 
@@ -2439,11 +2424,7 @@ AM_ErrorCode_t AM_SEC_ExecSecCmd(int dev_no, const AM_FENDCTRL_DVBFrontendParame
 	pthread_mutex_unlock(&(sec_control.m_lnbs.lock));
 
 	AM_DEBUG(1, "%s", "AM_SEC_ExecSecCmd async\n");
-	ret = AM_Sec_SetAsyncInfo(dev_no, 
-				NULL,
-				(const AM_FENDCTRL_DVBFrontendParametersSatellite_t *)para,
-				&status,
-				tunetimeout);
+	ret = AM_Sec_SetAsyncInfo(dev_no, NULL, para, &status, tunetimeout);
 	//AM_Sec_AsyncSet();
 	AM_DEBUG(1, "%s", "AM_SEC_ExecSecCmd async ok\n");
 

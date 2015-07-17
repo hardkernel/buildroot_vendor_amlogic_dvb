@@ -37,7 +37,7 @@ static int monitor_callback(unsigned char *pnit, unsigned int len, void *user)
 
 int nit_test(int time)
 {
-	AM_TSUPD_MonHandle_t mid;
+	int mid;
 	AM_ErrorCode_t err = AM_SUCCESS;
 	AM_TSUPD_OpenMonitorParam_t openpara;
 	AM_TSUPD_MonitorParam_t monitorpara;
@@ -88,7 +88,7 @@ static int dl_callback(unsigned char *pdata, unsigned int len, void *user)
 
 int download_test(int pid, int tid, int ext)
 {
-	AM_TSUPD_DlHandle_t did;
+	int did;
 	AM_ErrorCode_t err = AM_SUCCESS;
 	AM_TSUPD_OpenDownloaderParam_t openpara;
 	AM_TSUPD_DownloaderParam_t dlpara;
@@ -145,7 +145,7 @@ typedef struct dpt_s{
 #define slot_complete 3
 #define slot_done    4
 
-		AM_TSUPD_DlHandle_t did;
+		unsigned int did;
 	}part_slot[MAX_PART_SUPPORT];
 	pthread_mutex_t    slot_lock;
 
@@ -185,9 +185,9 @@ static int dl_part_callback(unsigned char *pdata, unsigned int len, void *user)
 	return 0;
 }
 
-AM_TSUPD_DlHandle_t dl_part_start(int pid, int tid, int ext, int slot)
+int dl_part_start(int pid, int tid, int ext, int slot)
 {
-	AM_TSUPD_DlHandle_t did;
+	int did;
 	AM_ErrorCode_t err = AM_SUCCESS;
 	AM_TSUPD_OpenDownloaderParam_t openpara;
 	AM_TSUPD_DownloaderParam_t dlpara;
@@ -221,7 +221,7 @@ AM_TSUPD_DlHandle_t dl_part_start(int pid, int tid, int ext, int slot)
 }
 
 
-int dl_part_stop(AM_TSUPD_DlHandle_t did)
+int dl_part_stop(int did)
 {
 	AM_ErrorCode_t err = AM_SUCCESS;
 

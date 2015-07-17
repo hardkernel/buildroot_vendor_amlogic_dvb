@@ -62,9 +62,7 @@ INT32S atsc_psip_parse_stt(INT8U* data, INT32U length, stt_section_info_t *info)
     stt_section_t *sect = NULL;
     INT32U tmp_time;
     INT8U GPS_UTC_offset;
-
-    UNUSED(length);
-
+	
     if(data && info)
     {
         sect = (stt_section_t*)data;

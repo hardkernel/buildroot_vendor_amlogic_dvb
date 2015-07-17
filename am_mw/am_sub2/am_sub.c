@@ -19,7 +19,7 @@
 
 typedef struct
 {
-	long               handle;
+	INT32U             handle;
 	AM_SUB2_Para_t     para;
 	AM_Bool_t          running;
 	pthread_mutex_t    lock;

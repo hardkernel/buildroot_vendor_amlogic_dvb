@@ -56,7 +56,7 @@ static AM_VOUT_Device_t vout_devices[] =
 /**\brief 根据设备号取得设备结构*/
 static AM_INLINE AM_ErrorCode_t vout_get_dev(int dev_no, AM_VOUT_Device_t **dev)
 {
-	if((dev_no<0) || (((size_t)dev_no)>=VOUT_DEV_COUNT))
+	if((dev_no<0) || (dev_no>=VOUT_DEV_COUNT))
 	{
 		AM_DEBUG(1, "invalid vout device number %d, must in(%d~%d)", dev_no, 0, VOUT_DEV_COUNT-1);
 		return AM_VOUT_ERR_INVALID_DEV_NO;

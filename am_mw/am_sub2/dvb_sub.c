@@ -1025,8 +1025,6 @@ static void sub_parse_pdata(dvbsub_decoder_t* decoder, dvbsub_region_t* region,
     INT32U i = 0;
     bs_t bs = {NULL,NULL,NULL,0};
 
-    UNUSED(decoder);
-
     /* sanity check */
     if (!p_region->p_pixbuf)
     {
@@ -1820,7 +1818,7 @@ static void sub_update_display(dvbsub_decoder_t* decoder)
     /* callback update display */
     if (decoder->callback)
     {
-        decoder->callback((long)decoder, p_pic);
+        decoder->callback((INT32U)decoder, p_pic);
     }
     return;
 }
@@ -1886,7 +1884,7 @@ static void sub_remove_display(dvbsub_decoder_t* decoder, dvbsub_picture_t* pic)
     return;
 }
 
-INT32S dvbsub_decoder_create(INT16U composition_id, INT16U ancillary_id, dvbsub_callback_t callback, long* handle)
+INT32S dvbsub_decoder_create(INT16U composition_id, INT16U ancillary_id, dvbsub_callback_t callback, INT32U* handle)
 {
     dvbsub_decoder_t *sub_decoder = NULL;
     INT32S retcode = 0;
@@ -1932,13 +1930,13 @@ INT32S dvbsub_decoder_create(INT16U composition_id, INT16U ancillary_id, dvbsub_
                 sub_default_clut_init(sub_decoder);
                 sub_default_display_init(sub_decoder);
 
-                *handle = (long)sub_decoder;
+                *handle = (INT32U)sub_decoder;
             }
         }
     }
     else
     {
-        *handle = (long)sub_decoder;
+        *handle = (INT32U)sub_decoder;
     }
 
     if (retcode == 0 && sub_decoder)
@@ -1949,14 +1947,14 @@ INT32S dvbsub_decoder_create(INT16U composition_id, INT16U ancillary_id, dvbsub_
     return retcode;
 }
 
-INT32S dvbsub_decoder_destroy(long handle)
+INT32S dvbsub_decoder_destroy(INT32U handle)
 {
     INT32S retcode = 0;
     dvbsub_picture_t *p_pic = NULL, *p_pic_next = NULL;
     sub_pic_region_t *p_reg = NULL, *p_reg_next = NULL;
     dvbsub_decoder_t *sub_decoder = (dvbsub_decoder_t*)handle;
 
-    if ((handle != (long)sub_decoder) || (handle == 0))
+    if ((handle != (INT32U)sub_decoder) || (handle == 0))
     {
         dvbsub_dbg("[dvbsub_decoder_destroy] invalid handle !\r\n");
         return -1;
@@ -2005,11 +2003,11 @@ INT32S dvbsub_decoder_destroy(long handle)
 }
 
 
-INT32S dvbsub_parse_pes_packet(long handle, const INT8U* packet, INT32U length)
+INT32S dvbsub_parse_pes_packet(INT32U handle, const INT8U* packet, INT32U length)
 {
     INT32S retcode = 0;
     INT64U pts = (INT64U)0;
-    unsigned long pes_data_start = 0;
+    INT32U pes_data_start = 0;
     INT32U pes_data_length = 0;
     INT32U pes_packet_length = 0;
     INT8U  scrambling_control = 0;
@@ -2018,7 +2016,7 @@ INT32S dvbsub_parse_pes_packet(long handle, const INT8U* packet, INT32U length)
     dvbsub_sys_t *p_sys = NULL;
     dvbsub_decoder_t *sub_decoder = (dvbsub_decoder_t*)handle;
 
-    if ((handle != (long)sub_decoder) || (handle == 0))
+    if ((handle != (INT32U)sub_decoder) || (handle == 0))
     {
         dvbsub_dbg("[dvbsub_parse_pes_packet] invalid handle !\r\n");
         return -1;
@@ -2085,7 +2083,7 @@ INT32S dvbsub_parse_pes_packet(long handle, const INT8U* packet, INT32U length)
     pts |= (INT64U)((((packet[10] << 8) | packet[11]) >> 1) & 0x7fff) << 15;
     pts |= (INT64U)((((packet[12] << 8) | packet[13]) >> 1) & 0x7fff);
 
-    pes_data_start = (unsigned long)(&packet[9+pes_header_length]);
+    pes_data_start = (INT32U)(&packet[9+pes_header_length]);
     pes_data_length = pes_packet_length - 3 - pes_header_length;
 
     /* check pes data length */
@@ -2152,11 +2150,11 @@ INT32S dvbsub_parse_pes_packet(long handle, const INT8U* packet, INT32U length)
     return retcode;
 }
 
-dvbsub_picture_t* dvbsub_get_display_set(long handle)
+dvbsub_picture_t* dvbsub_get_display_set(INT32U handle)
 {
     dvbsub_decoder_t *sub_decoder = (dvbsub_decoder_t*)handle;
 
-    if ((handle != (long)sub_decoder) || (handle == 0))
+    if ((handle != (INT32U)sub_decoder) || (handle == 0))
     {
         dvbsub_dbg("[dvbsub_get_display_set] invalid handle !\r\n");
         return NULL;
@@ -2165,12 +2163,12 @@ dvbsub_picture_t* dvbsub_get_display_set(long handle)
     return sub_decoder->p_head;
 }
 
-INT32S dvbsub_remove_display_picture(long handle, dvbsub_picture_t* pic)
+INT32S dvbsub_remove_display_picture(INT32U handle, dvbsub_picture_t* pic)
 {
     INT32S retcode = 0;
     dvbsub_decoder_t *sub_decoder = (dvbsub_decoder_t*)handle;
 
-    if ((handle != (long)sub_decoder) || (handle == 0))
+    if ((handle != (INT32U)sub_decoder) || (handle == 0))
     {
         dvbsub_dbg("[dvbsub_remove_display_picture] invalid handle !\r\n");
         return -1;

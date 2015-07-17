@@ -386,9 +386,6 @@ static AM_ErrorCode_t dvr_enable_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *f
 
 static AM_ErrorCode_t dvr_set_buf_size(AM_DMX_Device_t *dev, AM_DMX_Filter_t *filter, int size)
 {
-	UNUSED(dev);
-	UNUSED(filter);
-	UNUSED(size);
 	return AM_SUCCESS;
 }
 
@@ -610,8 +607,6 @@ static AM_ErrorCode_t dvr_poll(AM_DMX_Device_t *dev, AM_DMX_FilterMask_t *mask, 
 	DVR_Demux *dmx = (DVR_Demux*)dev->drv_data;
 	struct pollfd pf;
 	int ret;
-	
-	UNUSED(mask);
 
 	pf.fd = dmx->dvr_fd;
 	pf.events = POLLIN|POLLERR;
@@ -648,11 +643,6 @@ static AM_ErrorCode_t dvr_poll(AM_DMX_Device_t *dev, AM_DMX_FilterMask_t *mask, 
 
 static AM_ErrorCode_t dvr_read(AM_DMX_Device_t *dev, AM_DMX_Filter_t *filter, uint8_t *buf, int *size)
 {
-	UNUSED(dev);
-	UNUSED(filter);
-	UNUSED(buf);
-	UNUSED(size);
-
 	return AM_SUCCESS;
 }
 

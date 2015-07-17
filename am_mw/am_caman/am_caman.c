@@ -127,7 +127,7 @@ struct table_s{
 
 	int dmx;
 
-	AM_SI_Handle_t si;
+	int si;
 
 	int fid;
 
@@ -239,10 +239,7 @@ static void section_handler(int dev_no, int fid, const uint8_t *data, int len, v
 	table_t *table = (table_t *)user_data;
 	AM_SI_SectionHeader_t header;
 	table_secbuf_t *secbuf;
-
-	UNUSED(dev_no);
-	UNUSED(fid);
-
+	
 	if (!table || !data || (table->fid==-1))
 		return;
 
@@ -658,19 +655,14 @@ static int do_rm_ca(char *name, void (*free_ca)(_ca_t *cai))
 
 static int ts_changed(struct dvb_frontend_event *evt1, struct dvb_frontend_event *evt2)
 {
-	UNUSED(evt1);
-	UNUSED(evt2);
 	return 1;
 }
 
-static void caman_fend_callback(long dev_no, int event_type, void *param, void *user_data)
+static void caman_fend_callback(int dev_no, int event_type, void *param, void *user_data)
 {
 	struct dvb_frontend_event *evt = (struct dvb_frontend_event*)param;
 	_caman_t *man = (_caman_t *)user_data;
-
-	UNUSED(dev_no);
-	UNUSED(event_type);
-
+	
 	if (!evt || (evt->status == 0))
 		return;
 
@@ -2185,8 +2177,6 @@ AM_ErrorCode_t AM_CAMAN_unregisterCA(char *name)
 
 AM_ErrorCode_t AM_CAMAN_getMatchedCA(char **names, unsigned int nnames)
 {
-	UNUSED(names);
-	UNUSED(nnames);
 	return AM_SUCCESS;
 }
 

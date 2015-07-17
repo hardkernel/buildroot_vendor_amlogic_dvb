@@ -45,7 +45,7 @@ static AM_AOUT_Device_t aout_devices[] =
 /**\brief 根据设备号取得设备结构*/
 static AM_INLINE AM_ErrorCode_t aout_get_dev(int dev_no, AM_AOUT_Device_t **dev)
 {
-	if((dev_no<0) || (((size_t)dev_no)>=AOUT_DEV_COUNT))
+	if((dev_no<0) || (dev_no>=AOUT_DEV_COUNT))
 	{
 		AM_DEBUG(1, "invalid aout device number %d, must in(%d~%d)", dev_no, 0, AOUT_DEV_COUNT-1);
 		return AM_AOUT_ERR_INVALID_DEV_NO;

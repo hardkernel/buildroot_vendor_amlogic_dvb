@@ -71,9 +71,7 @@ typedef struct
 static CommandMenu *curr_menu;
 static AM_FENDCTRL_DVBFrontendParameters_t fend_param;
 static AM_Bool_t go = AM_TRUE;
-static AM_SCAN_Handle_t hscan;
-static AM_TV_Handle_t htv;
-static AM_EPG_Handle_t hepg;
+static int hscan, htv, hepg;
 static int chan_num[MAX_PROG_CNT];
 static char programs[MAX_PROG_CNT][MAX_NAME_LEN];
 
@@ -94,7 +92,7 @@ static const char *weeks[]=
 static void show_main_menu(void);
 
 
-static void epg_evt_call_back(long dev_no, int event_type, void *param, void *user_data)
+static void epg_evt_call_back(int dev_no, int event_type, void *param, void *user_data)
 {
 	char *errmsg = NULL;
 	sqlite3 *hdb;
@@ -452,7 +450,7 @@ static void load_db_from_file(void)
 }
 #endif
 
-static void progress_evt_callback(long dev_no, int event_type, void *param, void *user_data)
+static void progress_evt_callback(int dev_no, int event_type, void *param, void *user_data)
 {
 	switch (event_type)
 	{
@@ -1122,7 +1120,7 @@ static int start_tv_test()
 
 #ifdef TEST_CA_CI
 	AM_CI_OpenPara_t  ci_para;
-	static AM_CI_Handle_t ci;
+	static int ci;
 	AM_CA_t *ca;
 
 	memset(&ci_para, 0, sizeof(ci_para));

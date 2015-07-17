@@ -8,7 +8,7 @@ extern "C" {
 
 typedef struct _ci_s _ci_t;
 
-int ci_caman_lock(AM_CI_Handle_t handle, int lock);
+int ci_caman_lock(int handle, int lock);
 
 
 #ifdef __cplusplus

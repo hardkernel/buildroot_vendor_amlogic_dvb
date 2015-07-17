@@ -29,7 +29,6 @@
 #include <am_epg.h>
 #include <am_rec.h>
 #include "am_rec_internal.h"
-#include "am_misc.h"
 
 /****************************************************************************
  * Macro definitions
@@ -395,7 +394,7 @@ static void *am_rec_record_thread(void* arg)
 	const int stat_flag = rec->stat_flag;
 	
 	memset(&epara, 0, sizeof(epara));
-	epara.hrec = rec;
+	epara.hrec = (int)rec;
 	/*设置DVR设备参数*/
 	memset(&para, 0, sizeof(para));
 	if (AM_DVR_Open(rec->create_para.dvr_dev, &para) != AM_SUCCESS)
@@ -504,7 +503,7 @@ close_file:
 	if ((stat_flag & REC_STAT_FL_RECORDING))
 	{
 		/*通知录像结束*/
-		AM_EVT_Signal((long)rec, AM_REC_EVT_RECORD_END, (void*)&epara);
+		AM_EVT_Signal((int)rec, AM_REC_EVT_RECORD_END, (void*)&epara);
 		rec->stat_flag &= ~REC_STAT_FL_RECORDING;
 	}
 	
@@ -596,11 +595,11 @@ start_end:
 		if (ret != AM_REC_ERR_BUSY)
 		{
 			AM_REC_RecEndPara_t epara;
-			epara.hrec = rec;
+			epara.hrec = (int)rec;
 			epara.error_code = ret;
 			epara.total_size = 0;
 			epara.total_time = 0;
-			AM_EVT_Signal((long)rec, AM_REC_EVT_RECORD_END, (void*)&epara);
+			AM_EVT_Signal((int)rec, AM_REC_EVT_RECORD_END, (void*)&epara);
 		}
 	}
 	
@@ -633,7 +632,7 @@ static int am_rec_stop_record(AM_REC_Recorder_t *rec)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-AM_ErrorCode_t AM_REC_Create(AM_REC_CreatePara_t *para, AM_REC_Handle_t *handle)
+AM_ErrorCode_t AM_REC_Create(AM_REC_CreatePara_t *para, int *handle)
 {
 	AM_REC_Recorder_t *rec;
 	pthread_mutexattr_t mta;
@@ -661,7 +660,7 @@ AM_ErrorCode_t AM_REC_Create(AM_REC_CreatePara_t *para, AM_REC_Handle_t *handle)
 	pthread_mutex_init(&rec->lock, &mta);
 	pthread_mutexattr_destroy(&mta);
 
-	*handle = rec;
+	*handle = (int)rec;
 
 	return AM_SUCCESS;
 }
@@ -672,7 +671,7 @@ AM_ErrorCode_t AM_REC_Create(AM_REC_CreatePara_t *para, AM_REC_Handle_t *handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-AM_ErrorCode_t AM_REC_Destroy(AM_REC_Handle_t handle)
+AM_ErrorCode_t AM_REC_Destroy(int handle)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 	pthread_t thread;
@@ -693,7 +692,7 @@ AM_ErrorCode_t AM_REC_Destroy(AM_REC_Handle_t handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-AM_ErrorCode_t AM_REC_StartRecord(AM_REC_Handle_t handle, AM_REC_RecPara_t *start_para)
+AM_ErrorCode_t AM_REC_StartRecord(int handle, AM_REC_RecPara_t *start_para)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -712,7 +711,7 @@ AM_ErrorCode_t AM_REC_StartRecord(AM_REC_Handle_t handle, AM_REC_RecPara_t *star
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-AM_ErrorCode_t AM_REC_StopRecord(AM_REC_Handle_t handle)
+AM_ErrorCode_t AM_REC_StopRecord(int handle)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -733,7 +732,7 @@ AM_ErrorCode_t AM_REC_StopRecord(AM_REC_Handle_t handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-AM_ErrorCode_t AM_REC_SetUserData(AM_REC_Handle_t handle, void *user_data)
+AM_ErrorCode_t AM_REC_SetUserData(int handle, void *user_data)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 
@@ -754,7 +753,7 @@ AM_ErrorCode_t AM_REC_SetUserData(AM_REC_Handle_t handle, void *user_data)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-AM_ErrorCode_t AM_REC_GetUserData(AM_REC_Handle_t handle, void **user_data)
+AM_ErrorCode_t AM_REC_GetUserData(int handle, void **user_data)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 
@@ -777,7 +776,7 @@ AM_ErrorCode_t AM_REC_GetUserData(AM_REC_Handle_t handle, void **user_data)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-AM_ErrorCode_t AM_REC_SetRecordPath(AM_REC_Handle_t handle, const char *path)
+AM_ErrorCode_t AM_REC_SetRecordPath(int handle, const char *path)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 
@@ -798,7 +797,7 @@ AM_ErrorCode_t AM_REC_SetRecordPath(AM_REC_Handle_t handle, const char *path)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-AM_ErrorCode_t AM_REC_GetRecordInfo(AM_REC_Handle_t handle, AM_REC_RecInfo_t *info)
+AM_ErrorCode_t AM_REC_GetRecordInfo(int handle, AM_REC_RecInfo_t *info)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 

@@ -24,13 +24,12 @@
 #include <linux/amdsc.h>
 #include <string.h>
 #include <errno.h>
-#include "am_misc.h"
 
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
 
-#define DEV_NAME "/dev/dvb0.dsc"
+#define DEV_NAME "/dev/dvb0.dsc0"
 
 /****************************************************************************
  * Static data
@@ -61,18 +60,14 @@ AM_DSC_Driver_t aml_dsc_drv =
 
 static AM_ErrorCode_t aml_open (AM_DSC_Device_t *dev, const AM_DSC_OpenPara_t *para)
 {
-	UNUSED(dev);
-	UNUSED(para);
 	return AM_SUCCESS;
 }
 
 static AM_ErrorCode_t aml_alloc_chan (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan)
 {
 	int fd;
-	char buf[32];
-
-	snprintf(buf, sizeof(buf), DEV_NAME"%d", dev->dev_no);
-	fd = open(buf, O_RDWR);
+	
+	fd = open(DEV_NAME, O_RDWR);
 	if(fd==-1)
 	{
 		AM_DEBUG(1, "cannot open \"%s\" (%d:%s)", DEV_NAME, errno, strerror(errno));
@@ -90,9 +85,7 @@ static AM_ErrorCode_t aml_alloc_chan (AM_DSC_Device_t *dev, AM_DSC_Channel_t *ch
 static AM_ErrorCode_t aml_free_chan (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan)
 {
 	int fd = (long)chan->drv_data;
-
-	UNUSED(dev);
-
+	
 	AM_DEBUG(2, "close DSC %d", chan->id);
 	close(fd);
 	return AM_SUCCESS;
@@ -101,9 +94,7 @@ static AM_ErrorCode_t aml_free_chan (AM_DSC_Device_t *dev, AM_DSC_Channel_t *cha
 static AM_ErrorCode_t aml_set_pid (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan, uint16_t pid)
 {
 	int fd = (long)chan->drv_data;
-
-	UNUSED(dev);	
-
+	
 	if(ioctl(fd, AMDSC_IOC_SET_PID, pid)==-1)
 	{
 		AM_DEBUG(1, "set pid failed \"%s\"", strerror(errno));
@@ -121,9 +112,7 @@ static AM_ErrorCode_t aml_set_key (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan,
 {
 	struct am_dsc_key dkey;
 	int fd = (long)chan->drv_data;
-
-	UNUSED(dev);
-
+	
 	dkey.type = type;
 	memcpy(dkey.key, key, sizeof(dkey.key));
 	
@@ -144,8 +133,7 @@ static AM_ErrorCode_t aml_set_key (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan,
 static AM_ErrorCode_t aml_set_source (AM_DSC_Device_t *dev, AM_DSC_Source_t src)
 {
 	char *cmd;
-	char buf[64];
-
+	
 	switch(src)
 	{
 		case AM_DSC_SRC_DMX0:
@@ -157,22 +145,17 @@ static AM_ErrorCode_t aml_set_source (AM_DSC_Device_t *dev, AM_DSC_Source_t src)
 		case AM_DSC_SRC_DMX2:
 			cmd = "dmx2";
 		break;
-		case AM_DSC_SRC_BYPASS:
-			cmd = "bypass";
-		break;
 
 		default:
 			return AM_DSC_ERR_NOT_SUPPORTED;
 		break;
 	}
 	
-	snprintf(buf, sizeof(buf), "/sys/class/stb/dsc%d_source", dev->dev_no);
-	return AM_FileEcho(buf, cmd);
+	return AM_FileEcho("/sys/class/stb/dsc_source", cmd);
 }
 
 static AM_ErrorCode_t aml_close (AM_DSC_Device_t *dev)
 {
-	UNUSED(dev);
 	return AM_SUCCESS;
 }
 

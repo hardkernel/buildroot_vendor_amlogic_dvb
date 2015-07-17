@@ -26,6 +26,18 @@
 #define  NIT_TEST
 #define  BAT_TEST
 
+#if 0
+static FILE *fp;
+static int sec_mask[255];
+static int sec_cnt = 0;
+#else
+typedef struct {
+	char data[4096];
+	int len;
+	int got;
+} Section;
+static Section sections[255];
+#endif
 
 static int s_last_num =-1;
 
@@ -45,8 +57,6 @@ static int pall=0;
 #define USER_MAX 10
 static int u_pid[USER_MAX]={[0 ... USER_MAX-1] = -1};
 static int u_para[USER_MAX]={[0 ... USER_MAX-1] = 0};
-static char *u_ext[USER_MAX]={[0 ... USER_MAX-1] = NULL};
-static int u_bs[USER_MAX]={[0 ... USER_MAX-1] = 0};
 static int u_para_g;
 static FILE *fp[USER_MAX];
 /*
@@ -134,7 +144,7 @@ static void dump_bytes(int dev_no, int fid, const uint8_t *data, int len, void *
 				data[5], data[6], data[7], data[8]);
 			return;
 		}
-
+		
 		if(get_upara(u-1)&UPARA_PR)
 			printf("[%d:%d] %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", u-1, u_pid[u-1],
 				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
@@ -305,12 +315,7 @@ static int get_section(int dmx, int timeout)
 			AM_TRY(AM_DMX_AllocateFilter(dmx, &fid_user[i]));
 
 			AM_TRY(AM_DMX_SetCallback(dmx, fid_user[i], dump_bytes, (void*)(long)(i+1)));
-
-			if(u_bs[i]) {
-				AM_TRY(AM_DMX_SetBufferSize(dmx, fid_user[i], u_bs[i]));
-				printf("buffersize => %d\n", u_bs[i]);
-			}
-
+		
 			if(get_upara(i)&UPARA_TYPE) {/*pes*/
 				memset(&pparam, 0, sizeof(pparam));
 				pparam.pid = u_pid[i];
@@ -324,38 +329,18 @@ static int get_section(int dmx, int timeout)
 				AM_TRY(AM_DMX_SetPesFilter(dmx, fid_user[i], &pparam));
 
 			} else {/*sct*/
-				int v[16] = {[0 ... 15] = 0};
-				int m[16] = {[0 ... 15] = 0};
-				int ii;
 				memset(&param, 0, sizeof(param));
 				param.pid = u_pid[i];
-				if(u_ext[i]) {
-				sscanf(u_ext[i], "%x:%x,%x:%x,%x:%x,%x:%x"
-					",%x:%x,%x:%x,%x:%x,%x:%x"
-					",%x:%x,%x:%x,%x:%x,%x:%x"
-					",%x:%x,%x:%x,%x:%x,%x:%x",
-					&v[0], &m[0], &v[1], &m[1],
-					&v[2], &m[2], &v[3], &m[3],
-					&v[4], &m[4], &v[5], &m[5],
-					&v[6], &m[6], &v[7], &m[7],
-					&v[8], &m[8], &v[9], &m[9],
-					&v[10], &m[10], &v[11], &m[11],
-					&v[12], &m[12], &v[13], &m[13],
-					&v[14], &m[14], &v[15], &m[15]);
-				for(ii=0; ii<16; ii++) {
-					if(m[ii]) {
-						param.filter.filter[ii] = v[ii];
-						param.filter.mask[ii] = m[ii];
-						printf("ext%d: [%d]%x:%x\n", i, ii, v[ii], m[ii]);
-					}
-				}
-				}
+			/*	param.filter.filter[0] = 0xa2;
+				param.filter.mask[0] = 0xff;*/
 				if(get_upara(i)&UPARA_CRC)
 					param.flags = DMX_CHECK_CRC;
 				if(get_upara(i)&UPARA_SF)
 					param.flags |= 0x100;
 				AM_TRY(AM_DMX_SetSecFilter(dmx, fid_user[i], &param));
 			}
+
+			AM_TRY(AM_DMX_SetBufferSize(dmx, fid_user[i], 64*1024));
 
 			if(get_upara(i)&UPARA_FILE) {
 				char name[32];
@@ -428,11 +413,6 @@ int get_para(char *argv)
 			sscanf(&argv[(len)+1], type, &var); \
 			printf("param["name"] => "type"\n", var); \
 		}
-	#define CASESTR(name, len, type, var) \
-		if(!strncmp(argv, name"=", (len)+1)) { \
-			var = &argv[(len)+1]; \
-			printf("param["name"] => "type"\n", var); \
-		}
 
 	CASE("freq",      4, "%i", freq)
 	else CASE("src",  3, "%i", src)
@@ -444,26 +424,16 @@ int get_para(char *argv)
 	else CASE("nit",  3, "%x", nit)
 	else CASE("timeout", 7, "%i", timeout)
 	else CASE("pall", 4, "%i", pall)
-	else CASE("pid0", 4, "%i", u_pid[0])
-	else CASE("pid1", 4, "%i", u_pid[1])
-	else CASE("pid2", 4, "%i", u_pid[2])
-	else CASE("pid3", 4, "%i", u_pid[3])
-	else CASE("pid4", 4, "%i", u_pid[4])
+	else CASE("pid0", 4, "%x", u_pid[0])
+	else CASE("pid1", 4, "%x", u_pid[1])
+	else CASE("pid2", 4, "%x", u_pid[2])
+	else CASE("pid3", 4, "%x", u_pid[3])
+	else CASE("pid4", 4, "%x", u_pid[4])
 	else CASE("para0", 5, "%x", u_para[0])
 	else CASE("para1", 5, "%x", u_para[1])
 	else CASE("para2", 5, "%x", u_para[2])
 	else CASE("para3", 5, "%x", u_para[3])
 	else CASE("para4", 5, "%x", u_para[4])
-	else CASESTR("ext0", 4, "%s", u_ext[0])
-	else CASESTR("ext1", 4, "%s", u_ext[1])
-	else CASESTR("ext2", 4, "%s", u_ext[2])
-	else CASESTR("ext3", 4, "%s", u_ext[3])
-	else CASESTR("ext4", 4, "%s", u_ext[4])
-	else CASE("bs0", 3, "%i", u_bs[0])
-	else CASE("bs1", 3, "%i", u_bs[1])
-	else CASE("bs2", 3, "%i", u_bs[2])
-	else CASE("bs3", 3, "%i", u_bs[3])
-	else CASE("bs4", 3, "%i", u_bs[4])
 	else CASE("para", 4, "%x", u_para_g)
 
 	return 0;
@@ -483,20 +453,16 @@ int main(int argc, char **argv)
 	if(argc==1)
 	{
 		printf(
-			"Usage:%s [freq=] [src=] [dmx=] [layer=] [timeout=] [pat=] [eit=] [bat=] [nit=] [pidx=] [parax=] [para=] [extx=] [bsx=]\n"
-			"  default   - src:0 dmx:0 layer:-1 parax:0\n"
-			"  x         - 0~4\n"
-			"  para      - d6->|111111|<-d1\n"
+			"Usage:%s [freq=] [src=] [dmx=] [layer=] [timeout=] [pat=] [eit=] [bat=] [nit=] [pidx=] [parax=] [para=]\n"
+			"  default   - src:0 dmx:0 layer:-1 uparax:0\n"
+			"  x         - 0~5\n"
+			"  upara     - d6->|111111|<-d1\n"
 			"    d1 - 0:sec 1:pes (means enable for pat/eit/bat/nit)\n"
 			"    d2 - 1:crc : sec only\n"
 			"    d3 - 1:print\n"
 			"    d4 - 1:swfilter\n"
 			"    d5 - 1:ts tap : pes only\n"
 			"    d6 - 1:w2file\n"
-			"  ext       - tid....\n"
-			"    eg. 0x82:0xff,0x02:0xff"
-			"    up to 16 filter data:mask(s)"
-			"  bs        - buffersize\n"
 			, argv[0]);
 		return 0;
 	}

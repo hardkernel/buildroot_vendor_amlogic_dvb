@@ -18,11 +18,12 @@
 #include "am_dsc_internal.h"
 #include "../am_adp_internal.h"
 #include <assert.h>
-#include "am_misc.h"
 
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
+
+#define DSC_DEV_COUNT      (1)
 
 /****************************************************************************
  * Static data
@@ -34,48 +35,18 @@ extern const AM_DSC_Driver_t emu_dsc_drv;
 extern const AM_DSC_Driver_t aml_dsc_drv;
 #endif
 
-static AM_DSC_Device_t *dsc_devices;
-
-#ifdef EMU_DSC
-#define dsc_get_driver() &emu_dsc_drv
-#else
-#define dsc_get_driver() &aml_dsc_drv
-#endif
-
-static AM_ErrorCode_t dsc_init_dev_db( int *dev_num )
+static AM_DSC_Device_t dsc_devices[DSC_DEV_COUNT] =
 {
-	char buf[32];
-	static int num = 1;
-	static int init = 0;
-
-	if(init) {
-		*dev_num = num;
-		return AM_SUCCESS;
-	}
-
-	if(AM_FileRead("/sys/module/aml/parameters/dsc_max", buf, sizeof(buf)) >= 0)
-		sscanf(buf, "%d", &num);
-	else
-		num = 1;
-
-	if(num) {
-		int i;
-
-		if(!(dsc_devices = malloc(sizeof(AM_DSC_Device_t)*num))) {
-			AM_DEBUG(1, "no memory for dsc init");
-			*dev_num = 0;
-			return AM_DSC_ERR_NOT_ALLOCATED;
-		}
-		memset(dsc_devices, 0, sizeof(AM_DSC_Device_t)*num);
-		for(i=0; i<num; i++)
-			dsc_devices[i].drv = dsc_get_driver();
-	}
-
-	*dev_num = num;
-	init = 1;
-
-	return AM_SUCCESS;
+#ifdef EMU_DSC
+{
+.drv = &emu_dsc_drv
 }
+#else
+{
+.drv = &aml_dsc_drv
+}
+#endif
+};
 
 /****************************************************************************
  * Static functions
@@ -84,13 +55,9 @@ static AM_ErrorCode_t dsc_init_dev_db( int *dev_num )
 /**\brief 根据设备号取得设备结构指针*/
 static AM_INLINE AM_ErrorCode_t dsc_get_dev(int dev_no, AM_DSC_Device_t **dev)
 {
-	int dev_cnt;
-
-	AM_TRY(dsc_init_dev_db(&dev_cnt));
-
-	if((dev_no<0) || (dev_no>=dev_cnt))
+	if((dev_no<0) || (dev_no>=DSC_DEV_COUNT))
 	{
-		AM_DEBUG(1, "invalid dsc device number %d, must in(%d~%d)", dev_no, 0, dev_cnt-1);
+		AM_DEBUG(1, "invalid dsc device number %d, must in(%d~%d)", dev_no, 0, DSC_DEV_COUNT-1);
 		return AM_DSC_ERR_INVALID_DEV_NO;
 	}
 	

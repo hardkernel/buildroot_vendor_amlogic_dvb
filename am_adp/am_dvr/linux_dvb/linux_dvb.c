@@ -63,8 +63,6 @@ static AM_ErrorCode_t dvb_open(AM_DVR_Device_t *dev, const AM_DVR_OpenPara_t *pa
 	char dev_name[32];
 	int fd;
 	
-	UNUSED(para);
-
 	snprintf(dev_name, sizeof(dev_name), "/dev/dvb0.dvr%d", dev->dev_no);
 	fd = open(dev_name, O_RDONLY);
 	if (fd == -1)

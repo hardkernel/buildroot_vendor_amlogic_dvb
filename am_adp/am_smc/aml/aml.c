@@ -69,9 +69,7 @@ AM_ErrorCode_t aml_open (AM_SMC_Device_t *dev, const AM_SMC_OpenPara_t *para)
 {
 	char name[PATH_MAX];
 	int fd;
-
-	UNUSED(para);
-
+	
 	snprintf(name, sizeof(name), "/dev/smc%d", dev->dev_no);
 	fd = open(name, O_RDWR);
 	if(fd==-1)

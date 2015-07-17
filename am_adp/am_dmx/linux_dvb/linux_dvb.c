@@ -78,9 +78,7 @@ static AM_ErrorCode_t dvb_open(AM_DMX_Device_t *dev, const AM_DMX_OpenPara_t *pa
 {
 	DVBDmx_t *dmx;
 	int i;
-
-	UNUSED(para);
-
+	
 	dmx = (DVBDmx_t*)malloc(sizeof(DVBDmx_t));
 	if(!dmx)
 	{
@@ -141,15 +139,12 @@ static AM_ErrorCode_t dvb_set_sec_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *
 	int fd = (long)filter->drv_data;
 	int ret;
 
-	UNUSED(dev);
-
 	p = *params;
-	/*
 	if(p.filter.mask[0] == 0){
 		p.filter.filter[0] = 0x00;
 		p.filter.mask[0]   = 0x80;
 	}
-	*/
+	
 	ret = ioctl(fd, DMX_SET_FILTER, &p);
 	if(ret==-1)
 	{
@@ -164,8 +159,6 @@ static AM_ErrorCode_t dvb_set_pes_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *
 {
 	int fd = (long)filter->drv_data;
 	int ret;
-
-	UNUSED(dev);
 
 	fcntl(fd,F_SETFL,O_NONBLOCK);
 
@@ -183,9 +176,7 @@ static AM_ErrorCode_t dvb_enable_filter(AM_DMX_Device_t *dev, AM_DMX_Filter_t *f
 {
 	int fd = (long)filter->drv_data;
 	int ret;
-
-	UNUSED(dev);
-
+	
 	if(enable)
 		ret = ioctl(fd, DMX_START, 0);
 	else
@@ -204,8 +195,6 @@ static AM_ErrorCode_t dvb_set_buf_size(AM_DMX_Device_t *dev, AM_DMX_Filter_t *fi
 {
 	int fd = (long)filter->drv_data;
 	int ret;
-
-	UNUSED(dev);
 	
 	ret = ioctl(fd, DMX_SET_BUFFER_SIZE, size);
 	if(ret==-1)
@@ -261,8 +250,6 @@ static AM_ErrorCode_t dvb_read(AM_DMX_Device_t *dev, AM_DMX_Filter_t *filter, ui
 	int len = *size;
 	int ret;
 	struct pollfd pfd;
-
-	UNUSED(dev);
 	
 	if(fd==-1)
 		return AM_DMX_ERR_NOT_ALLOCATED;

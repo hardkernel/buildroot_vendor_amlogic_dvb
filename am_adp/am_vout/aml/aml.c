@@ -50,8 +50,6 @@ const AM_VOUT_Driver_t aml_vout_drv =
 static AM_ErrorCode_t aml_open(AM_VOUT_Device_t *dev, const AM_VOUT_OpenPara_t *para)
 {
 	char buf[32];
-
-	UNUSED(para);
 	
 	if(AM_FileRead(DISP_MODE_FILE, buf, sizeof(buf))==AM_SUCCESS)
 	{
@@ -91,8 +89,6 @@ static AM_ErrorCode_t aml_open(AM_VOUT_Device_t *dev, const AM_VOUT_OpenPara_t *
 static AM_ErrorCode_t aml_set_format(AM_VOUT_Device_t *dev, AM_VOUT_Format_t fmt)
 {
 	const char *cmd;
-	
-	UNUSED(dev);
 	
 	switch(fmt)
 	{
@@ -135,16 +131,12 @@ static AM_ErrorCode_t aml_set_format(AM_VOUT_Device_t *dev, AM_VOUT_Format_t fmt
 static AM_ErrorCode_t aml_enable(AM_VOUT_Device_t *dev, AM_Bool_t enable)
 {
 	char *cmd = enable?"1":"0";
-
-	UNUSED(dev);
 	
 	return AM_FileEcho(DISP_ENABLE_FILE, cmd);
 }
 
 static AM_ErrorCode_t aml_close(AM_VOUT_Device_t *dev)
 {
-	UNUSED(dev);
-
 	return AM_SUCCESS;
 }
 

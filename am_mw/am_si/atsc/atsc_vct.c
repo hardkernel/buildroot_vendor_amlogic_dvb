@@ -158,7 +158,7 @@ INT32S atsc_psip_parse_vct(INT8U* data, INT32U length, vct_section_info_t *info)
 					if(atsc_convert_code_from_utf16_to_utf8((char*)ptr, 14, (char*)tmp_chan_info->short_name, 
                                           &chan_name_len) < 0 ) {
                                                memset(tmp_chan_info->short_name,0 ,chan_name_len);//reset shortname due to hit name  paser error
-                                               strcpy((char*)tmp_chan_info->short_name,"No Name");
+                                               strcpy(tmp_chan_info->short_name,"No Name");
                                           }
 
 					//short_channel_name_parse(ptr, tmp_chan_info->short_name);

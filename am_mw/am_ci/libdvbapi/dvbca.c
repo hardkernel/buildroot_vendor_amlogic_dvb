@@ -39,10 +39,10 @@ int dvbca_open(int adapter, int cadevice)
 	char filename[PATH_MAX+1];
 	int fd;
 
-	snprintf(filename, sizeof(filename), "/dev/dvb/adapter%i/ca%i", adapter, cadevice);
+	sprintf(filename, "/dev/dvb/adapter%i/ca%i", adapter, cadevice);
 	if ((fd = open(filename, O_RDWR)) < 0) {
 		// if that failed, try a flat /dev structure
-		snprintf(filename, sizeof(filename), "/dev/dvb%i.ca%i", adapter, cadevice);
+		sprintf(filename, "/dev/dvb%i.ca%i", adapter, cadevice);
 		fd = open(filename, O_RDWR);
 	}
 

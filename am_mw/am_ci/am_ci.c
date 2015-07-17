@@ -135,7 +135,7 @@ struct {
 		},
 };
 
-static inline AM_ErrorCode_t get_ci(AM_CI_Handle_t handle, _ci_t **pci)
+static inline AM_ErrorCode_t get_ci(int handle, _ci_t **pci)
 {
 	_ci_t *ci = (_ci_t *)handle;
 	int i;
@@ -650,9 +650,6 @@ static AM_ErrorCode_t ci_open_stdcam(_ci_t *ci, int dev, int slot_num)
 	int rc;
 	struct en50221_stdcam *stdcam;
 
-	UNUSED(dev);
-	UNUSED(slot_num);
-
 	// create transport layer
 	ci->tl = en50221_tl_create(1, 16);
 	if (ci->tl == NULL) {
@@ -750,7 +747,7 @@ static void *ci_workthread(void *para)
 }
 
 
-AM_ErrorCode_t AM_CI_Open(int dev_no, int slot_no, const AM_CI_OpenPara_t *para, AM_CI_Handle_t *handle)
+AM_ErrorCode_t AM_CI_Open(int dev_no, int slot_no, const AM_CI_OpenPara_t *para, int *handle)
 {
 	int rc;
 	AM_ErrorCode_t err = AM_SUCCESS;
@@ -776,12 +773,12 @@ AM_ErrorCode_t AM_CI_Open(int dev_no, int slot_no, const AM_CI_OpenPara_t *para,
 
 	pthread_mutex_unlock(&ci->lock);
 
-	*handle = ci;
+	*handle = (int)ci;
 
 	return err;
 }
 
-AM_ErrorCode_t AM_CI_Close(AM_CI_Handle_t handle)
+AM_ErrorCode_t AM_CI_Close(int handle)
 {
 	pthread_t t;
 	AM_ErrorCode_t err;
@@ -825,7 +822,7 @@ quit:
 	return err;
 }
 
-AM_ErrorCode_t AM_CI_Start(AM_CI_Handle_t handle)
+AM_ErrorCode_t AM_CI_Start(int handle)
 {
 	AM_ErrorCode_t err;
 	_ci_t *ci;
@@ -865,7 +862,7 @@ quit:
 	return err;	
 }
 
-AM_ErrorCode_t AM_CI_Stop(AM_CI_Handle_t handle)
+AM_ErrorCode_t AM_CI_Stop(int handle)
 {
 	AM_ErrorCode_t err=AM_SUCCESS;
 	_ci_t *ci;
@@ -894,7 +891,7 @@ quit:
 
 }
 
-AM_ErrorCode_t AM_CI_SetCallback(AM_CI_Handle_t handle, int cbid, AM_CI_CB_t *cb, void *arg)
+AM_ErrorCode_t AM_CI_SetCallback(int handle, int cbid, AM_CI_CB_t *cb, void *arg)
 {
 	AM_ErrorCode_t err = AM_SUCCESS;
 	_ci_t *ci;
@@ -916,8 +913,8 @@ AM_ErrorCode_t AM_CI_SetCallback(AM_CI_Handle_t handle, int cbid, AM_CI_CB_t *cb
 	{
 		#define SET(x) do{ci->x = cb->u.x; ci->x##_arg = arg;}while(0)
 		
-		case CBID_AI_CALLBACK:		SET(ai_cb);			break;
-		case CBID_CA_INFO_CALLBACK:	SET(ca_info_cb);		break;
+		case CBID_AI_CALLBACK:			SET(ai_cb);				break;
+		case CBID_CA_INFO_CALLBACK:	SET(ca_info_cb);			break;
 		case CBID_MMI_CLOSE_CALLBACK:	SET(mmi_close_cb);		break;
 		case CBID_MMI_DISPLAY_CONTROL_CALLBACK: SET(mmi_display_control_cb);			break;
 		case CBID_MMI_ENQ_CALLBACK:	SET(mmi_enq_cb);		break;
@@ -936,7 +933,7 @@ quit:
 	return err;
 }
 
-AM_ErrorCode_t AM_CI_App_ca_pmt(AM_CI_Handle_t handle, unsigned char *capmt, unsigned int size)
+AM_ErrorCode_t AM_CI_App_ca_pmt(int handle, unsigned char *capmt, unsigned int size)
 {
 	AM_ErrorCode_t err = AM_SUCCESS;
 	_ci_t *ci;
@@ -976,7 +973,7 @@ quit:
 	return err;
 }
 
-AM_ErrorCode_t AM_CI_App_ai_entermenu(AM_CI_Handle_t handle)
+AM_ErrorCode_t AM_CI_App_ai_entermenu(int handle)
 {
 	AM_ErrorCode_t err = AM_SUCCESS;
 	_ci_t *ci;
@@ -1013,7 +1010,7 @@ quit:
 }
 
 
-AM_ErrorCode_t AM_CI_App_mmi_answ(AM_CI_Handle_t handle, int answer_id, char *answer, int size)
+AM_ErrorCode_t AM_CI_App_mmi_answ(int handle, int answer_id, char *answer, int size)
 {
 	AM_ErrorCode_t err = AM_SUCCESS;
 	_ci_t *ci;
@@ -1046,7 +1043,7 @@ quit:
 	return err;
 }
 
-AM_ErrorCode_t AM_CI_App_mmi_menu_answ(AM_CI_Handle_t handle, int select)
+AM_ErrorCode_t AM_CI_App_mmi_menu_answ(int handle, int select)
 {
 	AM_ErrorCode_t err = AM_SUCCESS;
 	_ci_t *ci;
@@ -1079,7 +1076,7 @@ quit:
 	return err;
 }
 
-AM_ErrorCode_t AM_CI_App_mmi_close(AM_CI_Handle_t handle, int cmd_id, int delay)
+AM_ErrorCode_t AM_CI_App_mmi_close(int handle, int cmd_id, int delay)
 {
 	AM_ErrorCode_t err = AM_SUCCESS;
 	_ci_t *ci;
@@ -1160,7 +1157,7 @@ AM_ErrorCode_t AM_CI_GenerateCAPMT(unsigned char *pmt, unsigned int pmt_size,
 	return AM_SUCCESS;
 }
 
-AM_ErrorCode_t AM_CI_App_ai_enquiry(AM_CI_Handle_t handle)
+AM_ErrorCode_t AM_CI_App_ai_enquiry(int handle)
 {
 	AM_ErrorCode_t err = AM_SUCCESS;
 	_ci_t *ci;
@@ -1193,7 +1190,7 @@ quit:
 	return err;
 }
 
-AM_ErrorCode_t AM_CI_App_ca_info_enq(AM_CI_Handle_t handle)
+AM_ErrorCode_t AM_CI_App_ca_info_enq(int handle)
 {
 	AM_ErrorCode_t err = AM_SUCCESS;
 	_ci_t *ci;
@@ -1226,7 +1223,7 @@ quit:
 	return err;
 }
 
-AM_ErrorCode_t AM_CI_MatchCAID(AM_CI_Handle_t handle, unsigned int caid, int *match)
+AM_ErrorCode_t AM_CI_MatchCAID(int handle, unsigned int caid, int *match)
 {
 	AM_ErrorCode_t err = AM_SUCCESS;
 	_ci_t *ci;
@@ -1264,7 +1261,7 @@ quit:
 }
 
 
-int ci_caman_lock(AM_CI_Handle_t handle, int lock)
+int ci_caman_lock(int handle, int lock)
 {
 	AM_ErrorCode_t err = AM_SUCCESS;
 	_ci_t *ci;
@@ -1290,7 +1287,7 @@ int ci_caman_lock(AM_CI_Handle_t handle, int lock)
 #include "ca_ci.h"
 #include "ca_ci_internal.h"
 
-AM_ErrorCode_t AM_CI_CAMAN_getCA(AM_CI_Handle_t handle, AM_CA_t **ca)
+AM_ErrorCode_t AM_CI_CAMAN_getCA(int handle, AM_CA_t **ca)
 {
 	AM_ErrorCode_t err = AM_SUCCESS;
 	_ci_t *ci;

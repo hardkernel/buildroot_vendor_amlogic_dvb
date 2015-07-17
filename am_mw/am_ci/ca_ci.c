@@ -58,9 +58,6 @@ static int _ai_callback(void *arg, uint8_t slot_id, uint16_t session_number,
 	ca_ci_msg_t *msgdata;
 	ca_ci_appinfo_t *appinfo;
 
-	UNUSED(slot_id);
-	UNUSED(session_number);
-
 	msgdata = malloc(msg_size);
 	assert(msgdata);
 
@@ -85,9 +82,6 @@ static int _ca_info_callback(void *arg, uint8_t slot_id, uint16_t session_number
 	ca_ci_msg_t *msgdata;
 	ca_ci_cainfo_t *cainfo;
 
-	UNUSED(slot_id);
-	UNUSED(session_number);
-
 	msgdata = malloc(msg_size);
 	assert(msgdata);
 
@@ -111,9 +105,6 @@ static int _mmi_close_callback(void *arg, uint8_t slot_id, uint16_t session_numb
 	ca_ci_msg_t *msgdata;
 	ca_ci_mmi_close_t *mmiclose;
 
-	UNUSED(slot_id);
-	UNUSED(session_number);
-
 	msgdata = malloc(msg_size);
 	assert(msgdata);
 
@@ -136,9 +127,6 @@ static int _mmi_display_control_callback(void *arg, uint8_t slot_id, uint16_t se
 	ca_ci_msg_t *msgdata;
 	ca_ci_mmi_display_control_t *dc;
 
-	UNUSED(slot_id);
-	UNUSED(session_number);
-
 	msgdata = malloc(msg_size);
 	assert(msgdata);
 
@@ -160,9 +148,6 @@ static int _mmi_enq_callback(void *arg, uint8_t slot_id, uint16_t session_number
 	int msg_size = sizeof(ca_ci_msg_t) + sizeof(ca_ci_mmi_enq_t) + text_size*sizeof(uint8_t);
 	ca_ci_msg_t *msgdata;
 	ca_ci_mmi_enq_t *enq;
-
-	UNUSED(slot_id);
-	UNUSED(session_number);
 
 	msgdata = malloc(msg_size);
 	assert(msgdata);
@@ -203,9 +188,6 @@ static int __mmi_menu_list_callback(void *arg, uint8_t slot_id, uint16_t session
 	ca_ci_msg_t *msgdata;
 	unsigned char *menu, *ptr;
 	unsigned int off=0, i;
-
-	UNUSED(session_number);
-	UNUSED(slot_id);
 
 #define SIZE_OF(text) ((text)->text_size + sizeof((text)->text_size))
 	
@@ -273,11 +255,9 @@ static int _mmi_list_callback(void *arg, uint8_t slot_id, uint16_t session_numbe
 static int ca_ci_open(void *arg, AM_CAMAN_Ts_t *ts)
 {
 	ca_ci_t *ca_ci = (ca_ci_t*)arg;
-	AM_CI_Handle_t dev = ca_ci->ci;
+	int dev = (int)ca_ci->ci;
 	AM_CI_CB_t cb;
 	AM_ErrorCode_t ret;
-
-	UNUSED(ts);
 
 	AM_DEBUG(1, "\t-->|ca ci open, arg[%p]", arg);
 
@@ -318,7 +298,7 @@ final:
 static int ca_ci_close(void *arg)
 {
 	ca_ci_t *ca_ci = (ca_ci_t*)arg;
-	AM_CI_Handle_t dev = ca_ci->ci;
+	int dev = (int)ca_ci->ci;
 	AM_CI_CB_t cb;
 
 	AM_DEBUG(1, "\t-->|ca ci close");
@@ -349,7 +329,7 @@ static int ca_ci_close(void *arg)
 static int ca_ci_camatch(void *arg, unsigned int caid)
 {
 	ca_ci_t *ca_ci = (ca_ci_t*)arg;
-	AM_CI_Handle_t dev = ca_ci->ci;
+	int dev = (int)ca_ci->ci;
 	int match=0;
 	AM_ErrorCode_t err;
 	
@@ -366,11 +346,8 @@ static int ca_ci_camatch(void *arg, unsigned int caid)
 
 static int ca_ci_new_cat(void *arg, unsigned char *cat, unsigned int size)
 {
-	UNUSED(arg);
-	UNUSED(cat);
-	UNUSED(size);
-
 	AM_DEBUG(1, "\t-->|ca ci new cat");
+	
 
 	return 0;
 }
@@ -379,7 +356,7 @@ static int ca_ci_new_cat(void *arg, unsigned char *cat, unsigned int size)
 static int ca_ci_startpmt(void *arg, int service_id, unsigned char *pmt, unsigned int size)
 {
 	ca_ci_t *ca_ci = (ca_ci_t*)arg;
-	AM_CI_Handle_t dev = ca_ci->ci;
+	int dev = (int)ca_ci->ci;
 	AM_ErrorCode_t ret=AM_SUCCESS;
 	uint8_t *capmt;
 	unsigned int capmt_size;
@@ -415,7 +392,7 @@ final:
 static int ca_ci_stoppmt(void *arg, int service_id)
 {
 	ca_ci_t *ca_ci = (ca_ci_t*)arg;
-	AM_CI_Handle_t dev = ca_ci->ci;
+	int dev = (int)ca_ci->ci;
 	uint8_t *capmt=NULL;
 	unsigned int size;
 	AM_ErrorCode_t ret=AM_SUCCESS;
@@ -446,7 +423,6 @@ final:
 
 static int ca_ci_ts_changed(void *arg)
 {
-	UNUSED(arg);
 	AM_DEBUG(1, "\t-->|ci ca ts changed");
 	return 0;
 }
@@ -478,8 +454,6 @@ static int ca_ci_register_msg_send(void *arg, char *name, int (*send_msg)(char *
 
 static void ca_ci_free_msg(void *arg, AM_CA_Msg_t *msg)
 {
-	UNUSED(arg);
-
 	AM_DEBUG(1, "\t-->|ca ci free msg");
 
 	if(msg && msg->data)
@@ -490,7 +464,7 @@ static void ca_ci_free_msg(void *arg, AM_CA_Msg_t *msg)
 static int ca_ci_msg_receive(void *arg, AM_CA_Msg_t *msg)
 {
 	ca_ci_t *ca_ci = (ca_ci_t*)arg;
-	AM_CI_Handle_t dev = ca_ci->ci;
+	int dev = (int)ca_ci->ci;
 	ca_ci_msg_t *cimsg = (ca_ci_msg_t *)msg->data;
 
 	if(!msg->data || !msg->len)

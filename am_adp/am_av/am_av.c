@@ -251,8 +251,6 @@ static AM_ErrorCode_t av_start(AM_AV_Device_t *dev, AV_PlayMode_t mode, void *pa
 static void av_vout_format_changed(long dev_no, int event_type, void *param, void *data)
 {
 	AM_AV_Device_t *dev = (AM_AV_Device_t*)data;
-
-	UNUSED(dev_no);
 	
 	if(event_type==AM_VOUT_EVT_FORMAT_CHANGED)
 	{
@@ -2818,9 +2816,6 @@ AM_AV_SetVPathPara(int dev_no, AM_AV_FreeScalePara_t fs, AM_AV_DeinterlacePara_t
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-
-	UNUSED(dev_no);
-	UNUSED(di);
 	
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
 	

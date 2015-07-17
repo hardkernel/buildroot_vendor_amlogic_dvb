@@ -20,7 +20,6 @@
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
-#include "am_misc.h"
 
 /****************************************************************************
  * Macro definitions
@@ -259,8 +258,6 @@ static AM_INLINE AM_ErrorCode_t dmx_wait_cb(AM_DMX_Device_t *dev)
 		while(dev->flags&DMX_FL_RUN_CB)
 			pthread_cond_wait(&dev->cond, &dev->lock);
 	}
-#else
-	UNUSED(dev);
 #endif
 	return AM_SUCCESS;
 }
