@@ -62,7 +62,7 @@ static int print_result_callback(void *param, int col, char **values, char **nam
 	return 0;
 }
 
-static void progress_evt_callback(int dev_no, int event_type, void *param, void *user_data)
+static void progress_evt_callback(long dev_no, int event_type, void *param, void *user_data)
 {
 	char *errmsg = NULL;
 	
@@ -218,7 +218,7 @@ static void init_atv_fe_paras(AM_FENDCTRL_DVBFrontendParameters_t *fpara, int cn
 
 static int start_scan_test()
 {
-	int hscan = 0;
+	AM_SCAN_Handle_t hscan = NULL;
 	int i, mode;
 	AM_FENDCTRL_DVBFrontendParameters_t dtv_fes[10];
 	AM_FENDCTRL_DVBFrontendParameters_t atv_fes[10];

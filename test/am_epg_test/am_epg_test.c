@@ -25,7 +25,7 @@
  * Macro definitions
  ***************************************************************************/
 
-static void epg_evt_call_back(int dev_no, int event_type, void *param, void *user_data)
+static void epg_evt_call_back(long dev_no, int event_type, void *param, void *user_data)
 {
 	switch (event_type)
 	{
@@ -105,11 +105,12 @@ static void epg_evt_call_back(int dev_no, int event_type, void *param, void *use
 
 static int start_epg_test()
 {
-	int hmon, mode, op, distance;
+	int mode, op, distance;
 	char buf[256];
 	char buf1[32];
 	AM_Bool_t go = AM_TRUE;
 	AM_EPG_CreatePara_t epara;
+	AM_EPG_Handle_t hmon;
 
 	epara.fend_dev = FEND_DEV_NO;
 	epara.dmx_dev = DMX_DEV_NO;

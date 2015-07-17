@@ -55,6 +55,8 @@ enum AM_REC_ErrorCode
  * Type definitions
  ***************************************************************************/
 
+typedef void* AM_REC_Handle_t;
+
 /**\brief 数据库中记录的录像状态*/
 enum
 {
@@ -76,7 +78,7 @@ enum AM_REC_EventType
 /**\brief 录像结束数据*/
 typedef struct
 {
-	int hrec;	/**< 录像管理器句柄*/
+	AM_REC_Handle_t hrec;	/**< 录像管理器句柄*/
 	int error_code;	/**< 0-正常结束，其他见AM_REC_ErrorCode*/
 	long long total_size;	/**< 录像完成后的文件长度*/
 	int total_time;	/**< 录像完成后的总时长*/
@@ -123,7 +125,7 @@ typedef struct
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-extern AM_ErrorCode_t AM_REC_Create(AM_REC_CreatePara_t *para, int *handle);
+extern AM_ErrorCode_t AM_REC_Create(AM_REC_CreatePara_t *para, AM_REC_Handle_t *handle);
 
 /**\brief 销毁一个录像管理器
  * param handle 录像管理器句柄
@@ -131,7 +133,7 @@ extern AM_ErrorCode_t AM_REC_Create(AM_REC_CreatePara_t *para, int *handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-extern AM_ErrorCode_t AM_REC_Destroy(int handle);
+extern AM_ErrorCode_t AM_REC_Destroy(AM_REC_Handle_t handle);
 
 /**\brief 开始录像
  * \param handle 录像管理器句柄
@@ -140,7 +142,7 @@ extern AM_ErrorCode_t AM_REC_Destroy(int handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-extern AM_ErrorCode_t AM_REC_StartRecord(int handle, AM_REC_RecPara_t *start_para);
+extern AM_ErrorCode_t AM_REC_StartRecord(AM_REC_Handle_t handle, AM_REC_RecPara_t *start_para);
 
 /**\brief 停止录像
  * \param handle 录像管理器句柄
@@ -148,7 +150,7 @@ extern AM_ErrorCode_t AM_REC_StartRecord(int handle, AM_REC_RecPara_t *start_par
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-extern AM_ErrorCode_t AM_REC_StopRecord(int handle);
+extern AM_ErrorCode_t AM_REC_StopRecord(AM_REC_Handle_t handle);
 
 /**\brief 设置用户数据
  * \param handle 录像管理器句柄
@@ -157,7 +159,7 @@ extern AM_ErrorCode_t AM_REC_StopRecord(int handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-extern AM_ErrorCode_t AM_REC_SetUserData(int handle, void *user_data);
+extern AM_ErrorCode_t AM_REC_SetUserData(AM_REC_Handle_t handle, void *user_data);
 
 /**\brief 取得用户数据
  * \param handle 录像管理器句柄
@@ -166,7 +168,7 @@ extern AM_ErrorCode_t AM_REC_SetUserData(int handle, void *user_data);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-extern AM_ErrorCode_t AM_REC_GetUserData(int handle, void **user_data);
+extern AM_ErrorCode_t AM_REC_GetUserData(AM_REC_Handle_t handle, void **user_data);
 
 /**\brief 设置录像保存路径
  * \param handle 录像管理器句柄
@@ -175,7 +177,7 @@ extern AM_ErrorCode_t AM_REC_GetUserData(int handle, void **user_data);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-extern AM_ErrorCode_t AM_REC_SetRecordPath(int handle, const char *path);
+extern AM_ErrorCode_t AM_REC_SetRecordPath(AM_REC_Handle_t handle, const char *path);
 
 /**\brief 获取当前录像信息
  * \param handle 录像管理器句柄
@@ -184,7 +186,7 @@ extern AM_ErrorCode_t AM_REC_SetRecordPath(int handle, const char *path);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-extern AM_ErrorCode_t AM_REC_GetRecordInfo(int handle, AM_REC_RecInfo_t *info);
+extern AM_ErrorCode_t AM_REC_GetRecordInfo(AM_REC_Handle_t handle, AM_REC_RecInfo_t *info);
 
 #ifdef __cplusplus
 }

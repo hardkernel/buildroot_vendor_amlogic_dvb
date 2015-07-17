@@ -16,15 +16,15 @@ typedef AM_SUB2_Region_t  sub_pic_region_t;
 
 typedef AM_SUB2_Picture_t dvbsub_picture_t;
 
-typedef void (*dvbsub_callback_t)(INT32U handle, dvbsub_picture_t *display);
+typedef void (*dvbsub_callback_t)(long handle, dvbsub_picture_t *display);
 
-INT32S dvbsub_decoder_create(INT16U composition_id, INT16U ancillary_id, dvbsub_callback_t cb, INT32U* handle);
-INT32S dvbsub_decoder_destroy(INT32U handle);
+INT32S dvbsub_decoder_create(INT16U composition_id, INT16U ancillary_id, dvbsub_callback_t cb, long* handle);
+INT32S dvbsub_decoder_destroy(long handle);
 
-INT32S dvbsub_parse_pes_packet(INT32U handle, const INT8U* packet, INT32U length);
+INT32S dvbsub_parse_pes_packet(long handle, const INT8U* packet, INT32U length);
 
-dvbsub_picture_t* dvbsub_get_display_set(INT32U handle);
-INT32S dvbsub_remove_display_picture(INT32U handle, dvbsub_picture_t* pic);
+dvbsub_picture_t* dvbsub_get_display_set(long handle);
+INT32S dvbsub_remove_display_picture(long handle, dvbsub_picture_t* pic);
 
 #ifdef __cplusplus
 }

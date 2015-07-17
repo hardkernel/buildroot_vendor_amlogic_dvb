@@ -43,7 +43,7 @@ enum AM_EVT_ErrorCode
  ***************************************************************************/
 
 /**\brief 事件回调函数*/
-typedef void (*AM_EVT_Callback_t)(int dev_no, int event_type, void *param, void *data);
+typedef void (*AM_EVT_Callback_t)(long dev_no, int event_type, void *param, void *data);
 
 /****************************************************************************
  * Function prototypes  
@@ -58,7 +58,7 @@ typedef void (*AM_EVT_Callback_t)(int dev_no, int event_type, void *param, void 
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码
  */
-extern AM_ErrorCode_t AM_EVT_Subscribe(int dev_no, int event_type, AM_EVT_Callback_t cb, void *data);
+extern AM_ErrorCode_t AM_EVT_Subscribe(long dev_no, int event_type, AM_EVT_Callback_t cb, void *data);
 
 /**\brief 反注册一个事件回调函数
  * \param dev_no 回调函数对应的设备ID
@@ -69,14 +69,14 @@ extern AM_ErrorCode_t AM_EVT_Subscribe(int dev_no, int event_type, AM_EVT_Callba
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码
  */
-extern AM_ErrorCode_t AM_EVT_Unsubscribe(int dev_no, int event_type, AM_EVT_Callback_t cb, void *data);
+extern AM_ErrorCode_t AM_EVT_Unsubscribe(long dev_no, int event_type, AM_EVT_Callback_t cb, void *data);
 
 /**\brief 触发一个事件
  * \param dev_no 产生事件的设备ID
  * \param event_type 产生事件的类型
  * \param[in] param 事件参数
  */
-extern AM_ErrorCode_t AM_EVT_Signal(int dev_no, int event_type, void *param);
+extern AM_ErrorCode_t AM_EVT_Signal(long dev_no, int event_type, void *param);
 
 #ifdef __cplusplus
 }

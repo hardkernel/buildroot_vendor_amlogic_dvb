@@ -187,7 +187,7 @@
 #define SIGNAL_EVENT(e, d)\
 	AM_MACRO_BEGIN\
 		pthread_mutex_unlock(&mon->lock);\
-		AM_EVT_Signal((int)mon, e, d);\
+		AM_EVT_Signal((long)mon, e, d);\
 		pthread_mutex_lock(&mon->lock);\
 	AM_MACRO_END
 	
@@ -533,15 +533,15 @@ static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, 
 	{
 		if (i == 0)
 		{
-			sprintf(pids, "%d", ai->audios[i].pid);
-			sprintf(fmts, "%d", ai->audios[i].fmt);
+			snprintf(pids, 256, "%d", ai->audios[i].pid);
+			snprintf(fmts, 256, "%d", ai->audios[i].fmt);
 			sprintf(langs, "%s", ai->audios[i].lang);
 		}
 		else
 		{
-			sprintf(pids, "%s %d", pids, ai->audios[i].pid);
-			sprintf(fmts, "%s %d", fmts, ai->audios[i].fmt);
-			sprintf(langs, "%s %s", langs, ai->audios[i].lang);
+			snprintf(pids, 256, "%s %d", pids, ai->audios[i].pid);
+			snprintf(fmts, 256, "%s %d", fmts, ai->audios[i].fmt);
+			snprintf(langs, 256, "%s %s", langs, ai->audios[i].lang);
 		}
 	}
 }
@@ -649,6 +649,8 @@ static void am_epg_proc_tot_section(AM_EPG_Monitor_t *mon, void *tot_section)
 	uint16_t mjd;
 	uint8_t hour, min, sec;
 
+	UNUSED(mon);
+
 	/*取UTC时间*/
 	mjd = (uint16_t)(p_tot->i_utc_time >> 24);
 	hour = (uint8_t)(p_tot->i_utc_time >> 16);
@@ -667,7 +669,9 @@ static void am_epg_proc_stt_section(AM_EPG_Monitor_t *mon, void *stt_section)
 	stt_section_info_t *p_stt = (stt_section_info_t *)stt_section;
 	uint16_t mjd;
 	uint8_t hour, min, sec;
-	
+
+	UNUSED(mon);
+
 	AM_DEBUG(1, "STT UTC time is %u", p_stt->utc_time);
 	/*取UTC时间*/
 	pthread_mutex_lock(&time_lock);
@@ -1153,6 +1157,8 @@ static void am_epg_proc_rrt_section(AM_EPG_Monitor_t *mon, void *rrt_section)
         ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 	const char *new_dimension_sql_name = "new dimension";
 
+	UNUSED(mon);
+
 	AM_DB_HANDLE_PREPARE(hdb);
 	if (AM_DB_GetSTMT(&stmt, new_dimension_sql_name, new_dimension_sql, 0) != AM_SUCCESS)
 	{
@@ -1397,7 +1403,7 @@ static void am_epg_proc_vct_section(AM_EPG_Monitor_t *mon, void *vct_section)
 	if (p_vct->transport_stream_id != ts_id)
 	{
 		AM_DEBUG(1, "TS id not match, current(%d), but got(%d)", ts_id, p_vct->transport_stream_id);
-		SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)db_ts_id);
+		SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)(long)db_ts_id);
 		return;
 	}
 	
@@ -1423,7 +1429,7 @@ static void am_epg_proc_vct_section(AM_EPG_Monitor_t *mon, void *vct_section)
 					if (db_srv_id == mon->mon_service)
 					{
 						/*触发通知事件*/
-						SIGNAL_EVENT(AM_EPG_EVT_UPDATE_PROGRAM_AV, (void*)mon->mon_service);
+						SIGNAL_EVENT(AM_EPG_EVT_UPDATE_PROGRAM_AV, (void*)(long)mon->mon_service);
 					}
 				}
 				/* channel number changed ? */
@@ -1445,7 +1451,7 @@ static void am_epg_proc_vct_section(AM_EPG_Monitor_t *mon, void *vct_section)
 			else
 			{
 				AM_DEBUG(1, "Cannot get program %d, need a re-scan for current ts.", vcinfo->program_number);
-				SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)db_ts_id);
+				SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)(long)db_ts_id);
 				return;
 			}
 		}
@@ -1520,6 +1526,8 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)user_data;
 	AM_EPG_TableCtl_t * sec_ctrl;
 	AM_SI_SectionHeader_t header;
+
+	UNUSED(dev_no);
 
 	if (mon == NULL)
 	{
@@ -1940,7 +1948,7 @@ static void am_epg_check_pmt_update(AM_EPG_Monitor_t *mon)
 		AM_SI_LIST_END()
 
 		/*触发通知事件*/
-		SIGNAL_EVENT(AM_EPG_EVT_UPDATE_PROGRAM_AV, (void*)mon->mon_service);
+		SIGNAL_EVENT(AM_EPG_EVT_UPDATE_PROGRAM_AV, (void*)(long)mon->mon_service);
 	}
 }
 
@@ -2033,7 +2041,7 @@ static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 		if(prev_ts_id != mon->sdts->i_ts_id)
 		{
 			AM_DEBUG(1, "TS id not match, current(%d), but got(%d)", prev_ts_id, mon->sdts->i_ts_id);
-			SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)db_ts_id);
+			SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)(long)db_ts_id);
 			return;
 		}
 
@@ -2078,7 +2086,7 @@ static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 					if(prev_net_id != mon->sdts->i_network_id)
 					{
 						AM_DEBUG(1, "Network id not match, current(%d), but got(%d)", prev_net_id, mon->sdts->i_network_id);
-						SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)db_ts_id);
+						SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)(long)db_ts_id);
 						return;
 					}
 				}
@@ -2134,7 +2142,7 @@ static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 							sqlite3_reset(update_stmt);
 							AM_DEBUG(1, "Update '%s' done!", name);
 							/*触发通知事件*/
-							SIGNAL_EVENT(AM_EPG_EVT_UPDATE_PROGRAM_NAME, (void*)db_srv_id);
+							SIGNAL_EVENT(AM_EPG_EVT_UPDATE_PROGRAM_NAME, (void*)(long)db_srv_id);
 							if (! update)
 								update = AM_TRUE;
 						}
@@ -2147,7 +2155,7 @@ static void am_epg_check_sdt_update(AM_EPG_Monitor_t *mon)
 					{
 						AM_DEBUG(1, "SDT Update: Cannot find program for db_ts_id=%d  srv=%d",
 							db_ts_id,srv->i_service_id);
-						SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)db_ts_id);
+						SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)(long)db_ts_id);
 						goto update_end;
 					}
 					sqlite3_reset(stmt);
@@ -2170,7 +2178,7 @@ static void am_epg_nit_done(AM_EPG_Monitor_t *mon)
 	am_epg_free_filter(mon, &mon->nitctl.fid);
 
 	/*触发通知事件*/
-	SIGNAL_EVENT(AM_EPG_EVT_NEW_NIT, (void*)mon->nits->i_version);
+	SIGNAL_EVENT(AM_EPG_EVT_NEW_NIT, (void*)(long)mon->nits->i_version);
 	/* release for updating new tables */
 	RELEASE_TABLE_FROM_LIST(dvbpsi_nit_t, mon->nits);
 	/*监控下一版本*/
@@ -2590,10 +2598,13 @@ static void am_epg_reset(AM_EPG_Monitor_t *mon)
 }
 
 /**\brief 前端回调函数*/
-static void am_epg_fend_callback(int dev_no, int event_type, void *param, void *user_data)
+static void am_epg_fend_callback(long dev_no, int event_type, void *param, void *user_data)
 {
 	struct dvb_frontend_event *evt = (struct dvb_frontend_event*)param;
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)user_data;
+
+	UNUSED(dev_no);
+	UNUSED(event_type);
 
 	if (!mon || !evt || (evt->status == 0))
 		return;
@@ -2608,7 +2619,7 @@ static void am_epg_fend_callback(int dev_no, int event_type, void *param, void *
 /**\brief 处理前端事件*/
 static void am_epg_solve_fend_evt(AM_EPG_Monitor_t *mon)
 {
-
+	UNUSED(mon);
 }
 
 /**\brief 检查EPG更新通知*/
@@ -2901,7 +2912,7 @@ handle_events:
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, int *handle)
+AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, AM_EPG_Handle_t *handle)
 {
 	AM_EPG_Monitor_t *mon;
 	int rc;
@@ -2955,7 +2966,7 @@ AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, int *handle)
 		return AM_EPG_ERR_CANNOT_CREATE_THREAD;
 	}
 
-	*handle = (int)mon;
+	*handle = mon;
 
 	return AM_SUCCESS;
 }
@@ -2966,7 +2977,7 @@ AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, int *handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-AM_ErrorCode_t AM_EPG_Destroy(int handle)
+AM_ErrorCode_t AM_EPG_Destroy(AM_EPG_Handle_t handle)
 {
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t *)handle;
 	pthread_t t;
@@ -2996,7 +3007,7 @@ AM_ErrorCode_t AM_EPG_Destroy(int handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-AM_ErrorCode_t AM_EPG_ChangeMode(int handle, int op, int mode)
+AM_ErrorCode_t AM_EPG_ChangeMode(AM_EPG_Handle_t handle, int op, int mode)
 {
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 
@@ -3042,7 +3053,7 @@ AM_ErrorCode_t AM_EPG_ChangeMode(int handle, int op, int mode)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-AM_ErrorCode_t AM_EPG_MonitorService(int handle, int db_srv_id)
+AM_ErrorCode_t AM_EPG_MonitorService(AM_EPG_Handle_t handle, int db_srv_id)
 {
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 
@@ -3065,7 +3076,7 @@ AM_ErrorCode_t AM_EPG_MonitorService(int handle, int db_srv_id)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-AM_ErrorCode_t AM_EPG_SetEITPFCheckDistance(int handle, int distance)
+AM_ErrorCode_t AM_EPG_SetEITPFCheckDistance(AM_EPG_Handle_t handle, int distance)
 {
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 
@@ -3094,7 +3105,7 @@ AM_ErrorCode_t AM_EPG_SetEITPFCheckDistance(int handle, int distance)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-AM_ErrorCode_t AM_EPG_SetEITScheCheckDistance(int handle, int distance)
+AM_ErrorCode_t AM_EPG_SetEITScheCheckDistance(AM_EPG_Handle_t handle, int distance)
 {
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 
@@ -3226,7 +3237,7 @@ AM_ErrorCode_t AM_EPG_SetLocalOffset(int offset)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-AM_ErrorCode_t AM_EPG_SetUserData(int handle, void *user_data)
+AM_ErrorCode_t AM_EPG_SetUserData(AM_EPG_Handle_t handle, void *user_data)
 {
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 
@@ -3247,7 +3258,7 @@ AM_ErrorCode_t AM_EPG_SetUserData(int handle, void *user_data)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-AM_ErrorCode_t AM_EPG_GetUserData(int handle, void **user_data)
+AM_ErrorCode_t AM_EPG_GetUserData(AM_EPG_Handle_t handle, void **user_data)
 {
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 
@@ -3270,7 +3281,7 @@ AM_ErrorCode_t AM_EPG_GetUserData(int handle, void **user_data)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-AM_ErrorCode_t AM_EPG_SubscribeEvent(int handle, int db_evt_id)
+AM_ErrorCode_t AM_EPG_SubscribeEvent(AM_EPG_Handle_t handle, int db_evt_id)
 {
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 	AM_ErrorCode_t ret;
@@ -3300,7 +3311,7 @@ AM_ErrorCode_t AM_EPG_SubscribeEvent(int handle, int db_evt_id)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-AM_ErrorCode_t AM_EPG_UnsubscribeEvent(int handle, int db_evt_id)
+AM_ErrorCode_t AM_EPG_UnsubscribeEvent(AM_EPG_Handle_t handle, int db_evt_id)
 {
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 	AM_ErrorCode_t ret;

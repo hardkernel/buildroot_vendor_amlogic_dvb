@@ -41,6 +41,9 @@ enum AM_UPD_ErrorCode
  * Type definitions
  ***************************************************************************/
 
+typedef void* AM_TSUPD_MonHandle_t;
+typedef void* AM_TSUPD_DlHandle_t;
+
 /**\brief UPD Monitor 打开参数*/
 typedef struct {
 	int dmx;    /**<dmx id for the monitor*/
@@ -51,7 +54,7 @@ typedef struct {
 	int (*callback)(unsigned char* p_nit, unsigned int len, void *user); /**<nit数据回调。首次启动monitor模块或者nit发生变化时，monitor会回调此接口*/
 	void *callback_args;                     /**<回调参数。用户参数，monitor不会修改*/
 	int use_ext_nit;                         /**<该参数置1时，通知monitor模块使用外部注入nit，monitor内部停止nit获取*/
-    int timeout;                             /*超时设置。0表示使用默认值。单位毫秒*/
+	int timeout;                             /*超时设置。0表示使用默认值。单位毫秒*/
 	int nit_check_interval;                  /**<nit检查间隔，0表示使用默认值。单位毫秒*/
 }AM_TSUPD_MonitorParam_t;
 
@@ -78,7 +81,7 @@ typedef struct {
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_upd.h)
  */
-AM_ErrorCode_t AM_TSUPD_OpenMonitor(AM_TSUPD_OpenMonitorParam_t *para, int *mid);
+AM_ErrorCode_t AM_TSUPD_OpenMonitor(AM_TSUPD_OpenMonitorParam_t *para, AM_TSUPD_MonHandle_t *mid);
 
 /**\brief 启动UPD Monitor模块
  * \param [in] mid  Monitor句柄
@@ -87,7 +90,7 @@ AM_ErrorCode_t AM_TSUPD_OpenMonitor(AM_TSUPD_OpenMonitorParam_t *para, int *mid)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_upd.h)
  */
-AM_ErrorCode_t AM_TSUPD_StartMonitor(int mid, AM_TSUPD_MonitorParam_t *para);
+AM_ErrorCode_t AM_TSUPD_StartMonitor(AM_TSUPD_MonHandle_t mid, AM_TSUPD_MonitorParam_t *para);
 
 /**\brief 停止UPD Monitor模块
  * \param [in] mid  Monitor句柄
@@ -95,7 +98,7 @@ AM_ErrorCode_t AM_TSUPD_StartMonitor(int mid, AM_TSUPD_MonitorParam_t *para);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_upd.h)
  */
-AM_ErrorCode_t AM_TSUPD_StopMonitor(int mid);
+AM_ErrorCode_t AM_TSUPD_StopMonitor(AM_TSUPD_MonHandle_t mid);
 
 /**\brief 外部注入NIT，见AM_TSUPD_MonitorParam_t:use_ext_nit
  * \param [in] mid  Monitor句柄
@@ -105,7 +108,7 @@ AM_ErrorCode_t AM_TSUPD_StopMonitor(int mid);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_upd.h)
  */
-AM_ErrorCode_t AM_TSUPD_InjectNIT(int mid, unsigned char* p_nit, unsigned int len);
+AM_ErrorCode_t AM_TSUPD_InjectNIT(AM_TSUPD_MonHandle_t mid, unsigned char* p_nit, unsigned int len);
 
 /**\brief 关闭UPD Monitor模块
  * \param [in] mid  Monitor句柄
@@ -113,7 +116,7 @@ AM_ErrorCode_t AM_TSUPD_InjectNIT(int mid, unsigned char* p_nit, unsigned int le
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_upd.h)
  */
-AM_ErrorCode_t AM_TSUPD_CloseMonitor(int mid);
+AM_ErrorCode_t AM_TSUPD_CloseMonitor(AM_TSUPD_MonHandle_t mid);
 
 /**\brief 打开UPD Downloader模块
  * \param [in] para 打开参数
@@ -122,7 +125,7 @@ AM_ErrorCode_t AM_TSUPD_CloseMonitor(int mid);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_upd.h)
  */
-AM_ErrorCode_t AM_TSUPD_OpenDownloader(AM_TSUPD_OpenDownloaderParam_t *para, int *did);
+AM_ErrorCode_t AM_TSUPD_OpenDownloader(AM_TSUPD_OpenDownloaderParam_t *para, AM_TSUPD_DlHandle_t *did);
 
 /**\brief 启动UPD Downloader模块
  * \param [in] did  Downloader句柄
@@ -131,7 +134,7 @@ AM_ErrorCode_t AM_TSUPD_OpenDownloader(AM_TSUPD_OpenDownloaderParam_t *para, int
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_upd.h)
  */
-AM_ErrorCode_t AM_TSUPD_StartDownloader(int did, AM_TSUPD_DownloaderParam_t *para);
+AM_ErrorCode_t AM_TSUPD_StartDownloader(AM_TSUPD_DlHandle_t did, AM_TSUPD_DownloaderParam_t *para);
 
 /**\brief 获得UPD Downloader 数据
  * \param [in] did  Downloader句柄
@@ -141,7 +144,7 @@ AM_ErrorCode_t AM_TSUPD_StartDownloader(int did, AM_TSUPD_DownloaderParam_t *par
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_upd.h)
  */
-AM_ErrorCode_t AM_TSUPD_GetDownloaderData(int did, unsigned char **ppdata, unsigned int *len);
+AM_ErrorCode_t AM_TSUPD_GetDownloaderData(AM_TSUPD_DlHandle_t did, unsigned char **ppdata, unsigned int *len);
 
 /**\brief 停止UPD Downloader模块
  * \param [in] did  Downloader句柄
@@ -149,7 +152,7 @@ AM_ErrorCode_t AM_TSUPD_GetDownloaderData(int did, unsigned char **ppdata, unsig
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_upd.h)
  */
-AM_ErrorCode_t AM_TSUPD_StopDownloader(int did);
+AM_ErrorCode_t AM_TSUPD_StopDownloader(AM_TSUPD_DlHandle_t did);
 
 /**\brief 关闭UPD Downloader模块
  * \param [in] did  Downloader句柄
@@ -157,7 +160,7 @@ AM_ErrorCode_t AM_TSUPD_StopDownloader(int did);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_upd.h)
  */
-AM_ErrorCode_t AM_TSUPD_CloseDownloader(int did);
+AM_ErrorCode_t AM_TSUPD_CloseDownloader(AM_TSUPD_DlHandle_t did);
 
 
 #ifdef __cplusplus

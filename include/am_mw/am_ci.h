@@ -69,6 +69,8 @@ enum AM_CI_CA_PMT_CMD_ID
 	AM_CI_CA_PMT_CMD_ID_NOT_SELECTED =     0x04,
 };
 
+typedef void* AM_CI_Handle_t;
+
 typedef struct
 {
 	int foo;
@@ -109,25 +111,25 @@ typedef struct {
 	}u;
 }AM_CI_CB_t;
 
-extern AM_ErrorCode_t AM_CI_Open(int dev_no, int slot_no, const AM_CI_OpenPara_t *para, int *handle);
-extern AM_ErrorCode_t AM_CI_Close(int handle);
-extern AM_ErrorCode_t AM_CI_Start(int handle);
-extern AM_ErrorCode_t AM_CI_Stop(int handle);
+extern AM_ErrorCode_t AM_CI_Open(int dev_no, int slot_no, const AM_CI_OpenPara_t *para, AM_CI_Handle_t *handle);
+extern AM_ErrorCode_t AM_CI_Close(AM_CI_Handle_t handle);
+extern AM_ErrorCode_t AM_CI_Start(AM_CI_Handle_t handle);
+extern AM_ErrorCode_t AM_CI_Stop(AM_CI_Handle_t handle);
 
 /*set callbacks before start() or you may miss callbacks*/
-extern AM_ErrorCode_t AM_CI_SetCallback(int handle, int cbid, AM_CI_CB_t *cb, void *arg);
+extern AM_ErrorCode_t AM_CI_SetCallback(AM_CI_Handle_t handle, int cbid, AM_CI_CB_t *cb, void *arg);
 
 
-extern AM_ErrorCode_t AM_CI_App_ca_pmt(int handle, unsigned char *capmt, unsigned int size);
-extern AM_ErrorCode_t AM_CI_App_ai_entermenu(int handle);
+extern AM_ErrorCode_t AM_CI_App_ca_pmt(AM_CI_Handle_t handle, unsigned char *capmt, unsigned int size);
+extern AM_ErrorCode_t AM_CI_App_ai_entermenu(AM_CI_Handle_t handle);
 /*answer_id see:AM_CI_MMI_ANSWER_ID*/
-extern AM_ErrorCode_t AM_CI_App_mmi_answ(int handle, int answer_id, char *answer, int size);
-extern AM_ErrorCode_t AM_CI_App_mmi_menu_answ(int handle, int select);
-extern AM_ErrorCode_t AM_CI_App_mmi_close(int handle, int cmd_id, int delay);
+extern AM_ErrorCode_t AM_CI_App_mmi_answ(AM_CI_Handle_t handle, int answer_id, char *answer, int size);
+extern AM_ErrorCode_t AM_CI_App_mmi_menu_answ(AM_CI_Handle_t handle, int select);
+extern AM_ErrorCode_t AM_CI_App_mmi_close(AM_CI_Handle_t handle, int cmd_id, int delay);
 
 /*infomations enquired will be repled in the callback*/
-extern AM_ErrorCode_t AM_CI_App_ca_info_enq(int handle);
-extern AM_ErrorCode_t AM_CI_App_ai_enquiry(int handle);
+extern AM_ErrorCode_t AM_CI_App_ca_info_enq(AM_CI_Handle_t handle);
+extern AM_ErrorCode_t AM_CI_App_ai_enquiry(AM_CI_Handle_t handle);
 
 /*user need to free the generated capmt with free() in the end */
 extern AM_ErrorCode_t AM_CI_GenerateCAPMT(unsigned char *pmt, unsigned int pmt_size, 
@@ -135,8 +137,8 @@ extern AM_ErrorCode_t AM_CI_GenerateCAPMT(unsigned char *pmt, unsigned int pmt_s
 											int ca_list_management, int ca_pmt_cmd_id, 
 											int moveca);
 
-extern AM_ErrorCode_t AM_CI_MatchCAID(int handle, unsigned int caid, int *match);
-extern AM_ErrorCode_t AM_CI_CAMAN_getCA(int handle, AM_CA_t **ca);
+extern AM_ErrorCode_t AM_CI_MatchCAID(AM_CI_Handle_t handle, unsigned int caid, int *match);
+extern AM_ErrorCode_t AM_CI_CAMAN_getCA(AM_CI_Handle_t handle, AM_CA_t **ca);
 
 
 

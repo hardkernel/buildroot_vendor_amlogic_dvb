@@ -461,7 +461,7 @@ AM_ErrorCode_t AM_Check_UTF8(const char *src, int src_len, char *dest, int *dest
 	int nchar;
 	nchar = 0;
 	/* This counts the characters and does utf8 syntax checking */
-	ret = traverse_string(src, src_len, in_utf8, &nchar,dest, dest_len);
+	ret = traverse_string((unsigned char*)src, src_len, in_utf8, &nchar,dest, dest_len);
 
 	*dest_len = nchar;	
 	return AM_SUCCESS;	

@@ -25,6 +25,8 @@ extern "C"
  * Type definitions
  ***************************************************************************/
 
+typedef void* AM_TV_Handle_t;
+
 /**\brief TV模块错误代码*/
 enum AM_TV_ErrorCode
 {
@@ -69,7 +71,7 @@ typedef enum
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-extern AM_ErrorCode_t AM_TV_Create(int fend_dev, int av_dev, sqlite3 *hdb, int *handle);
+extern AM_ErrorCode_t AM_TV_Create(int fend_dev, int av_dev, sqlite3 *hdb, AM_TV_Handle_t *handle);
 
 /**\brief 销毁一个TV设备
  * \param handle TV句柄
@@ -77,7 +79,7 @@ extern AM_ErrorCode_t AM_TV_Create(int fend_dev, int av_dev, sqlite3 *hdb, int *
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-extern AM_ErrorCode_t AM_TV_Destroy(int handle);
+extern AM_ErrorCode_t AM_TV_Destroy(AM_TV_Handle_t handle);
 
 /**\brief 播放下一个频道(频道+)
  * \param handle TV句柄
@@ -85,7 +87,7 @@ extern AM_ErrorCode_t AM_TV_Destroy(int handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-extern AM_ErrorCode_t AM_TV_ChannelUp(int handle);
+extern AM_ErrorCode_t AM_TV_ChannelUp(AM_TV_Handle_t handle);
 
 /**\brief 播放上一个频道(频道-)
  * \param handle TV句柄
@@ -93,7 +95,7 @@ extern AM_ErrorCode_t AM_TV_ChannelUp(int handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-extern AM_ErrorCode_t AM_TV_ChannelDown(int handle);
+extern AM_ErrorCode_t AM_TV_ChannelDown(AM_TV_Handle_t handle);
 
 /**\brief 播放指定频道
  * \param handle TV句柄
@@ -102,7 +104,7 @@ extern AM_ErrorCode_t AM_TV_ChannelDown(int handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-extern AM_ErrorCode_t AM_TV_PlayChannel(int handle, int chan_num);
+extern AM_ErrorCode_t AM_TV_PlayChannel(AM_TV_Handle_t handle, int chan_num);
 
 /**\brief 播放当前停止的频道,如未播放任何频道，则播放一个频道号最小的频道
  * \param handle TV句柄
@@ -110,7 +112,7 @@ extern AM_ErrorCode_t AM_TV_PlayChannel(int handle, int chan_num);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-extern AM_ErrorCode_t AM_TV_Play(int handle);
+extern AM_ErrorCode_t AM_TV_Play(AM_TV_Handle_t handle);
 
 /**\brief 停止当前播放
  * \param handle TV句柄
@@ -118,7 +120,7 @@ extern AM_ErrorCode_t AM_TV_Play(int handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-extern AM_ErrorCode_t AM_TV_StopPlay(int handle);
+extern AM_ErrorCode_t AM_TV_StopPlay(AM_TV_Handle_t handle);
 
 
 /**\brief 获取当前频道
@@ -128,7 +130,7 @@ extern AM_ErrorCode_t AM_TV_StopPlay(int handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-extern AM_ErrorCode_t AM_TV_GetCurrentChannel(int handle, int *srv_dbid);
+extern AM_ErrorCode_t AM_TV_GetCurrentChannel(AM_TV_Handle_t handle, int *srv_dbid);
 
 #ifdef __cplusplus
 }

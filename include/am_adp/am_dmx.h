@@ -198,6 +198,8 @@ extern AM_ErrorCode_t AM_DMX_SetSource(int dev_no, AM_DMX_Source_t src);
  */
 extern AM_ErrorCode_t AM_DMX_Sync(int dev_no);
 
+extern AM_ErrorCode_t AM_DMX_GetScrambleStatus(int dev_no, AM_Bool_t dev_status[2]);
+
 #ifdef __cplusplus
 }
 #endif

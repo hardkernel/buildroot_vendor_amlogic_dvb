@@ -549,10 +549,13 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort4(int dev_no, int lnbport,
  *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)
  */
 AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort16(int dev_no, int lnbport, 
-																AM_FEND_Polarisation_t polarisation, 
-																AM_FEND_Localoscollatorfreq_t local_oscillator_freq)
+					AM_FEND_Polarisation_t polarisation, 
+					AM_FEND_Localoscollatorfreq_t local_oscillator_freq)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	UNUSED(polarisation);
+	UNUSED(local_oscillator_freq);
 
 	if((lnbport < 0xF0) || (lnbport > 0xFF)){
 		ret = AM_FEND_DISEQCCMD_ERROR_BASE;
@@ -1506,6 +1509,8 @@ AM_ErrorCode_t AM_FEND_Diseqccmd_SetODULoFreq(int dev_no, unsigned char ub_numbe
 int AM_ProduceAngularPositioner(int dev_no, double local_longitude, double local_latitude, double satellite_longitude)
 {
 	int RotorCmd = 0;
+
+	UNUSED(dev_no);
 
 	if ( satellite_longitude < 0 )
 		satellite_longitude = 360 + satellite_longitude;	

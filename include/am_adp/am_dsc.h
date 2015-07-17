@@ -62,8 +62,9 @@ typedef enum {
 /**\brief 解扰器输入源*/
 typedef enum {
 	AM_DSC_SRC_DMX0,         /**< TS输入0*/
-	AM_DSC_SRC_DMX1 ,         /**< TS输入1*/
-	AM_DSC_SRC_DMX2          /**< TS输入2*/
+	AM_DSC_SRC_DMX1,         /**< TS输入1*/
+	AM_DSC_SRC_DMX2,         /**< TS输入2*/
+	AM_DSC_SRC_BYPASS        /**< 旁路DSC*/
 } AM_DSC_Source_t;
 
 /****************************************************************************

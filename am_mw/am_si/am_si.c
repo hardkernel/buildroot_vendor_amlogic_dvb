@@ -22,6 +22,7 @@
 #include <am_mem.h>
 #include <am_av.h>
 #include <am_iconv.h>
+#include "am_misc.h"
 #include <errno.h>
 #include <freesat.h>
 
@@ -319,7 +320,7 @@ static AM_ErrorCode_t si_decode_tot(void **p_table, dvbpsi_psi_section_t *p_sect
 }
 
 /**\brief 检查句柄是否有效*/
-static AM_INLINE AM_ErrorCode_t si_check_handle(int handle)
+static AM_INLINE AM_ErrorCode_t si_check_handle(AM_SI_Handle_t handle)
 {
 	if (handle && ((SI_Decoder_t*)handle)->allocated &&
 		(((SI_Decoder_t*)handle)->prv_data == si_prv_data))
@@ -913,7 +914,7 @@ static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char l
 	}
 	else
 	{
-		sprintf(ai->audios[ai->audio_count].lang, "Audio%d", ai->audio_count+1);
+		snprintf(ai->audios[ai->audio_count].lang, sizeof(ai->audios[ai->audio_count].lang), "Audio%d", ai->audio_count+1);
 	}
 	
 	AM_DEBUG(0, "Add a audio: pid %d, fmt %d, language: %s ,audio_type:%d", aud_pid, aud_fmt, ai->audios[ai->audio_count].lang,audio_type);
@@ -930,7 +931,7 @@ static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char l
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-AM_ErrorCode_t AM_SI_Create(int *handle)
+AM_ErrorCode_t AM_SI_Create(AM_SI_Handle_t *handle)
 {
 	SI_Decoder_t *dec;
 
@@ -946,7 +947,7 @@ AM_ErrorCode_t AM_SI_Create(int *handle)
 	dec->prv_data = (void*)si_prv_data;
 	dec->allocated = AM_TRUE;
 
-	*handle = (int)dec;
+	*handle = dec;
 
 	return AM_SUCCESS;
 }
@@ -957,7 +958,7 @@ AM_ErrorCode_t AM_SI_Create(int *handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-AM_ErrorCode_t AM_SI_Destroy(int handle)
+AM_ErrorCode_t AM_SI_Destroy(AM_SI_Handle_t handle)
 {
 	SI_Decoder_t *dec = (SI_Decoder_t*)handle;
 
@@ -988,7 +989,7 @@ AM_ErrorCode_t AM_SI_Destroy(int handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-AM_ErrorCode_t AM_SI_DecodeSection(int handle, uint16_t pid, uint8_t *buf, uint16_t len, void **sec)
+AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, uint8_t *buf, uint16_t len, void **sec)
 {
 	dvbpsi_psi_section_t *psi_sec = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -1109,7 +1110,7 @@ AM_ErrorCode_t AM_SI_DecodeSection(int handle, uint16_t pid, uint8_t *buf, uint1
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-AM_ErrorCode_t AM_SI_ReleaseSection(int handle, uint8_t table_id, void *sec)
+AM_ErrorCode_t AM_SI_ReleaseSection(AM_SI_Handle_t handle, uint8_t table_id, void *sec)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
@@ -1182,7 +1183,7 @@ AM_ErrorCode_t AM_SI_ReleaseSection(int handle, uint8_t table_id, void *sec)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_si.h)
  */
-AM_ErrorCode_t AM_SI_GetSectionHeader(int handle, uint8_t *buf, uint16_t len, AM_SI_SectionHeader_t *sec_header)
+AM_ErrorCode_t AM_SI_GetSectionHeader(AM_SI_Handle_t handle, uint8_t *buf, uint16_t len, AM_SI_SectionHeader_t *sec_header)
 {
 	assert(buf && sec_header);
 	AM_TRY(si_check_handle(handle));
@@ -1247,7 +1248,7 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 		AM_DEBUG(1, "AM_SI_ConvertDVBTextCode fbyte == 0x%x \n",fbyte);
 		//log_print("AM_SI_ConvertDVBTextCode fbyte == 0x%x \n",fbyte);
 		if (fbyte >= 0x01 && fbyte <= 0x0B)
-			sprintf(cod, "ISO-8859-%d", fbyte + 4);
+			snprintf(cod, sizeof(cod), "ISO-8859-%d", fbyte + 4);
 		else if (fbyte >= 0x0C && fbyte <= 0x0F)
 		{
 			/*Reserved for future use, we set to ISO8859-1*/
@@ -1258,7 +1259,7 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 			uint16_t val = (uint16_t)(((uint16_t)in_code[1]<<8) | (uint16_t)in_code[2]);
 			if (val >= 0x0001 && val <= 0x000F)
 			{
-				sprintf(cod, "ISO-8859-%d", val);
+				snprintf(cod, sizeof(cod), "ISO-8859-%d", val);
 			}
 			else
 			{
@@ -1588,7 +1589,9 @@ AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_Subtitl
 				sub_info->subtitles[sub_info->subtitle_count].anci_page_id = tmp_sub->i_ancillary_page_id;
 				if (tmp_sub->i_iso6392_language_code[0] == 0)
 				{
-					sprintf(sub_info->subtitles[sub_info->subtitle_count].lang, "Subtitle%d", sub_info->subtitle_count+1);
+					snprintf(sub_info->subtitles[sub_info->subtitle_count].lang,
+						sizeof(sub_info->subtitles[sub_info->subtitle_count].lang),
+						"Subtitle%d", sub_info->subtitle_count+1);
 				}
 				else
 				{
@@ -1620,7 +1623,9 @@ AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_Teletex
 				ttx_info->teletexts[ttx_info->teletext_count].type         = 0x0;
 				ttx_info->teletexts[ttx_info->teletext_count].magazine_no  = 1;
 				ttx_info->teletexts[ttx_info->teletext_count].page_no      = 100;
-				sprintf(ttx_info->teletexts[ttx_info->teletext_count].lang, "Teletext%d", ttx_info->teletext_count+1);
+				snprintf(ttx_info->teletexts[ttx_info->teletext_count].lang,
+					sizeof(ttx_info->teletexts[ttx_info->teletext_count].lang),
+					"Teletext%d", ttx_info->teletext_count+1);
 				ttx_info->teletext_count++;
 				return AM_SUCCESS;
 			}
@@ -1678,7 +1683,9 @@ AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_Teletex
 				ttx_info->teletexts[ttx_info->teletext_count].page_no      = tmp_ttx->i_teletext_page_number;
 				if (tmp_ttx->i_iso6392_language_code[0] == 0)
 				{
-					sprintf(ttx_info->teletexts[ttx_info->teletext_count].lang, "Teletext%d", ttx_info->teletext_count+1);
+					snprintf(ttx_info->teletexts[ttx_info->teletext_count].lang,
+						sizeof(ttx_info->teletexts[ttx_info->teletext_count].lang),
+						"Teletext%d", ttx_info->teletext_count+1);
 				}
 				else
 				{

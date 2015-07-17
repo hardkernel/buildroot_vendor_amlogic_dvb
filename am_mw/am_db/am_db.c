@@ -978,6 +978,8 @@ AM_ErrorCode_t AM_DB_PutHandle(sqlite3 *handle)
 	
 	assert(handle);
 
+	UNUSED(handle);
+
 	pthread_mutex_lock(&dblock);
 
 	if(multithread)

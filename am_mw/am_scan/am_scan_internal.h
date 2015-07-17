@@ -279,7 +279,7 @@ struct AM_SCAN_Scanner_s
 	{
 		AM_Bool_t						start;
 		int								start_idx;		/**< 起始频点参数在start_freqs中的索引*/
-		int								hsi;			/**< SI解析句柄*/
+		AM_SI_Handle_t                                  hsi;			/**< SI解析句柄*/
 		AM_SCAN_TableCtl_t				patctl;			/**< PAT接收控制*/
 		AM_SCAN_TableCtl_t				pmtctl[5];		/**< PMT接收控制*/
 		AM_SCAN_TableCtl_t				catctl;			/**< CAT接收控制*/
