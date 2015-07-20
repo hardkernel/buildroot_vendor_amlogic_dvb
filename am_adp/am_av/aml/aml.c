@@ -4178,12 +4178,14 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 
 
-		if(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur > NO_DATA_CHECK_TIME) && (apts_stop_dur > NO_DATA_CHECK_TIME)){
+		//if(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur > NO_DATA_CHECK_TIME) && (apts_stop_dur > NO_DATA_CHECK_TIME)){
+		if(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur > NO_DATA_CHECK_TIME)){
 			no_audio_data = AM_TRUE;
 			AM_DEBUG(1, "audio data stopped");
 		}
 
-		if(!no_video_data && !av_paused && (dmx_vpts_stop_dur > NO_DATA_CHECK_TIME) && (vpts_stop_dur > NO_DATA_CHECK_TIME)){
+		//if(!no_video_data && !av_paused && (dmx_vpts_stop_dur > NO_DATA_CHECK_TIME) && (vpts_stop_dur > NO_DATA_CHECK_TIME)){
+		if(!no_video_data && !av_paused && (dmx_vpts_stop_dur > NO_DATA_CHECK_TIME)){
 			no_video_data = AM_TRUE;
 			AM_DEBUG(1, "video data stopped");
 		}
