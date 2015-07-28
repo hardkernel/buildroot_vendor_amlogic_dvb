@@ -3884,7 +3884,7 @@ static AM_ErrorCode_t am_scan_atv_step_tune(AM_SCAN_Scanner_t *scanner)
 			AM_DEBUG(1, "Trying to tune atv frequency %uHz (range:%d ~ %d)...", 
 				dvb_fend_para(cur_fe_para)->frequency,
 				scanner->atvctl.min_freq, scanner->atvctl.max_freq);
- 
+			
             /* Set frontend */
 			ret = AM_FENDCTRL_SetPara(scanner->start_para.fend_dev_id, &cur_fe_para);
 			if (ret == AM_SUCCESS)
@@ -3986,6 +3986,20 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 			scanner->start_freqs[scanner->curr_freq].flag &= ~AM_SCAN_FE_FL_ATV;
 		else
 			scanner->start_freqs[scanner->curr_freq].flag &= ~AM_SCAN_FE_FL_DTV;
+
+		 if (IS_DVBT2()){
+		        struct dtv_properties prop;
+		        struct dtv_property property;
+
+		        prop.num = 1;
+		        prop.props = &property;
+		        memset(&property, 0, sizeof(property));
+		        property.cmd = DTV_DVBT2_PLP_ID;
+		        property.u.data = -1;
+		        AM_DEBUG(1, "Set PLP%d to receive non-SDT tables...", property.u.data);
+		        AM_FEND_SetProp(scanner->start_para.fend_dev_id, &prop);
+		}
+		
 		/* try set frontend */
 		ret = AM_FENDCTRL_SetPara(scanner->start_para.fend_dev_id, &cur_fe_para);
 		if (ret == AM_SUCCESS)
@@ -4400,6 +4414,20 @@ static AM_ErrorCode_t am_scan_start_dtv(AM_SCAN_Scanner_t *scanner)
 		AM_DEBUG(1, "Set SEC settings...");
 		
 		AM_SEC_SetSetting(scanner->start_para.fend_dev_id, &dtv_start_para.sat_para.sec);
+	}
+
+	if (IS_DVBT2())
+	{
+		struct dtv_properties prop;
+		struct dtv_property property;
+
+		prop.num = 1;
+		prop.props = &property;		
+		memset(&property, 0, sizeof(property));
+		property.cmd = DTV_DVBT2_PLP_ID;
+		property.u.data = -1;
+		AM_DEBUG(1, "Set PLP%d to receive non-SDT tables...", property.u.data);
+		AM_FEND_SetProp(scanner->start_para.fend_dev_id, &prop);
 	}
 
 	/* 启动搜索 */
