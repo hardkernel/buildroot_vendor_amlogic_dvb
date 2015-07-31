@@ -16,7 +16,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../include/am_adp $(LOCAL_PATH)/../../andro
 		    packages/amlogic/LibPlayer/amplayer\
 		    vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
 			vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
-			vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
+			vendor/amlogic/frameworks/av/LibPlayer/amadec/include
 
 LOCAL_STATIC_LIBRARIES := libam_adp
 LOCAL_SHARED_LIBRARIES := libamplayer libcutils liblog libc
