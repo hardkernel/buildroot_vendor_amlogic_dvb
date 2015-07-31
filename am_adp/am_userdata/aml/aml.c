@@ -527,6 +527,8 @@ static AM_ErrorCode_t aml_open(AM_USERDATA_Device_t *dev, const AM_USERDATA_Open
 	int fd, rc;
 	aml_ud_drv_data_t *drv_data;
 
+	UNUSED(para);
+
 	drv_data = (aml_ud_drv_data_t*)malloc(sizeof(aml_ud_drv_data_t));
 	if (drv_data == NULL)
 	{

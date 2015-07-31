@@ -38,7 +38,7 @@ struct AM_Event
 	AM_Event_t        *next;    /**< 指向链表中的下一个事件*/
 	AM_EVT_Callback_t  cb;      /**< 回调函数*/
 	int                type;    /**< 事件类型*/
-	int                dev_no;  /**< 设备号*/
+	long               dev_no;  /**< 设备号*/
 	void              *data;    /**< 用户回调参数*/
 };
 
@@ -68,7 +68,7 @@ static pthread_mutex_t lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码
  */
-AM_ErrorCode_t AM_EVT_Subscribe(int dev_no, int event_type, AM_EVT_Callback_t cb, void *data)
+AM_ErrorCode_t AM_EVT_Subscribe(long dev_no, int event_type, AM_EVT_Callback_t cb, void *data)
 {
 	AM_Event_t *evt;
 	int pos;
@@ -110,7 +110,7 @@ AM_ErrorCode_t AM_EVT_Subscribe(int dev_no, int event_type, AM_EVT_Callback_t cb
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码
  */
-AM_ErrorCode_t AM_EVT_Unsubscribe(int dev_no, int event_type, AM_EVT_Callback_t cb, void *data)
+AM_ErrorCode_t AM_EVT_Unsubscribe(long dev_no, int event_type, AM_EVT_Callback_t cb, void *data)
 {
 	AM_Event_t *evt, *eprev;
 	int pos;
@@ -150,7 +150,7 @@ AM_ErrorCode_t AM_EVT_Unsubscribe(int dev_no, int event_type, AM_EVT_Callback_t 
  * \param event_type 产生事件的类型
  * \param[in] param 事件参数
  */
-AM_ErrorCode_t AM_EVT_Signal(int dev_no, int event_type, void *param)
+AM_ErrorCode_t AM_EVT_Signal(long dev_no, int event_type, void *param)
 {
 	AM_Event_t *evt;
 	int pos = event_type%AM_EVT_BUCKET_COUNT;

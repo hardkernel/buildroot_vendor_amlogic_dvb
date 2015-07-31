@@ -16,6 +16,7 @@
 #include <am_debug.h>
 #include <am_time.h>
 #include <am_mem.h>
+#include <am_misc.h>
 #include "am_smc_internal.h"
 #include "../am_adp_internal.h"
 #include <assert.h>
@@ -142,7 +143,7 @@ void ringbuffer_reset(struct ringbuffer *rbuf)
 /**\brief 根据设备号取得设备结构*/
 static AM_INLINE AM_ErrorCode_t smc_get_dev(int dev_no, AM_SMC_Device_t **dev)
 {
-	if((dev_no<0) || (dev_no>=SMC_DEV_COUNT))
+	if((dev_no<0) || (((size_t)dev_no)>=SMC_DEV_COUNT))
 	{
 		AM_DEBUG(1, "invalid smartcard device number %d, must in(%d~%d)", dev_no, 0, SMC_DEV_COUNT-1);
 		return AM_SMC_ERR_INVALID_DEV_NO;
@@ -707,7 +708,7 @@ AM_ErrorCode_t AM_SMC_TransferT0(int dev_no, const uint8_t *send, int slen, uint
 			ringbuffer_write(&rxbuf,dst,1);
 			goto final;
 		}
-		else if((byte==INS_BYTE)||(byte==INS_BYTE^0x01)) //0xfe 0xff
+		else if((byte==INS_BYTE)||(byte==(INS_BYTE^0x01))) //0xfe 0xff
 		{
 			int cnt = ringbuffer_avail(&txbuf);
         		AM_DEBUG(1, "case3--cnt is: 0x%x \n", cnt);
@@ -733,7 +734,7 @@ AM_ErrorCode_t AM_SMC_TransferT0(int dev_no, const uint8_t *send, int slen, uint
 		{
 				AM_DEBUG(1, "%s %d ======================= smc error IO......\n", __FUNCTION__, __LINE__);
 				ret = AM_SMC_ERR_IO;
-				AM_FileRead("/sys/class/smc-class/smc_reg", &regs,100);
+				AM_FileRead("/sys/class/smc-class/smc_reg", (char*)&regs,100);
 				AM_DEBUG(1, "line %d smc_regs:  %s\n", __LINE__,regs);
 				break;
 		}

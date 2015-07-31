@@ -18,6 +18,7 @@
 #include <am_mem.h>
 #include <am_evt.h>
 #include <am_time.h>
+#include "am_dmx.h"
 #include <am_thread.h>
 #include "../am_av_internal.h"
 #include "../../am_aout/am_aout_internal.h"
@@ -555,12 +556,15 @@ static AM_ErrorCode_t adec_cmd(const char *cmd)
 
 	return ret;
 #else
+	UNUSED(cmd);
 	return 0;
 #endif
 }
 
 static AM_ErrorCode_t adec_open(AM_AOUT_Device_t *dev, const AM_AOUT_OpenPara_t *para)
 {
+	UNUSED(dev);
+	UNUSED(para);
 	return AM_SUCCESS;
 }
 
@@ -574,6 +578,9 @@ static AM_ErrorCode_t adec_set_volume(AM_AOUT_Device_t *dev, int vol)
 	return adec_cmd(buf);
 #else
 	int ret=0;
+
+	UNUSED(dev);
+
 #ifdef CHIP_8626X
 	ret = audio_decode_set_volume(vol);
 #else
@@ -594,6 +601,9 @@ static AM_ErrorCode_t adec_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 	return adec_cmd(cmd);
 #else
 	int ret=0;
+
+	UNUSED(dev);
+
 	ret = audio_decode_set_mute(adec_handle, mute?1:0);
 
 	if(ret==-1)
@@ -628,6 +638,9 @@ static AM_ErrorCode_t adec_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_Output
 	return adec_cmd(cmd);
 #else
 	int ret=0;
+
+	UNUSED(dev);
+
 	switch(mode)
 	{
 		case AM_AOUT_OUTPUT_STEREO:
@@ -654,12 +667,15 @@ static AM_ErrorCode_t adec_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_Output
 
 static AM_ErrorCode_t adec_close(AM_AOUT_Device_t *dev)
 {
+	UNUSED(dev);
 	return AM_SUCCESS;
 }
 
 /*音频控制（通过amplayer2）操作*/
 static AM_ErrorCode_t amp_open(AM_AOUT_Device_t *dev, const AM_AOUT_OpenPara_t *para)
 {
+	UNUSED(dev);
+	UNUSED(para);
 	return AM_SUCCESS;
 }
 
@@ -828,6 +844,7 @@ static AM_ErrorCode_t amp_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_OutputM
 
 static AM_ErrorCode_t amp_close(AM_AOUT_Device_t *dev)
 {
+	UNUSED(dev);
 	return AM_SUCCESS;
 }
 
@@ -1152,10 +1169,9 @@ static AV_FilePlayerData_t* aml_create_fp(AM_AV_Device_t *dev)
 
 static int aml_update_player_info_callback(int pid,player_info_t * info)
 {
+	UNUSED(pid);
 	if (info)
-	{
 		AM_EVT_Signal(0, AM_AV_EVT_PLAYER_UPDATE_INFO, (void*)info);
-	}
 
 	return 0;
 }
@@ -1169,7 +1185,7 @@ int aml_set_tsync_enable(int enable)
 	fd=open(path, O_CREAT|O_RDWR | O_TRUNC, 0644);
 	if(fd>=0)
 	{
-		sprintf(bcmd,"%d",enable);
+		snprintf(bcmd,sizeof(bcmd),"%d",enable);
 		write(fd,bcmd,strlen(bcmd));
 		close(fd);
 		return 0;
@@ -2336,6 +2352,8 @@ static void aml_destroy_timeshift_data(AV_TimeshiftData_t *tshift, AM_Bool_t des
 
 static int am_timeshift_reset(AV_TimeshiftData_t *tshift, int deinterlace_val, AM_Bool_t start_audio)
 {
+	UNUSED(deinterlace_val);
+
 	aml_destroy_timeshift_data(tshift, AM_FALSE);
 
 	aml_start_timeshift(tshift, &tshift->para, AM_FALSE, start_audio);
@@ -2348,6 +2366,8 @@ static int am_timeshift_reset(AV_TimeshiftData_t *tshift, int deinterlace_val, A
 
 static int am_timeshift_reset_continue(AV_TimeshiftData_t *tshift, int deinterlace_val, AM_Bool_t start_audio)
 {
+	UNUSED(deinterlace_val);
+
 	aml_destroy_timeshift_data(tshift, AM_FALSE);
 
 	aml_start_timeshift(tshift, &tshift->para, AM_FALSE, start_audio);
@@ -3251,7 +3271,14 @@ static AM_ErrorCode_t aml_decode_jpeg(AV_JPEGData_t *jpeg, const uint8_t *data, 
 			AM_OSD_DestroySurface(surf);
 		}
 	}
+#else
+	UNUSED(jpeg);
+	UNUSED(data);
+	UNUSED(len);
+	UNUSED(mode);
+	UNUSED(para);
 #endif
+
 	return ret;
 }
 
@@ -3260,6 +3287,8 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 //#ifndef ANDROID
 	char buf[32];
 	int v;
+
+	UNUSED(para);
 
 	if(AM_FileRead(VID_AXIS_FILE, buf, sizeof(buf))==AM_SUCCESS)
 	{
@@ -3427,6 +3456,7 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 
 static AM_ErrorCode_t aml_close(AM_AV_Device_t *dev)
 {
+	UNUSED(dev);
 	return AM_SUCCESS;
 }
 
@@ -4493,7 +4523,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 			{
 				memset((void*)&data->pctl,0,sizeof(play_control_t));
 
-				player_register_update_callback(&data->pctl.callback_fn, aml_update_player_info_callback, PLAYER_INFO_POP_INTERVAL);
+				//player_register_update_callback(&data->pctl.callback_fn, aml_update_player_info_callback, PLAYER_INFO_POP_INTERVAL);
 
 				data->pctl.file_name = strndup(pp->name,FILENAME_LENGTH_MAX);
 				data->pctl.video_index = -1;
@@ -4519,7 +4549,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 				}
 
 				player_start_play(data->media_id);
-				AM_AOUT_SetDriver(AOUT_DEV_NO, &amplayer_aout_drv, (void*)(long)data->media_id);
+				//AM_AOUT_SetDriver(AOUT_DEV_NO, &amplayer_aout_drv, (void*)(long)data->media_id);
 			}
 #endif
 		break;
@@ -4608,6 +4638,8 @@ static AM_ErrorCode_t aml_close_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 static AM_ErrorCode_t aml_ts_source(AM_AV_Device_t *dev, AM_AV_TSSource_t src)
 {
 	char *cmd;
+
+	UNUSED(dev);
 
 	switch(src)
 	{
@@ -4733,6 +4765,8 @@ static AM_ErrorCode_t aml_file_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *
 static AM_ErrorCode_t aml_inject_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *para)
 {
 	AV_InjectData_t *data;
+
+	UNUSED(para);
 
 	data = (AV_InjectData_t*)dev->inject_player.drv_data;
 
@@ -4909,17 +4943,17 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 		break;
 		case AV_VIDEO_PARA_CONTRAST:
 			name = VID_CONTRAST_FILE;
-			snprintf(buf, sizeof(buf), "%d", (long)val);
+			snprintf(buf, sizeof(buf), "%ld", (long)val);
 			cmd = buf;
 		break;
 		case AV_VIDEO_PARA_SATURATION:
 			name = VID_SATURATION_FILE;
-			snprintf(buf, sizeof(buf), "%d", (long)val);
+			snprintf(buf, sizeof(buf), "%ld", (long)val);
 			cmd = buf;
 		break;
 		case AV_VIDEO_PARA_BRIGHTNESS:
 			name = VID_BRIGHTNESS_FILE;
-			snprintf(buf, sizeof(buf), "%d", (long)val);
+			snprintf(buf, sizeof(buf), "%ld", (long)val);
 			cmd = buf;
 		break;
 		case AV_VIDEO_PARA_ENABLE:
@@ -5035,7 +5069,7 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 		break;
 		case AV_VIDEO_PARA_ERROR_RECOVERY_MODE:
 			name = VDEC_H264_ERROR_RECOVERY_MODE_FILE;
-			snprintf(buf, sizeof(buf), "%d", (long)val);
+			snprintf(buf, sizeof(buf), "%ld", (long)val);
 			cmd = buf;
 		break;
 	}
@@ -5150,6 +5184,10 @@ end:
 		close(fd);
 	return ret;
 #else
+	UNUSED(dev);
+	UNUSED(para);
+	UNUSED(s);
+
 	return AM_AV_ERR_NOT_SUPPORTED;
 #endif
 }
@@ -5735,6 +5773,8 @@ aml_set_vpath(AM_AV_Device_t *dev)
 
 	AM_FileEcho("/sys/class/video/axis", video_axis);
 	AM_FileRead("/sys/class/video/axis", video_axis, sizeof(video_axis));
+#else
+	UNUSED(dev);
 #endif
 	return AM_SUCCESS;
 }
@@ -5818,8 +5858,10 @@ static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM
 static AM_ErrorCode_t aml_set_vdec_error_recovery_mode(AM_AV_Device_t *dev, uint8_t error_recovery_mode)
 {
     char buf[32];
+    
+    UNUSED(dev);
 
-    if(error_recovery_mode < 0 || error_recovery_mode > 3)
+    if(error_recovery_mode > 3)
     {
        AM_DEBUG(1, "set error_recovery_mode input parameters error!");
        return AM_FAILURE;

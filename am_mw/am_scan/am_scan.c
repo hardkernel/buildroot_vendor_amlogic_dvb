@@ -29,8 +29,6 @@
 #include <linux/tvin/tvin.h>
 #include <sigdetect.h>
 
-
-
 #ifdef CC_BOARD_ATV_SIGDETECT
 #include <sigdetect.h>
 #endif
@@ -122,7 +120,7 @@
 #define RELEASE_TABLE_FROM_LIST(_t, _l)\
 	AM_MACRO_BEGIN\
 		_t *tmp, *next;\
-		tmp = (_l);\
+		tmp = (_t *)(_l);\
 		while (tmp){\
 			next = tmp->p_next;\
 			AM_SI_ReleaseSection(scanner->dtvctl.hsi, tmp->i_table_id, (void*)tmp);\
@@ -150,7 +148,7 @@
 #define SIGNAL_EVENT(e, d)\
 	AM_MACRO_BEGIN\
 		pthread_mutex_unlock(&scanner->lock);\
-		AM_EVT_Signal((int)scanner, e, d);\
+		AM_EVT_Signal((long)scanner, e, d);\
 		pthread_mutex_lock(&scanner->lock);\
 	AM_MACRO_END
 
@@ -159,7 +157,7 @@
 	AM_MACRO_BEGIN\
 		AM_SCAN_Progress_t prog;\
 		prog.evt = t;\
-		prog.data = (void*)d;\
+		prog.data = (void*)(long)d;\
 		SIGNAL_EVENT(AM_SCAN_EVT_PROGRESS, (void*)&prog);\
 	AM_MACRO_END
 
@@ -290,6 +288,8 @@ static AM_ErrorCode_t am_scan_isdbt_prepare_oneseg(AM_SCAN_TS_t *ts);
 
 extern AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,int out_len);
 
+int  am_audiostd_to_enmu(int data);
+int  am_videostd_to_enmu(int data);
 
 
 static int  am_set_atv_tuner_cvbs_std(AM_SCAN_Scanner_t *scanner,int std) {
@@ -434,7 +434,7 @@ static int am_scan_rec_tab_add_srv(AM_SCAN_RecTab_t *tab, int id, AM_SCAN_TS_t *
 
 		tab->buf_size = size;
 		tab->srv_ids  = buf;
-		tab->tses = buf1;
+		tab->tses = (AM_SCAN_TS_t **)buf1;
 	}
 
 	tab->srv_ids[tab->srv_cnt] = id;
@@ -763,17 +763,17 @@ static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, 
 	{
 		if (i == 0)
 		{
-			sprintf(pids, "%d", ai->audios[i].pid);
-			sprintf(fmts, "%d", ai->audios[i].fmt);
+			snprintf(pids, 256, "%d", ai->audios[i].pid);
+			snprintf(fmts, 256, "%d", ai->audios[i].fmt);
 			sprintf(langs, "%s", ai->audios[i].lang);
-			sprintf(audio_type,"%d",ai->audios[i].audio_type);
+			snprintf(audio_type, 256, "%d",ai->audios[i].audio_type);
 		}
 		else
 		{
-			sprintf(pids, "%s %d", pids, ai->audios[i].pid);
-			sprintf(fmts, "%s %d", fmts, ai->audios[i].fmt);
-			sprintf(langs, "%s %s", langs, ai->audios[i].lang);
-			sprintf(audio_type,"%s %d",audio_type,ai->audios[i].audio_type);
+			snprintf(pids, 256, "%s %d", pids, ai->audios[i].pid);
+			snprintf(fmts, 256, "%s %d", fmts, ai->audios[i].fmt);
+			snprintf(langs, 256, "%s %s", langs, ai->audios[i].lang);
+			snprintf(audio_type, 256, "%s %d",audio_type,ai->audios[i].audio_type);
 		}
 	}
 }
@@ -794,19 +794,19 @@ static void format_subtitle_strings(AM_SI_SubtitleInfo_t *si, char *pids, char *
 	{
 		if (i == 0)
 		{
-			sprintf(pids,  "%d", si->subtitles[i].pid);
-			sprintf(types, "%d", si->subtitles[i].type);
-			sprintf(cids,  "%d", si->subtitles[i].comp_page_id);
-			sprintf(aids,  "%d", si->subtitles[i].anci_page_id);
+			snprintf(pids, 256,  "%d", si->subtitles[i].pid);
+			snprintf(types, 256, "%d", si->subtitles[i].type);
+			snprintf(cids, 256,  "%d", si->subtitles[i].comp_page_id);
+			snprintf(aids, 256,  "%d", si->subtitles[i].anci_page_id);
 			sprintf(langs, "%s", si->subtitles[i].lang);
 		}
 		else
 		{
-			sprintf(pids,  "%s %d", pids, si->subtitles[i].pid);
-			sprintf(types, "%s %d", types, si->subtitles[i].type);
-			sprintf(cids,  "%s %d", cids, si->subtitles[i].comp_page_id);
-			sprintf(aids,  "%s %d", aids, si->subtitles[i].anci_page_id);
-			sprintf(langs, "%s %s", langs, si->subtitles[i].lang);
+			snprintf(pids, 256,  "%s %d", pids, si->subtitles[i].pid);
+			snprintf(types, 256, "%s %d", types, si->subtitles[i].type);
+			snprintf(cids, 256,  "%s %d", cids, si->subtitles[i].comp_page_id);
+			snprintf(aids, 256,  "%s %d", aids, si->subtitles[i].anci_page_id);
+			snprintf(langs, 256, "%s %s", langs, si->subtitles[i].lang);
 		}
 	}
 }
@@ -827,19 +827,19 @@ static void format_teletext_strings(AM_SI_TeletextInfo_t *ti, char *pids, char *
 	{
 		if (i == 0)
 		{
-			sprintf(pids,   "%d", ti->teletexts[i].pid);
-			sprintf(types,  "%d", ti->teletexts[i].type);
-			sprintf(magnos, "%d", ti->teletexts[i].magazine_no);
-			sprintf(pgnos,  "%d", ti->teletexts[i].page_no);
+			snprintf(pids, 256,   "%d", ti->teletexts[i].pid);
+			snprintf(types, 256,  "%d", ti->teletexts[i].type);
+			snprintf(magnos, 256, "%d", ti->teletexts[i].magazine_no);
+			snprintf(pgnos,256,   "%d", ti->teletexts[i].page_no);
 			sprintf(langs,  "%s", ti->teletexts[i].lang);
 		}
 		else
 		{
-			sprintf(pids,   "%s %d", pids, ti->teletexts[i].pid);
-			sprintf(types,  "%s %d", types, ti->teletexts[i].type);
-			sprintf(magnos, "%s %d", magnos, ti->teletexts[i].magazine_no);
-			sprintf(pgnos,  "%s %d", pgnos, ti->teletexts[i].page_no);
-			sprintf(langs,  "%s %s", langs, ti->teletexts[i].lang);
+			snprintf(pids, 256,   "%s %d", pids, ti->teletexts[i].pid);
+			snprintf(types, 256,  "%s %d", types, ti->teletexts[i].type);
+			snprintf(magnos, 256, "%s %d", magnos, ti->teletexts[i].magazine_no);
+			snprintf(pgnos, 256,  "%s %d", pgnos, ti->teletexts[i].page_no);
+			snprintf(langs, 256,  "%s %s", langs, ti->teletexts[i].lang);
 		}
 	}
 }
@@ -1341,6 +1341,8 @@ static void am_scan_extract_srv_info_from_sdt(AM_SCAN_Result_t *result, dvbpsi_s
 	int curr_name_len = 0, tmp_len;
 	char name[AM_DB_MAX_SRV_NAME_LEN+1];
 
+	UNUSED(result);
+
 #define COPY_NAME(_s, _slen)\
 	AM_MACRO_BEGIN\
 		int copy_len = ((curr_name_len+_slen)>=name_size) ? (name_size-curr_name_len) : _slen;\
@@ -1487,7 +1489,7 @@ static void add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang
 	}
 	else
 	{
-		sprintf(ai->audios[ai->audio_count].lang, "Audio%d", ai->audio_count+1);
+		snprintf(ai->audios[ai->audio_count].lang, sizeof(ai->audios[ai->audio_count].lang), "Audio%d", ai->audio_count+1);
 	}
 	
 	AM_DEBUG(1, "Add a audio: pid %d, fmt %d, language: %s", aud_pid, aud_fmt, ai->audios[ai->audio_count].lang);
@@ -2251,6 +2253,8 @@ AM_MACRO_END
 /**\brief 按LCN顺序进行默认排序 */
 static void am_scan_dtv_default_sort_by_lcn(AM_SCAN_Result_t *result, sqlite3_stmt **stmts, AM_SCAN_RecTab_t *srv_tab)
 {
+	UNUSED(srv_tab);
+
 	if (result->tses && result->start_para->dtv_para.standard != AM_SCAN_DTV_STD_ATSC)
 	{
 		int row = AM_DB_MAX_SRV_CNT_PER_SRC, i, j;
@@ -3443,7 +3447,9 @@ static void am_scan_section_handler(int dev_no, int fid, const uint8_t *data, in
 	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)user_data;
 	AM_SCAN_TableCtl_t * sec_ctrl;
 	AM_SI_SectionHeader_t header;
-	
+
+	UNUSED(dev_no);
+
 	if (scanner == NULL)
 	{
 		AM_DEBUG(1, "Scan: Invalid param user_data in dmx callback");
@@ -3771,7 +3777,7 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner)
 			}
 			/*搜索结束*/
 			scanner->stage = AM_SCAN_STAGE_DONE;
-			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_SCAN_END, (void*)scanner->end_code);
+			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_SCAN_END, (void*)(long)scanner->end_code);
 			
 			return AM_SCAN_ERR_CANNOT_GET_NIT;
 		}
@@ -3844,7 +3850,7 @@ static AM_ErrorCode_t am_scan_all_done(AM_SCAN_Scanner_t *scanner)
 
 	/*搜索结束*/
 	scanner->stage = AM_SCAN_STAGE_DONE;
-	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_SCAN_END, (void*)scanner->end_code);
+	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_SCAN_END, (void*)(long)scanner->end_code);
 	
 	return AM_SUCCESS;
 }
@@ -3878,7 +3884,7 @@ static AM_ErrorCode_t am_scan_atv_step_tune(AM_SCAN_Scanner_t *scanner)
 			am_scan_atv_check_freq_range(scanner, scanner->atvctl.range_check, &dvb_fend_para(cur_fe_para)->frequency);
 			AM_DEBUG(1, "ATV step tune: %s %dHz", scanner->atvctl.direction>0?"+":"-", scanner->atvctl.step);
 
-			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_ATV_TUNING, (void*)(dvb_fend_para(cur_fe_para)->frequency));
+			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_ATV_TUNING, (void*)(long)(dvb_fend_para(cur_fe_para)->frequency));
 		
 		
 			AM_DEBUG(1, "Trying to tune atv frequency %uHz (range:%d ~ %d)...", 
@@ -4029,10 +4035,13 @@ static AM_ErrorCode_t am_scan_start_current_ts(AM_SCAN_Scanner_t *scanner)
 	return am_scan_start_ts(scanner, 0);
 }
 
-static void am_scan_fend_callback(int dev_no, int event_type, void *param, void *user_data)
+static void am_scan_fend_callback(long dev_no, int event_type, void *param, void *user_data)
 {
 	struct dvb_frontend_event *evt = (struct dvb_frontend_event*)param;
 	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)user_data;
+
+	UNUSED(dev_no);
+	UNUSED(event_type);
 
 	if (!scanner || !evt || (evt->status == 0))
 		return;
@@ -4502,7 +4511,7 @@ static AM_ErrorCode_t am_scan_stop_dtv(AM_SCAN_Scanner_t *scanner)
 		pthread_mutex_unlock(&scanner->lock);
 		AM_DEBUG(1, "Waiting for dmx callback...");
 		AM_DMX_Sync(dtv_start_para.dmx_dev_id);
-		AM_DEBUG(1, "OK, hsi is %d", scanner->dtvctl.hsi);
+		AM_DEBUG(1, "OK, hsi is %p", scanner->dtvctl.hsi);
 		pthread_mutex_lock(&scanner->lock);
 	
 		/*表控制释放*/
@@ -5375,7 +5384,7 @@ static void am_scan_copy_adtv_feparas(int fe_cnt, AM_FENDCTRL_DVBFrontendParamet
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_scan.h)
  */
-AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
+AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, AM_SCAN_Handle_t *handle)
 {
 	AM_SCAN_Scanner_t *scanner;
 	int rc;
@@ -5553,7 +5562,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
 		return AM_SCAN_ERR_CANNOT_CREATE_THREAD;
 	}
 	
-	*handle = (int)scanner;
+	*handle = scanner;
 	return AM_SUCCESS;
 }
 
@@ -5563,7 +5572,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_scan.h)
  */
-AM_ErrorCode_t AM_SCAN_Start(int handle)
+AM_ErrorCode_t AM_SCAN_Start(AM_SCAN_Handle_t handle)
 {
 	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)handle;
 
@@ -5586,7 +5595,7 @@ AM_ErrorCode_t AM_SCAN_Start(int handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_scan.h)
  */
-AM_ErrorCode_t AM_SCAN_Destroy(int handle, AM_Bool_t store)
+AM_ErrorCode_t AM_SCAN_Destroy(AM_SCAN_Handle_t handle, AM_Bool_t store)
 {
 	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)handle;
 
@@ -5616,7 +5625,7 @@ AM_ErrorCode_t AM_SCAN_Destroy(int handle, AM_Bool_t store)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_scan.h)
  */
-AM_ErrorCode_t AM_SCAN_SetUserData(int handle, void *user_data)
+AM_ErrorCode_t AM_SCAN_SetUserData(AM_SCAN_Handle_t handle, void *user_data)
 {
 	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)handle;
 
@@ -5637,7 +5646,7 @@ AM_ErrorCode_t AM_SCAN_SetUserData(int handle, void *user_data)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_scan.h)
  */
-AM_ErrorCode_t AM_SCAN_GetUserData(int handle, void **user_data)
+AM_ErrorCode_t AM_SCAN_GetUserData(AM_SCAN_Handle_t handle, void **user_data)
 {
 	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)handle;
 

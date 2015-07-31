@@ -23,6 +23,11 @@ typedef struct{
 static void ad_callback (int dev_no, int fhandle, const uint8_t *data, int len, void *user_data)
 {
 	AM_AD_Data_t *ad = (AM_AD_Data_t*)user_data;
+
+	UNUSED(dev_no);
+	UNUSED(fhandle);
+	UNUSED(data);
+
 	AM_DEBUG(1, "ad data %d", len);
 }
 
@@ -130,6 +135,8 @@ AM_ErrorCode_t
 AM_AD_SetVolume(AM_AD_Handle_t handle, int vol)
 {
 	AM_AD_Data_t *ad = (AM_AD_Data_t*)handle;
+
+	UNUSED(vol);
 
 	if(!ad)
 		return AM_AD_ERR_INVALID_HANDLE;

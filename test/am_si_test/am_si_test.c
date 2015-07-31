@@ -153,7 +153,7 @@ static int get_sec_by_hfilter(int hfilter)
 
 static void si_section_callback(int dev_no, int fid, const uint8_t *data, int len, void *user_data)
 {
-	int hsi;
+	AM_SI_Handle_t hsi;
 	int t;
 	AM_SI_SectionHeader_t header;
 	void *p_table;

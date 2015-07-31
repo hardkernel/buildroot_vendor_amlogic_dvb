@@ -35,6 +35,9 @@ extern "C"
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
+
+typedef void* AM_SCAN_Handle_t;
+
 /**\brief Scan模块错误代码*/
 enum AM_SCAN_ErrorCode
 {
@@ -338,7 +341,7 @@ struct AM_SCAN_CreatePara_s
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_scan.h)
  */
-extern AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle);
+extern AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, AM_SCAN_Handle_t *handle);
 
 /**\brief 销毀节目搜索
  * \param handle Scan句柄
@@ -347,7 +350,7 @@ extern AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, int *handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_scan.h)
  */
-extern AM_ErrorCode_t AM_SCAN_Destroy(int handle, AM_Bool_t store);
+extern AM_ErrorCode_t AM_SCAN_Destroy(AM_SCAN_Handle_t handle, AM_Bool_t store);
 
 /**\brief 启动节目搜索
  * \param handle Scan句柄
@@ -355,7 +358,7 @@ extern AM_ErrorCode_t AM_SCAN_Destroy(int handle, AM_Bool_t store);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_scan.h)
  */
-extern AM_ErrorCode_t AM_SCAN_Start(int handle);
+extern AM_ErrorCode_t AM_SCAN_Start(AM_SCAN_Handle_t handle);
 
 /**\brief 设置用户数据
  * \param handle Scan句柄
@@ -364,7 +367,7 @@ extern AM_ErrorCode_t AM_SCAN_Start(int handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_scan.h)
  */
-extern AM_ErrorCode_t AM_SCAN_SetUserData(int handle, void *user_data);
+extern AM_ErrorCode_t AM_SCAN_SetUserData(AM_SCAN_Handle_t handle, void *user_data);
 
 /**\brief 取得用户数据
  * \param handle Scan句柄
@@ -373,7 +376,7 @@ extern AM_ErrorCode_t AM_SCAN_SetUserData(int handle, void *user_data);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_scan.h)
  */
-extern AM_ErrorCode_t AM_SCAN_GetUserData(int handle, void **user_data);
+extern AM_ErrorCode_t AM_SCAN_GetUserData(AM_SCAN_Handle_t handle, void **user_data);
 
 
 #ifdef __cplusplus

@@ -39,6 +39,8 @@ extern "C"
  * Type definitions
  ***************************************************************************/
 
+typedef void* AM_EPG_Handle_t;
+
 /**\brief EPG模块错误代码*/
 enum AM_EPG_ErrorCode
 {
@@ -134,7 +136,7 @@ typedef struct
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-extern AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, int *handle);
+extern AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, AM_EPG_Handle_t *handle);
 
 /**\brief 销毀一个EPG监控
  * \param handle 句柄
@@ -142,7 +144,7 @@ extern AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, int *handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-extern AM_ErrorCode_t AM_EPG_Destroy(int handle);
+extern AM_ErrorCode_t AM_EPG_Destroy(AM_EPG_Handle_t handle);
 
 /**\brief 设置EPG监控模式
  * \param handle 句柄
@@ -152,7 +154,7 @@ extern AM_ErrorCode_t AM_EPG_Destroy(int handle);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-extern AM_ErrorCode_t AM_EPG_ChangeMode(int handle, int op, int mode);
+extern AM_ErrorCode_t AM_EPG_ChangeMode(AM_EPG_Handle_t handle, int op, int mode);
 
 /**\brief 设置当前监控的service，监控其PMT和EIT actual pf
  * \param handle 句柄
@@ -161,7 +163,7 @@ extern AM_ErrorCode_t AM_EPG_ChangeMode(int handle, int op, int mode);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-extern AM_ErrorCode_t AM_EPG_MonitorService(int handle, int db_srv_id);
+extern AM_ErrorCode_t AM_EPG_MonitorService(AM_EPG_Handle_t handle, int db_srv_id);
 
 /**\brief 设置EPG PF 自动更新间隔
  * \param handle 句柄
@@ -170,7 +172,7 @@ extern AM_ErrorCode_t AM_EPG_MonitorService(int handle, int db_srv_id);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-extern AM_ErrorCode_t AM_EPG_SetEITPFCheckDistance(int handle, int distance);
+extern AM_ErrorCode_t AM_EPG_SetEITPFCheckDistance(AM_EPG_Handle_t handle, int distance);
 
 /**\brief 设置EPG Schedule 自动更新间隔
  * \param handle 句柄
@@ -179,7 +181,7 @@ extern AM_ErrorCode_t AM_EPG_SetEITPFCheckDistance(int handle, int distance);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-extern AM_ErrorCode_t AM_EPG_SetEITScheCheckDistance(int handle, int distance);
+extern AM_ErrorCode_t AM_EPG_SetEITScheCheckDistance(AM_EPG_Handle_t handle, int distance);
 
 
 /**\brief 字符编码转换
@@ -234,7 +236,7 @@ extern AM_ErrorCode_t AM_EPG_SetLocalOffset(int offset);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-extern AM_ErrorCode_t AM_EPG_SubscribeEvent(int handle, int db_evt_id);
+extern AM_ErrorCode_t AM_EPG_SubscribeEvent(AM_EPG_Handle_t handle, int db_evt_id);
 
 /**\brief 设置用户数据
  * \param handle EPG句柄
@@ -243,7 +245,7 @@ extern AM_ErrorCode_t AM_EPG_SubscribeEvent(int handle, int db_evt_id);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-extern AM_ErrorCode_t AM_EPG_SetUserData(int handle, void *user_data);
+extern AM_ErrorCode_t AM_EPG_SetUserData(AM_EPG_Handle_t handle, void *user_data);
 
 /**\brief 取得用户数据
  * \param handle Scan句柄
@@ -252,7 +254,7 @@ extern AM_ErrorCode_t AM_EPG_SetUserData(int handle, void *user_data);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-extern AM_ErrorCode_t AM_EPG_GetUserData(int handle, void **user_data);
+extern AM_ErrorCode_t AM_EPG_GetUserData(AM_EPG_Handle_t handle, void **user_data);
 
 #ifdef __cplusplus
 }

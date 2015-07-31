@@ -122,7 +122,7 @@ struct AM_EPG_Monitor_s
 	pthread_mutex_t     lock;   		/**< 保护互斥体*/
 	pthread_cond_t      cond;    		/**< 条件变量*/
 	pthread_t          	thread;         /**< 状态监控线程*/
-	int					hsi;			/**< SI解析句柄*/
+	AM_SI_Handle_t      hsi;		/**< SI解析句柄*/
 	int					eitpf_check_time; 	/**< EIT PF自动检查更新间隔，ms*/
 	int					eitsche_check_time; /**< EIT Schedule自动检查更新间隔，ms*/
 	int					new_eit_check_time; /**< EIT数据更新检查时间*/

@@ -314,24 +314,6 @@ extern AM_ErrorCode_t AM_FEND_SetVoltage(int dev_no, fe_sec_voltage_t voltage);
  */
 extern AM_ErrorCode_t AM_FEND_EnableHighLnbVoltage(int dev_no, long arg);                          
                                                                            
-/**\brief 转化信号强度dBm值为百分比(NorDig)
- * \param rf_power_dbm dBm值
- * \param constellation 调制模式
- * \param code_rate 码率
- * \return 百分比值
- */
-extern int AM_FEND_CalcTerrPowerPercentNorDig(short rf_power_dbm, fe_modulation_t constellation, fe_code_rate_t code_rate);
-
-/**\brief 转化C/N值为百分比(NorDig)
- * \param cn C/N值
- * \param constellation 调制模式
- * \param code_rate 码率
- * \param hierarchy 等级调制参数
- * \param isLP 低优先级模式
- * \return 百分比值
- */
-extern int AM_FEND_CalcTerrCNPercentNorDig(float cn, int ber, fe_modulation_t constellation, fe_code_rate_t code_rate, fe_hierarchy_t hierarchy, int isLP);
-
 /**\brief 卫星盲扫开始  
  * \param dev_no 前端设备号
  * \param[in] cb 盲扫回调函数

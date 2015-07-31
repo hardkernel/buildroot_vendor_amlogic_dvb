@@ -189,7 +189,7 @@ static AM_ErrorCode_t am_tv_try_play(AM_TV_Data_t *tv)
 }
 
 /**\brief 前端回调*/
-static void am_tv_fend_callback(int dev_no, int event_type, void *param, void *user_data)
+static void am_tv_fend_callback(long dev_no, int event_type, void *param, void *user_data)
 {
 	struct dvb_frontend_event *evt = (struct dvb_frontend_event*)param;
 	AM_TV_Data_t *tv = (AM_TV_Data_t*)user_data;
@@ -368,7 +368,7 @@ static AM_ErrorCode_t am_tv_play_channel(AM_TV_Data_t *tv, int op, int chan_num)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-AM_ErrorCode_t AM_TV_Create(int fend_dev, int av_dev, sqlite3 *hdb, int *handle)
+AM_ErrorCode_t AM_TV_Create(int fend_dev, int av_dev, sqlite3 *hdb, AM_TV_Handle_t *handle)
 {
 	AM_TV_Data_t *tv;
 
@@ -398,7 +398,7 @@ AM_ErrorCode_t AM_TV_Create(int fend_dev, int av_dev, sqlite3 *hdb, int *handle)
 	/*注册前端事件*/
 	AM_EVT_Subscribe(tv->fend_dev, AM_FEND_EVT_STATUS_CHANGED, am_tv_fend_callback, (void*)tv);
 		
-	*handle = (int)tv;
+	*handle = tv;
 	AM_DEBUG(1, "Create TV from AV(%d) ok!", av_dev);
 	
 	return AM_SUCCESS;
@@ -410,7 +410,7 @@ AM_ErrorCode_t AM_TV_Create(int fend_dev, int av_dev, sqlite3 *hdb, int *handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-AM_ErrorCode_t AM_TV_Destroy(int handle)
+AM_ErrorCode_t AM_TV_Destroy(AM_TV_Handle_t handle)
 {
 	AM_TV_Data_t *tv = (AM_TV_Data_t*)handle;
 
@@ -434,7 +434,7 @@ AM_ErrorCode_t AM_TV_Destroy(int handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-AM_ErrorCode_t AM_TV_ChannelUp(int handle)
+AM_ErrorCode_t AM_TV_ChannelUp(AM_TV_Handle_t handle)
 {
 	AM_TV_Data_t *tv = (AM_TV_Data_t*)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -459,7 +459,7 @@ final:
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-AM_ErrorCode_t AM_TV_ChannelDown(int handle)
+AM_ErrorCode_t AM_TV_ChannelDown(AM_TV_Handle_t handle)
 {
 	AM_TV_Data_t *tv = (AM_TV_Data_t*)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -485,7 +485,7 @@ final:
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-AM_ErrorCode_t AM_TV_PlayChannel(int handle, int chan_num)
+AM_ErrorCode_t AM_TV_PlayChannel(AM_TV_Handle_t handle, int chan_num)
 {
 	AM_TV_Data_t *tv = (AM_TV_Data_t*)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -508,7 +508,7 @@ final:
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-AM_ErrorCode_t AM_TV_Play(int handle)
+AM_ErrorCode_t AM_TV_Play(AM_TV_Handle_t handle)
 {
 	AM_TV_Data_t *tv = (AM_TV_Data_t*)handle;
 	AM_ErrorCode_t ret = AM_FAILURE;
@@ -546,7 +546,7 @@ AM_ErrorCode_t AM_TV_Play(int handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-AM_ErrorCode_t AM_TV_StopPlay(int handle)
+AM_ErrorCode_t AM_TV_StopPlay(AM_TV_Handle_t handle)
 {
 	AM_TV_Data_t *tv = (AM_TV_Data_t*)handle;
 	AM_ErrorCode_t ret;
@@ -568,7 +568,7 @@ AM_ErrorCode_t AM_TV_StopPlay(int handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tv.h)
  */
-AM_ErrorCode_t AM_TV_GetCurrentChannel(int handle, int *srv_dbid)
+AM_ErrorCode_t AM_TV_GetCurrentChannel(AM_TV_Handle_t handle, int *srv_dbid)
 {
 	AM_TV_Data_t *tv = (AM_TV_Data_t*)handle;
 

@@ -69,7 +69,7 @@ static int progress=10;
 
 static int searching_state=SEARCHING_IDLE;
 
-static int search_handle=0;
+static AM_SCAN_Handle_t search_handle = NULL;
 
 /****************************************************************************
  * Functions
@@ -260,7 +260,7 @@ static int scan_result_quit (DTV_Window_t *win)
 	return 0;
 }
 
-static void dtv_program_progress_handler(int dev_no, int event_type, void *param, void *user_data)
+static void dtv_program_progress_handler(long dev_no, int event_type, void *param, void *user_data)
 {
 	extern int  dtv_update(); 
 	

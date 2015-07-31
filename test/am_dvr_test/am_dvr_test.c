@@ -23,6 +23,7 @@
 #include <am_fend.h>
 #include <am_dvr.h>
 #include <errno.h>
+#include <am_dsc.h>
 
 /****************************************************************************
  * Macro definitions
@@ -138,6 +139,36 @@ static void stop_si(void)
 		sdt_fid = -1;
 	}
 #endif
+}
+
+void start_dsc(int dsc, int src, int pid_cnt, int *pids)
+{
+	AM_DSC_OpenPara_t dsc_para;
+	int dscc[8];
+	int i;
+	int ret;
+
+	memset(&dsc_para, 0, sizeof(AM_DSC_OpenPara_t));
+	ret = AM_DSC_Open(dsc, &dsc_para);
+
+	for(i=0; i<pid_cnt; i++) {
+		if(pids[i]>0) {
+			int ret;
+			char key[8] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
+
+			ret = AM_DSC_SetSource(dsc, src);
+			ret=AM_DSC_AllocateChannel(dsc, &dscc[i]);
+			ret=AM_DSC_SetChannelPID(dsc, dscc[i], pids[i]);
+			ret=AM_DSC_SetKey(dsc,dscc[i],AM_DSC_KEY_TYPE_ODD, (const uint8_t*)key);
+			ret=AM_DSC_SetKey(dsc,dscc[i],AM_DSC_KEY_TYPE_EVEN, (const uint8_t*)key);
+			printf("dsc[%d] set default key for pid[%d]\n", dsc, pids[i]);
+		}
+	}
+}
+
+void stop_dsc(int dsc)
+{
+	AM_DSC_Close(dsc);
 }
 
 static int dvr_data_write(int fd, uint8_t *buf, int size)
@@ -307,6 +338,20 @@ int start_dvr_test(void)
 
 				AM_DVR_SetSource(dev_no, fifo_id);
 			}
+			else if (!strncmp(buf, "dscstart", 8))
+			{
+				int dsc, src, pid_cnt;
+				int pids[8];
+				sscanf(buf + 8, "%d %d %d %d %d %d %d %d %d %d %d", &dsc, &src, &pid_cnt, &pids[0], &pids[1],&pids[2],&pids[3],
+					&pids[4],&pids[5],&pids[6],&pids[7]);
+				start_dsc(dsc, src, pid_cnt, pids);
+			}
+			else if (!strncmp(buf, "dscstop", 7))
+			{
+				int dsc;
+				sscanf(buf + 7, "%d", &dsc);
+				stop_dsc(dsc);
+			}
 			else
 			{
 				printf("Unkown command: %s\n", buf);
@@ -371,7 +416,7 @@ int main(int argc, char **argv)
 		AM_DEBUG(1, "Openning DMX%d...", i);
 		memset(&para, 0, sizeof(para));
 		AM_TRY(AM_DMX_Open(i, &para));
-		AM_DMX_SetSource(i, AM_DMX_SRC_TS2);
+		AM_DMX_SetSource(i, AM_DMX_SRC_TS0);
 		AM_DEBUG(1, "Openning DVR%d...", i);
 		memset(&dpara, 0, sizeof(dpara));
 		AM_TRY(AM_DVR_Open(i, &dpara));

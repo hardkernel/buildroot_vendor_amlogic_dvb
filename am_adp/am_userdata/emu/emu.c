@@ -13,6 +13,8 @@
 
 #define AM_DEBUG_LEVEL 2
 
+#include <assert.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <am_debug.h>
 #include "../am_userdata_internal.h"
