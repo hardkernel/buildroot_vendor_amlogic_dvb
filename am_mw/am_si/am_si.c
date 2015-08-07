@@ -856,6 +856,7 @@ iso6937_end:
 		char *org_ucs2 = ucs2;
 		char **pin=&ucs2;
 		char **pout=&dest;
+		char *o_dest = dest;
 		
 		handle=iconv_open("utf-8","ucs-2");
 
@@ -871,6 +872,8 @@ iso6937_end:
 		    iconv_close(handle);
 		    return AM_FAILURE;
 		}
+
+		AM_Check_UTF8(o_dest, *dest_len, o_dest, dest_len);
 		
 		free(org_ucs2);
 
@@ -1223,6 +1226,7 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
     char **pout=&out_code;
     char fbyte;
     char cod[32];
+    char *o_out_code = out_code;
 
 	AM_DEBUG(0, "DVB convert text code");
 
@@ -1350,6 +1354,8 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 		    iconv_close(handle);
 		    return AM_FAILURE;
 		}
+
+		AM_Check_UTF8(o_out_code, out_len, o_out_code, &out_len);
 
 		return iconv_close(handle);
 	}

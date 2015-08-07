@@ -403,6 +403,12 @@ static int in_utf8(unsigned long value, void *arg)
 	return 1;
 }
 
+static int is_ctrl_code(unsigned long v)
+{
+	return ((v >= 0x80) && (v <= 0x9f))
+		|| ((v >= 0xE080) && (v <= 0xE09f));
+}
+
 /* This function traverses a string and passes the value of each character
  * to an optional function along with a void * argument.
  */
@@ -421,13 +427,18 @@ static int traverse_string(const unsigned char *p, int len,
 			p++;
 			continue;
 		}//return -1;
+		else if(is_ctrl_code(value))
+		{//remove the control codes
+			len -= ret;
+			p += ret;
+			continue;
+		}
 		else
 		{        
 			int *pos = arg;
+			if((*pos + ret) > *dest_len)
+				break;
 
-                    if((*pos + ret) > *dest_len)
-                        break;            
-			
 			char *tp = dest+(*pos);
 			memcpy(tp,p,ret);
 			len -= ret;
