@@ -15,4 +15,4 @@
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
-include $(LOCAL_PATH)/am_adp/Android.mk $(LOCAL_PATH)/am_mw/Android.mk
+include $(LOCAL_PATH)/am_adp/Android.mk $(LOCAL_PATH)/am_mw/Android.mk $(LOCAL_PATH)/am_ver/Android.mk

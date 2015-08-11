@@ -2859,6 +2859,24 @@ AM_ErrorCode_t AM_AV_SwitchTSAudio(int dev_no, uint16_t apid, AM_AV_AFormat_t af
 	return ret;
 }
 
+AM_ErrorCode_t AM_AV_ResetAudioDecoder(int dev_no)
+{
+	AM_AV_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	
+	AM_TRY(av_get_openned_dev(dev_no, &dev));
+	
+	pthread_mutex_lock(&dev->lock);
+	
+	if ((dev->mode & AV_PLAY_TS) && dev->drv->switch_ts_audio) 
+		ret = dev->drv->reset_audio_decoder(dev);
+	
+	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
+
+
 /**\brief used to set /sys/module/amvdec_h264/parameters/error_recovery_mode to choose display mosaic or not
  * \param dev_no 音视频设备号
  * \param error_recovery_mode : 0 ,skip mosaic and reset vdec,2 skip mosaic ,3 display mosaic

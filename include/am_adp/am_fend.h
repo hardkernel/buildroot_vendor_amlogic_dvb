@@ -371,6 +371,15 @@ extern AM_ErrorCode_t AM_FEND_FineTune(int dev_no, unsigned int freq);
  */
 extern AM_ErrorCode_t AM_FEND_SetCvbsAmpOut(int dev_no, unsigned int amp);
 
+/**\brief 模拟get atv status
+ *\param dev_no 前端设备号
+ *\param atv_status ，单位为atv_status_t
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+AM_ErrorCode_t AM_FEND_GetAtvStatus(int dev_no,  atv_status_t *atv_status);
+
 #ifdef __cplusplus
 }
 #endif

@@ -74,13 +74,14 @@ enum AM_EPG_Mode
 	AM_EPG_SCAN_STT	= 0x1000,	/**< 监控STT*/
 	AM_EPG_SCAN_RRT	= 0x2000,	/**< 监控RRT*/
 	AM_EPG_SCAN_PSIP_EIT = 0x4000,	/**< 监控ATSC EIT*/
+	AM_EPG_SCAN_PSIP_ETT = 0x8000,	/**< 监控ATSC ETT*/
 	
 	/*Composed mode*/
 	AM_EPG_SCAN_EIT_PF_ALL		= AM_EPG_SCAN_EIT_PF_ACT | AM_EPG_SCAN_EIT_PF_OTH,/**< 监控所有eit pf*/
 	AM_EPG_SCAN_EIT_SCHE_ALL 	= AM_EPG_SCAN_EIT_SCHE_ACT | AM_EPG_SCAN_EIT_SCHE_OTH,/**< 监控所有eit schedule*/
 	AM_EPG_SCAN_EIT_ALL 		= AM_EPG_SCAN_EIT_PF_ALL | AM_EPG_SCAN_EIT_SCHE_ALL, /**< 监控所有eit*/
 	AM_EPG_SCAN_ALL				= AM_EPG_SCAN_PAT|AM_EPG_SCAN_PMT|AM_EPG_SCAN_CAT|AM_EPG_SCAN_SDT|AM_EPG_SCAN_NIT|AM_EPG_SCAN_TDT|AM_EPG_SCAN_EIT_ALL|
-									AM_EPG_SCAN_MGT|AM_EPG_SCAN_VCT|AM_EPG_SCAN_STT|AM_EPG_SCAN_RRT|AM_EPG_SCAN_PSIP_EIT,
+									AM_EPG_SCAN_MGT|AM_EPG_SCAN_VCT|AM_EPG_SCAN_STT|AM_EPG_SCAN_RRT|AM_EPG_SCAN_PSIP_EIT|AM_EPG_SCAN_PSIP_ETT,
 };
 
 /**\brief EPG监控事件类型*/
@@ -99,6 +100,7 @@ enum AM_EPG_EventType
 	AM_EPG_EVT_NEW_MGT,		/**< 发新新版本MGT， 参数为mgt_section_info_t*/
 	AM_EPG_EVT_NEW_VCT,		/**< 发新新版本VCT， 参数为vct_section_info_t*/
 	AM_EPG_EVT_NEW_PSIP_EIT,/**< 发新新版本ATSC EIT， 参数为eit_section_info_t*/
+	AM_EPG_EVT_NEW_PSIP_ETT,/**< 发新新版本ATSC ETT， 参数为ett_section_info_t*/
 	AM_EPG_EVT_EIT_DONE,   /**< 所有EIT接收完毕*/
 	AM_EPG_EVT_UPDATE_EVENTS,	/**< 通知接收到新的EIT events 数据，用于上层实现更新*/
 	AM_EPG_EVT_UPDATE_PROGRAM_AV,	/**< 节目音视频播放信息更新*/

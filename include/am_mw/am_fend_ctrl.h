@@ -119,7 +119,8 @@ typedef struct AM_FENDCTRL_DVBFrontendParameters{
 		AM_FENDCTRL_DVBFrontendParametersAnalog_t analog;
 		AM_FENDCTRL_DVBFrontendParametersDTMB_t dtmb;
 		AM_FENDCTRL_DVBFrontendParametersISDBT_t isdbt;
-	};	
+	};
+    int m_logicalChannelNum;
 	int m_type; /**< 前端控制模块解调模式*/
 }AM_FENDCTRL_DVBFrontendParameters_t;
   

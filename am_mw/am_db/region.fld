@@ -7,4 +7,5 @@
 "symbol_rate integer",				/**< 符号率, symbol/s*/
 "bandwidth integer",				/**< 带宽,参考linux/dvb/frontend.h fe_bandwidth*/
 "ofdm_mode integer",				/**< OFDM模式,参考linux/dvb/frontend.h OFDM_DVBT/OFDMDVBT2*/
+"logical_channel_num integer", /**逻辑频道号*/
 

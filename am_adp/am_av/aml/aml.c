@@ -151,6 +151,7 @@ void *adec_handle = NULL;
 #define TSYNC_MODE_FILE "/sys/class/tsync/mode"
 #define AV_THRESHOLD_MIN_FILE "/sys/class/tsync/av_threshold_min"
 #define AV_THRESHOLD_MAX_FILE "/sys/class/tsync/av_threshold_max"
+#define AVS_PLUS_DECT_FILE "/sys/module/amvdec_avs/parameters/profile"
 
 #define CANVAS_ALIGN(x)    (((x)+7)&~7)
 #define JPEG_WRTIE_UNIT    (32*1024)
@@ -392,6 +393,7 @@ static AM_ErrorCode_t aml_timeshift_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, v
 static AM_ErrorCode_t aml_timeshift_get_info(AM_AV_Device_t *dev, AM_AV_TimeshiftInfo_t *info);
 static AM_ErrorCode_t aml_set_vpath(AM_AV_Device_t *dev);
 static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt);
+static AM_ErrorCode_t aml_reset_audio_decoder(AM_AV_Device_t *dev);
 
 const AM_AV_Driver_t aml_av_drv =
 {
@@ -415,6 +417,7 @@ const AM_AV_Driver_t aml_av_drv =
 .get_timeshift_info = aml_timeshift_get_info,
 .set_vpath   = aml_set_vpath,
 .switch_ts_audio = aml_switch_ts_audio,
+.reset_audio_decoder = aml_reset_audio_decoder,
 };
 
 /*音频控制（通过解码器）操作*/
@@ -3790,7 +3793,7 @@ static void* aml_av_monitor_thread(void *arg)
 	AM_Bool_t is_hd_video = AM_FALSE;
 	AM_Bool_t audio_scrambled = AM_FALSE;
 	AM_Bool_t video_scrambled = AM_FALSE;
-	AM_Bool_t no_audio_data = AM_FALSE, no_video_data = AM_FALSE;
+	AM_Bool_t no_audio_data = AM_TRUE, no_video_data = AM_TRUE;
 	AM_Bool_t has_amaster = AM_FALSE;
 	AM_Bool_t need_replay;
 	int resample_type = 0;
@@ -3807,6 +3810,7 @@ static void* aml_av_monitor_thread(void *arg)
 	int apts_stop_time = 0, vpts_stop_time = 0, apts_stop_dur = 0, vpts_stop_dur = 0;
 	int dmx_apts_stop_time = 0, dmx_vpts_stop_time = 0, dmx_apts_stop_dur = 0, dmx_vpts_stop_dur = 0;
 	int tsync_mode, vmaster_time = 0, vmaster_dur = 0;
+	int abuf_level_empty_time = 0, abuf_level_empty_dur = 0, vbuf_level_empty_time = 0, vbuf_level_empty_dur = 0;
 	int down_audio_cache_time = 0, down_video_cache_time = 0;
 	struct am_io_param astatus;
 	struct am_io_param vstatus;
@@ -3814,6 +3818,8 @@ static void* aml_av_monitor_thread(void *arg)
 	struct timespec rt;
 	char buf[32];
 	AV_TSData_t *ts;
+	AM_Bool_t is_avs_plus = AM_FALSE;
+	int avs_fmt = 0;
 
 #ifndef ENABLE_PCR
 	property_set("sys.amplayer.drop_pcm", "1");
@@ -3864,6 +3870,22 @@ static void* aml_av_monitor_thread(void *arg)
 			vbuf_read_ptr = 0;
 		}
 
+		if(vbuf_level == 0){
+			if(!vbuf_level_empty_time)
+				vbuf_level_empty_time = now;
+			vbuf_level_empty_dur = now - vbuf_level_empty_time;
+		}else{
+			vbuf_level_empty_time = 0;
+			vbuf_level_empty_dur = 0;
+		}
+		if(abuf_level == 0){
+			if(!abuf_level_empty_time)
+				abuf_level_empty_time = now;
+			abuf_level_empty_dur = now - abuf_level_empty_time;
+		}else{
+			abuf_level_empty_time = 0;
+			abuf_level_empty_dur = 0;
+		}
 		if(abuf_read_ptr == last_abuf_read_ptr){
 			if(!arp_stop_time)
 				arp_stop_time = now;
@@ -3896,6 +3918,17 @@ static void* aml_av_monitor_thread(void *arg)
 			frame_width = 0;
 			frame_height= 0;
 		}
+		if(AM_FileRead(AVS_PLUS_DECT_FILE, buf, sizeof(buf)) >= 0){
+			sscanf(buf, "%d", &avs_fmt);
+		}else{
+			AM_DEBUG(1, "cannot read \"%s\"", AVS_PLUS_DECT_FILE);
+			avs_fmt = 0;
+		}
+		AM_DEBUG(1, "avs_fmt: \"%x\"", avs_fmt);
+		if(avs_fmt==0x148) //bit8 
+			is_avs_plus = AM_TRUE;
+		else
+			is_avs_plus = AM_FALSE;			
 
 		if(AM_FileRead(AUDIO_PTS_FILE, buf, sizeof(buf)) >= 0){
 			sscanf(buf+2, "%x", &apts);
@@ -4188,69 +4221,54 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 #endif
 
-		if(has_audio && !audio_scrambled && adec_start && !av_paused && (dmx_apts_stop_dur > SCRAMBLE_CHECK_TIME) && (apts_stop_dur > SCRAMBLE_CHECK_TIME)){
+        //first no_data
+		if(has_audio && adec_start &&  (dmx_apts_stop_dur > NO_DATA_CHECK_TIME) && (apts_stop_dur > NO_DATA_CHECK_TIME)){
 			AM_Bool_t sf[2];
+            AM_DEBUG(1, "audio stoped");
+            no_audio_data = AM_TRUE;
+            //second scramble
+            if(abuf_level_empty_dur > SCRAMBLE_CHECK_TIME){
 			AM_DMX_GetScrambleStatus(0, sf);
 			if(sf[1]){
 				audio_scrambled = AM_TRUE;
-				AM_DEBUG(1, "audio scrambled");
+                    AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_SCAMBLED, NULL);
+                    AM_DEBUG(1, "audio scrambled > stoped");
+                }else{
+                    AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
 			}
 
+            }else{
+                AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
+            }
 		}
 
-		if(has_video && !video_scrambled && !av_paused && (dmx_vpts_stop_dur > SCRAMBLE_CHECK_TIME) && (vpts_stop_dur > SCRAMBLE_CHECK_TIME)){
+		if(has_video && (dmx_vpts_stop_dur > NO_DATA_CHECK_TIME) && (vpts_stop_dur > NO_DATA_CHECK_TIME)){
 			AM_Bool_t sf[2];
+            no_video_data = AM_TRUE;
+            AM_DEBUG(1, "video data stopped");
+            if(vbuf_level_empty_dur > SCRAMBLE_CHECK_TIME){
 			AM_DMX_GetScrambleStatus(0, sf);
 			if(sf[0]){
 				video_scrambled = AM_TRUE;
+                    AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_SCAMBLED, NULL);
 				AM_DEBUG(1, "video scrambled");
+                }else{
+                    AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
 			}
+            }else{
+                AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
 		}
 
 
-		//if(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur > NO_DATA_CHECK_TIME) && (apts_stop_dur > NO_DATA_CHECK_TIME)){
-		if(!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur > NO_DATA_CHECK_TIME)){
-			no_audio_data = AM_TRUE;
-			AM_DEBUG(1, "audio data stopped");
+
 		}
 
-		//if(!no_video_data && !av_paused && (dmx_vpts_stop_dur > NO_DATA_CHECK_TIME) && (vpts_stop_dur > NO_DATA_CHECK_TIME)){
-		if(!no_video_data && !av_paused && (dmx_vpts_stop_dur > NO_DATA_CHECK_TIME)){
-			no_video_data = AM_TRUE;
-			AM_DEBUG(1, "video data stopped");
+		else if(is_avs_plus &&(dev->ts_player.play_para.vfmt == VFORMAT_AVS))
+		{
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_NOT_SUPPORT, NULL);//not  unsupport , just  FORMAT  is AVS
 		}
 
-		if(audio_scrambled){
-			AM_Bool_t sf[2];
-			AM_DMX_GetScrambleStatus(0, sf);
-			if(sf[1]){
-				audio_scrambled = AM_TRUE;
-				AM_DEBUG(1, "audio scrambled");
-			}
-			else
-				audio_scrambled = AM_FALSE;
-		}
-
-
-		if(video_scrambled){
-			AM_Bool_t sf[2];
-			AM_DMX_GetScrambleStatus(0, sf);
-			if(sf[0]){
-				video_scrambled = AM_TRUE;
-				AM_DEBUG(1, "video scrambled");
-			}
-			else
-				video_scrambled = AM_FALSE;
-		}
-
-		if(audio_scrambled)
-			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_SCAMBLED, NULL);
-		else if(video_scrambled)
-			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_SCAMBLED, NULL);
-		else if(no_audio_data&&no_video_data)
-			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
-		else
-			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_DATA_RESUME, NULL);
+		//AM_DEBUG(1,"no_audio = %d, dmx_a_stop = %d, a_stop= %d, no_video=%d, dmx_v_stop=%d, v_stop=%d, abuf_empty=%d, vbuf_empty=%d\n",no_audio_data,dmx_apts_stop_dur,apts_stop_dur, no_video_data, dmx_vpts_stop_dur, vpts_stop_dur, abuf_level_empty_dur,vbuf_level_empty_dur);
 
 		if(no_audio_data && dmx_apts_stop_dur == 0){
 			no_audio_data = AM_FALSE;
@@ -5873,5 +5891,27 @@ static AM_ErrorCode_t aml_set_vdec_error_recovery_mode(AM_AV_Device_t *dev, uint
     return AM_SUCCESS;
 }
 
+AM_ErrorCode_t aml_reset_audio_decoder(AM_AV_Device_t *dev)
+{
+      int fd = -1;
+
+       if(dev->ts_player.drv_data)
+               fd = ((AV_TSData_t*)dev->ts_player.drv_data)->fd;
+
+       if (fd < 0)
+       {
+               AM_DEBUG(1, "ts_player fd < 0, error!");
+              return AM_AV_ERR_SYS;
+       }
+
+       /*reset audio*/
+       if(ioctl(fd, AMSTREAM_IOC_AUDIO_RESET, 0)==-1)
+       {
+               AM_DEBUG(1, "audio reset failed");
+               return AM_AV_ERR_SYS;
+       }
+
+       return AM_SUCCESS;
+}
 
 

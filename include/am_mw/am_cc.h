@@ -48,6 +48,48 @@ typedef struct AM_CC_DrawPara AM_CC_DrawPara_t;
 typedef void (*AM_CC_DrawBegin_t)(AM_CC_Handle_t handle, AM_CC_DrawPara_t *draw_para);
 typedef void (*AM_CC_DrawEnd_t)(AM_CC_Handle_t handle, AM_CC_DrawPara_t *draw_para);
 
+typedef enum {
+    CC_STATE_RUNNING      = 0x1001,
+    CC_STATE_STOP                 ,
+
+    CMD_CC_START          = 0x2001,
+    CMD_CC_STOP                   ,
+
+    CMD_CC_BEGIN          = 0x3000,
+    CMD_CC_1                      ,
+    CMD_CC_2                      ,
+    CMD_CC_3                      ,
+    CMD_CC_4                      ,
+
+    //this doesn't support currently
+    CMD_TT_1              = 0x3005,
+    CMD_TT_2                      ,
+    CMD_TT_3                      ,
+    CMD_TT_4                      ,
+
+    //cc service
+    CMD_SERVICE_1         = 0x4001,
+    CMD_SERVICE_2                 ,
+    CMD_SERVICE_3                 ,
+    CMD_SERVICE_4                 ,
+    CMD_SERVICE_5                 ,
+    CMD_SERVICE_6                 ,
+    CMD_CC_END                    ,
+
+    CMD_SET_COUNTRY_BEGIN = 0x5000,
+    CMD_SET_COUNTRY_USA           ,
+    CMD_SET_COUNTRY_KOREA         ,
+    CMD_SET_COUNTRY_END           ,
+    /*set CC source type according ATV or DTV*/
+    CMD_CC_SET_VBIDATA   = 0x7001,
+    CMD_CC_SET_USERDATA ,
+	
+	CMD_CC_SET_CHAN_NUM = 0x8001,
+	CMD_VCHIP_RST_CHGSTAT = 0x9001,
+
+    CMD_CC_MAX
+} AM_CLOSECAPTION_cmd_t;
+
 /**\brief caption mode*/
 typedef enum
 {
@@ -211,6 +253,17 @@ extern AM_ErrorCode_t AM_CC_SetUserOptions(AM_CC_Handle_t handle, AM_CC_UserOpti
  *   - 其他值 错误代码(见am_cc.h)
  */
 extern void *AM_CC_GetUserData(AM_CC_Handle_t handle);
+
+/*
+** the following Interface added for new architecture of ATSC Close Caption
+*/
+typedef void(*AM_CC_CallBack)(char *str, int cnt, int data_buf[], int cmd_buf[], void *user_data);
+typedef void(*AM_VCHIP_CallBack)(int vchip_stat, void *user_data);
+
+extern void AM_CC_Cmd(int cmd);
+extern void AM_CC_Set_CallBack(AM_CC_CallBack notify, void *user_data);
+extern void AM_Set_CurrentChanNumber(int ntscchannumber);
+extern void AM_VCHIP_Set_CallBack(AM_VCHIP_CallBack notify, void *user_data);
 
 #ifdef __cplusplus
 }

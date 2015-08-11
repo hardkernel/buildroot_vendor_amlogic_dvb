@@ -54,6 +54,9 @@ static pthread_mutex_t lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 static pthread_mutex_t lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
 #endif
 
+pthread_mutexattr_t attr;
+
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
 /****************************************************************************
  * API functions
@@ -72,9 +75,33 @@ AM_ErrorCode_t AM_EVT_Subscribe(long dev_no, int event_type, AM_EVT_Callback_t c
 {
 	AM_Event_t *evt;
 	int pos;
+    int i;
 	
 	assert(cb);
 	
+    //同样的callback注册,过滤掉.
+    //有相同dev_no的可能性.(malloc函数分配的在释放后,再次分配,经常是同一个指针)
+    //暂时还是原来的设计,使用dev_no作为事件标志之一,但实际上意义不大,主要还是使用event_type,比如合理.
+    //同样cb与dev_no绑定的意义不大,造成上层需要每次配对调用Subscribe/unSubscribe
+    //Subscribe/unSubscribe如果在cb函数里面做,又极易出现逻辑难题(延后处理),或者死锁.
+    //除非上层使用msg重启用线程来处理,但这是个不合理的强制设计,pass
+    //事件与监听有多对多的需求吗?好像没有
+
+    pthread_rwlock_rdlock(&rwlock);
+    for(i = 0; i < AM_EVT_BUCKET_COUNT; i++)	
+	for(evt=events[i]; evt; evt=evt->next)
+	{
+        //--如果使用dev_no过滤,那就会有可能会有少量内存浪费,如果不使用,但dev_no又是动态的(handle),fk
+        if(evt->dev_no == dev_no && evt->cb == cb && evt->type == event_type)
+        {
+            AM_DEBUG(1, "the same cb set");
+            pthread_rwlock_unlock(&rwlock);
+            return AM_SUCCESS;
+        }
+	}
+    pthread_rwlock_unlock(&rwlock);
+    
+    
 	/*分配事件*/
 	evt = malloc(sizeof(AM_Event_t));
 	if(!evt)
@@ -82,7 +109,6 @@ AM_ErrorCode_t AM_EVT_Subscribe(long dev_no, int event_type, AM_EVT_Callback_t c
 		AM_DEBUG(1, "not enough memory");
 		return AM_EVT_ERR_NO_MEM;
 	}
-	
 	evt->dev_no = dev_no;
 	evt->type   = event_type;
 	evt->cb     = cb;
@@ -91,13 +117,13 @@ AM_ErrorCode_t AM_EVT_Subscribe(long dev_no, int event_type, AM_EVT_Callback_t c
 	pos = event_type%AM_EVT_BUCKET_COUNT;
 	
 	/*加入事件哈希表中*/
-	pthread_mutex_lock(&lock);
-	
+	//pthread_mutex_lock(&lock);
+	pthread_rwlock_wrlock(&rwlock);
 	evt->next   = events[pos];
 	events[pos] = evt;
 	
-	pthread_mutex_unlock(&lock);
-	
+	//pthread_mutex_unlock(&lock);
+	pthread_rwlock_unlock(&rwlock);
 	return AM_SUCCESS;
 }
 
@@ -119,8 +145,8 @@ AM_ErrorCode_t AM_EVT_Unsubscribe(long dev_no, int event_type, AM_EVT_Callback_t
 	
 	pos = event_type%AM_EVT_BUCKET_COUNT;
 	
-	pthread_mutex_lock(&lock);
-	
+	//pthread_mutex_lock(&lock);
+	pthread_rwlock_wrlock(&rwlock);
 	for(eprev=NULL,evt=events[pos]; evt; eprev=evt,evt=evt->next)
 	{
 		if((evt->dev_no==dev_no) && (evt->type==event_type) && (evt->cb==cb) &&
@@ -134,8 +160,8 @@ AM_ErrorCode_t AM_EVT_Unsubscribe(long dev_no, int event_type, AM_EVT_Callback_t
 		}
 	}
 	
-	pthread_mutex_unlock(&lock);
-	
+	//pthread_mutex_unlock(&lock);
+	pthread_rwlock_unlock(&rwlock);
 	if(evt)
 	{
 		free(evt);
@@ -155,18 +181,50 @@ AM_ErrorCode_t AM_EVT_Signal(long dev_no, int event_type, void *param)
 	AM_Event_t *evt;
 	int pos = event_type%AM_EVT_BUCKET_COUNT;
 	
-	pthread_mutex_lock(&lock);
-	
+	//1.使用读写锁,
+    //2.多线程可以同时发送signal事件,
+    //3.多线程如果同时发送同一事件,并且同时触发同一callback,会有风险,但一般来说,同一事件,只由同一线程发送,更不应该同时刻.
+    //4.如果有同一时刻,不同线程,发送同一事件,触发同一callback存在,那就是相当的个例,可以在上层那个个例的cb函数里面自己加锁.
+    //5.但上层要避免在cb事件响应函数里面去AM_EVT_Subscribe/AM_EVT_Unsubscribe事件链表,因为这样会造成死锁.
+    //6.不应该也不需要在cb函数里面去AM_EVT_Subscribe/AM_EVT_Unsubscribe事件链表,切记!!!
+	pthread_rwlock_rdlock(&rwlock);
 	for(evt=events[pos]; evt; evt=evt->next)
 	{
 		if((evt->dev_no==dev_no) && (evt->type==event_type))
 		{
+            //pthread_mutex_lock(&lock);
 			evt->cb(dev_no, event_type, param, evt->data);
+            //pthread_mutex_unlock(&lock);
 		}
 	}
-	
-	pthread_mutex_unlock(&lock);
-	
+    pthread_rwlock_unlock(&rwlock);
 	return AM_SUCCESS;
 }
-
+/*
+*/
+AM_ErrorCode_t AM_EVT_Init()
+{
+    int i;
+    pthread_mutexattr_init(&attr);    
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);  
+    pthread_mutex_init(&lock, &attr);    
+    pthread_mutexattr_destroy(&attr);
+    
+    for(i = 0; i < AM_EVT_BUCKET_COUNT; i++) events[i] = NULL;
+    return AM_SUCCESS;
+}
+/*
+*/
+AM_ErrorCode_t AM_EVT_Destory()
+{
+    AM_Event_t *evt;
+    int i;
+    pthread_mutex_destroy(&lock);
+	for(i = 0; i < AM_EVT_BUCKET_COUNT; i++)	
+	for(evt=events[i]; evt; evt=evt->next)
+	{
+        free(evt);
+	}
+    
+    return AM_SUCCESS;
+}

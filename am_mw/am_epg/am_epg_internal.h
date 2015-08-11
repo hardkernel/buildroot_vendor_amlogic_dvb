@@ -59,6 +59,7 @@ enum
 	AM_EPG_EVT_RRT_DONE		= 0x100000,	/**< RRT接收完毕*/
 	AM_EPG_EVT_PSIP_EIT_DONE	= 0x200000, /**< ATSC 某个 EIT 接收完毕*/
 	AM_EPG_EVT_VCT_DONE		= 0x400000,	/**< VCT接收完毕*/
+	AM_EPG_EVT_PSIP_ETT_DONE	= 0x800000,/**< ATSC 某个 ETT 接收完毕*/
 };
 
 typedef struct AM_EPG_Monitor_s AM_EPG_Monitor_t ;
@@ -71,6 +72,7 @@ typedef struct
 	uint8_t			sec;
 	uint8_t			last;
 	uint8_t			seg_last;	/**< segment_last_section_num 只对EIT有效*/	
+	uint16_t        leng;       /*sec_length*/
 	uint8_t			mask[32];
 }AM_EPG_SubCtl_t;
 
@@ -113,6 +115,7 @@ struct AM_EPG_Monitor_s
 	AM_EPG_TableCtl_t	rrtctl;
 	AM_EPG_TableCtl_t	vctctl;
 	AM_EPG_TableCtl_t	psip_eitctl[128]; /**< ATSC PSIP supports up to 128 EITs*/
+	AM_EPG_TableCtl_t   psip_ettctl[128]; /**< ATSC PSIP supports up to 128 ETTs*/
 
 	int					src;			/**< 源标识*/
 	int					fend_dev;		/**< FEND 设备号*/
@@ -130,6 +133,8 @@ struct AM_EPG_Monitor_s
 	int					psip_eit_count;	/**<ATSC EIT 最大个数*/
 	int					psip_eit_done_flag;	/**< ATSC EIT 接收完成标志*/
 	AM_Bool_t			eit_has_data;		/**< 是否有需要通知更新的EIT数据*/
+	int					psip_ett_count; /**<ATSC ETT 最大个数*/
+	int					psip_ett_done_flag; /**< ATSC ETT 接收完成标志*/
 	
 	dvbpsi_pat_t		*pats;
 	dvbpsi_pmt_t		*pmts;
@@ -143,6 +148,7 @@ struct AM_EPG_Monitor_s
 	rrt_section_info_t	*rrts;
 	vct_section_info_t	*vcts;
 	eit_section_info_t	*psip_eits;
+	ett_section_info_t  *psip_etts;
 
 	struct dvb_frontend_event 		fe_evt;			/**< 前端事件*/
 

@@ -61,7 +61,7 @@ static void usage(void)
 {
 	printf("usage: am_av_test INPUT\n");
 	printf("    INPUT: FILE [loop] [POSITION]\n");
-	printf("    INPUT: dvb vpid apid vfmt afmt frequency\n");
+	printf("    INPUT: dvb vpid apid vfmt afmt frequency tssrc fe_modulation\n");
 	printf("    INPUT: aes FILE\n");
 	printf("    INPUT: ves FILE\n");
 #ifdef ENABLE_JPEG_TEST	
@@ -447,14 +447,14 @@ static void file_play(const char *name, int loop, int pos)
 	AM_DMX_Close(DMX_DEV_NO);
 }
 
-static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, int argc, char *argv[])
+static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, int femode, int argc, char *argv[])
 {
 	int running = 1;
 	char buf[256];
 	AM_DMX_OpenPara_t para;
+	int SNR;
 	
 	memset(&para, 0, sizeof(para));
-	
 	AM_DMX_Open(DMX_DEV_NO, &para);
 	AM_DMX_SetSource(DMX_DEV_NO, src);
 	AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_DMX1);
@@ -468,11 +468,18 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, 
 		
 		memset(&para, 0, sizeof(para));
 
-		printf("Input fontend mode: (0-DVBC, 1-DVBT, 2-DVBS)\n");
-		printf("mode(0/1/2): ");
+		printf("Input fontend mode: (0-DVBC, 1-DVBT, 2-DVBS, 3-DTMB,4-ATSC)\n");
+		printf("mode(0/1/2/3/4): ");
 		scanf("%d", &mode);
-		para.mode = (mode==0)?FE_QAM : 
-				(mode==1)? FE_OFDM : FE_QPSK;
+		switch(mode)
+		{
+			case 0: para.mode = FE_QAM; break;
+			case 1: para.mode = FE_OFDM; break;
+			case 2: para.mode = FE_QPSK; break;
+			case 3: para.mode = FE_DTMB; break;
+			case 4: para.mode = FE_ATSC; break;
+			default: para.mode = FE_DTMB; break;
+		}
 		
 		AM_FEND_Open(FEND_DEV_NO, &para);
 
@@ -480,20 +487,29 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, 
 	
 		
 		p.frequency = freq;
-#if 0	
-		p.inversion = INVERSION_AUTO;
-		p.u.ofdm.bandwidth = BANDWIDTH_8_MHZ;
-		p.u.ofdm.code_rate_HP = FEC_AUTO;
-		p.u.ofdm.code_rate_LP = FEC_AUTO;
-		p.u.ofdm.constellation = QAM_AUTO;
-		p.u.ofdm.guard_interval = GUARD_INTERVAL_AUTO;
-		p.u.ofdm.hierarchy_information = HIERARCHY_AUTO;
-		p.u.ofdm.transmission_mode = TRANSMISSION_MODE_AUTO;
-#else		
-		p.u.qam.symbol_rate = 6875000;
-		p.u.qam.fec_inner = FEC_AUTO;
-		p.u.qam.modulation = QAM_64;
-#endif		
+		if(para.mode == FE_ATSC)
+		{
+			printf("femode: %d\n",femode);
+			p.u.vsb.modulation = femode;
+		}
+		else if(para.mode == FE_QAM)
+		{
+			p.u.qam.symbol_rate = 6875000;
+			p.u.qam.fec_inner = FEC_AUTO;
+			p.u.qam.modulation = femode;//QAM_64;
+		}
+		else
+		{
+			p.inversion = INVERSION_AUTO;
+			p.u.ofdm.bandwidth = BANDWIDTH_8_MHZ;
+			p.u.ofdm.code_rate_HP = FEC_AUTO;
+			p.u.ofdm.code_rate_LP = FEC_AUTO;
+			p.u.ofdm.constellation = QAM_AUTO;
+			p.u.ofdm.guard_interval = GUARD_INTERVAL_AUTO;
+			p.u.ofdm.hierarchy_information = HIERARCHY_AUTO;
+			p.u.ofdm.transmission_mode = TRANSMISSION_MODE_AUTO;
+
+		}
 		AM_FEND_Lock(FEND_DEV_NO, &p, &status);
 		
 		printf("lock status: 0x%x\n", status);
@@ -506,12 +522,12 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, 
 
 	while(running)
 	{
+	#if 1
 		printf("********************\n");
 		printf("* commands:\n");
 		printf("* quit\n");
 		normal_help();
 		printf("********************\n");
-		
 		if(fgets(buf, 256, stdin))
 		{
 			if(!strncmp(buf, "quit", 4))
@@ -523,6 +539,13 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, 
 				normal_cmd(buf);
 			}
 		}
+	//#else
+		SNR = 0;
+		AM_FEND_GetSNR(FEND_DEV_NO,&SNR);
+		printf("SNR = %d\n",SNR);
+		sleep(1);
+	#endif
+		
 	}
 	
 	if(freq>0)
@@ -1076,6 +1099,7 @@ int main(int argc, char **argv)
 	if(strcmp(argv[1], "dvb")==0)
 	{
 		int tssrc=AM_DMX_SRC_TS0;
+		int fe_mode = VSB_8;
 
 		if(argc<3)
 			usage();
@@ -1096,8 +1120,11 @@ int main(int argc, char **argv)
 
 		if(argc>7)
 			tssrc = strtol(argv[7], NULL, 0);
+		
+		if(argc>8)
+			fe_mode = strtol(argv[8], NULL, 0);
 	
-		dvb_play(vpid, apid, vfmt, afmt, freq, tssrc, argc, argv);
+		dvb_play(vpid, apid, vfmt, afmt, freq, tssrc, fe_mode, argc, argv);
 	}
 	else if(strcmp(argv[1], "ves")==0)
 	{

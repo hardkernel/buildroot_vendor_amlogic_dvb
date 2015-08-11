@@ -26,13 +26,6 @@
 #include <am_av.h>
 #include <linux/ioctl.h>
 #include <linux/types.h>
-#include <linux/tvin/tvin.h>
-#include <sigdetect.h>
-
-#ifdef CC_BOARD_ATV_SIGDETECT
-#include <sigdetect.h>
-#endif
-
 
 /****************************************************************************
  * Macro definitions
@@ -49,7 +42,7 @@
 #define BIT_TEST(a, b) ((a)[BIT_SLOT(b)] & BIT_MASK(b))
 
 /*超时ms定义*/
-#define PAT_TIMEOUT 6000
+#define PAT_TIMEOUT 10000
 #define PMT_TIMEOUT 3000
 #define SDT_TIMEOUT 6000
 #define NIT_TIMEOUT 10000
@@ -230,7 +223,7 @@ const char *sql_stmts[MAX_STMT] =
 	 current_ttx=-1,ttx_pids=?,ttx_types=?,ttx_magazine_nos=?,ttx_page_nos=?,ttx_langs=?,\
 	 skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,\
 	 hide_guide=?, source_id=?,favor=?,db_sat_para_id=?,scrambled_flag=?,lcn=-1,hd_lcn=-1,sd_lcn=-1,\
-	 default_chan_num=-1,chan_order=0,lcn_order=0,service_id_order=0,hd_sd_order=0,pmt_pid=?,dvbt2_plp_id=?,sdt_ver=?,pcr_pid=? where db_id=?",
+	 default_chan_num=-1,chan_order=?,lcn_order=0,service_id_order=0,hd_sd_order=0,pmt_pid=?,dvbt2_plp_id=?,sdt_ver=?,pcr_pid=? where db_id=?",
 	"select db_id,service_type from srv_table where db_ts_id=? order by service_id",
 	"update srv_table set chan_num=? where db_id=?",
 	"delete  from evt_table where db_ts_id=?",
@@ -270,6 +263,8 @@ const char *sql_stmts[MAX_STMT] =
 	"select db_id,service_type from srv_table where src=? and chan_num>0 order by chan_order",
 	"select db_id,service_type from srv_table where db_ts_id=? and chan_num<=0 order by service_id",
 	"delete from booking_table where db_evt_id in (select db_id from evt_table where db_ts_id=?)",
+	"select db_ts_id,db_id from srv_table where src = ? and chan_order = ?",
+	"update ts_table set db_net_id=?,ts_id=?,symb=?,mod=?,bw=?,snr=?,ber=?,strength=?,std=?,aud_mode=?,dvbt_flag=?,flags=0,freq=? where db_id=?",
 };
 
 /****************************************************************************
@@ -292,109 +287,9 @@ int  am_audiostd_to_enmu(int data);
 int  am_videostd_to_enmu(int data);
 
 
-static int  am_set_atv_tuner_cvbs_std(AM_SCAN_Scanner_t *scanner,int std) {
-	    AM_DEBUG(1,"%s std= %d", __FUNCTION__,std);
-	    int audio_std = am_audiostd_to_enmu(std);
-	    int video_std = am_videostd_to_enmu(std);
-        tvin_sig_fmt_t cvbs_fmt = TVIN_SIG_FMT_NULL;
-        // if (video_std >= 0) {
-           // if (video_std < CC_ATV_VIDEO_STD_START || video_std > CC_ATV_VIDEO_STD_END) {
-               // video_std = ATVGetVideoStdDefaultCfg();
-           // }
-        // }
-           if (video_std == CC_ATV_VIDEO_STD_AUTO) {
-               cvbs_fmt = TVIN_SIG_FMT_NULL;
-           } else if (video_std == CC_ATV_VIDEO_STD_PAL) {
-               if (audio_std == CC_ATV_AUDIO_STD_DK) {
-                   cvbs_fmt = TVIN_SIG_FMT_CVBS_PAL_I;
-               } else if (audio_std == CC_ATV_AUDIO_STD_I) {
-                   cvbs_fmt = TVIN_SIG_FMT_CVBS_PAL_I;
-               } else if (audio_std == CC_ATV_AUDIO_STD_BG) {
-                   cvbs_fmt = TVIN_SIG_FMT_CVBS_PAL_I;
-               } else if (audio_std == CC_ATV_AUDIO_STD_M) {
-                   cvbs_fmt = TVIN_SIG_FMT_CVBS_PAL_M;
-               }
-           } else if (video_std == CC_ATV_VIDEO_STD_NTSC) {
-               if (audio_std == CC_ATV_AUDIO_STD_DK) {
-                   cvbs_fmt = TVIN_SIG_FMT_CVBS_NTSC_M;
-               } else if (audio_std == CC_ATV_AUDIO_STD_I) {
-                   cvbs_fmt = TVIN_SIG_FMT_CVBS_NTSC_M;
-               } else if (audio_std == CC_ATV_AUDIO_STD_BG) {
-                   cvbs_fmt = TVIN_SIG_FMT_CVBS_NTSC_M;
-               } else if (audio_std == CC_ATV_AUDIO_STD_M) {
-                   cvbs_fmt = TVIN_SIG_FMT_CVBS_NTSC_M;
-               }
-           } else if (video_std == CC_ATV_VIDEO_STD_SECAM) {
-               if (audio_std == CC_ATV_AUDIO_STD_DK) {
-                   cvbs_fmt = TVIN_SIG_FMT_CVBS_SECAM;
-               } else if (audio_std == CC_ATV_AUDIO_STD_I) {
-                   cvbs_fmt = TVIN_SIG_FMT_CVBS_SECAM;
-               } else if (audio_std == CC_ATV_AUDIO_STD_BG) {
-                   cvbs_fmt = TVIN_SIG_FMT_CVBS_SECAM;
-               } else if (audio_std == CC_ATV_AUDIO_STD_M) {
-                   cvbs_fmt = TVIN_SIG_FMT_CVBS_SECAM;
-               } else if (audio_std == CC_ATV_AUDIO_STD_L) {
-                   cvbs_fmt = TVIN_SIG_FMT_CVBS_SECAM;
-               }
-           }
-   
-       AM_DEBUG(1,"%s, cvbs fmt = %d\n", __FUNCTION__, cvbs_fmt);
-      
-       int ret = ioctl(scanner->atvctl.afe_fd, TVIN_IOC_S_AFE_CVBS_STD,  &cvbs_fmt);
-       if (ret < 0){
-           AM_DEBUG(1,"%s, error(%s)!\n", __FUNCTION__, strerror(errno));
-           return -1;
-       }
-       return 0;
-    }	
-    
-    
+
    
 
-    int  am_audiostd_to_enmu(int data){
-		AM_DEBUG(1,"%s data = %d", __FUNCTION__,data);
-	    cc_atv_audio_standard_t std = CC_ATV_AUDIO_STD_DK;
-	    if( ((data & TUNER_STD_PAL_DK) == TUNER_STD_PAL_DK) ||
-	        ((data & TUNER_STD_SECAM_DK) == TUNER_STD_SECAM_DK))
-	        std =  CC_ATV_AUDIO_STD_DK;
-	    else
-        if((data & TUNER_STD_PAL_I) == TUNER_STD_PAL_I)
-            std =  CC_ATV_AUDIO_STD_I;
-        else
-        if( ((data & TUNER_STD_PAL_BG) == TUNER_STD_PAL_BG) ||
-            ((data & TUNER_STD_SECAM_B) == TUNER_STD_SECAM_B)|| 
-            ((data & TUNER_STD_SECAM_G) == TUNER_STD_SECAM_G ))
-            std = CC_ATV_AUDIO_STD_BG;
-    	else
-	    if( ((data & TUNER_STD_PAL_M) == TUNER_STD_PAL_M) ||
-            ((data & TUNER_STD_NTSC_M) == TUNER_STD_NTSC_M))
-	        std = CC_ATV_AUDIO_STD_M;
-	    else
-	    if( (data & TUNER_STD_SECAM_L) == TUNER_STD_SECAM_L)            
-	        std = CC_ATV_AUDIO_STD_L;   
-		AM_DEBUG(1,"%s audio standard = %d", __FUNCTION__,std);
-	    return  std ;
-	}
-	
-	int  am_videostd_to_enmu(int data){
-	    AM_DEBUG(1,"%s", __FUNCTION__);
-	    cc_atv_video_standard_t  video_standard = CC_ATV_VIDEO_STD_PAL;
-        if((data & TUNER_COLOR_AUTO) == TUNER_COLOR_AUTO){
-             video_standard = CC_ATV_VIDEO_STD_AUTO;
-        }else
-        if((data & TUNER_COLOR_PAL) == TUNER_COLOR_PAL){
-             video_standard = CC_ATV_VIDEO_STD_PAL;
-        }else
-        if((data & TUNER_COLOR_NTSC) == TUNER_COLOR_NTSC){
-            video_standard = CC_ATV_VIDEO_STD_NTSC;
-        }else
-        if((data & TUNER_COLOR_SECAM) == TUNER_COLOR_SECAM){
-            video_standard = CC_ATV_VIDEO_STD_SECAM;
-        }
-	    AM_DEBUG(1,"%s video standard = %d", __FUNCTION__,video_standard);
-        return video_standard;
-        
-    }
 
 
 static void am_scan_rec_tab_init(AM_SCAN_RecTab_t *tab)
@@ -476,129 +371,7 @@ static int am_scan_format_atv_freq(int tmp_freq)
 }
 
 
-/**\brief Open VDIN device*/
-static AM_ErrorCode_t am_scan_open_vdin(AM_SCAN_Scanner_t *scanner)
-{
-	struct tvin_parm_s vdin_para;
-	
-	if (scanner->atvctl.vdin_fd < 0)
-	{
-		char buf[128];
-		
-		snprintf(buf, sizeof(buf), "/dev/vdin%d", atv_start_para.afe_dev_id);
-		scanner->atvctl.vdin_fd = open(buf, O_RDWR);
-		if (scanner->atvctl.vdin_fd < 0)
-		{
-			AM_DEBUG(1, "Open %s failed", buf);
-			return AM_FAILURE;
-		}
 
-		AM_DEBUG(1, "Open vdin ok, fd = %d", scanner->atvctl.vdin_fd);
-	}
-
-	/* Open port */
-	memset(&vdin_para, 0, sizeof(vdin_para));
-	vdin_para.port = TVIN_PORT_CVBS0;
-	if (ioctl(scanner->atvctl.vdin_fd, TVIN_IOC_OPEN, &vdin_para) < 0) 
-	{
-	    AM_DEBUG(1, "Vdin open port[%d], error(%s)!", vdin_para.port, strerror(errno));
-	}
-
-
-	return AM_SUCCESS;
-}
-
-static AM_ErrorCode_t am_scan_close_vdin(AM_SCAN_Scanner_t *scanner)
-{
-	if (scanner->atvctl.vdin_fd >= 0) 
-	{
-		AM_DEBUG(1, "Close vdin, fd = %d", scanner->atvctl.vdin_fd);
-		if (ioctl(scanner->atvctl.vdin_fd, TVIN_IOC_CLOSE) < 0) 
-		{
-			AM_DEBUG(1, "Vdin TVIN_IOC_CLOSE, error(%s)!", strerror(errno));
-		}
-
-		close(scanner->atvctl.vdin_fd);
-		scanner->atvctl.vdin_fd = -1;
-	}
-
-	return AM_SUCCESS;
-}
-
-
-/**\brief 打开AFE设备*/
-static AM_ErrorCode_t am_scan_open_afe(AM_SCAN_Scanner_t *scanner)
-{
-	if (scanner->atvctl.afe_fd < 0)
-	{
-		char buf[128];
-		
-		snprintf(buf, sizeof(buf), "/dev/tvafe%d", atv_start_para.afe_dev_id);
-		scanner->atvctl.afe_fd = open(buf, O_RDWR);
-		if (scanner->atvctl.afe_fd < 0)
-		{
-			AM_DEBUG(1, "Open %s failed", buf);
-			return AM_FAILURE;
-		}
-
-		AM_DEBUG(1, "Open tvafe ok, fd = %d", scanner->atvctl.afe_fd);
-	}
-	
-	return AM_SUCCESS;
-}
-
-/**\brief 关闭AFE设备*/
-static AM_ErrorCode_t am_scan_close_afe(AM_SCAN_Scanner_t *scanner)
-{
-	if (scanner->atvctl.afe_fd >= 0)
-	{
-		AM_DEBUG(1, "Close tvafe, fd = %d", scanner->atvctl.afe_fd);
-		close(scanner->atvctl.afe_fd);
-		scanner->atvctl.afe_fd = -1;
-	}
-	
-	return AM_SUCCESS;
-}
-
-/**\brief 获取CVBS lock状态*/
-static AM_Bool_t am_scan_atv_cvbs_lock(AM_SCAN_Scanner_t *scanner)
-{
-	tvafe_cvbs_video_t cvbs_lock_status;
-	int ret, i = 0;
-	int condition_val = 3;
-
-	if (scanner->atvctl.afe_fd >= 0)
-	{
-		while (i < 20)
-		{
-			ret = ioctl(scanner->atvctl.afe_fd, TVIN_IOC_G_AFE_CVBS_LOCK, &cvbs_lock_status);
-			if (ret < 0) 
-			{
-				AM_DEBUG(1, "TVIN_IOC_G_AFE_CVBS_LOCK, error: return(%d), error(%s)!\n", ret, strerror(errno));
-				break;
-			} 
-			else 
-			{
-				AM_DEBUG(1, "TVIN_IOC_G_AFE_CVBS_LOCK, value=%d.\n", cvbs_lock_status);
-			}
-			
-			if (cvbs_lock_status == TVAFE_CVBS_VIDEO_H_LOCKED || cvbs_lock_status == TVAFE_CVBS_VIDEO_HV_LOCKED)
-			{
-			    if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL)
-                     usleep(2000*1000);
-                else
-				if (atv_start_para.mode == AM_SCAN_ATVMODE_AUTO)
-                     usleep(1000*1000);
-			   
-				return AM_TRUE;
-            }
-			usleep(50*1000);
-			i++;
-		}
-    }
-    
-    return AM_FALSE;
-}
 
 /**\brief 插入一个网络记录，返回其索引*/
 static int insert_net(sqlite3_stmt **stmts, int src, int orig_net_id)
@@ -1080,6 +853,30 @@ static dvbpsi_pat_t *get_valid_pats(AM_SCAN_TS_t *ts)
 }
 
 /***\brief 更新一个TS数据*/
+static void am_scan_update_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, int net_dbid, int dbid, AM_SCAN_TS_t *ts)
+{
+	int ts_id = -1;
+	int symbol_rate=0, modulation=0, dvbt_flag=0;
+
+	sqlite3_bind_int(stmts[UPDATE_TS_FREQ], 1, net_dbid);
+	sqlite3_bind_int(stmts[UPDATE_TS_FREQ], 2, ts_id);
+	sqlite3_bind_int(stmts[UPDATE_TS_FREQ], 3, symbol_rate);
+	sqlite3_bind_int(stmts[UPDATE_TS_FREQ], 4, modulation);
+	sqlite3_bind_int(stmts[UPDATE_TS_FREQ], 5, (ts->type!=AM_SCAN_TS_ANALOG) ? (int)dvb_fend_para(ts->digital.fend_para)->u.ofdm.bandwidth : 0);
+	sqlite3_bind_int(stmts[UPDATE_TS_FREQ], 6, (ts->type!=AM_SCAN_TS_ANALOG) ? ts->digital.snr : 0);
+	sqlite3_bind_int(stmts[UPDATE_TS_FREQ], 7, (ts->type!=AM_SCAN_TS_ANALOG) ? ts->digital.ber : 0);
+	sqlite3_bind_int(stmts[UPDATE_TS_FREQ], 8, (ts->type!=AM_SCAN_TS_ANALOG) ? ts->digital.strength : 0);
+	sqlite3_bind_int(stmts[UPDATE_TS_FREQ], 9, (ts->type==AM_SCAN_TS_ANALOG) ? ts->analog.std : -1);
+	sqlite3_bind_int(stmts[UPDATE_TS_FREQ], 10,(ts->type==AM_SCAN_TS_ANALOG) ?  1/*Stereo*/ : -1);
+	sqlite3_bind_int(stmts[UPDATE_TS_FREQ], 11, dvbt_flag);
+	sqlite3_bind_int(stmts[UPDATE_TS_FREQ], 12, ts->analog.freq);
+	sqlite3_bind_int(stmts[UPDATE_TS_FREQ], 13, dbid);
+
+	sqlite3_step(stmts[UPDATE_TS_FREQ]);
+	sqlite3_reset(stmts[UPDATE_TS_FREQ]);
+}
+
+/***\brief 更新一个TS数据*/
 static void am_scan_update_ts_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, int net_dbid, int dbid, AM_SCAN_TS_t *ts)
 {
 	int ts_id = -1;
@@ -1306,11 +1103,12 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 	sqlite3_bind_int(stmts[UPDATE_SRV], 33, 0);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 34, srv_info->satpara_dbid);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 35, srv_info->scrambled_flag);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 36, srv_info->pmt_pid);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 37, srv_info->plp_id);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 38, srv_info->sdt_version);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 39, srv_info->pcr_pid);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 40, srv_info->srv_dbid);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 36, srv_info->chan_num);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 37, srv_info->pmt_pid);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 38, srv_info->plp_id);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 39, srv_info->sdt_version);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 40, srv_info->pcr_pid);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 41, srv_info->srv_dbid);
 	sqlite3_step(stmts[UPDATE_SRV]);
 	sqlite3_reset(stmts[UPDATE_SRV]);
 }
@@ -1447,8 +1245,9 @@ static void am_scan_extract_srv_info_from_vc(vct_channel_info_t *vcinfo, AM_SCAN
 	srv_info->hidden = vcinfo->hidden;
 	srv_info->hide_guide = vcinfo->hide_guide;
 	srv_info->source_id = vcinfo->source_id;
-	memcpy(srv_info->name, vcinfo->short_name, sizeof(vcinfo->short_name));
-	srv_info->name[sizeof(vcinfo->short_name)] = 0;
+    memcpy(srv_info->name, "xxx", 3);
+	memcpy(srv_info->name+3, vcinfo->short_name, sizeof(vcinfo->short_name));
+	srv_info->name[sizeof(vcinfo->short_name)+3] = 0;
 	/*业务类型*/
 	srv_info->srv_type = vcinfo->service_type;
 	
@@ -1511,6 +1310,57 @@ static int get_pmt_pid(dvbpsi_pat_t *pats, int program_number)
 	AM_SI_LIST_END()
 
 	return 0x1fff;
+}
+/** Update Analog TS to database */
+static void update_analog_ts_bynum(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_t *ts, int atv_update_num)
+{
+	int dbid;
+	char lang_tmp[3];
+	AM_SCAN_ServiceInfo_t srv_info;
+	AM_Bool_t store = (stmts != NULL);
+	int r = -1;
+	int dbtsid = -1;
+
+	if (ts->type != AM_SCAN_TS_ANALOG)
+		return;
+
+	if (store)
+	{
+		AM_DEBUG(1, "@@ Storing a analog ts @@");
+
+		dbid = -1;
+
+		AM_DEBUG(1, "ATV SCAN STORE CURRENT NUM = %d", atv_update_num);
+
+		sqlite3_bind_int(stmts[SELECT_DBTSID_BY_NUM_AND_SRC], 1, FE_ANALOG);
+		sqlite3_bind_int(stmts[SELECT_DBTSID_BY_NUM_AND_SRC], 2, atv_update_num);
+		if (sqlite3_step(stmts[SELECT_DBTSID_BY_NUM_AND_SRC])  == SQLITE_ROW)
+		{
+			dbtsid = sqlite3_column_int(stmts[SELECT_DBTSID_BY_NUM_AND_SRC], 0);
+			dbid = sqlite3_column_int(stmts[SELECT_DBTSID_BY_NUM_AND_SRC], 1);
+		}
+		sqlite3_reset(stmts[SELECT_DBTSID_BY_NUM_AND_SRC]);
+		AM_DEBUG(1, "dbtsid = %d , dbid = %d", dbtsid, dbid);
+		if (dbtsid != -1)
+		{
+			am_scan_update_ts(stmts, result, -1, dbtsid, ts);
+
+			am_scan_init_service_info(&srv_info);
+			srv_info.satpara_dbid = -1;
+			srv_info.src = FE_ANALOG;
+			srv_info.vfmt = -1;
+
+			memset(lang_tmp, 0, sizeof(lang_tmp));
+			add_audio(&srv_info.aud_info, 0x1fff, -1, lang_tmp);
+			srv_info.srv_type = AM_SCAN_SRV_ATV;
+			strcpy(srv_info.name, "xxxATV Program");
+
+			srv_info.chan_num = atv_update_num;
+			srv_info.srv_dbid = dbid;
+			am_scan_update_service_info(stmts, result, &srv_info);
+		}
+
+	}
 }
 
 /**\brief Store a Analog TS to database */
@@ -2782,6 +2632,62 @@ static void am_scan_dvbs_default_sort_by_hd_sd(AM_SCAN_Result_t *result, sqlite3
 	}
 }
 
+static void am_scan_atv_store(AM_SCAN_Result_t *result)
+{
+	AM_SCAN_TS_t *ts;
+	char sqlstr[128];
+	sqlite3_stmt	*stmts[MAX_STMT];
+	int i, ret, db_sat_id = -1;
+	int src = result->start_para->dtv_para.source;
+	AM_SCAN_DTVSatellitePara_t *sat_para = &result->start_para->dtv_para.sat_para;
+	AM_SCAN_RecTab_t srv_tab;
+	AM_Bool_t has_atv = AM_FALSE;
+	sqlite3 *hdb;
+	int atvauto_num = 0;
+
+	assert(result);
+
+	AM_DB_HANDLE_PREPARE(hdb);
+	am_scan_rec_tab_init(&srv_tab);
+
+	/*Prepare sqlite3 stmts*/
+	memset(stmts, 0, sizeof(sqlite3_stmt*) * MAX_STMT);
+	for (i=0; i<MAX_STMT; i++)
+	{
+		ret = sqlite3_prepare(hdb, sql_stmts[i], -1, &stmts[i], NULL);
+		if (ret != SQLITE_OK)
+		{
+			AM_DEBUG(1, "Prepare sqlite3 failed, stmts[%d] ret = %x", i, ret);
+			goto store_end;
+		}
+	}
+
+	AM_DEBUG(1, "Storing tses ...");
+	/*依次存储每个TS*/
+	AM_SI_LIST_BEGIN(result->tses, ts)
+		if (ts->type == AM_SCAN_TS_ANALOG)
+		{
+			has_atv = AM_TRUE;
+			if (result->start_para->atv_para.mode == AM_SCAN_ATVMODE_MANUAL)
+			{
+				atvauto_num = result->start_para->atv_para.channel_num;
+			}
+			else
+			{
+				atvauto_num ++;
+			}
+			update_analog_ts_bynum(stmts, result, ts, atvauto_num);
+		}
+	AM_SI_LIST_END()
+store_end:
+	for (i=0; i<MAX_STMT; i++)
+	{
+		if (stmts[i] != NULL)
+			sqlite3_finalize(stmts[i]);
+	}
+
+	am_scan_rec_tab_release(&srv_tab);
+}
 /**\brief 默认搜索完毕存储函数*/
 static void am_scan_default_store(AM_SCAN_Result_t *result)
 {
@@ -4622,13 +4528,7 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 	
 	scanner->atvctl.start = 1;
 	
-    TvinSigDetect_CreateThread();
 
-	am_scan_open_afe(scanner);
-
-    /*set atv cvbs*/
-    int std = scanner->start_para.atv_para.default_std;
-     am_set_atv_tuner_cvbs_std(scanner,std);
 	
 	return am_scan_start_next_ts(scanner);
 }
@@ -4640,9 +4540,8 @@ static AM_ErrorCode_t am_scan_stop_atv(AM_SCAN_Scanner_t *scanner)
 	{
 		AM_DEBUG(1, "Stopping atv ...");
 		AM_DEBUG(1, "Closing AFE device ...");
-		am_scan_close_afe(scanner);
 
-        TvinSigDetect_Stop();
+
 
 		scanner->atvctl.start = 0;
 		AM_DEBUG(1, "atv stopped !");
@@ -4666,8 +4565,6 @@ static AM_ErrorCode_t am_scan_start(AM_SCAN_Scanner_t *scanner)
 		if (scanner->start_para.mode == AM_SCAN_MODE_ADTV)
 		{
 			/* open atv devices */
-			am_scan_open_afe(scanner);
-			am_scan_open_vdin(scanner);
 		}
 		
 		return am_scan_start_dtv(scanner);
@@ -4716,6 +4613,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 	uint8_t plp_ids[256];
 	uint8_t plp_num = 0;
 
+    AM_SCAN_ATV_LOCK_PARA_t atv_lock_para;
 	if (scanner->end_code == AM_SCAN_RESULT_UNLOCKED)
 		scanner->end_code = AM_SCAN_RESULT_OK;
 
@@ -4752,12 +4650,16 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 	if (scanner->stage == AM_SCAN_STAGE_TS)
 	{
 		/* For analog ts, we must check the tv decoder */
-		if (cur_fe_para.m_type == FE_ANALOG && !am_scan_atv_cvbs_lock(scanner))
+		if (cur_fe_para.m_type == FE_ANALOG )
+		{
+            atv_lock_para.pData = scanner->user_data;
+            if(!(scanner->atvctl.am_scan_atv_cvbs_lock(&atv_lock_para)))
 		{
 			AM_DEBUG(1, "cvbs unlock !");
 			scanner->atvctl.step = atv_start_para.cvbs_unlocked_step;
 			am_scan_atv_step_tune(scanner);
 			return 0;
+            }
 		}
 		
 		/*频点锁定，新申请内存以添加该频点信息*/
@@ -5261,8 +5163,6 @@ handle_events:
 	if (scanner->start_para.mode == AM_SCAN_MODE_ADTV)
 	{
 		/* close atv devices */
-		am_scan_close_vdin(scanner);	
-		am_scan_close_afe(scanner);
 	}
 			
 	pthread_mutex_unlock(&scanner->lock);
@@ -5537,14 +5437,16 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, AM_SCAN_Handle_t *hand
 		atv_start_para.cvbs_locked_step = DEFAULT_CVBS_LOCK_STEP;
 	scanner->result.start_para = &scanner->start_para;
 	scanner->result.reserved = (void*)scanner;
-	scanner->atvctl.afe_fd = -1;
-	scanner->atvctl.vdin_fd = -1;
+    scanner->atvctl.am_scan_atv_cvbs_lock =  para->atv_para.am_scan_atv_cvbs_lock;
 	
 	if (! para->store_cb)
 		scanner->store_cb = am_scan_default_store;
 	else
 		scanner->store_cb = para->store_cb;
 	
+	AM_DEBUG(1, "atv_para.storeMode == %d", para->atv_para.storeMode);
+	if (para->atv_para.storeMode == 1)
+		scanner->store_cb = am_scan_atv_store;
 	pthread_mutexattr_init(&mta);
 	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE_NP);
 	pthread_mutex_init(&scanner->lock, &mta);

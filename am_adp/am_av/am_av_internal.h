@@ -198,6 +198,7 @@ struct AM_AV_Driver
 	AM_ErrorCode_t (*get_timeshift_info)(AM_AV_Device_t *dev, AM_AV_TimeshiftInfo_t *info);
 	AM_ErrorCode_t (*set_vpath)(AM_AV_Device_t *dev);
 	AM_ErrorCode_t (*switch_ts_audio)(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt);
+	AM_ErrorCode_t (*reset_audio_decoder)(AM_AV_Device_t *dev);
 };
 
 /**\brief 音视频播放参数*/

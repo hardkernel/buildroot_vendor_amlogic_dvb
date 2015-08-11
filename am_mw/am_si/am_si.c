@@ -1094,6 +1094,9 @@ AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, uint8_t 
 		case AM_SI_TID_PSIP_EIT:
 			si_decode_psip_table(*sec, eit, eit_section_info_t, buf, len);
 			break;
+		case AM_SI_TID_PSIP_ETT:
+			si_decode_psip_table(*sec, ett, ett_section_info_t, buf, len);
+			break;
 		default:
 			ret = AM_SI_ERR_NOT_SUPPORTED;
 			break;
@@ -1169,6 +1172,9 @@ AM_ErrorCode_t AM_SI_ReleaseSection(AM_SI_Handle_t handle, uint8_t table_id, voi
 			break;
 		case AM_SI_TID_PSIP_EIT:
 			atsc_psip_free_eit_info((eit_section_info_t*)sec);
+			break;
+		case AM_SI_TID_PSIP_ETT:
+			atsc_psip_free_ett_info((ett_section_info_t*)sec);
 			break;
 		default:
 			ret = AM_SI_ERR_INVALID_SECTION_DATA;
@@ -1382,6 +1388,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 	memset(lang_tmp, 0, sizeof(lang_tmp));
 	switch (es->i_type)
 	{
+		AM_DEBUG(1,"es->i_type : 0x02x\n",es->i_type);
 		/*override by parse descriptor*/
 		case 0x6:
 			AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)

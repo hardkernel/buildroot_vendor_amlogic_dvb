@@ -8,8 +8,6 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_epg/am_epg.c\
 		   am_rec/am_rec.c\
-		   am_scan/libsigdetect/tvin/tvin_api.c \
-		   am_scan/libsigdetect/sigdetect.c \
 		   am_scan/am_scan.c\
 		   am_sub2/am_sub.c am_sub2/dvb_sub.c \
 		   am_tt2/am_tt.c \
@@ -69,6 +67,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/atsc/atsc_rrt.c\
 		   am_si/atsc/atsc_stt.c\
 		   am_si/atsc/atsc_eit.c\
+		   am_si/atsc/atsc_ett.c\
 		   am_si/atsc/atsc_descriptor.c\
 		   am_si/atsc/huffman_decode.c\
 		   am_fend_ctrl/am_sec.c\
@@ -101,7 +100,13 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_ci/ca_ci.c \
 		   am_cc/am_cc.c \
 		   am_upd/am_upd.c \
-		   am_freesat/freesat.c
+		   am_freesat/freesat.c\
+                   am_closecaption/am_cc.c \
+                   am_closecaption/am_cc_decoder.c \
+                   am_closecaption/am_xds.c \
+                   am_closecaption/am_cc_slice.c \
+                   am_closecaption/am_vbi/linux_vbi/linux_vbi.c \
+                   am_closecaption/am_vbi/am_vbi_api.c
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1 #
 ifeq ($(AMLOGIC_LIBPLAYER), y)
@@ -115,7 +120,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/descriptors\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/tables\
 		    $(LOCAL_PATH)/../include/am_mw/atsc\
-		    $(LOCAL_PATH)/am_scan/libsigdetect\
+			$(LOCAL_PATH)/am_closecaption/am_vbi\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    packages/amlogic/LibPlayer/amadec/include\
 		    packages/amlogic/LibPlayer/amcodec/include\
@@ -132,6 +137,10 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 ifeq ($(AMLOGIC_LIBPLAYER), y)
 LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg
 LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amplayer
+endif
+
+ifeq ($(strip $(BOARD_TV_USE_NEW_TVIN_PARAM)),true)
+LOCAL_CFLAGS += -DCC_TV_USE_NEW_TVIN_PARAM=1
 endif
 
 ifeq ($(AMLOGIC_LIBPLAYER), y)
@@ -151,8 +160,6 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_epg/am_epg.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
-		   am_scan/libsigdetect/sigdetect.c \
-	       am_scan/libsigdetect/tvin/tvin_api.c \
 		   am_sub2/am_sub.c am_sub2/dvb_sub.c \
 		   am_tt2/am_tt.c \
 		   am_ad/am_ad.c \
@@ -211,6 +218,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/atsc/atsc_rrt.c\
 		   am_si/atsc/atsc_stt.c\
 		   am_si/atsc/atsc_eit.c\
+		   am_si/atsc/atsc_ett.c\
 		   am_si/atsc/atsc_descriptor.c\
 		   am_si/atsc/huffman_decode.c\
 		   am_fend_ctrl/am_sec.c\
@@ -242,7 +250,13 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_ci/am_ci.c \
 		   am_ci/ca_ci.c \
 		   am_cc/am_cc.c \
-		   am_upd/am_upd.c
+		   am_upd/am_upd.c\
+		   am_closecaption/am_cc.c \
+		   am_closecaption/am_cc_decoder.c \
+		   am_closecaption/am_xds.c \
+		   am_closecaption/am_cc_slice.c \
+		   am_closecaption/am_vbi/linux_vbi/linux_vbi.c \
+		   am_closecaption/am_vbi/am_vbi_api.c
 
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1 #
@@ -264,6 +278,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    external/libzvbi/src\
 		    external/sqlite/dist\
 		    external/icu4c/common\
+			$(LOCAL_PATH)/am_closecaption/am_vbi\
 		    vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
 			vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
 			vendor/amlogic/frameworks/av/LibPlayer/amadec/include\

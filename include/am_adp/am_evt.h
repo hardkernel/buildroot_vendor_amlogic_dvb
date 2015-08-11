@@ -78,6 +78,13 @@ extern AM_ErrorCode_t AM_EVT_Unsubscribe(long dev_no, int event_type, AM_EVT_Cal
  */
 extern AM_ErrorCode_t AM_EVT_Signal(long dev_no, int event_type, void *param);
 
+/*
+*/
+extern AM_ErrorCode_t AM_EVT_Init();
+/*
+*/
+extern AM_ErrorCode_t AM_EVT_Destory();
+
 #ifdef __cplusplus
 }
 #endif

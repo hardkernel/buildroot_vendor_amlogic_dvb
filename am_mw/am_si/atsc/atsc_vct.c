@@ -164,6 +164,8 @@ INT32S atsc_psip_parse_vct(INT8U* data, INT32U length, vct_section_info_t *info)
 					//short_channel_name_parse(ptr, tmp_chan_info->short_name);
 					tmp_chan_info->major_channel_number = MAJOR_CHANNEL_NUM(vct_sect_chan->major_channel_number);
 					tmp_chan_info->minor_channel_number = MINOR_CHANNEL_NUM(vct_sect_chan->minor_channel_number);
+					AM_DEBUG(1, "The major is:%d, the minor is:%d.", tmp_chan_info->major_channel_number, tmp_chan_info->minor_channel_number);
+
 					tmp_chan_info->program_number = MAKE_SHORT_HL(vct_sect_chan->program_number);
 					tmp_chan_info->service_type = vct_sect_chan->service_type;
 					tmp_chan_info->source_id = MAKE_SHORT_HL(vct_sect_chan->source_id);

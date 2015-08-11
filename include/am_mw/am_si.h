@@ -31,6 +31,7 @@
 #include "atsc/atsc_rrt.h"
 #include "atsc/atsc_stt.h"
 #include "atsc/atsc_eit.h"
+#include "atsc/atsc_ett.h"
 
 
 #ifdef __cplusplus

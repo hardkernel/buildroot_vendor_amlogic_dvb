@@ -129,6 +129,8 @@ enum
 	QUERY_EXIST_SRV_BY_CHAN_ORDER,
 	QUERY_NONEXIST_SRV_BY_SRV_ID_ORDER,
 	DELETE_TS_EVTS_BOOKINGS,
+	SELECT_DBTSID_BY_NUM_AND_SRC,	
+	UPDATE_TS_FREQ,
 	MAX_STMT
 };
 
@@ -297,8 +299,7 @@ struct AM_SCAN_Scanner_s
 	struct
 	{
 		AM_Bool_t start;
-		int afe_fd;
-		int vdin_fd;
+        AM_Bool_t (*am_scan_atv_cvbs_lock)(void*);/*同步delay函数*/
 		int start_idx;		/**< 起始频点参数在start_freqs中的索引*/
 		int range_check;
 		int direction;	/**< -1/+1*/

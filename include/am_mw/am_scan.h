@@ -28,7 +28,7 @@ extern "C"
  * Macro definitions
  ***************************************************************************/
 
-//virtual define 
+//virtual define
 #define TUNER_COLOR_AUTO    ((tuner_std_id)0x02000000)
 
 
@@ -93,11 +93,11 @@ enum AM_SCAN_ServiceType
 	AM_SCAN_SRV_UNKNOWN	= 0,	/**< 未知类型*/
 	AM_SCAN_SRV_DTV		= 1,	/**< 数字电视类型*/
 	AM_SCAN_SRV_DRADIO	= 2,	/**< 数字广播类型*/
-	AM_SCAN_SRV_ATV		= 3,	/**< 模拟电视类型*/	
+	AM_SCAN_SRV_ATV		= 3,	/**< 模拟电视类型*/
 };
 
 /**\brief DTV标准定义*/
-typedef enum 
+typedef enum
 {
 	AM_SCAN_DTV_STD_DVB		= 0x00,	/**< DVB标准*/
 	AM_SCAN_DTV_STD_ATSC	= 0x01,	/**< ATSC标准*/
@@ -148,7 +148,7 @@ enum AM_SCAN_ResultCode
 };
 
 /**\brief TS信号类型*/
-typedef enum 
+typedef enum
 {
 	AM_SCAN_TS_DIGITAL,
 	AM_SCAN_TS_ANALOG
@@ -180,7 +180,7 @@ typedef struct
 }AM_SCAN_PLPProgress_t;
 
 /**\brief 搜索进度数据*/
-typedef struct 
+typedef struct
 {
 	int		evt;	/**< 事件类型，见AM_SCAN_ProgressEvt*/
 	void	*data;  /**< 事件数据，见AM_SCAN_ProgressEvt描述*/
@@ -254,17 +254,24 @@ typedef struct AM_SCAN_TS_s
 				dvbpsi_sdt_t 				*sdts;		/**< the sdt actuals in this data PLP*/
 			}dvbt2_data_plps[256];
 		}digital;
-		
+
 		struct
 		{
 			int freq;		/**< 频率*/
 			int std;		/**< tuner std*/
+            int logicalChannelNum;
 		}analog;
 	};
-	
+
 	int tp_index; /**< 位于频率表中的位置*/
 	struct AM_SCAN_TS_s *p_next;	/**< 指向下一个TS*/
 }AM_SCAN_TS_t;
+
+typedef struct
+{
+    void* pData;
+    v4l2_std_id pOutColorSTD;
+} AM_SCAN_ATV_LOCK_PARA_t;
 
 /**\brief ATV搜索参数定义*/
 typedef struct
@@ -273,14 +280,17 @@ typedef struct
 	int channel_id;	/**< Used for manual scan*/
 	int direction;	/**< Manual模式时设置*/
 	int afe_dev_id;			/**< AFE设备号*/
-	int default_std;		/**< tuner std*/	
+	int default_std;		/**< tuner std*/
 	int afc_range;			/**< AFC range in Hz*/
 	int afc_unlocked_step;	/**< AFC unlocked step frequency in Hz*/
 	int cvbs_unlocked_step;	/**< CVBS unlocked step frequency in Hz*/
 	int cvbs_locked_step;	/**< CVBS locked step frequency in Hz*/
 	int fe_cnt;		/**< 前端参数个数*/
+    AM_Bool_t (*am_scan_atv_cvbs_lock)(void*);/*同步delay函数*/
 	AM_FENDCTRL_DVBFrontendParameters_t *fe_paras;	/**< 前端参数列表，当mode!=AM_SCAN_ATVMODE_FREQ时，前3个参数分别
 														为min_freq, max_freq, start_freq*/
+	int channel_num;
+	int storeMode;		/**0:insert 1:update*/
 }AM_SCAN_ATVCreatePara_t;
 
 /**\brief DTV搜索参数定义*/
@@ -331,9 +341,9 @@ struct AM_SCAN_CreatePara_s
 
 
 /****************************************************************************
- * Function prototypes  
+ * Function prototypes
  ***************************************************************************/
- 
+
  /**\brief 创建节目搜索
  * \param [in] para 创建参数
  * \param [out] handle 返回SCAN句柄

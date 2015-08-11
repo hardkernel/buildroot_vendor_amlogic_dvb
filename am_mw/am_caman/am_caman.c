@@ -798,11 +798,10 @@ static int start_table_pmt(_ts_t *ts, int monitor, unsigned int pid, unsigned in
 	{
 		AM_DEBUG(1, "-->|start table pmt: monitor[%d] pid[%d] pn[%d]", monitor, pid, pn);
 
-		table_stop(pmt);
+		table_close(pmt);
 		RELEASE_TABLE_FROM_LIST(dvbpsi_pmt_t, ts->psipmt, pmt);
 		RELEASE_TABLE_FROM_LIST(dvbpsi_pmt_t, ts->psipmt_monitor, pmt);
-		table_close(pmt);
-
+	
 		memset(pmt, 0, sizeof(table_t));
 
 		/*!!fid==-1 when closed!!*/
@@ -899,11 +898,10 @@ static int start_table_cat(_ts_t *ts, int monitor, int (*cat_done)(int, table_t 
 	{
 		AM_DEBUG(1, "-->|start table cat: monitor[%d]", monitor);
 
-		table_stop(cat);
+		table_close(cat);
 		RELEASE_TABLE_FROM_LIST(dvbpsi_cat_t, ts->psicat, cat);
 		RELEASE_TABLE_FROM_LIST(dvbpsi_cat_t, ts->psicat_monitor, cat);
-		table_close(cat);
-
+	
 		memset(cat, 0, sizeof(table_t));
 		
 		/*!!fid==-1 when closed!!*/
@@ -997,10 +995,9 @@ static int start_table_pat(_ts_t *ts, int monitor, int (*pat_done)(int, table_t 
 	{
 		AM_DEBUG(1, "-->|start table pat: monitor[%d]", monitor);
 
-		table_stop(pat);
+		table_close(pat);
 		RELEASE_TABLE_FROM_LIST(dvbpsi_pat_t, ts->psipat, pat);
 		RELEASE_TABLE_FROM_LIST(dvbpsi_pat_t, ts->psipat_monitor, pat);
-		table_close(pat);
 
 		memset(pat, 0, sizeof(table_t));
 		
@@ -1055,9 +1052,9 @@ static int stop_table(table_t *table)
 
 static int close_ts(_ts_t *ts)
 {
-	table_stop(&ts->pmt);
-	table_stop(&ts->pat);
-	table_stop(&ts->cat);
+	table_close(&ts->pmt);
+	table_close(&ts->pat);
+	table_close(&ts->cat);
 
 	ts->tsevt &= ~(tsevt_new_pmt|tsevt_mon_pmt|tsevt_mon_pmt_start);
 	ts->tsevt &= ~(tsevt_new_pat|tsevt_mon_pat|tsevt_mon_pat_start);
@@ -1071,10 +1068,6 @@ static int close_ts(_ts_t *ts)
 	
 	RELEASE_TABLE_FROM_LIST(dvbpsi_cat_t, ts->psicat, &ts->cat);
 	RELEASE_TABLE_FROM_LIST(dvbpsi_cat_t, ts->psicat_monitor, &ts->cat);
-
-	table_close(&ts->pmt);
-	table_close(&ts->pat);
-	table_close(&ts->cat);
 
 	return 0;
 }
