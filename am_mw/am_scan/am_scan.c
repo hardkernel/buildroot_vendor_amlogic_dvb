@@ -5142,19 +5142,22 @@ handle_events:
 	if (scanner->result.tses/* && scanner->stage == AM_SCAN_STAGE_DONE*/ && scanner->store)
 	{
 		AM_DEBUG(1, "Call store proc");
-		int nit_version = -1;
-		if(scanner->result.nits!=NULL){
-			AM_DEBUG(1, "Call store proc-----------%d",scanner->result.nits->i_version);
-			nit_version = scanner->result.nits->i_version;
-		}	
-		else
-			AM_DEBUG(1, "scanner->result.nits==NULL");
+
+		//int nit_version = -1;
+		//if(scanner->result.nits!=NULL){
+		//	AM_DEBUG(1, "Call store proc-----------%d",scanner->result.nits->i_version);
+		//	nit_version = scanner->result.nits->i_version;
+		//}
+		//else
+		//	AM_DEBUG(1, "scanner->result.nits==NULL");
 		
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_STORE_BEGIN, NULL);
 		if (scanner->store_cb)
 			scanner->store_cb(&scanner->result);
-		if(nit_version!=-1)
-			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_STORE_END, nit_version);
+		//if(nit_version!=-1)
+		//	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_STORE_END, nit_version);
+
+		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_STORE_END, 100);
 	}
 	
 	am_scan_stop_atv(scanner);

@@ -2281,7 +2281,7 @@ static void am_epg_nit_done(AM_EPG_Monitor_t *mon)
 	am_epg_free_filter(mon, &mon->nitctl.fid);
 
 	/*触发通知事件*/
-	SIGNAL_EVENT(AM_EPG_EVT_NEW_NIT, (void*)mon->nits);
+	SIGNAL_EVENT(AM_EPG_EVT_NEW_NIT, (void*)(long)mon->nits->i_version);
 	/* release for updating new tables */
 	RELEASE_TABLE_FROM_LIST(dvbpsi_nit_t, mon->nits);
 	/*监控下一版本*/
