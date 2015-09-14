@@ -1663,3 +1663,25 @@ AM_ErrorCode_t AM_FEND_GetAtvStatus(int dev_no,  atv_status_t *atv_status)
 	return ret;
 }
 
+AM_ErrorCode_t AM_FEND_SetAfc(int dev_no, unsigned int afc)
+{
+	AM_FEND_Device_t *dev = NULL;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+
+	if(!dev->drv->set_afc)
+	{
+		AM_DEBUG(1, "fronend %d no not support set_afc", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+
+	pthread_mutex_lock(&dev->lock);
+
+	ret = dev->drv->set_afc(dev, afc);
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+

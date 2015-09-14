@@ -713,4 +713,5 @@ struct dvbsx_blindscanevent {
 #define FE_READ_TS                 _IOR('o', 96, int)
 //set & get the tuner parameters only atv
 #define FE_SET_PARAM_BOX           _IOWR('o', 97, tuner_param_t)
+#define FE_SET_AFC               _IOW('o', 98, __u32)
 #endif /*_DVBFRONTEND_H_*/

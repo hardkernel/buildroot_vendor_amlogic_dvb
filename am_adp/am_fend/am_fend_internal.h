@@ -67,6 +67,7 @@ typedef struct
 	AM_ErrorCode_t (*fine_tune)(AM_FEND_Device_t *dev, unsigned int freq);
     AM_ErrorCode_t (*set_cvbs_amp_out)(AM_FEND_Device_t *dev, tuner_param_t *tuner_para);
     AM_ErrorCode_t (*get_atv_status)(AM_FEND_Device_t *dev, atv_status_t *atv_status);
+    AM_ErrorCode_t (*set_afc)(AM_FEND_Device_t *dev, unsigned int afc);
     
 } AM_FEND_Driver_t;
 
