@@ -380,6 +380,15 @@ extern AM_ErrorCode_t AM_FEND_SetCvbsAmpOut(int dev_no, unsigned int amp);
  */
 AM_ErrorCode_t AM_FEND_GetAtvStatus(int dev_no,  atv_status_t *atv_status);
 
+/**\brief 模拟set AFC
+ *\param dev_no 前端设备号
+ *\param afc AFC
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+AM_ErrorCode_t AM_FEND_SetAfc(int dev_no, unsigned int afc);
+
 #ifdef __cplusplus
 }
 #endif
