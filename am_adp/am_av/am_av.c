@@ -1140,6 +1140,32 @@ AM_ErrorCode_t AM_AV_StartInject(int dev_no, const AM_AV_InjectPara_t *para)
 	return ret;
 }
 
+/**\brief Set DRM mode
+ * \param dev_no 音视频设备号
+ * \param[in] enable enable or disable DRM mode
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+AM_ErrorCode_t AM_AV_SetDRMMode(int dev_no, int enable)
+{
+	AM_AV_Device_t *dev;
+	AM_ErrorCode_t ret = AM_AV_ERR_SYS;
+	
+	assert(para);
+	
+	AM_TRY(av_get_openned_dev(dev_no, &dev));
+	
+	pthread_mutex_lock(&dev->lock);
+
+	if (dev->drv->set_drm_mode)
+		ret = dev->drv->set_drm_mode(dev, enable);
+	
+	pthread_mutex_unlock(&dev->lock);
+	
+	return ret;
+}
+
 /**\brief 进入数据注入模式后，向音视频设备注入数据
  * \param dev_no 音视频设备号
  * \param type 注入数据类型

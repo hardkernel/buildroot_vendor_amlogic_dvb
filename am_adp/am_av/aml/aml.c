@@ -394,6 +394,7 @@ static AM_ErrorCode_t aml_timeshift_get_info(AM_AV_Device_t *dev, AM_AV_Timeshif
 static AM_ErrorCode_t aml_set_vpath(AM_AV_Device_t *dev);
 static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt);
 static AM_ErrorCode_t aml_reset_audio_decoder(AM_AV_Device_t *dev);
+static AM_ErrorCode_t aml_set_drm_mode(AM_AV_Device_t *dev, int enable);
 
 const AM_AV_Driver_t aml_av_drv =
 {
@@ -418,6 +419,7 @@ const AM_AV_Driver_t aml_av_drv =
 .set_vpath   = aml_set_vpath,
 .switch_ts_audio = aml_switch_ts_audio,
 .reset_audio_decoder = aml_reset_audio_decoder,
+.set_drm_mode = aml_set_drm_mode
 };
 
 /*音频控制（通过解码器）操作*/
@@ -5914,4 +5916,24 @@ AM_ErrorCode_t aml_reset_audio_decoder(AM_AV_Device_t *dev)
        return AM_SUCCESS;
 }
 
+static AM_ErrorCode_t aml_set_drm_mode(AM_AV_Device_t *dev, int enable)
+{
+	int fd = -1;
 
+	if(dev->inject_player.drv_data) {
+		fd = ((AV_InjectData_t*)dev->inject_player.drv_data)->vid_fd;
+	}
+
+	if (fd < 0)
+	{
+		AM_DEBUG(1, "inject_player fd < 0, error!");
+		return AM_AV_ERR_SYS;
+	}
+
+	if (ioctl(fd, AMSTREAM_IOC_SET_DRMMODE, (void *)enable) == -1)
+	{
+		return AM_AV_ERR_SYS;
+	}
+	return AM_SUCCESS;
+	
+}

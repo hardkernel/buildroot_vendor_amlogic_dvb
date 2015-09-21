@@ -751,6 +751,15 @@ extern AM_ErrorCode_t AM_AV_StartAudioESData(int dev_no, AM_AV_AFormat_t format,
  */
 extern AM_ErrorCode_t AM_AV_StopAudioES(int dev_no);
 
+/**\brief Set DRM mode
+ * \param dev_no 音视频设备号
+ * \param[in] enable enable or disable DRM mode
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+extern AM_ErrorCode_t AM_AV_SetDRMMode(int dev_no, int enable);
+
 /**\brief 开始进入数据注入模式
  * \param dev_no 音视频设备号
  * \param[in] para 注入参数
