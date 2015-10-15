@@ -76,6 +76,7 @@ enum AM_SCAN_ProgressEvt
 	AM_SCAN_PROGRESS_NEW_PROGRAM,	/**< Searched a new program which will be stored*/
 	AM_SCAN_PROGRESS_DVBT2_PLP_BEGIN,	/**< Start a DVB-T2 data PLP, parameter is AM_SCAN_PLPProgress_t*/
 	AM_SCAN_PROGRESS_DVBT2_PLP_END,	/**< DVB-T2 PLP search end, parameter is AM_SCAN_PLPProgress_t*/
+	AM_SCAN_PROGRESS_SCAN_EXIT,
 };
 
 /**\brief 搜索事件类型*/
