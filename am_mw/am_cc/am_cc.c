@@ -220,6 +220,7 @@ static void am_cc_override_by_user_options(AM_CC_Decoder_t *cc, struct vbi_page 
 		for (j=0; j<pg->columns; j++)
 		{
 			ac = &pg->text[i*pg->columns + j];
+#if 0//pd-114913
 			if (pg->pgno <= 8)
 			{
 				/*NTSC CC style*/
@@ -230,7 +231,9 @@ static void am_cc_override_by_user_options(AM_CC_Decoder_t *cc, struct vbi_page 
 				else if (ac->opacity == VBI_TRANSPARENT_FULL)
 					ac->opacity = (VBI_OPAQUE<<4) | VBI_TRANSPARENT_SPACE;
 			}
-			else if (ac->unicode == 0x20 && ac->opacity == VBI_TRANSPARENT_SPACE)
+			else
+#endif
+			if (ac->unicode == 0x20 && ac->opacity == VBI_TRANSPARENT_SPACE)
 			{
 				ac->opacity = (VBI_TRANSPARENT_SPACE<<4) | VBI_TRANSPARENT_SPACE;
 			}
