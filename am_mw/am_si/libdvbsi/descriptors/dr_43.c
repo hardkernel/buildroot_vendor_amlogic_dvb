@@ -73,21 +73,25 @@ dvbpsi_sat_deliv_sys_dr_t * dvbpsi_DecodeSatDelivSysDr(
   }
 
   /* Decode data */
-  p_decoded->i_frequency         =   (uint32_t)(p_descriptor->p_data[0] << 24)
-                                   | (uint32_t)(p_descriptor->p_data[1] << 16)
-                                   | (uint32_t)(p_descriptor->p_data[2] <<  8)
-                                   | (uint32_t)(p_descriptor->p_data[3]);
-  p_decoded->i_orbital_position  =   (uint16_t)(p_descriptor->p_data[4] << 8)
-                                   | (uint16_t)(p_descriptor->p_data[5]);
+  p_decoded->i_frequency         =   DVBPSI_BCD2VALUE(p_descriptor->p_data[0]) * 10000000 +
+  									 DVBPSI_BCD2VALUE(p_descriptor->p_data[1]) * 100000 +
+  									 DVBPSI_BCD2VALUE(p_descriptor->p_data[2]) * 1000 +
+  									 DVBPSI_BCD2VALUE(p_descriptor->p_data[3]) * 10;
+
+  p_decoded->i_orbital_position  =   DVBPSI_BCD2VALUE(p_descriptor->p_data[4]) * 100 +
+									 DVBPSI_BCD2VALUE(p_descriptor->p_data[5]);
+
   p_decoded->i_west_east_flag    =   (p_descriptor->p_data[6] >> 7) & 0x01;
   p_decoded->i_polarization      =   (p_descriptor->p_data[6] >> 5) & 0x03;
   p_decoded->i_roll_off          =   (p_descriptor->p_data[6] >> 3) & 0x03;
   p_decoded->i_modulation_system =   (p_descriptor->p_data[6] >> 2) & 0x01;
   p_decoded->i_modulation_type   =    p_descriptor->p_data[6] & 0x03;
-  p_decoded->i_symbol_rate       =   (uint32_t)(p_descriptor->p_data[7] << 20)
-                                   | (uint32_t)(p_descriptor->p_data[8] << 12)
-                                   | (uint32_t)(p_descriptor->p_data[9] <<  4)
-                                   | (uint32_t)((p_descriptor->p_data[10] >> 4) & 0x0f);
+
+  p_decoded->i_symbol_rate       =   DVBPSI_BCD2VALUE(p_descriptor->p_data[7]) * 10000000 +
+  									 DVBPSI_BCD2VALUE(p_descriptor->p_data[8]) * 100000 +
+  									 DVBPSI_BCD2VALUE(p_descriptor->p_data[9]) * 1000 +
+  									 ((p_descriptor->p_data[10]&0xf0) >> 4) * 100;
+
   p_decoded->i_fec_inner         =    p_descriptor->p_data[10] & 0x0f;
 
   p_descriptor->p_decoded = (void*)p_decoded;

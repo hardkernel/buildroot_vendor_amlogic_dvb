@@ -91,7 +91,7 @@ dvbpsi_cable_delivery_dr_t * dvbpsi_DecodeCableDeliveryDr(
   p_decoded->i_symbol_rate       =   DVBPSI_BCD2VALUE(p_descriptor->p_data[7]) * 10000000 +
   									 DVBPSI_BCD2VALUE(p_descriptor->p_data[8]) * 100000 +
   									 DVBPSI_BCD2VALUE(p_descriptor->p_data[9]) * 1000 +
-  									 ((p_descriptor->p_data[10]&0xf0) >> 4);
+  									 ((p_descriptor->p_data[10]&0xf0) >> 4) * 100;
   p_decoded->i_fec_inner         =    p_descriptor->p_data[10] & 0x0f;
 
   p_descriptor->p_decoded = (void*)p_decoded;
