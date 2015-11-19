@@ -2918,19 +2918,34 @@ static AM_Bool_t am_scan_tablectl_test_complete(AM_SCAN_TableCtl_t * scl)
 static AM_Bool_t am_scan_tablectl_test_recved(AM_SCAN_TableCtl_t * scl, AM_SI_SectionHeader_t *header)
 {
 	int i;
-	
+
 	if (!scl->subctl)
 		return AM_TRUE;
 
 	for (i=0; i<scl->subs; i++)
 	{
-		if ((scl->subctl[i].ext == header->extension) && 
-			(scl->subctl[i].ver == header->version) && 
-			(scl->subctl[i].last == header->last_sec_num) && 
+		if ((scl->subctl[i].ext == header->extension) &&
+			(scl->subctl[i].ver == header->version) &&
+			(scl->subctl[i].last == header->last_sec_num) &&
 			!BIT_TEST(scl->subctl[i].mask, header->sec_num))
+		{
+			AM_DEBUG(1,"%s %d\n", __FUNCTION__, __LINE__);
+			AM_DEBUG(1, "test_recved true:\npid 0x%x\ttid 0x%x\n sext %d\thext %d\n sver %d\thver %d\n slast %d\thlast "
+					         "%d\n",
+			         scl->pid, scl->tid, scl->subctl[i].ext, header->extension, scl->subctl[i].ver, header->version,
+			         scl->subctl[i].last, header->last_sec_num);
 			return AM_TRUE;
+		}
+		else
+		{
+			AM_DEBUG(1, "%s %d\n", __FUNCTION__, __LINE__);
+			AM_DEBUG(1, "test_recved false:\npid 0x%x\ttid 0x%x\n sext %d\thext %d\n sver %d\thver %d\n slast "
+					         "%d\thlast "
+					         "%d\n",
+			         scl->pid, scl->tid, scl->subctl[i].ext, header->extension, scl->subctl[i].ver, header->version,
+			         scl->subctl[i].last, header->last_sec_num);
+		}
 	}
-	
 	return AM_FALSE;
 }
 
@@ -2955,7 +2970,7 @@ static AM_ErrorCode_t am_scan_tablectl_mark_section(AM_SCAN_TableCtl_t * scl, AM
 		if ((scl->subctl[i].ver == 0xff) && !fsub)
 			fsub = &scl->subctl[i];
 	}
-	
+
 	if (!sub && !fsub)
 	{
 		AM_DEBUG(1, "No more subctl for adding new %s subtable", scl->tname);
@@ -2963,7 +2978,7 @@ static AM_ErrorCode_t am_scan_tablectl_mark_section(AM_SCAN_TableCtl_t * scl, AM
 	}
 	if (!sub)
 		sub = fsub;
-	
+
 	/*发现新版本，重新设置接收控制*/
 	if (sub->ver != 0xff && (sub->ver != header->version ||\
 		sub->ext != header->extension || sub->last != header->last_sec_num))
@@ -2972,12 +2987,12 @@ static AM_ErrorCode_t am_scan_tablectl_mark_section(AM_SCAN_TableCtl_t * scl, AM
 	if (sub->ver == 0xff)
 	{
 		int i;
-		
+
 		/*接收到的第一个section*/
 		sub->last = header->last_sec_num;
-		sub->ver = header->version;	
+		sub->ver = header->version;
 		sub->ext = header->extension;
-		
+
 		for (i=0; i<(sub->last+1); i++)
 			BIT_SET(sub->mask, i);
 	}
@@ -2996,7 +3011,7 @@ static void am_scan_free_filter(AM_SCAN_Scanner_t *scanner, int *fid)
 {
 	if (*fid == -1)
 		return;
-		
+
 	AM_DMX_FreeFilter(dtv_start_para.dmx_dev_id, *fid);
 	*fid = -1;
 	pthread_mutex_unlock(&scanner->lock);
@@ -3017,7 +3032,7 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 	am_scan_free_filter(scanner, &scanner->dtvctl.nitctl.fid);
 	/*清除事件标志*/
 	//scanner->evt_flag &= ~scanner->dtvctl.nitctl.evt_flag;
-	
+
 	if (scanner->stage == AM_SCAN_STAGE_TS)
 	{
 		/*清除搜索标识*/
@@ -3025,7 +3040,7 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 		AM_DEBUG(1, "NIT Done in TS stage!");
 		return;
 	}
-	
+
 	if (! scanner->result.nits)
 	{
 		AM_DEBUG(1, "No NIT found ,try next frequency");
@@ -3035,20 +3050,20 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 
 	/*清除搜索标识*/
 	scanner->recv_status &= ~scanner->dtvctl.nitctl.recv_flag;
-	
+
 	if (scanner->start_freqs)
 		free(scanner->start_freqs);
 	scanner->start_freqs = NULL;
 	scanner->start_freqs_cnt = 0;
 	scanner->curr_freq = -1;
-	
+
 	/*首先统计NIT中描述的TS个数*/
 	AM_SI_LIST_BEGIN(scanner->result.nits, nit)
 		AM_SI_LIST_BEGIN(nit->p_first_ts, ts)
 		scanner->start_freqs_cnt++;
 		AM_SI_LIST_END()
 	AM_SI_LIST_END()
-	
+
 	if (scanner->start_freqs_cnt == 0)
 	{
 		AM_DEBUG(1, "No TS in NIT");
@@ -3063,9 +3078,9 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 		goto NIT_END;
 	}
 	memset(scanner->start_freqs, 0, sizeof(AM_SCAN_FrontEndPara_t) * scanner->start_freqs_cnt);
-	
+
 	scanner->start_freqs_cnt = 0;
-	
+
 	/*从NIT搜索结果中取出频点列表存到start_freqs中*/
 	AM_SI_LIST_BEGIN(scanner->result.nits, nit)
 		/*遍历每个TS*/
@@ -3139,7 +3154,7 @@ static void am_scan_bat_done(AM_SCAN_Scanner_t *scanner)
 	//scanner->evt_flag &= ~scanner->dtvctl.batctl.evt_flag;
 	/*清除搜索标识*/
 	scanner->recv_status &= ~scanner->dtvctl.batctl.recv_flag;
-	
+
 	if (scanner->recv_status == AM_SCAN_RECVING_COMPLETE)
 	{
 		/*开始搜索TS*/
@@ -3166,10 +3181,10 @@ static void am_scan_pat_done(AM_SCAN_Scanner_t *scanner)
 	{
 		am_scan_isdbt_prepare_oneseg(scanner->curr_ts);
 	}
-	
+
 	/* Set the current PAT section */
 	scanner->dtvctl.cur_pat = scanner->curr_ts->digital.pats;
-	
+
 	/*开始搜索PMT表*/
 	am_scan_request_pmts(scanner);
 }
@@ -3178,21 +3193,28 @@ static void am_scan_pat_done(AM_SCAN_Scanner_t *scanner)
 static void am_scan_pmt_done(AM_SCAN_Scanner_t *scanner)
 {
 	int i;
-	
+	int ret = 0;
 	for (i=0; i<(int)AM_ARRAY_SIZE(scanner->dtvctl.pmtctl); i++)
 	{
-		if (scanner->dtvctl.pmtctl[i].fid >= 0 && 
-			am_scan_tablectl_test_complete(&scanner->dtvctl.pmtctl[i]) &&
-			scanner->dtvctl.pmtctl[i].data_arrive_time > 0)
+		ret = am_scan_tablectl_test_complete(&scanner->dtvctl.pmtctl[i]);
+		if (scanner->dtvctl.pmtctl[i].fid >= 0 &&
+			ret &&
+			scanner->dtvctl.pmtctl[i].data_arrive_time != 0 /*&&
+				scanner->dtvctl.pmtctl[i].data_arrive_time != 1*/ )
 		{
 			AM_DEBUG(1, "Stop filter for PMT, program %d", scanner->dtvctl.pmtctl[i].ext);
 			am_scan_free_filter(scanner, &scanner->dtvctl.pmtctl[i].fid);
 		}
+		else
+		{
+			AM_DEBUG(1, "fid %d test_complete %d arrive_time %d\n", scanner->dtvctl.pmtctl[i].fid,
+			         ret, scanner->dtvctl.pmtctl[i].data_arrive_time);
+		}
 	}
-	
+
 	/*清除事件标志*/
 	//scanner->evt_flag &= ~scanner->dtvctl.pmtctl.evt_flag;
-	
+
 	/*开始搜索尚未接收的PMT表*/
 	am_scan_request_pmts(scanner);
 }
@@ -3218,8 +3240,8 @@ static void am_scan_sdt_done(AM_SCAN_Scanner_t *scanner)
 	/*清除搜索标识*/
 	scanner->recv_status &= ~scanner->dtvctl.sdtctl.recv_flag;
 
-	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_SDT_DONE, 
-		IS_DVBT2() ? (void*)scanner->curr_ts->digital.dvbt2_data_plps[scanner->curr_plp].sdts 
+	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_SDT_DONE,
+		IS_DVBT2() ? (void*)scanner->curr_ts->digital.dvbt2_data_plps[scanner->curr_plp].sdts
 		: (void*)scanner->curr_ts->digital.sdts);
 }
 
@@ -3233,7 +3255,7 @@ static void am_scan_mgt_done(AM_SCAN_Scanner_t *scanner)
 	scanner->recv_status &= ~scanner->dtvctl.mgtctl.recv_flag;
 
 	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_MGT_DONE, (void*)scanner->curr_ts->digital.mgts);
-	
+
 	/*开始搜索VCT表*/
 	if (scanner->curr_ts->digital.mgts)
 	{
@@ -3258,7 +3280,7 @@ static void am_scan_vct_done(AM_SCAN_Scanner_t *scanner)
 	atsc_descriptor_t *descr;
 	vct_section_info_t *vct;
 	vct_channel_info_t *chan;
-		
+
 	am_scan_free_filter(scanner, &scanner->dtvctl.vctctl.fid);
 	/*清除事件标志*/
 	//scanner->evt_flag &= ~scanner->vctctl.evt_flag;
@@ -3273,9 +3295,11 @@ static AM_SCAN_TableCtl_t *am_scan_get_section_ctrl_by_fid(AM_SCAN_Scanner_t *sc
 {
 	AM_SCAN_TableCtl_t *scl = NULL;
 	int i;
-	
+
 	if (scanner->dtvctl.patctl.fid == fid)
+	{
 		scl = &scanner->dtvctl.patctl;
+	}
 	else if (dtv_start_para.standard == AM_SCAN_DTV_STD_ATSC)
 	{
 		if (scanner->dtvctl.mgtctl.fid == fid)
@@ -3294,7 +3318,7 @@ static AM_SCAN_TableCtl_t *am_scan_get_section_ctrl_by_fid(AM_SCAN_Scanner_t *sc
 		else if (scanner->dtvctl.batctl.fid == fid)
 			scl = &scanner->dtvctl.batctl;
 	}
-	
+
 	if (scl == NULL)
 	{
 		for (i=0; i<(int)AM_ARRAY_SIZE(scanner->dtvctl.pmtctl); i++)
@@ -3306,7 +3330,6 @@ static AM_SCAN_TableCtl_t *am_scan_get_section_ctrl_by_fid(AM_SCAN_Scanner_t *sc
 			}
 		}
 	}
-	
 	return scl;
 }
 
@@ -3315,7 +3338,7 @@ static void am_scan_add_vc_from_vct(AM_SCAN_Scanner_t *scanner, vct_section_info
 {
 	vct_channel_info_t *tmp, *new;
 	AM_Bool_t found;
-	
+
 	AM_SI_LIST_BEGIN(vct->vct_chan_info, tmp)
 		new = (vct_channel_info_t *)malloc(sizeof(vct_channel_info_t));
 		if (new == NULL)
@@ -3326,19 +3349,19 @@ static void am_scan_add_vc_from_vct(AM_SCAN_Scanner_t *scanner, vct_section_info
 		/*here we share the desc pointer*/
 		*new = *tmp;
 		new->p_next = NULL;
-		
+
 		found = AM_FALSE;
 		/*Is this vc already added?*/
 		AM_SI_LIST_BEGIN(scanner->result.vcs, tmp)
-			if (tmp->channel_TSID == new->channel_TSID && 
+			if (tmp->channel_TSID == new->channel_TSID &&
 				tmp->program_number == new->program_number)
 			{
 				found = AM_TRUE;
 				break;
 			}
 		AM_SI_LIST_END()
-		
-		if (! found)		
+
+		if (! found)
 		{
 			/*Add this vc to result.vcs*/
 			ADD_TO_LIST(new, scanner->result.vcs);
@@ -3363,7 +3386,7 @@ static void am_scan_section_handler(int dev_no, int fid, const uint8_t *data, in
 	}
 	if (data == NULL)
 		return;
-		
+
 	pthread_mutex_lock(&scanner->lock);
 	/*获取接收控制数据*/
 	sec_ctrl = am_scan_get_section_ctrl_by_fid(scanner, fid);
@@ -3375,13 +3398,13 @@ static void am_scan_section_handler(int dev_no, int fid, const uint8_t *data, in
 			AM_DEBUG(1, "Scan: section_syntax_indicator is 0, skip this section");
 			goto parse_end;
 		}
-		
+
 		if (AM_SI_GetSectionHeader(scanner->dtvctl.hsi, (uint8_t*)data, len, &header) != AM_SUCCESS)
 		{
 			AM_DEBUG(1, "Scan: section header error");
 			goto parse_end;
 		}
-		
+
 		/*该section是否已经接收过*/
 		if (am_scan_tablectl_test_recved(sec_ctrl, &header))
 		{
@@ -3390,12 +3413,12 @@ static void am_scan_section_handler(int dev_no, int fid, const uint8_t *data, in
 			if (sec_ctrl->subs > 1)
 			{
 				int now;
-				
+
 				AM_TIME_GetClock(&now);
-				if (am_scan_tablectl_test_complete(sec_ctrl) && 
+				if (am_scan_tablectl_test_complete(sec_ctrl) &&
 					((now - sec_ctrl->data_arrive_time) > sec_ctrl->repeat_distance))
 				{
-					AM_DEBUG(1, "%s Done!", sec_ctrl->tname);
+					AM_DEBUG(1, "%s Done!!", sec_ctrl->tname);
 					scanner->evt_flag |= sec_ctrl->evt_flag;
 					pthread_cond_signal(&scanner->cond);
 				}
