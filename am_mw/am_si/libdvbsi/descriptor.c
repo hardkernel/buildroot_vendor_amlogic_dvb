@@ -29,7 +29,7 @@
 
 
 #include "config.h"
-
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -38,10 +38,9 @@
 #elif defined(HAVE_STDINT_H)
 #include <stdint.h>
 #endif
-
+#include <am_debug.h>
 #include "dvbpsi.h"
 #include "descriptor.h"
-
 extern void si_decode_descriptor(dvbpsi_descriptor_t *des);
 
 /*****************************************************************************
@@ -50,45 +49,52 @@ extern void si_decode_descriptor(dvbpsi_descriptor_t *des);
  * Creation of a new dvbpsi_descriptor_t structure.
  *****************************************************************************/
 dvbpsi_descriptor_t* dvbpsi_NewDescriptor(uint8_t i_tag, uint8_t i_length,
-                                          uint8_t* p_data)
+		uint8_t* p_data)
 {
-  dvbpsi_descriptor_t* p_descriptor
-                = (dvbpsi_descriptor_t*)malloc(sizeof(dvbpsi_descriptor_t));
-  
-  if(p_descriptor)
-  {
-    if (i_length == 0)
-    {
-  	  /* In some descriptors, this case is legacy */
-  	  p_descriptor->p_data = NULL;
-  	  p_descriptor->i_tag = i_tag;
-      p_descriptor->i_length = i_length;
-      p_descriptor->p_decoded = NULL;
-      p_descriptor->p_next = NULL;
-  	  return p_descriptor;
-   }
-    p_descriptor->p_data = (uint8_t*)malloc(i_length * sizeof(uint8_t));
+	AM_DEBUG(1, "malloc descriptor\n");
+	dvbpsi_descriptor_t* p_descriptor
+		= (dvbpsi_descriptor_t*)malloc(sizeof(dvbpsi_descriptor_t));
+	if(!p_descriptor)
+	{
+		AM_DEBUG(1,"descriptor malloc failed\n"); 
+		p_descriptor = NULL;
+	}
+	else
+	{
+		if (i_length == 0)
+		{
+			/* In some descriptors, this case is legacy */
+			p_descriptor->p_data = NULL;
+			p_descriptor->i_tag = i_tag;
+			p_descriptor->i_length = i_length;
+			p_descriptor->p_decoded = NULL;
+			p_descriptor->p_next = NULL;
+			return p_descriptor;
+		}
+		p_descriptor->p_data = (uint8_t*)malloc(i_length * sizeof(uint8_t));
 
-    if(p_descriptor->p_data)
-    {
-      p_descriptor->i_tag = i_tag;
-      p_descriptor->i_length = i_length;
-      if(p_data)
-        memcpy(p_descriptor->p_data, p_data, i_length);
-      p_descriptor->p_decoded = NULL;
-      p_descriptor->p_next = NULL;
+		if(p_descriptor->p_data)
+		{
+			p_descriptor->i_tag = i_tag;
+			p_descriptor->i_length = i_length;
+			if(p_data)
+				memcpy(p_descriptor->p_data, p_data, i_length);
+			p_descriptor->p_decoded = NULL;
+			p_descriptor->p_next = NULL;
 
-      /*Decode it*/
-      si_decode_descriptor(p_descriptor);
-    }
-    else
-    {
-      free(p_descriptor);
-      p_descriptor = NULL;
-    }
-  }
-
-  return p_descriptor;
+			/*Decode it*/
+			AM_DEBUG(1,"About to decode descriptor\n");
+			si_decode_descriptor(p_descriptor);
+		}
+		else
+		{
+			AM_DEBUG(1, "descriptor pdata malloc failed\n");	
+			if(p_descriptor)
+				free(p_descriptor);
+			p_descriptor = NULL;
+		}
+	}
+	return p_descriptor;
 }
 
 
@@ -99,18 +105,18 @@ dvbpsi_descriptor_t* dvbpsi_NewDescriptor(uint8_t i_tag, uint8_t i_length,
  *****************************************************************************/
 void dvbpsi_DeleteDescriptors(dvbpsi_descriptor_t* p_descriptor)
 {
-  while(p_descriptor != NULL)
-  { 
-    dvbpsi_descriptor_t* p_next = p_descriptor->p_next;
+	while(p_descriptor != NULL)
+	{ 
+		dvbpsi_descriptor_t* p_next = p_descriptor->p_next;
 
-    if(p_descriptor->p_data != NULL)
-      free(p_descriptor->p_data);
+		if(p_descriptor->p_data != NULL)
+			free(p_descriptor->p_data);
 
-    if(p_descriptor->p_decoded != NULL)
-      free(p_descriptor->p_decoded);
+		if(p_descriptor->p_decoded != NULL)
+			free(p_descriptor->p_decoded);
 
-    free(p_descriptor);
-    p_descriptor = p_next;
-  }
+		free(p_descriptor);
+		p_descriptor = p_next;
+	}
 }
 
