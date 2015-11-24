@@ -3521,6 +3521,12 @@ static AM_ErrorCode_t aml_open_ts_mode(AM_AV_Device_t *dev)
 		free(ts);
 		return AM_AV_ERR_CANNOT_OPEN_DEV;
 	}
+	AM_DEBUG(1, "try to init subtitle ring buf");
+	int sid = 0xffff;
+	if(ioctl(ts->fd, AMSTREAM_IOC_SID, sid)==-1)
+	{
+		AM_DEBUG(1, "set sub PID failed");
+	}
 	#endif
 
 	dev->ts_player.drv_data = (void*)ts;
