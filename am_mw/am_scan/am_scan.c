@@ -4920,7 +4920,9 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 		si.locked = (scanner->fe_evt.status&FE_HAS_LOCK) ? AM_TRUE : AM_FALSE;
 	}
 	si.frequency = scanner->fe_evt.parameters.frequency;
-	SIGNAL_EVENT(AM_SCAN_EVT_SIGNAL, (void*)&si);
+
+	if (cur_fe_para.m_type != FE_ANALOG) /*atv lock = afc lock + cvbs lock*/
+		SIGNAL_EVENT(AM_SCAN_EVT_SIGNAL, (void*)&si);
 		
 	scanner->recv_status &= ~AM_SCAN_RECVING_WAIT_FEND;
 
