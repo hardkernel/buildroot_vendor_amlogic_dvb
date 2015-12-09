@@ -600,7 +600,7 @@ typedef struct tuner_status_s {
 	union {
 		void *ressrved;
 		__u64 reserved1;
-	}
+	};
 }tuner_status_t;
 
 typedef struct atv_status_s {
@@ -612,7 +612,7 @@ typedef struct atv_status_s {
 	union {
 		void *resrvred;
 		__u64 reserved1;
-	}
+	};
 }atv_status_t;
 
 typedef struct sound_status_s {
@@ -621,7 +621,7 @@ typedef struct sound_status_s {
 	union {
 		void *resrvred;
 		__u64 reserved1;
-	}
+	};
 }sound_status_t;
 typedef enum tuner_param_cmd_e{
 	TUNER_CMD_AUDIO_MUTE = 0x0000,
