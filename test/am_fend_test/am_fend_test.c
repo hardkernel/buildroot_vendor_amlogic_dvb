@@ -495,14 +495,16 @@ static int open_fend(int *id, int *mode)
 	if(*id<0)
 		return -2;
 
-	printf("Input fontend mode: (0-DVBC, 1-DVBT, 2-DVBS, 3-ISDBT, 4-DTMB)\n");
-	printf("mode(0/1/2/3/4): ");
+	printf("Input fontend mode: (0-DVBC, 1-DVBT, 2-DVBS, 3-ISDBT, 4-DTMB, 5-DVBT2)\n");
+	printf("mode(0/1/2/3/4/5): ");
 	scanf("%d", mode);
 	para.mode = (*mode==0)?FE_QAM : 
 			(*mode==1)? FE_OFDM : 
 			(*mode==2)? FE_QPSK :
 			(*mode==3)? FE_ISDBT :
-						FE_DTMB ;
+			(*mode==4)? FE_DTMB :
+			(*mode==5)? FE_OFDM :
+				FE_OFDM;
 
 	AM_TRY(AM_FEND_Open(*id, &para));
 
@@ -523,7 +525,7 @@ static int lock_fend(int id, int mode)
 	static int freq, srate, qam;
 	static int bw;
 
-	/*(0-DVBC, 1-DVBT, 2-DVBS, 3-ISDBT, 4-DTMB)*/
+	/*(0-DVBC, 1-DVBT, 2-DVBS, 3-ISDBT, 4-DTMB, 5-DVBT2)*/
 
 	if(mode==-1)
 		return -1;
@@ -605,14 +607,16 @@ static int lock_fend(int id, int mode)
 				p.u.qam.modulation = QAM_256;
 			break;
 		}
-	}else if(mode==1 || mode==3 || mode==4){
+	}else if(mode==1 || mode==3 || mode==4 || mode==5){
 		printf("BW[8/7/6/5(AUTO) MHz]: ");
 		scanf("%d", &bw);
 
 		if(mode==1) {
 			printf("T2?[0/1]: ");
 			scanf("%d", &p.u.ofdm.ofdm_mode);
-		}
+		} else if(mode == 5)
+			printf("set to T2\n");
+			p.u.ofdm.ofdm_mode = OFDM_DVBT2;
 		
 		p.frequency = freq;
 		switch(bw)
@@ -745,6 +749,53 @@ static int stat_fend(int id)
 	return 0;
 }
 
+static int dvbt2_plp(int id)
+{
+	int set_not_get = 0;
+	uint8_t plp_ids[256];
+	uint8_t plp = 0;
+	int err;
+	int i;
+
+	struct dtv_properties prop;
+	struct dtv_property property;
+
+	printf("get/set(0/1): ");
+	scanf("%d", &set_not_get);
+
+	if (!set_not_get) {
+		prop.num = 1;
+		prop.props = &property;
+
+		memset(&property, 0, sizeof(property));
+		property.cmd = DTV_DVBT2_PLP_ID;
+		property.u.buffer.reserved1[1] = UINT_MAX;/*get plps*/
+		property.u.buffer.reserved2 = plp_ids;
+		err = AM_FEND_GetProp(id, &prop);
+		plp = property.u.buffer.reserved1[0];
+		if(!err) {
+			printf("DVB-T2 get %d PLPs:\n\t", plp);
+			for(i=0; i<plp; i++)
+				printf("%d ", plp_ids[i]);
+			printf("\n\n");
+		} else
+			printf("DVB-T2 get plps FAIL.err(0x%x)\n", err);
+	} else {
+		printf("input plp to set:");
+		scanf("%d", &plp);
+		memset(&property, 0, sizeof(property));
+		property.cmd = DTV_DVBT2_PLP_ID;
+		property.u.data = plp;
+
+		err = AM_FEND_SetProp(id, &prop);
+		if(!err)
+			printf("DVB-T2 Set PLP%d ", property.u.data);
+		else
+			printf("DVB-T2 Set PLP%d FAIL.err(0x%x)\n", property.u.data, err);
+	}
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	int fe_id=-1;
@@ -753,8 +804,13 @@ int main(int argc, char **argv)
 	char buf[64], last[64];
 	char *cmd=NULL;
 
+	int is_dvbt2 = 0;
+
 	if(open_fend(&fe_id, &mode)!=0)
 		return 0;
+
+	if(mode == 5)
+		is_dvbt2 = 1;
 
 	while(1)
 	{
@@ -784,6 +840,8 @@ int main(int argc, char **argv)
 				mode = -1;
 				break;
 			}
+		} else if (is_dvbt2 && !strncmp(cmd, "plp", 3)) {
+			dvbt2_plp(fe_id);
 		} else {
 			continue;
 		}
