@@ -35,6 +35,20 @@ extern "C"
 		(60 * ((10*(((m) & 0xF0)>>4)) + ((m) & 0xF))) + \
 		((10*(((s) & 0xF0)>>4)) + ((s) & 0xF)))
 
+#define EVT_NAME_LEN 256
+#define ITEM_DESCR_LEN 256
+#define ITEM_CHAR_LEN 1024
+#define EVT_TEXT_LEN 1024
+#define EXT_TEXT_LEN 4096
+#define MAX_LANGUAGE_CNT 4
+#define MAX_ITEM_CNT 16
+
+#define COMPOSED_NAME_LEN ((EVT_NAME_LEN/*single len*/+1/*extra 0x80 for language splitting*/+3/*language code*/)*MAX_LANGUAGE_CNT)
+#define COMPOSED_DESCR_LEN ((EVT_TEXT_LEN+4)*MAX_LANGUAGE_CNT)
+#define COMPOSED_EXT_ITEM_LEN ((ITEM_DESCR_LEN+ITEM_CHAR_LEN+2/*:\n*/+4)*MAX_LANGUAGE_CNT)
+#define COMPOSED_EXT_DESCR_LEN ((EXT_TEXT_LEN+4)*MAX_LANGUAGE_CNT)
+
+
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
@@ -126,6 +140,29 @@ typedef struct
 	sqlite3	*hdb;	/**< 数据库句柄，可用于预约播放查询等数据库操作*/
 	char text_langs[128]; /**< */
 }AM_EPG_CreatePara_t;
+
+typedef struct {
+	int src;
+	unsigned short srv_id;
+	unsigned short ts_id;
+	unsigned short net_id;
+	unsigned short evt_id;
+	int start;
+	int end;
+	int nibble;
+	int parental_rating;
+	char name[COMPOSED_NAME_LEN+1];
+	char desc[COMPOSED_DESCR_LEN+1];
+	char ext_item[COMPOSED_EXT_ITEM_LEN + 1];
+	char ext_descr[COMPOSED_EXT_DESCR_LEN + 1];
+	int sub_flag;
+	int sub_status;
+	int source_id;
+	char rrt_ratings[1024];
+}AM_EPG_Event_t;
+
+typedef void (*AM_EPG_Events_UpdateCB_t) (AM_EPG_Handle_t handle, int event_count, AM_EPG_Event_t *pevents);
+typedef void (*AM_EPG_PMT_UpdateCB_t) (AM_EPG_Handle_t handle, dvbpsi_pmt_t *pmts);
 
 /****************************************************************************
  * Function prototypes  
@@ -257,6 +294,13 @@ extern AM_ErrorCode_t AM_EPG_SetUserData(AM_EPG_Handle_t handle, void *user_data
  *   - 其他值 错误代码(见am_epg.h)
  */
 extern AM_ErrorCode_t AM_EPG_GetUserData(AM_EPG_Handle_t handle, void **user_data);
+
+
+extern AM_ErrorCode_t AM_EPG_MonitorServiceByID(AM_EPG_Handle_t handle, int ts_id, int srv_id, AM_EPG_PMT_UpdateCB_t pmt_cb);
+
+extern AM_ErrorCode_t AM_EPG_SetEventsCallback(AM_EPG_Handle_t handle, AM_EPG_Events_UpdateCB_t cb);
+
+extern void AM_EPG_FreeEvents(int event_count, AM_EPG_Event_t *pevents);
 
 #ifdef __cplusplus
 }

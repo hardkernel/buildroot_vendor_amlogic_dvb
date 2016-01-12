@@ -21,13 +21,6 @@ extern "C"
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
-#define EVT_NAME_LEN 256
-#define ITEM_DESCR_LEN 256
-#define ITEM_CHAR_LEN 1024
-#define EVT_TEXT_LEN 1024
-#define EXT_TEXT_LEN 4096
-#define MAX_LANGUAGE_CNT 4
-#define MAX_ITEM_CNT 16
 
 /****************************************************************************
  * Type definitions
@@ -156,6 +149,11 @@ struct AM_EPG_Monitor_s
 	void			*user_data;
 	int				curr_ts;	/**< 当前监控的TS*/
 	char			text_langs[128];
+
+	AM_EPG_Events_UpdateCB_t evt_cb;
+	int                      mon_service_sid;
+	int                      curr_ts_tsid;
+	AM_EPG_PMT_UpdateCB_t    pmt_cb;
 };
 
 /**\brief 当前时间管理*/

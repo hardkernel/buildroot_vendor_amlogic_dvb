@@ -49,8 +49,10 @@ extern "C"
 	AM_MACRO_END
 #else
 #include <android/log.h>
-
-#define log_print(...) __android_log_print(ANDROID_LOG_INFO, "AM_DEBUG", __VA_ARGS__)
+#ifndef TAG_EXT
+#define TAG_EXT
+#endif
+#define log_print(...) __android_log_print(ANDROID_LOG_INFO, "AM_DEBUG"TAG_EXT, __VA_ARGS__)
 #define AM_DEBUG(_level,_fmt...) \
 	AM_MACRO_BEGIN\
 	if ((_level)<=(AM_DEBUG_LEVEL))\
