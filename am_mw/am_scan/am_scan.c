@@ -887,7 +887,7 @@ static void am_scan_update_ts_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *resul
 	if (ts->type != AM_SCAN_TS_ANALOG)
 	{
 		dvbpsi_pat_t *pats = get_valid_pats(ts);
-		if (pats != NULL)
+		if (pats != NULL && !ts->digital.use_vct_tsid)
 			ts_id = pats->i_ts_id;
 		else if (ts->digital.vcts != NULL)
 			ts_id = ts->digital.vcts->transport_stream_id;
@@ -1491,6 +1491,11 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	AM_Bool_t program_found_in_vct = AM_FALSE;
 	AM_Bool_t store = (stmts != NULL);
 
+	if(ts->digital.vcts
+		&& (ts->digital.vcts->transport_stream_id != ts->digital.pats->i_ts_id)
+		&& (ts->digital.pats->i_ts_id == 0))
+		ts->digital.use_vct_tsid = 1;
+
 	if (store)
 	{
 		AM_DB_HANDLE_PREPARE(hdb);
@@ -1561,8 +1566,8 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 				continue;
 			
 			/*从VCT表中查找该service并获取信息*/
-			if (vct->transport_stream_id == ts->digital.pats->i_ts_id &&
-				vcinfo->channel_TSID == vct->transport_stream_id)
+			if ((ts->digital.use_vct_tsid || (vct->transport_stream_id == ts->digital.pats->i_ts_id))
+				&& vcinfo->channel_TSID == vct->transport_stream_id)
 			{	
 				if (vcinfo->program_number == pmt->i_program_number)
 				{
@@ -1577,7 +1582,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 			}
 			else
 			{
-				AM_DEBUG(1, "Program(%d) of TS(%d) in VCT(%d) found, current(%d)", 
+				AM_DEBUG(1, "Program(%d ts:%d) in VCT(ts:%d) found, current (ts:%d)",
 						vcinfo->program_number, vcinfo->channel_TSID,
 						vct->transport_stream_id, ts->digital.pats->i_ts_id);
 				continue;
@@ -1634,9 +1639,9 @@ VCT_END:
 		}
 		else
 		{
-			AM_DEBUG(1, "Program(%d) of TS(%d) in VCT(%d) found, current(%d)",
+			AM_DEBUG(1, "Program(%d ts:%d) in VCT(ts:%d) found",
 			vcinfo->program_number, vcinfo->channel_TSID,
-			vct->transport_stream_id, vcinfo->channel_TSID);
+			vct->transport_stream_id);
 			continue;
 		}
 	AM_SI_LIST_END()
@@ -3196,11 +3201,10 @@ static void am_scan_pmt_done(AM_SCAN_Scanner_t *scanner)
 	int ret = 0;
 	for (i=0; i<(int)AM_ARRAY_SIZE(scanner->dtvctl.pmtctl); i++)
 	{
+		if (scanner->dtvctl.pmtctl[i].fid < 0)
+			continue;
 		ret = am_scan_tablectl_test_complete(&scanner->dtvctl.pmtctl[i]);
-		if (scanner->dtvctl.pmtctl[i].fid >= 0 &&
-			ret &&
-			scanner->dtvctl.pmtctl[i].data_arrive_time != 0 /*&&
-				scanner->dtvctl.pmtctl[i].data_arrive_time != 1*/ )
+		if (ret && scanner->dtvctl.pmtctl[i].data_arrive_time != 0)
 		{
 			AM_DEBUG(1, "Stop filter for PMT, program %d", scanner->dtvctl.pmtctl[i].ext);
 			am_scan_free_filter(scanner, &scanner->dtvctl.pmtctl[i].fid);
@@ -4998,7 +5002,7 @@ static void am_scan_get_wait_timespec(AM_SCAN_Scanner_t *scanner, struct timespe
 			end = scanner->dtvctl.table.end_time;\
 			rel = am_scan_compare_timespec(&scanner->dtvctl.table.end_time, &now);\
 			if (rel <= 0){\
-				AM_DEBUG(1, "%s timeout", scanner->dtvctl.table.tname);\
+				AM_DEBUG(1, "%s:0x%x timeout", scanner->dtvctl.table.tname, scanner->dtvctl.table.pid);\
 				scanner->dtvctl.table.data_arrive_time = 1;/*just mark it*/\
 				scanner->dtvctl.table.done(scanner);\
 			}\

@@ -245,7 +245,7 @@ typedef struct AM_SCAN_TS_s
 			dvbpsi_sdt_t *sdts;		/**< 搜索到的SDT表*/
 			mgt_section_info_t *mgts;		/**< 搜索到的MGT表*/
 			vct_section_info_t *vcts;		/**< 搜索到的VCT表*/
-
+			int use_vct_tsid;
 			int				dvbt2_data_plp_num;	/**< DVB-T2 DATA PLP count*/
 			struct
 			{
@@ -260,7 +260,7 @@ typedef struct AM_SCAN_TS_s
 		{
 			int freq;		/**< 频率*/
 			int std;		/**< tuner std*/
-            int logicalChannelNum;
+			int logicalChannelNum;
 		}analog;
 	};
 
