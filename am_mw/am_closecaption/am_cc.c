@@ -42,7 +42,11 @@
 #define TAG      "ATSC_CC"
 #define ATSC_CC_DBG(a...) __android_log_print(ANDROID_LOG_INFO, TAG, a)
 
+#ifdef PTHREAD_RECURSIVE_MUTEX_INITIALIZER
 static pthread_mutex_t cc_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
+#else
+static pthread_mutex_t cc_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+#endif
 #define am_cc_lock     pthread_mutex_lock(&cc_lock)
 #define am_cc_unlock   pthread_mutex_unlock(&cc_lock)
 

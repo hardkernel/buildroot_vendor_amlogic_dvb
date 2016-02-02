@@ -127,12 +127,21 @@ struct {
 	_ci_t cis[AM_CI_DEV_COUNT];
 } gci = 
 {
+#ifdef PTHREAD_RECURSIVE_MUTEX_INITIALIZER
 	.lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER,
 	.cis = 
 		{
 			[0]={.lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER,},
 			[1]={.lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER,},
 		},
+#else
+	.lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP,
+	.cis =
+		{
+			[0]={.lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP,},
+			[1]={.lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP,},
+		},
+#endif
 };
 
 static inline AM_ErrorCode_t get_ci(AM_CI_Handle_t handle, _ci_t **pci)

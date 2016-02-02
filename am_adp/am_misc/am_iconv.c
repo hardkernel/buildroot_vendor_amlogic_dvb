@@ -14,6 +14,7 @@
 #define AM_DEBUG_LEVEL 1
 
 #include <am_iconv.h>
+#include <am_debug.h>
 
 UConverter* (*am_ucnv_open_ptr)(const char *converterName, UErrorCode *err);
 void (*am_ucnv_close_ptr)(UConverter * converter);
@@ -43,9 +44,20 @@ am_ucnv_dlink(void)
 	LOAD_UCNV_SYMBOL(ucnv_close, post)\
 	LOAD_UCNV_SYMBOL(ucnv_convertEx, post)
 
+#define CHECK_LOAD_SYMBOL(name)\
+	if(!am_##name##_ptr){\
+		AM_DEBUG(1, #name" not found. ucnv init fail.");}
+#define CHECK_LOAD_SYMBOLS()\
+	CHECK_LOAD_SYMBOL(ucnv_open)\
+	CHECK_LOAD_SYMBOL(ucnv_close)\
+	CHECK_LOAD_SYMBOL(ucnv_convertEx)
+
 	LOAD_UCNV_SYMBOLS("")
 	LOAD_UCNV_SYMBOLS("_48")
 	LOAD_UCNV_SYMBOLS("_51")
 	LOAD_UCNV_SYMBOLS("_53")
+	LOAD_UCNV_SYMBOLS("_55")
+
+	CHECK_LOAD_SYMBOLS()
 }
 

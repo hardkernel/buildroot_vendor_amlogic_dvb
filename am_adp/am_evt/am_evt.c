@@ -51,7 +51,11 @@ static AM_Event_t *events[AM_EVT_BUCKET_COUNT];
 #ifndef ANDROID
 static pthread_mutex_t lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 #else
+#ifdef PTHREAD_RECURSIVE_MUTEX_INITIALIZER
 static pthread_mutex_t lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
+#else
+static pthread_mutex_t lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+#endif
 #endif
 
 pthread_mutexattr_t attr;
