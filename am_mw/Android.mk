@@ -150,6 +150,8 @@ LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libdl libc 
 endif
 LOCAL_PRELINK_MODULE := false
 
+LOCAL_32_BIT_ONLY := true
+
 include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
@@ -298,6 +300,8 @@ else
 LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libdl libc libcutils
 endif
 LOCAL_PRELINK_MODULE := false
+
+LOCAL_32_BIT_ONLY := true
 
 include $(BUILD_STATIC_LIBRARY)
 

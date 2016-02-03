@@ -56,6 +56,8 @@ endif
 
 LOCAL_PRELINK_MODULE := false
 
+LOCAL_32_BIT_ONLY := true
+
 include $(BUILD_SHARED_LIBRARY)
 
 
@@ -110,6 +112,8 @@ else
 LOCAL_SHARED_LIBRARIES+=libcutils liblog libdl libc libamadec libamcodec
 endif
 LOCAL_PRELINK_MODULE := false
+
+LOCAL_32_BIT_ONLY := true
 
 include $(BUILD_STATIC_LIBRARY)
 
