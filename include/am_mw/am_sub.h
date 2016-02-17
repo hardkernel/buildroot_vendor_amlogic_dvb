@@ -86,7 +86,7 @@ typedef void (*AM_SUB_ClearCb_t)(AM_SUB_Screen_t* screen);
 
 
 /**\brief 开始处理subtitle(包括解析subtitle)
- * \param dmx_id  demux id号
+ * \param dmx_dev_id  demux 设备id号
  * \param pid  packet id
  * \param composition_id 合成page 编号
  * \param ancillary_id  辅助page编号

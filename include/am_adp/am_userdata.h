@@ -2,7 +2,8 @@
  *  Copyright C 2013 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file am_userdata.h
- * \brief user data驱动模块
+ * \brief MPEG user data驱动模块
+ * 读取MPEG user data.
  *
  * \author Xia Lei Peng <leipeng.xia@amlogic.com>
  * \date 2013-3-13: create the document
@@ -75,7 +76,7 @@ extern AM_ErrorCode_t AM_USERDATA_Close(int dev_no);
  * \param dev_no USERDATA设备号
  * \param	[out] buf 缓冲区
  * \param size	需要读取的数据长度
- * \param timeout 读取超时时间 ms 
+ * \param timeout_ms 读取超时时间 ms 
  * \return
  *   - 实际读取的字节数
  */

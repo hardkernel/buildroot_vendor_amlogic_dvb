@@ -197,7 +197,7 @@ extern AM_ErrorCode_t AM_EPG_ChangeMode(AM_EPG_Handle_t handle, int op, int mode
 
 /**\brief 设置当前监控的service，监控其PMT和EIT actual pf
  * \param handle 句柄
- * \param service_id	需要监控的service的数据库索引
+ * \param db_srv_id	需要监控的service的数据库索引
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)

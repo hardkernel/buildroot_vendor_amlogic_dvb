@@ -169,6 +169,7 @@ extern AM_ErrorCode_t AM_SMC_Write(int dev_no, const uint8_t *data, int len, int
  *直接从智能卡读取数据，调用函数的线程会阻塞，直到读取到期望数目的数据，或到达超时时间。
  * \param dev_no 智能卡设备号
  * \param[out] data 数据缓冲区
+ * \param[out] act_len 返回实际读取数据长度
  * \param[in] len 希望读取的数据长度
  * \param timeout 读取超时时间，以毫秒为单位，<0表示永久等待。
  * \return
@@ -181,6 +182,7 @@ extern AM_ErrorCode_t AM_SMC_ReadEx(int dev_no, uint8_t *data, int *act_len, int
  *直接向智能卡发送数据，调用函数的线程会阻塞，直到全部数据被写入，或到达超时时间。
  * \param dev_no 智能卡设备号
  * \param[in] data 数据缓冲区
+ * \param[out] act_len 返回实际发送数据长度
  * \param[in] len 希望发送的数据长度
  * \param timeout 读取超时时间，以毫秒为单位，<0表示永久等待。
  * \return

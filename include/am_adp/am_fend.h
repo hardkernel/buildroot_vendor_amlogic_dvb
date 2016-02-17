@@ -280,7 +280,7 @@ extern AM_ErrorCode_t AM_FEND_DiseqcRecvSlaveReply(int dev_no, struct dvb_diseqc
 
 /**\brief 发送数字卫星设备控制tone burst
  * \param dev_no 前端设备号 
- * \param tone burst控制方式
+ * \param minicmd burst控制方式
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend.h)
@@ -346,7 +346,7 @@ extern AM_ErrorCode_t AM_FEND_BlindGetProcess(int dev_no, unsigned int *process)
 /**\brief 卫星盲扫信息 
  * \param dev_no 前端设备号
  * \param[out] para 盲扫频点信息缓存区
- * \param[in out] para in 盲扫频点信息缓存区大小，out 盲扫频点个数
+ * \param[in,out] count in 盲扫频点信息缓存区大小，out 盲扫频点个数
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend.h)

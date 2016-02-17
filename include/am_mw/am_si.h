@@ -305,7 +305,7 @@ extern AM_ErrorCode_t AM_SI_GetSectionHeader(AM_SI_Handle_t handle, uint8_t *buf
 
 /**\brief 设置默认的DVB编码方式，当前端流未按照DVB标准，即第一个
  * 字符没有指定编码方式时，可以调用该函数来指定一个强制转换的编码。
- * \param [in] code 默认进行强制转换的字符编码方式,如GB2312，BIG5等.
+ * \param [in] coding 默认进行强制转换的字符编码方式,如GB2312，BIG5等.
  * \return
  */
 extern void AM_SI_SetDefaultDVBTextCoding(const char *coding);
@@ -333,7 +333,7 @@ extern AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *ou
 extern AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info);
 
 /**\brief 按ATSC标准从一个ATSC visual channel中提取音视频
- * \param [in] es ES流
+ * \param [in] vcinfo 频道信息
  * \param [out] vid 提取出的视频PID
  * \param [out] vfmt 提取出的视频压缩格式
  * \param [out] aud_info 提取出的音频数据

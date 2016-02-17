@@ -208,12 +208,7 @@ AM_ErrorCode_t AM_TT_PreviousPage();
 AM_ErrorCode_t AM_TT_PerformColorLink(unsigned char color);
 
 /**\brief 注册图形相关接口函数
- * \param  fr 填充矩形函数
- * \param  dt 绘制字符函数
- * \param  cc 颜色索引转换函数 
- * \param  gfh 获取字体高度函数
- * \param  gfw 获取字体宽度函数
- * \param  mcc 颜色转换函数
+ * \param[in] ops 绘图操作函数结构指针
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tt.h)

@@ -198,13 +198,13 @@ typedef struct
 	struct dvb_frontend_parameters	*new_tps;	/**< 本次通知搜索到的新TP信息*/
 }AM_SCAN_DTVBlindScanProgress_t;
 
-/**\breif New program progress data*/
+/**\brief New program progress data*/
 typedef struct
 {
-	int service_id;
-	int service_type;	/**< See AM_SCAN_ServiceType*/
-	AM_Bool_t scrambled;
-	char name[1024];
+	int service_id;      /**< service id*/
+	int service_type;	 /**< See AM_SCAN_ServiceType*/
+	AM_Bool_t scrambled; /**< Is scrambled*/
+	char name[1024];     /**< Program name*/
 }AM_SCAN_ProgramProgress_t;
 
 /**\brief 当前搜索的频点信号信息*/

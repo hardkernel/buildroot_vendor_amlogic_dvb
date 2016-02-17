@@ -130,9 +130,9 @@ extern AM_ErrorCode_t AM_DVR_SetSource(int dev_no, AM_DVR_Source_t src);
 
 /**\brief 从DVR读取录像数据
  * \param dev_no DVR设备号
- * \param	[out] buf 缓冲区
+ * \param[out] buf 缓冲区
  * \param size	需要读取的数据长度
- * \param timeout 读取超时时间 ms 
+ * \param timeout_ms 读取超时时间 ms 
  * \return
  *   - 实际读取的字节数
  */

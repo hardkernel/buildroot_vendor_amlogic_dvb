@@ -239,7 +239,7 @@ extern AM_ErrorCode_t AM_FEND_Diseqccmd_SetLNBPort16(int dev_no, int lnbport,
                                                                   
 /**\brief 设置channel频率 (Diseqc1.1 M) 
  * \param dev_no 前端设备号
- * \param Freq unit KHZ 
+ * \param freq unit KHZ 
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)
@@ -377,7 +377,11 @@ extern AM_ErrorCode_t AM_FEND_Diseqccmd_SetODUUbxSignalOn(int dev_no);
                                                                  
 /**\brief 设置ODU (Diseqc extention) 
  * \param dev_no 前端设备号
- * \param ub_number user band number(0-7)   
+ * \param ub_number user band number(0-7)
+ * \param satellite_position_count 卫星位置数目
+ * \param input_bank_count input bank数目
+ * \param rf_type 前端RF类型
+ * \param ub_count user band数目
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend_diseqc_cmd.h)

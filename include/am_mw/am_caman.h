@@ -267,7 +267,7 @@ AM_ErrorCode_t AM_CAMAN_stopService(int service_id);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_caman.h)
  */
-AM_ErrorCode_t AM_CAMAN_stopCA(char *name);
+AM_ErrorCode_t AM_CAMAN_stopCA(char *caname);
 
 /*get/free Msgs from CAMAN/CA
     get -> use -> free
@@ -275,7 +275,7 @@ AM_ErrorCode_t AM_CAMAN_stopCA(char *name);
 
 /**\brief 获取CA消息，主动方式取得CA消息，回调方式见AM_CAMAN_setCallback
  * \param [out]    caname 消息由别名为caname的CA发出
- * \param [in out] msg    传入存放消息指针的指针，*msg指向传出消息。消息空间由调用者调用AM_CAMAN_freeMsg回收
+ * \param [in,out] msg    传入存放消息指针的指针，*msg指向传出消息。消息空间由调用者调用AM_CAMAN_freeMsg回收
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_caman.h)
@@ -299,7 +299,7 @@ AM_ErrorCode_t AM_CAMAN_freeMsg(AM_CA_Msg_t *msg);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_caman.h)
  */
-AM_ErrorCode_t AM_CAMAN_putMsg(char *name, AM_CA_Msg_t *msg);
+AM_ErrorCode_t AM_CAMAN_putMsg(char *caname, AM_CA_Msg_t *msg);
 
 /*register/unregister CAs*/
 
@@ -311,7 +311,7 @@ AM_ErrorCode_t AM_CAMAN_putMsg(char *name, AM_CA_Msg_t *msg);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_caman.h)
  */
-AM_ErrorCode_t AM_CAMAN_registerCA(char *name, AM_CA_t *ca, AM_CA_Opt_t *opt);
+AM_ErrorCode_t AM_CAMAN_registerCA(char *caname, AM_CA_t *ca, AM_CA_Opt_t *opt);
 
 /**\brief 从CA管理模块解除注册CA
  * \param [in] caname 指定CA别名
@@ -319,7 +319,7 @@ AM_ErrorCode_t AM_CAMAN_registerCA(char *name, AM_CA_t *ca, AM_CA_Opt_t *opt);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_caman.h)
  */
-AM_ErrorCode_t AM_CAMAN_unregisterCA(char *name);
+AM_ErrorCode_t AM_CAMAN_unregisterCA(char *caname);
 
 /**\brief 设定CA消息回调函数，回调方式取得CA消息，主动获取见AM_CAMAN_getMsg
  * \param [in] caname 注册到指定CA或NULL=注册到已注册所有CA
@@ -328,7 +328,7 @@ AM_ErrorCode_t AM_CAMAN_unregisterCA(char *name);
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_caman.h)
  */
-AM_ErrorCode_t AM_CAMAN_setCallback(char *name, int (*cb)(char *name, AM_CA_Msg_t *msg));
+AM_ErrorCode_t AM_CAMAN_setCallback(char *caname, int (*cb)(char *name, AM_CA_Msg_t *msg));
 
 #ifdef __cplusplus
 }

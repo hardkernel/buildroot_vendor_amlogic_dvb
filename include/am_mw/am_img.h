@@ -89,7 +89,6 @@ extern AM_ErrorCode_t AM_IMG_LoadGIF(const char *name, const AM_IMG_DecodePara_t
 /**\brief 加载JPEG图片
  * \param[in] name 图片文件名
  * \param[in] para 解码参数
- * \param flags 解码标志，AM_IMG_FL_HW表示用硬件进行解码
  * \param[out] img 返回加载的绘图表面
  * \return
  *   - AM_SUCCESS 成功

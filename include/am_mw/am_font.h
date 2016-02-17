@@ -188,7 +188,7 @@ extern AM_ErrorCode_t AM_FONT_Draw(int font_id, AM_OSD_Surface_t *surface, const
 
 /**\brief 取指定字体的行间距
  * \param font_id 字体句柄
- * \param[out] 返回行间距值
+ * \param[out] lineskip 返回行间距值
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_font.h)

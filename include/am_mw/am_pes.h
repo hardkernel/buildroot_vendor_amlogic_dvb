@@ -48,7 +48,7 @@ typedef struct
 }AM_PES_Para_t;
 
 /**\brief 创建一个PES分析器
- * \param[out] 返回创建的句柄
+ * \param[out] handle 返回创建的句柄
  * \param[in] para PES分析器参数
  * \return
  *   - AM_SUCCESS 成功
@@ -57,7 +57,7 @@ typedef struct
 AM_ErrorCode_t AM_PES_Create(AM_PES_Handle_t *handle, AM_PES_Para_t *para);
 
 /**\brief 释放一个PES分析器
- * \param 句柄
+ * \param handle 句柄
  * \return
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_sub.h)
@@ -65,7 +65,7 @@ AM_ErrorCode_t AM_PES_Create(AM_PES_Handle_t *handle, AM_PES_Para_t *para);
 AM_ErrorCode_t AM_PES_Destroy(AM_PES_Handle_t handle);
 
 /**\brief 分析PES数据
- * \param 句柄
+ * \param handle 句柄
  * \param[in] buf PES数据缓冲区
  * \param size 缓冲区中数据大小
  * \return
@@ -75,7 +75,7 @@ AM_ErrorCode_t AM_PES_Destroy(AM_PES_Handle_t handle);
 AM_ErrorCode_t AM_PES_Decode(AM_PES_Handle_t handle, uint8_t *buf, int size);
 
 /**\brief 取得分析器中用户定义数据
- * \param 句柄
+ * \param handle 句柄
  * \return 用户定义数据
  */
 void*          AM_PES_GetUserData(AM_PES_Handle_t handle);
