@@ -192,7 +192,7 @@ void *adec_handle = NULL;
 #define LR_FORMAT_INDICATOR     0x00000200
 #define BT_FORMAT_INDICATOR     0x00000400
 
-
+#define VALID_PID(_pid_) ((_pid_)>0 && (_pid_)<0x1fff)
 
 /****************************************************************************
  * Type definitions
@@ -347,6 +347,8 @@ typedef struct
 	int					rtime;
 	int					aud_pid;
 	int					aud_fmt;
+	int					aud_idx;
+	AM_Bool_t				aud_valid;
 	AV_PlayCmd_t		cmd;
 	AV_PlayCmd_t		last_cmd;
 	pthread_t			thread;
@@ -1307,13 +1309,15 @@ static AV_InjectData_t* aml_create_inject_data(void)
 static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t *para)
 {
 	int vfd=-1, afd=-1;
+	AM_Bool_t has_video = VALID_PID(para->vid_id);
+	AM_Bool_t has_audio = (VALID_PID(para->aud_id) && audio_get_format_supported(para->aud_fmt));
 
 	inj->pkg_fmt = para->pkg_fmt;
 
 	switch(para->pkg_fmt)
 	{
 		case PFORMAT_ES:
-			if(para->vid_id>=0)
+			if(has_video)
 			{
 				vfd = open(STREAM_VBUF_FILE, O_RDWR);
 				if(vfd==-1)
@@ -1323,7 +1327,7 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 				}
 				inj->vid_fd = vfd;
 			}
-			if(para->aud_id>=0)
+			if(has_audio)
 			{
 				afd = open(STREAM_ABUF_FILE, O_RDWR);
 				if(afd==-1)
@@ -1366,7 +1370,7 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 		return AM_AV_ERR_NOT_SUPPORTED;
 	}
 
-	if(para->vid_id>=0)
+	if(has_video)
 	{
 		dec_sysinfo_t am_sysinfo;
 
@@ -1415,7 +1419,7 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 
 	}
 
-	if(para->aud_id>=0)
+	if(has_audio)
 	{
 		if(ioctl(afd, AMSTREAM_IOC_AFORMAT, para->aud_fmt)==-1)
 		{
@@ -1461,7 +1465,7 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 		}
 	}
 
-	if(para->aud_id>=0)
+	if(has_audio)
 	{
 		adec_start_decode(afd, para->aud_fmt);
 	}
@@ -2100,6 +2104,8 @@ static AV_TimeshiftData_t* aml_create_timeshift_data(void)
 
 	memset(tshift, 0, sizeof(AV_TimeshiftData_t));
 	tshift->av_fd = -1;
+	tshift->aud_idx = -1;
+	tshift->aud_valid = AM_FALSE;
 
 	return tshift;
 }
@@ -2164,6 +2170,8 @@ static int aml_timeshift_get_trick_stat(AV_TimeshiftData_t *tshift)
 static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_TimeshiftPara_t *para, AM_Bool_t create_thread, AM_Bool_t start_audio)
 {
 	char buf[64];
+	AM_Bool_t has_video = VALID_PID(para->media_info.vid_pid);
+	AM_Bool_t has_audio = tshift->aud_valid;
 
 	AM_DEBUG(1, "Openning demux%d",para->dmx_id);
 	snprintf(buf, sizeof(buf), "/dev/dvb0.demux%d", para->dmx_id);
@@ -2202,19 +2210,19 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 	AM_DEBUG(1, "Setting play param");
 #if defined(ANDROID) || defined(CHIP_8626X)
 	/*Set tsync enable/disable*/
-	if (para->media_info.vid_pid >= 0x1fff || para->media_info.aud_cnt <= 0)
-	{
-		AM_DEBUG(1, "Set tsync enable to 0");
-		aml_set_tsync_enable(0);
-	}
-	else
+	if (has_video && has_audio)
 	{
 		AM_DEBUG(1, "Set tsync enable to 1");
 		aml_set_tsync_enable(1);
 	}
+	else
+	{
+		AM_DEBUG(1, "Set tsync enable to 0");
+		aml_set_tsync_enable(0);
+	}
 #endif
 
-	if(para->media_info.vid_pid < 0x1fff)
+	if(has_video)
 	{
 		if(ioctl(tshift->av_fd, AMSTREAM_IOC_VFORMAT, para->media_info.vid_fmt)==-1)
 		{
@@ -2228,14 +2236,14 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 		}
 	}
 
-	if(para->media_info.aud_cnt > 0)
+	if(has_audio)
 	{
-		if(ioctl(tshift->av_fd, AMSTREAM_IOC_AFORMAT, para->media_info.audios[0].fmt)==-1)
+		if(ioctl(tshift->av_fd, AMSTREAM_IOC_AFORMAT, tshift->aud_fmt)==-1)
 		{
 			AM_DEBUG(1, "set audio format failed");
 			return AM_AV_ERR_SYS;
 		}
-		if(ioctl(tshift->av_fd, AMSTREAM_IOC_AID, para->media_info.audios[0].pid)==-1)
+		if(ioctl(tshift->av_fd, AMSTREAM_IOC_AID, tshift->aud_pid)==-1)
 		{
 			AM_DEBUG(1, "set audio PID failed");
 			return AM_AV_ERR_SYS;
@@ -2254,7 +2262,7 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 		return AM_AV_ERR_SYS;
 	}
 
-	if(para->media_info.aud_cnt > 0 && start_audio)
+	if(has_audio && start_audio)
 	{
 		audio_info_t info;
 
@@ -2274,12 +2282,6 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 		tshift->state = AV_TIMESHIFT_STAT_STOP;
 		tshift->speed = 0;
 		tshift->duration = para->media_info.duration;
-
-		if (para->media_info.aud_cnt > 0)
-		{
-			tshift->aud_pid = para->media_info.audios[0].pid;
-			tshift->aud_fmt = para->media_info.audios[0].fmt;
-		}
 
 		AM_DEBUG(1, "timeshifting mode %d, duration %d", para->mode, tshift->duration);
 		if (para->mode == AM_AV_TIMESHIFT_MODE_PLAYBACK || tshift->duration <= 0)
@@ -2423,7 +2425,7 @@ static int am_timeshift_fffb(AV_TimeshiftData_t *tshift)
 
 static int aml_timeshift_pause_av(AV_TimeshiftData_t *tshift)
 {
-	if (tshift->aud_pid < 0x1fff)
+	if (tshift->aud_valid)
 	{
 #if defined(ADEC_API_NEW)
 		audio_decode_pause(adec_handle);
@@ -2442,7 +2444,7 @@ static int aml_timeshift_pause_av(AV_TimeshiftData_t *tshift)
 
 static int aml_timeshift_resume_av(AV_TimeshiftData_t *tshift)
 {
-	if (tshift->aud_pid < 0x1fff)
+	if (tshift->aud_valid)
 	{
 #if defined(ADEC_API_NEW)
 		audio_decode_resume(adec_handle);
@@ -2567,7 +2569,7 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 			break;
 		case AV_PLAY_SWITCH_AUDIO:
 			/* just restart play using the new audio para */
-			AM_DEBUG(1, "Switch audio to pid=%d, fmt=%d",tshift->aud_pid, tshift->aud_fmt);
+			AM_DEBUG(1, "Switch audio to pid=%d, fmt=%d, valid=%d",tshift->aud_pid, tshift->aud_fmt, tshift->aud_valid);
 			/*Set the left to 0, we will read from the new point*/
 			tshift->left = 0;
 			tshift->inject_size = 0;
@@ -3030,6 +3032,8 @@ static AM_ErrorCode_t aml_timeshift_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, v
 				{
 					data->aud_pid = audio_para->apid;
 					data->aud_fmt = audio_para->afmt;
+					data->aud_idx = i;
+					data->aud_valid = (VALID_PID(data->aud_pid) && audio_get_format_supported(data->aud_fmt));
 					break;
 				}
 			}
@@ -3513,7 +3517,7 @@ static AM_ErrorCode_t aml_open_ts_mode(AM_AV_Device_t *dev)
 	ts->fd     = -1;
 	ts->vid_fd = open(AMVIDEO_FILE, O_RDWR);
 
-	#ifndef MPTSONLYAUDIOVIDEO
+#ifndef MPTSONLYAUDIOVIDEO
 	ts->fd = open(STREAM_TS_FILE, O_RDWR);
 	if(ts->fd==-1)
 	{
@@ -3527,7 +3531,7 @@ static AM_ErrorCode_t aml_open_ts_mode(AM_AV_Device_t *dev)
 	{
 		AM_DEBUG(1, "set sub PID failed");
 	}
-	#endif
+#endif
 
 	dev->ts_player.drv_data = (void*)ts;
 
@@ -3538,11 +3542,14 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 {
 	AV_TSData_t *ts;
 	int val;
+	AM_Bool_t has_video = VALID_PID(tp->vpid);
+	AM_Bool_t has_audio = (VALID_PID(tp->apid) && audio_get_format_supported(tp->afmt));
+
+	AM_DEBUG(1, "aml start ts: V[%d:%d] A[%d:%d] P[%d]", tp->vpid, tp->vfmt, tp->apid, tp->afmt, tp->pcrpid);
 
 	ts = (AV_TSData_t*)dev->ts_player.drv_data;
 
-	if((tp->vpid > 0) && (tp->vpid<0x1fff)
-			&& (tp->apid > 0) && (tp->apid<0x1fff))
+	if(has_video && has_audio)
 	{
 		AM_DEBUG(1, "%s, enable pcr_master", __FUNCTION__);
 		gAVPcrEnable = AM_TRUE;
@@ -3562,29 +3569,18 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 #ifdef MPTSONLYAUDIOVIDEO
 	if(ts->fd == -1)
 	{
-		AM_Bool_t have_video = AM_FALSE, have_audio = AM_FALSE;
 
-		if((tp->vpid > 0) && (tp->vpid<0x1fff))
-		{
-			have_video = AM_TRUE;
-		}
+		AM_DEBUG(1, "aml_start_ts_mode used MPTSONLYAUDIOVIDEO %d %d %d %d", tp->vpid, has_video, tp->apid, has_audio);
 
-		if((tp->apid > 0) && (tp->apid<0x1fff))
-		{
-			have_audio = AM_TRUE;
-		}
-
-		AM_DEBUG(1, "aml_start_ts_mode used MPTSONLYAUDIOVIDEO %d %d %d %d", tp->vpid, have_video, tp->apid, have_audio);
-
-		if(have_video && have_audio)
+		if(has_video && has_audio)
 		{
 			ts->fd = open(STREAM_TS_FILE, O_RDWR);
 		}
-		else if((!have_video) && have_audio)
+		else if((!has_video) && has_audio)
 		{
 			ts->fd = open(STREAM_TSONLYAUDIO_FILE, O_RDWR);
 		}
-		else if((!have_audio) && have_video)
+		else if((!has_audio) && has_video)
 		{
 			ts->fd = open(STREAM_TSONLYVIDEO_FILE, O_RDWR);
 		}
@@ -3604,21 +3600,21 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 
 #if defined(ANDROID) || defined(CHIP_8626X)
 	/*Set tsync enable/disable*/
-	if (tp->vpid >= 0x1fff || tp->apid >= 0x1fff)
-	{
-		AM_DEBUG(1, "Set tsync enable to 0");
-		aml_set_tsync_enable(0);
-	}
-	else
+	if (has_video && has_audio)
 	{
 		AM_DEBUG(1, "Set tsync enable to 1");
 		aml_set_tsync_enable(1);
+	}
+	else
+	{
+		AM_DEBUG(1, "Set tsync enable to 0");
+		aml_set_tsync_enable(0);
 	}
 #endif
 
 
 
-	if(tp->vpid && (tp->vpid<0x1fff)){
+	if(has_video){
 		val = tp->vfmt;
 		if(ioctl(ts->fd, AMSTREAM_IOC_VFORMAT, val)==-1)
 		{
@@ -3634,7 +3630,7 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	}
 
 	/*if ((tp->vfmt == VFORMAT_H264) || (tp->vfmt == VFORMAT_VC1))*/
-	if((tp->vpid > 0) && (tp->vpid<0x1fff)){
+	if(has_video){
 
 		memset(&am_sysinfo,0,sizeof(dec_sysinfo_t));
 		if(tp->vfmt == VFORMAT_VC1)
@@ -3669,7 +3665,7 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 		}
 	}
 
-	if(tp->apid && (tp->apid<0x1fff)){
+	if(has_audio){
 		if((tp->afmt==AFORMAT_AC3) || (tp->afmt==AFORMAT_DTS)){
 			//set_arc_freq(1);
 		}
@@ -3700,9 +3696,12 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 		}
 		AM_FileEcho(TSYNC_MODE_FILE, "2");
 	}
-	property_set("sys.amplayer.drop_pcm", "1");
-	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
-	adec_start_decode(ts->fd, tp->afmt);
+
+	if(has_audio) {
+		property_set("sys.amplayer.drop_pcm", "1");
+		AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
+		adec_start_decode(ts->fd, tp->afmt);
+	}
 //#endif /*ENABLE_PCR*/
 
 	if(ioctl(ts->fd, AMSTREAM_IOC_PORT_INIT, 0)==-1)
@@ -3794,8 +3793,8 @@ static void* aml_av_monitor_thread(void *arg)
 	AM_AV_Device_t *dev = (AM_AV_Device_t *)arg;
 	AM_Bool_t adec_start = AM_FALSE;
 	AM_Bool_t av_paused = AM_TRUE;
-	AM_Bool_t has_audio = dev->ts_player.play_para.apid < 0x1fff;
-	AM_Bool_t has_video = dev->ts_player.play_para.vpid < 0x1fff;
+	AM_Bool_t has_audio = VALID_PID(dev->ts_player.play_para.apid) && audio_get_format_supported(dev->ts_player.play_para.afmt);
+	AM_Bool_t has_video = VALID_PID(dev->ts_player.play_para.vpid);
 	AM_Bool_t bypass_di = AM_FALSE;
 	AM_Bool_t drop_b_frame = AM_FALSE;
 	AM_Bool_t is_hd_video = AM_FALSE;
@@ -4594,6 +4593,12 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 			tshift_p = (AM_AV_TimeshiftPara_t*)para;
 			tshift = dev->timeshift_player.drv_data;
 			m_tshift = tshift;
+			if(tshift_p->media_info.aud_cnt > 0) {
+				tshift->aud_idx = 0;
+				tshift->aud_pid = tshift_p->media_info.audios[0].pid;
+				tshift->aud_fmt = tshift_p->media_info.audios[0].fmt;
+				tshift->aud_valid = (VALID_PID(tshift->aud_pid) && audio_get_format_supported(tshift->aud_fmt));
+			}
 			if(aml_start_timeshift(tshift, tshift_p, AM_TRUE, AM_TRUE)!=AM_SUCCESS)
 				return AM_AV_ERR_SYS;
 		break;
@@ -5806,9 +5811,12 @@ aml_set_vpath(AM_AV_Device_t *dev)
 }
 
 /**\brief 切换TS播放的音频*/
-static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt)
+static AM_ErrorCode_t aml_switch_ts_audio_legacy(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt)
 {
 	int fd = -1;
+	AM_Bool_t audio_valid = (VALID_PID(apid) && audio_get_format_supported(afmt));
+
+	AM_DEBUG(1, "switch ts audio: A[%d:%d]", apid, afmt);
 
 	if(dev->ts_player.drv_data)
 		fd = ((AV_TSData_t*)dev->ts_player.drv_data)->fd;
@@ -5830,7 +5838,7 @@ static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM
 	adec_stop_decode();
 
 	/*Set Audio PID & fmt*/
-	if(apid && (apid<0x1fff))
+	if(audio_valid)
 	{
 		if(ioctl(fd, AMSTREAM_IOC_AFORMAT, (int)afmt)==-1)
 		{
@@ -5876,8 +5884,23 @@ static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM
 	return AM_SUCCESS;
 }
 
+static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt)
+{
+	AV_TSPlayPara_t *tp = &dev->ts_player.play_para;
+	AM_ErrorCode_t err = AM_SUCCESS;
 
+	AM_DEBUG(1, "switch ts audio: A[%d:%d]", apid, afmt);
 
+	err = aml_close_ts_mode(dev, AM_TRUE);
+
+	tp->apid = apid;
+	tp->afmt = afmt;
+
+	err = aml_open_ts_mode(dev);
+	err = aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_TRUE);
+
+	return err;
+}
 
 
 /**\brief set vdec_h264 error_recovery_mode :0 or 2 -> skip display Mosaic  ,3: display mosaic in case of vdec hit error*/
