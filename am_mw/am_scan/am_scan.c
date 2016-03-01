@@ -5492,8 +5492,10 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, AM_SCAN_Handle_t *hand
 	scanner->result.reserved = (void*)scanner;
     scanner->atvctl.am_scan_atv_cvbs_lock =  para->atv_para.am_scan_atv_cvbs_lock;
 	
-	if (! para->store_cb)
+	if (! para->store_cb) {
 		scanner->store_cb = am_scan_default_store;
+		AM_DEBUG(1, "Scan using default_store_proc");
+	}
 	else
 		scanner->store_cb = para->store_cb;
 	

@@ -858,7 +858,7 @@ iso6937_end:
 		char **pout=&dest;
 		char *o_dest = dest;
 		
-		handle=iconv_open("utf-8","ucs-2");
+		handle=iconv_open("utf-8","utf-16");
 
 		if (handle == (iconv_t)-1)
 		{
@@ -1212,7 +1212,7 @@ AM_ErrorCode_t AM_SI_GetSectionHeader(AM_SI_Handle_t handle, uint8_t *buf, uint1
  */
 void AM_SI_SetDefaultDVBTextCoding(const char *coding)
 {
-	AM_DEBUG(1, "AM_SI_SetDefaultDVBTextCoding coding == %s \n",coding);
+	AM_DEBUG(1, "AM_SI_SetDefaultDVBTextCoding coding == [%s] \n",coding);
 	snprintf(forced_dvb_text_coding, sizeof(forced_dvb_text_coding), "%s", coding);
 }
 
@@ -1238,7 +1238,7 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 
     
 	if (!in_code || !out_code || in_len <= 0 || out_len <= 0){
-		AM_DEBUG(1,"---%s--AM_FAILURE--\n",__FUNCTION__);
+		AM_DEBUG(1,"%s : bad param\n", __FUNCTION__);
 		return AM_FAILURE;
 	}
 
@@ -1293,7 +1293,7 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 			if (strcmp(forced_dvb_text_coding, ""))
 			{
 				/*强制将输入按默认编码处理*/
-				AM_DEBUG(1,"-fbyte >= 0x20-forced_dvb_text_coding---cod=%s--\n",cod);
+				AM_DEBUG(1,"-fbyte >= 0x20-forced_dvb_text_coding-[%s]-\n",forced_dvb_text_coding);
 				strcpy(cod, forced_dvb_text_coding);
 			}
 			else
@@ -1388,7 +1388,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 	memset(lang_tmp, 0, sizeof(lang_tmp));
 	switch (es->i_type)
 	{
-		AM_DEBUG(1,"es->i_type : 0x02x\n",es->i_type);
+		AM_DEBUG(1, "es->i_type : 0x%02x", es->i_type);
 		/*override by parse descriptor*/
 		case 0x6:
 			AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)

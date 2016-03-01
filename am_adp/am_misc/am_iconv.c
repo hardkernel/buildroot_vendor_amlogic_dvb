@@ -31,8 +31,10 @@ am_ucnv_dlink(void)
 {
 	static void* handle = NULL;
 
-	if(handle == NULL)
+	if(handle == NULL) {
 		handle = dlopen("libicuuc.so", RTLD_LAZY);
+		setenv("ICU_DATA", "/system/usr/icu", 1);
+	}
 	
 	assert(handle);
 
