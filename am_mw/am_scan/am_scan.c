@@ -3765,6 +3765,24 @@ void am_scan_atv_check_freq_range(AM_SCAN_Scanner_t *scanner, int check_type, ui
         {
             *check_freq = max_freq;
         }
+    }else if (check_type == AM_SCAN_ATV_FREQ_INCREASE_CHECK) {
+        if (*check_freq > max_freq)
+        {
+            *check_freq = max_freq;
+        }
+        else if (*check_freq < min_freq)
+        {
+            *check_freq = min_freq;
+        }
+    } else if (check_type == AM_SCAN_ATV_FREQ_DECREASE_CHECK) {
+        if (*check_freq < max_freq)
+        {
+            *check_freq = max_freq;
+        }
+        else if (*check_freq > min_freq)
+        {
+            *check_freq = min_freq;
+        }
     }
 }
 
@@ -4517,7 +4535,7 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 	if (atv_start_para.mode == AM_SCAN_ATVMODE_FREQ)
 	{
 		scanner->atvctl.direction = 1;
-		scanner->atvctl.range_check = AM_SCAN_ATV_FREQ_RANGE_CHECK;
+		scanner->atvctl.range_check = AM_SCAN_ATV_FREQ_INCREASE_CHECK;
 		scanner->atvctl.step = 0;
 		scanner->atvctl.min_freq = 0;
 		scanner->atvctl.max_freq = 0;
@@ -4527,7 +4545,7 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 	else if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL)
 	{
 		scanner->atvctl.direction = (atv_start_para.direction>0) ? 1 : -1;
-		scanner->atvctl.range_check = AM_SCAN_ATV_FREQ_LOOP_CHECK;
+		scanner->atvctl.range_check = (atv_start_para.direction>0) ? AM_SCAN_ATV_FREQ_INCREASE_CHECK : AM_SCAN_ATV_FREQ_DECREASE_CHECK;
 		scanner->atvctl.step = 0;
 		scanner->atvctl.min_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx].fe_para)->frequency;
 		scanner->atvctl.max_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+1].fe_para)->frequency;
@@ -4543,7 +4561,7 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 	else
 	{
 		scanner->atvctl.direction = 1;
-		scanner->atvctl.range_check = AM_SCAN_ATV_FREQ_RANGE_CHECK;
+		scanner->atvctl.range_check = AM_SCAN_ATV_FREQ_INCREASE_CHECK;
 		scanner->atvctl.step = 0;
 		scanner->atvctl.min_freq = (int)dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx].fe_para)->frequency;
 		scanner->atvctl.max_freq = (int)dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+1].fe_para)->frequency;
