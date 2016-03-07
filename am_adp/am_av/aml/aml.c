@@ -509,7 +509,7 @@ static int get_amstream(AM_AV_Device_t *dev)
 	return -1;
 }
 
-static void adec_start_decode(int fd, int fmt)
+static void adec_start_decode(int fd, int fmt, int has_video)
 {
 #if !defined(ADEC_API_NEW)
 		adec_cmd("start");
@@ -519,6 +519,7 @@ static void adec_start_decode(int fd, int fmt)
 		memset(&param, 0, sizeof(param));
 		param.handle = fd;
 		param.format = fmt;
+		param.has_video = has_video;
 		audio_decode_init(&adec_handle, &param);
 		audio_set_av_sync_threshold(adec_handle, AV_SYNC_THRESHOLD);
 		audio_decode_set_volume(adec_handle, 1.);
@@ -1467,7 +1468,7 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AM_AV_InjectPara_t 
 
 	if(has_audio)
 	{
-		adec_start_decode(afd, para->aud_fmt);
+		adec_start_decode(afd, para->aud_fmt, has_video);
 	}
 
 	inj->aud_id = para->aud_id;
@@ -2274,7 +2275,7 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AM_AV_Time
 			AM_DEBUG(1, "set audio info failed");
 		}
 
-		adec_start_decode(tshift->av_fd, tshift->aud_fmt);
+		adec_start_decode(tshift->av_fd, tshift->aud_fmt, has_video);
 	}
 
 	if (create_thread)
@@ -3700,7 +3701,7 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	if(has_audio) {
 		property_set("sys.amplayer.drop_pcm", "1");
 		AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
-		adec_start_decode(ts->fd, tp->afmt);
+		adec_start_decode(ts->fd, tp->afmt, has_video);
 	}
 //#endif /*ENABLE_PCR*/
 
@@ -4055,7 +4056,7 @@ static void* aml_av_monitor_thread(void *arg)
 				info.valid  = 1;
 				ioctl(ts->fd, AMSTREAM_IOC_AUDIO_INFO, (unsigned long)&info);
 
-				adec_start_decode(ts->fd, dev->ts_player.play_para.afmt);
+				adec_start_decode(ts->fd, dev->ts_player.play_para.afmt, has_video);
 
 				if(av_paused){
 					audio_decode_pause(adec_handle);
@@ -4511,7 +4512,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 				return AM_AV_ERR_SYS;
 			}
 			aml_start_data_source(src, dev->aud_player.para.data, dev->aud_player.para.len, dev->aud_player.para.times);
-			adec_start_decode(src->fd, val);
+			adec_start_decode(src->fd, val, 0);
 		break;
 		case AV_PLAY_TS:
 			tp = (AV_TSPlayPara_t *)para;
@@ -5815,6 +5816,7 @@ static AM_ErrorCode_t aml_switch_ts_audio_legacy(AM_AV_Device_t *dev, uint16_t a
 {
 	int fd = -1;
 	AM_Bool_t audio_valid = (VALID_PID(apid) && audio_get_format_supported(afmt));
+	AM_Bool_t has_video = VALID_PID(dev->ts_player.play_para.vpid);
 
 	AM_DEBUG(1, "switch ts audio: A[%d:%d]", apid, afmt);
 
@@ -5869,7 +5871,7 @@ static AM_ErrorCode_t aml_switch_ts_audio_legacy(AM_AV_Device_t *dev, uint16_t a
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
 	AM_FileEcho(TSYNC_MODE_FILE, "2");
 
-	adec_start_decode(fd, afmt);
+	adec_start_decode(fd, afmt, has_video);
 #endif /*ENABLE_PCR*/
 
 
