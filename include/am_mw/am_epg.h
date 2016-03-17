@@ -131,6 +131,31 @@ enum AM_EPG_ModeOp
 	AM_EPG_MODE_OP_SET,		 /**< 设置EPG监控模式*/
 };
 
+enum AM_EPG_TAB
+{
+	AM_EPG_TAB_PAT,		/**<PAT*/
+	AM_EPG_TAB_PMT,		/**<PMT*/
+	AM_EPG_TAB_CAT,		/**<CAT*/
+	AM_EPG_TAB_SDT,		/**<SDT*/
+	AM_EPG_TAB_NIT,		/**<NIT*/
+	AM_EPG_TAB_TDT,		/**<TDT*/
+	AM_EPG_TAB_EIT,		/**<EIT*/
+	AM_EPG_TAB_STT,		/**<STT*/
+	AM_EPG_TAB_RRT,		/**<RRT*/
+	AM_EPG_TAB_MGT,		/**<MGT*/
+	AM_EPG_TAB_VCT,		/**<VCT*/
+	AM_EPG_TAB_PSIP_EIT,	/**<PSIPEIT*/
+	AM_EPG_TAB_PSIP_ETT,	/**<PSIPETT*/
+	AM_EPG_TAB_MAX
+};
+
+typedef struct AM_EPG_Event_s AM_EPG_Event_t;
+
+typedef void (*AM_EPG_Events_UpdateCB_t) (AM_EPG_Handle_t handle, int event_count, AM_EPG_Event_t *pevents);
+typedef void (*AM_EPG_PMT_UpdateCB_t) (AM_EPG_Handle_t handle, dvbpsi_pmt_t *pmts);
+typedef void (*AM_EPG_TAB_UpdateCB_t) (AM_EPG_Handle_t handle, int type, void *tables, void *user_data);
+
+
 /**\brief EPG创建参数*/
 typedef struct
 {
@@ -141,7 +166,7 @@ typedef struct
 	char text_langs[128]; /**< */
 }AM_EPG_CreatePara_t;
 
-typedef struct {
+struct AM_EPG_Event_s {
 	int src;
 	unsigned short srv_id;
 	unsigned short ts_id;
@@ -159,10 +184,8 @@ typedef struct {
 	int sub_status;
 	int source_id;
 	char rrt_ratings[1024];
-}AM_EPG_Event_t;
+};
 
-typedef void (*AM_EPG_Events_UpdateCB_t) (AM_EPG_Handle_t handle, int event_count, AM_EPG_Event_t *pevents);
-typedef void (*AM_EPG_PMT_UpdateCB_t) (AM_EPG_Handle_t handle, dvbpsi_pmt_t *pmts);
 
 /****************************************************************************
  * Function prototypes  
@@ -301,6 +324,8 @@ extern AM_ErrorCode_t AM_EPG_MonitorServiceByID(AM_EPG_Handle_t handle, int ts_i
 extern AM_ErrorCode_t AM_EPG_SetEventsCallback(AM_EPG_Handle_t handle, AM_EPG_Events_UpdateCB_t cb);
 
 extern void AM_EPG_FreeEvents(int event_count, AM_EPG_Event_t *pevents);
+
+extern AM_ErrorCode_t AM_EPG_SetTablesCallback(AM_EPG_Handle_t handle, int table_type, AM_EPG_TAB_UpdateCB_t cb, void *user_data);
 
 #ifdef __cplusplus
 }

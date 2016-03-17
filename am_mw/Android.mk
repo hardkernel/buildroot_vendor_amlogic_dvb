@@ -252,13 +252,14 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_ci/am_ci.c \
 		   am_ci/ca_ci.c \
 		   am_cc/am_cc.c \
-		   am_upd/am_upd.c\
-		   am_closecaption/am_cc.c \
-		   am_closecaption/am_cc_decoder.c \
-		   am_closecaption/am_xds.c \
-		   am_closecaption/am_cc_slice.c \
-		   am_closecaption/am_vbi/linux_vbi/linux_vbi.c \
-		   am_closecaption/am_vbi/am_vbi_api.c
+		   am_upd/am_upd.c \
+		   am_freesat/freesat.c\
+                   am_closecaption/am_cc.c \
+                   am_closecaption/am_cc_decoder.c \
+                   am_closecaption/am_xds.c \
+                   am_closecaption/am_cc_slice.c \
+                   am_closecaption/am_vbi/linux_vbi/linux_vbi.c \
+                   am_closecaption/am_vbi/am_vbi_api.c
 
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1 #

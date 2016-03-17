@@ -154,7 +154,21 @@ struct AM_EPG_Monitor_s
 	int                      mon_service_sid;
 	int                      curr_ts_tsid;
 	AM_EPG_PMT_UpdateCB_t    pmt_cb;
+
+	struct {
+		AM_EPG_TAB_UpdateCB_t cb;
+		void                  *user_data;
+	}tab_cbs[AM_EPG_TAB_MAX];
+
+#define TAB_CB(_mon, _type, _tab) do { \
+	if ((_mon)->tab_cbs[_type].cb) \
+		(_mon)->tab_cbs[_type].cb((_mon), _type, (void *)(_tab), (_mon)->tab_cbs[_type].user_data); \
+	} while(0)
+#define IS_CB_SET(_mon, _type) ((_mon)->tab_cbs[_type].cb)
+
+	int                      disable_def_proc;
 };
+
 
 /**\brief 当前时间管理*/
 typedef struct
