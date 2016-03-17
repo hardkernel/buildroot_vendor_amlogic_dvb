@@ -473,6 +473,19 @@ static AV_TimeshiftData_t *m_tshift = NULL;
  * Static functions
  ***************************************************************************/
 
+static AM_Bool_t show_first_frame_nosync(void)
+{
+	char buf[32];
+
+	if(AM_FileRead("/sys/class/video/show_first_frame_nosync", buf, sizeof(buf)) >= 0){
+		int v = atoi(buf);
+
+		return (v == 1) ? AM_TRUE : AM_FALSE;
+	}
+
+	return AM_FALSE;
+}
+
 static int get_amstream(AM_AV_Device_t *dev)
 {
 	if(dev->mode&AV_PLAY_TS)
@@ -3699,7 +3712,9 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	}
 
 	if(has_audio) {
-		property_set("sys.amplayer.drop_pcm", "1");
+		if(!show_first_frame_nosync()) {
+			property_set("sys.amplayer.drop_pcm", "1");
+		}
 		AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
 		adec_start_decode(ts->fd, tp->afmt, has_video);
 	}
@@ -3830,7 +3845,9 @@ static void* aml_av_monitor_thread(void *arg)
 	int avs_fmt = 0;
 
 #ifndef ENABLE_PCR
-	property_set("sys.amplayer.drop_pcm", "1");
+	if(!show_first_frame_nosync()) {
+		property_set("sys.amplayer.drop_pcm", "1");
+	}
 #else
 	av_paused  = AM_FALSE;
 	adec_start = AM_TRUE;
@@ -5867,7 +5884,9 @@ static AM_ErrorCode_t aml_switch_ts_audio_legacy(AM_AV_Device_t *dev, uint16_t a
 	dev->ts_player.play_para.afmt = afmt;
 
 #ifdef ENABLE_PCR
-	property_set("sys.amplayer.drop_pcm", "1");
+	if(!show_first_frame_nosync()) {
+		property_set("sys.amplayer.drop_pcm", "1");
+	}
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
 	AM_FileEcho(TSYNC_MODE_FILE, "2");
 
