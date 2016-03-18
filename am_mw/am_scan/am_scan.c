@@ -207,16 +207,16 @@ static int dvbc_std_freqs[] =
 /*SQLite3 stmts*/
 const char *sql_stmts[MAX_STMT] = 
 {
-	"select db_id from net_table where src=? and network_id=?",
-	"insert into net_table(network_id, src) values(?,?)",
-	"update net_table set name=? where db_id=?",
-	"select db_id from ts_table where src=? and freq=? and db_sat_para_id=? and polar=?",
-	"insert into ts_table(src,freq,db_sat_para_id,polar) values(?,?,?,?)",
-	"update ts_table set db_net_id=?,ts_id=?,symb=?,mod=?,bw=?,snr=?,ber=?,strength=?,std=?,aud_mode=?,dvbt_flag=?,flags=0 where db_id=?",
-	"delete  from srv_table where db_ts_id=?",
-	"select db_id from srv_table where db_net_id=? and db_ts_id=? and dvbt2_plp_id=? and service_id=?",
-	"insert into srv_table(db_net_id, db_ts_id,dvbt2_plp_id,service_id) values(?,?,?,?)",
-	"update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?,\
+/*QUERY_NET,*/	                     "select db_id from net_table where src=? and network_id=?",
+/*INSERT_NET,*/	                     "insert into net_table(network_id, src) values(?,?)",
+/*UPDATE_NET,*/	                     "update net_table set name=? where db_id=?",
+/*QUERY_TS,*/	                     "select db_id from ts_table where src=? and freq=? and db_sat_para_id=? and polar=?",
+/*INSERT_TS,*/	                     "insert into ts_table(src,freq,db_sat_para_id,polar) values(?,?,?,?)",
+/*UPDATE_TS,*/	                     "update ts_table set db_net_id=?,ts_id=?,symb=?,mod=?,bw=?,snr=?,ber=?,strength=?,std=?,aud_mode=?,dvbt_flag=?,flags=0 where db_id=?",
+/*DELETE_TS_SRVS,*/	                     "delete  from srv_table where db_ts_id=?",
+/*QUERY_SRV,*/	                     "select db_id from srv_table where db_net_id=? and db_ts_id=? and dvbt2_plp_id=? and service_id=?",
+/*INSERT_SRV,*/	                     "insert into srv_table(db_net_id, db_ts_id,dvbt2_plp_id,service_id) values(?,?,?,?)",
+/*UPDATE_SRV,*/	                     "update srv_table set src=?, name=?,service_type=?,eit_schedule_flag=?, eit_pf_flag=?,\
 	 running_status=?,free_ca_mode=?,volume=?,aud_track=?,vid_pid=?,vid_fmt=?,\
 	 current_aud=-1,aud_pids=?,aud_fmts=?,aud_langs=?, aud_types=?,\
 	 current_sub=-1,sub_pids=?,sub_types=?,sub_composition_page_ids=?,sub_ancillary_page_ids=?,sub_langs=?,\
@@ -224,47 +224,47 @@ const char *sql_stmts[MAX_STMT] =
 	 skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,\
 	 hide_guide=?, source_id=?,favor=?,db_sat_para_id=?,scrambled_flag=?,lcn=-1,hd_lcn=-1,sd_lcn=-1,\
 	 default_chan_num=-1,chan_order=?,lcn_order=0,service_id_order=0,hd_sd_order=0,pmt_pid=?,dvbt2_plp_id=?,sdt_ver=?,pcr_pid=? where db_id=?",
-	"select db_id,service_type from srv_table where db_ts_id=? order by service_id",
-	"update srv_table set chan_num=? where db_id=?",
-	"delete  from evt_table where db_ts_id=?",
-	"select db_id from ts_table where src=? order by freq",
-	"delete from grp_map_table where db_srv_id in (select db_id from srv_table where db_ts_id=?)",
-	"select srv_table.service_id, ts_table.ts_id, net_table.network_id from srv_table, ts_table, net_table where srv_table.db_id=? and ts_table.db_id=srv_table.db_ts_id and net_table.db_id=srv_table.db_net_id",
-	"update srv_table set skip=? where db_id=?",
-	"select max(chan_num) from srv_table where service_type=? and src=?",
-	"select max(chan_num) from srv_table where src=?",
-	"select max(major_chan_num) from srv_table",
-	"update srv_table set major_chan_num=?, chan_num=? where db_id=(select db_id from srv_table where db_ts_id=?)",
-	"select db_id from srv_table where src=? and chan_num=?",
-	"select db_id from sat_para_table where lnb_num=? and motor_num=? and pos_num=?",
-	"select db_id from sat_para_table where lnb_num=? and sat_longitude=?",
-	"insert into sat_para_table(sat_name,lnb_num,lof_hi,lof_lo,lof_threshold,signal_22khz,voltage,motor_num,pos_num,lo_direction,la_direction,\
+/*QUERY_SRV_BY_TYPE,*/	             "select db_id,service_type from srv_table where db_ts_id=? order by service_id",
+/*UPDATE_CHAN_NUM,*/	             "update srv_table set chan_num=? where db_id=?",
+/*DELETE_TS_EVTS,*/	             "delete  from evt_table where db_ts_id=?",
+/*QUERY_TS_BY_FREQ_ORDER,*/	     "select db_id from ts_table where src=? order by freq",
+/*DELETE_SRV_GRP,*/	             "delete from grp_map_table where db_srv_id in (select db_id from srv_table where db_ts_id=?)",
+/*QUERY_SRV_TS_NET_ID,*/	     "select srv_table.service_id, ts_table.ts_id, net_table.network_id from srv_table, ts_table, net_table where srv_table.db_id=? and ts_table.db_id=srv_table.db_ts_id and net_table.db_id=srv_table.db_net_id",
+/*UPDATE_CHAN_SKIP,*/	             "update srv_table set skip=? where db_id=?",
+/*QUERY_MAX_CHAN_NUM_BY_TYPE,*/   "select max(chan_num) from srv_table where service_type=? and src=?",
+/*QUERY_MAX_CHAN_NUM,*/	     "select max(chan_num) from srv_table where src=?",
+/*QUERY_MAX_MAJOR_CHAN_NUM,*/	     "select max(major_chan_num) from srv_table",
+/*UPDATE_MAJOR_CHAN_NUM,*/	     "update srv_table set major_chan_num=?, chan_num=? where db_id=(select db_id from srv_table where db_ts_id=?)",
+/*QUERY_SRV_BY_CHAN_NUM,*/	     "select db_id from srv_table where src=? and chan_num=?",
+/*QUERY_SAT_PARA_BY_POS_NUM,*/     "select db_id from sat_para_table where lnb_num=? and motor_num=? and pos_num=?",
+/*QUERY_SAT_PARA_BY_LO_LA,*/	     "select db_id from sat_para_table where lnb_num=? and sat_longitude=?",
+/*INSERT_SAT_PARA,*/	             "insert into sat_para_table(sat_name,lnb_num,lof_hi,lof_lo,lof_threshold,signal_22khz,voltage,motor_num,pos_num,lo_direction,la_direction,\
 	longitude,latitude,diseqc_mode,tone_burst,committed_cmd,uncommitted_cmd,repeat_count,sequence_repeat,fast_diseqc,cmd_order,sat_longitude) \
 	values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-	"select db_id from srv_table where src=? and lcn=?",
-	"select max(lcn) from srv_table where src=?",
-	"update srv_table set lcn=?,hd_lcn=?,sd_lcn=? where db_id=?",
-	"update srv_table set default_chan_num=? where db_id=?",
-	"select service_type from srv_table where db_id=?",
-	"select max(default_chan_num) from srv_table where service_type=? and src=?",
-	"select max(default_chan_num) from srv_table where src=?",
-	"select db_id,hd_lcn from srv_table where src=? and sd_lcn=?",
-	"select db_id,service_type from srv_table where src=? order by default_chan_num",
-	"select db_id,service_type from srv_table where src=? order by lcn",
-	"update ts_table set freq=?,std=?,aud_mode=? where db_id=?",
-	"update sat_para_table set sat_name=?,lof_hi=?,lof_lo=?,lof_threshold=?,signal_22khz=?,\
+/*QUERY_SRV_BY_LCN,*/	             "select db_id from srv_table where src=? and lcn=?",
+/*QUERY_MAX_LCN,*/	             "select max(lcn) from srv_table where src=?",
+/*UPDATE_LCN,*/	                     "update srv_table set lcn=?,hd_lcn=?,sd_lcn=? where db_id=?",
+/*UPDATE_DEFAULT_CHAN_NUM,*/	     "update srv_table set default_chan_num=? where db_id=?",
+/*QUERY_SRV_TYPE,*/	             "select service_type from srv_table where db_id=?",
+/*QUERY_MAX_DEFAULT_CHAN_NUM_BY_TYPE,*/     "select max(default_chan_num) from srv_table where service_type=? and src=?",
+/*QUERY_MAX_DEFAULT_CHAN_NUM,*/	       "select max(default_chan_num) from srv_table where src=?",
+/*QUERY_SRV_BY_SD_LCN,*/	               "select db_id,hd_lcn from srv_table where src=? and sd_lcn=?",
+/*QUERY_SRV_BY_DEF_CHAN_NUM_ORDER,*/	       "select db_id,service_type from srv_table where src=? order by default_chan_num",
+/*QUERY_SRV_BY_LCN_ORDER,*/	               "select db_id,service_type from srv_table where src=? order by lcn",
+/*UPDATE_ANALOG_TS,*/	                     "update ts_table set freq=?,std=?,aud_mode=? where db_id=?",
+/*UPDATE_SAT_PARA,*/	                     "update sat_para_table set sat_name=?,lof_hi=?,lof_lo=?,lof_threshold=?,signal_22khz=?,\
 	voltage=?,lo_direction=?,la_direction=?,longitude=?,latitude=?,diseqc_mode=?,\
 	tone_burst=?,committed_cmd=?,uncommitted_cmd=?,repeat_count=?,sequence_repeat=?,\
 	fast_diseqc=?,cmd_order=?,lnb_num=?,motor_num=?,pos_num=? where db_id=?",
-	"select db_id,freq,symb from ts_table where src=? and db_sat_para_id=? and polar=?",
-	"update ts_table set freq=?, symb=? where db_id=?",
-	"select db_id from sat_para_table order by db_id",
-	"select db_id from ts_table where db_sat_para_id=? order by freq",
-	"select db_id,service_type from srv_table where src=? and chan_num>0 order by chan_order",
-	"select db_id,service_type from srv_table where db_ts_id=? and chan_num<=0 order by service_id",
-	"delete from booking_table where db_evt_id in (select db_id from evt_table where db_ts_id=?)",
-	"select db_ts_id,db_id from srv_table where src = ? and chan_order = ?",
-	"update ts_table set db_net_id=?,ts_id=?,symb=?,mod=?,bw=?,snr=?,ber=?,strength=?,std=?,aud_mode=?,dvbt_flag=?,flags=0,freq=? where db_id=?",
+/*QUERY_SAT_TP_BY_POLAR,*/	             "select db_id,freq,symb from ts_table where src=? and db_sat_para_id=? and polar=?",
+/*UPDATE_TS_FREQ_SYMB,*/	             "update ts_table set freq=?, symb=? where db_id=?",
+/*QUERY_DVBS_SAT_BY_SAT_ORDER,*/	     "select db_id from sat_para_table order by db_id",
+/*QUERY_DVBS_TP_BY_FREQ_ORDER,*/	     "select db_id from ts_table where db_sat_para_id=? order by freq",
+/*QUERY_EXIST_SRV_BY_CHAN_ORDER,*/	     "select db_id,service_type from srv_table where src=? and chan_num>0 order by chan_order",
+/*QUERY_NONEXIST_SRV_BY_SRV_ID_ORDER,*/    "select db_id,service_type from srv_table where db_ts_id=? and chan_num<=0 order by service_id",
+/*DELETE_TS_EVTS_BOOKINGS,*/	             "delete from booking_table where db_evt_id in (select db_id from evt_table where db_ts_id=?)",
+/*SELECT_DBTSID_BY_NUM_AND_SRC,*/	     "select db_ts_id,db_id from srv_table where src = ? and chan_order = ?",
+/*UPDATE_TS_FREQ,*/	                     "update ts_table set db_net_id=?,ts_id=?,symb=?,mod=?,bw=?,snr=?,ber=?,strength=?,std=?,aud_mode=?,dvbt_flag=?,flags=0,freq=? where db_id=?",
 };
 
 /****************************************************************************
@@ -2718,7 +2718,7 @@ static void am_scan_default_store(AM_SCAN_Result_t *result)
 		ret = sqlite3_prepare(hdb, sql_stmts[i], -1, &stmts[i], NULL);
 		if (ret != SQLITE_OK)
 		{
-			AM_DEBUG(1, "Prepare sqlite3 failed, stmts[%d] ret = %x", i, ret);
+			AM_DEBUG(1, "Prepare sqlite3 failed, hdb[%p] stmts[%d] ret = %x", hdb, i, ret);
 			goto store_end;
 		}
 	}
@@ -3895,12 +3895,12 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 			if (scanner->start_freqs[scanner->curr_freq].flag == AM_SCAN_FE_FL_ATV &&
 				cur_fe_para.m_type != FE_ANALOG)
 			{
-                
-                if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL)
-                    dvb_fend_para(cur_fe_para)->u.analog.flag |= ANALOG_FLAG_MANUL_SCAN;
-                else
-                    dvb_fend_para(cur_fe_para)->u.analog.flag |= ANALOG_FLAG_ENABLE_AFC;
-                    
+
+				if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL)
+					dvb_fend_para(cur_fe_para)->u.analog.flag |= ANALOG_FLAG_MANUL_SCAN;
+				else
+					dvb_fend_para(cur_fe_para)->u.analog.flag |= ANALOG_FLAG_ENABLE_AFC;
+
 				cur_fe_para.m_type = FE_ANALOG;
 				dvb_fend_para(cur_fe_para)->u.analog.std = atv_start_para.default_std;
 				if (atv_start_para.afc_range <= 0)
@@ -4658,7 +4658,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 	uint8_t plp_ids[256];
 	uint8_t plp_num = 0;
 
-    AM_SCAN_ATV_LOCK_PARA_t atv_lock_para;
+	AM_SCAN_ATV_LOCK_PARA_t atv_lock_para;
 	if (scanner->end_code == AM_SCAN_RESULT_UNLOCKED)
 		scanner->end_code = AM_SCAN_RESULT_OK;
 
@@ -4697,14 +4697,14 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 		/* For analog ts, we must check the tv decoder */
 		if (cur_fe_para.m_type == FE_ANALOG )
 		{
-            atv_lock_para.pData = scanner->user_data;
-            if(!(scanner->atvctl.am_scan_atv_cvbs_lock(&atv_lock_para)))
-		{
-			AM_DEBUG(1, "cvbs unlock !");
-			scanner->atvctl.step = atv_start_para.cvbs_unlocked_step;
-			am_scan_atv_step_tune(scanner);
-			return 0;
-            }
+			atv_lock_para.pData = scanner->user_data;
+			if(!(scanner->atvctl.am_scan_atv_cvbs_lock(&atv_lock_para)))
+			{
+				AM_DEBUG(1, "cvbs unlock !");
+				scanner->atvctl.step = atv_start_para.cvbs_unlocked_step;
+				am_scan_atv_step_tune(scanner);
+				return 0;
+			}
 		}
 		
 		/*频点锁定，新申请内存以添加该频点信息*/
@@ -4728,7 +4728,15 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			si.frequency = formatted_freq;
 			si.locked = AM_TRUE;
 			SIGNAL_EVENT(AM_SCAN_EVT_SIGNAL, (void*)&si);
-			
+
+			if (scanner->proc_mode | AM_SCAN_PROCMODE_AUTOPAUSE_ON_ATV_FOUND) {
+				pthread_mutex_lock(&scanner->lock_pause);
+				scanner->status = AM_SCAN_STATUS_PAUSED;
+				pthread_cond_wait(&scanner->cond_pause, &scanner->lock_pause);
+				scanner->status = AM_SCAN_STATUS_RUNNING;
+				pthread_mutex_unlock(&scanner->lock_pause);
+			}
+
 			/* Analog processing */
 			scanner->curr_ts->type = AM_SCAN_TS_ANALOG;
 			scanner->curr_ts->analog.freq = formatted_freq;
@@ -5215,12 +5223,15 @@ handle_events:
 	{
 		/* close atv devices */
 	}
-			
+
 	pthread_mutex_unlock(&scanner->lock);
+
 	/*反注册前端事件*/
 	AM_EVT_Unsubscribe(scanner->start_para.fend_dev_id, AM_FEND_EVT_STATUS_CHANGED, am_scan_fend_callback, (void*)scanner);
 	pthread_mutex_destroy(&scanner->lock);
 	pthread_cond_destroy(&scanner->cond);
+	pthread_mutex_destroy(&scanner->lock_pause);
+	pthread_cond_destroy(&scanner->cond_pause);
 	if (atv_start_para.fe_paras != NULL)
 		free(atv_start_para.fe_paras);
 	free(scanner);		
@@ -5502,10 +5513,15 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, AM_SCAN_Handle_t *hand
 	AM_DEBUG(1, "atv_para.storeMode == %d", para->atv_para.storeMode);
 	if (para->atv_para.storeMode == 1)
 		scanner->store_cb = am_scan_atv_store;
+
+	scanner->proc_mode = para->proc_mode;
+
 	pthread_mutexattr_init(&mta);
 	pthread_mutexattr_settype(&mta, PTHREAD_MUTEX_RECURSIVE_NP);
 	pthread_mutex_init(&scanner->lock, &mta);
 	pthread_cond_init(&scanner->cond, NULL);
+	pthread_mutex_init(&scanner->lock_pause, &mta);
+	pthread_cond_init(&scanner->cond_pause, NULL);
 	pthread_mutexattr_destroy(&mta);
 	
 	rc = pthread_create(&scanner->thread, NULL, am_scan_thread, (void*)scanner);
@@ -5514,6 +5530,8 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, AM_SCAN_Handle_t *hand
 		AM_DEBUG(1, "%s", strerror(rc));
 		pthread_mutex_destroy(&scanner->lock);
 		pthread_cond_destroy(&scanner->cond);
+		pthread_mutex_destroy(&scanner->lock_pause);
+		pthread_cond_destroy(&scanner->cond_pause);
 		free(scanner->start_freqs);
 		free(scanner);
 		return AM_SCAN_ERR_CANNOT_CREATE_THREAD;
@@ -5559,7 +5577,11 @@ AM_ErrorCode_t AM_SCAN_Destroy(AM_SCAN_Handle_t handle, AM_Bool_t store)
 	if (scanner)
 	{
 		pthread_t t;
-		
+
+		pthread_mutex_lock(&scanner->lock_pause);
+		pthread_cond_signal(&scanner->cond_pause);
+		pthread_mutex_unlock(&scanner->lock_pause);
+
 		pthread_mutex_lock(&scanner->lock);
 		/*等待搜索线程退出*/
 		scanner->evt_flag |= AM_SCAN_EVT_QUIT;
@@ -5614,6 +5636,41 @@ AM_ErrorCode_t AM_SCAN_GetUserData(AM_SCAN_Handle_t handle, void **user_data)
 		pthread_mutex_lock(&scanner->lock);
 		*user_data = scanner->user_data;
 		pthread_mutex_unlock(&scanner->lock);
+	}
+
+	return AM_SUCCESS;
+}
+
+AM_ErrorCode_t AM_SCAN_GetStatus(AM_SCAN_Handle_t handle, int *status)
+{
+	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)handle;
+
+	if (!status)
+		return AM_SCAN_ERR_INVALID_PARAM;
+
+	if (scanner)
+	{
+		pthread_mutex_lock(&scanner->lock_pause);
+		*status = scanner->status;
+		pthread_mutex_unlock(&scanner->lock_pause);
+	}
+	return AM_SUCCESS;
+}
+
+AM_ErrorCode_t AM_SCAN_Pause(AM_SCAN_Handle_t handle)
+{
+	return AM_SCAN_ERR_NOT_SUPPORTED;
+}
+
+AM_ErrorCode_t AM_SCAN_Resume(AM_SCAN_Handle_t handle)
+{
+	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)handle;
+
+	if (scanner)
+	{
+		pthread_mutex_lock(&scanner->lock_pause);
+		pthread_cond_signal(&scanner->cond_pause);
+		pthread_mutex_unlock(&scanner->lock_pause);
 	}
 
 	return AM_SUCCESS;

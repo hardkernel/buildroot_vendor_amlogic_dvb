@@ -148,6 +148,19 @@ enum AM_SCAN_ResultCode
 	AM_SCAN_RESULT_UNLOCKED,	/**< 未锁定任何频点*/
 };
 
+enum AM_SCAN_Status
+{
+	AM_SCAN_STATUS_RUNNING,
+	AM_SCAN_STATUS_PAUSED,
+};
+
+enum AM_SCAN_PROCMode
+{
+	AM_SCAN_PROCMODE_NORMAL                  = 0x00,
+	AM_SCAN_PROCMODE_AUTOPAUSE_ON_ATV_FOUND  = 0x01,
+	AM_SCAN_PROCMODE_AUTOPAUSE_ON_DTV_FOUND  = 0x02,
+};
+
 /**\brief TS信号类型*/
 typedef enum
 {
@@ -338,6 +351,7 @@ struct AM_SCAN_CreatePara_s
 	sqlite3 *hdb;						/**< 数据库句柄*/
 	AM_SCAN_ATVCreatePara_t atv_para;	/**< ATV 搜索参数*/
 	AM_SCAN_DTVCreatePara_t dtv_para;	/**< DTV 搜索参数*/
+	int proc_mode;
 };
 
 
@@ -389,6 +403,11 @@ extern AM_ErrorCode_t AM_SCAN_SetUserData(AM_SCAN_Handle_t handle, void *user_da
  */
 extern AM_ErrorCode_t AM_SCAN_GetUserData(AM_SCAN_Handle_t handle, void **user_data);
 
+extern AM_ErrorCode_t AM_SCAN_GetStatus(AM_SCAN_Handle_t handle, int *status);
+
+extern AM_ErrorCode_t AM_SCAN_Pause(AM_SCAN_Handle_t handle);
+
+extern AM_ErrorCode_t AM_SCAN_Resume(AM_SCAN_Handle_t handle);
 
 #ifdef __cplusplus
 }

@@ -311,6 +311,12 @@ struct AM_SCAN_Scanner_s
 		int start_freq;
 		int afc_locked_freq;
 	}atvctl;		/**< ATV控制*/
+
+	pthread_mutex_t     			lock_pause;
+	pthread_cond_t      			cond_pause;
+
+	int                                     status;
+	int                                     proc_mode;
 };
 
 
