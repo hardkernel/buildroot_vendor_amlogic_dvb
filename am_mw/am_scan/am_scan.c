@@ -4729,7 +4729,8 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			si.locked = AM_TRUE;
 			SIGNAL_EVENT(AM_SCAN_EVT_SIGNAL, (void*)&si);
 
-			if (scanner->proc_mode | AM_SCAN_PROCMODE_AUTOPAUSE_ON_ATV_FOUND) {
+			if (scanner->proc_mode & AM_SCAN_PROCMODE_AUTOPAUSE_ON_ATV_FOUND) {
+				AM_DEBUG(1, "atv found, pause");
 				pthread_mutex_lock(&scanner->lock_pause);
 				scanner->status = AM_SCAN_STATUS_PAUSED;
 				pthread_cond_wait(&scanner->cond_pause, &scanner->lock_pause);
@@ -5514,6 +5515,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, AM_SCAN_Handle_t *hand
 	if (para->atv_para.storeMode == 1)
 		scanner->store_cb = am_scan_atv_store;
 
+	AM_DEBUG(1, "proc_mode = %d", para->proc_mode);
 	scanner->proc_mode = para->proc_mode;
 
 	pthread_mutexattr_init(&mta);
