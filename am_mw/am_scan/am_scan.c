@@ -4727,26 +4727,35 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			memset(&si, 0, sizeof(si));
 			si.frequency = formatted_freq;
 			si.locked = AM_TRUE;
-			SIGNAL_EVENT(AM_SCAN_EVT_SIGNAL, (void*)&si);
 
-			if (scanner->proc_mode & AM_SCAN_PROCMODE_AUTOPAUSE_ON_ATV_FOUND) {
-				AM_DEBUG(1, "atv found, pause");
-				pthread_mutex_lock(&scanner->lock_pause);
-				scanner->status = AM_SCAN_STATUS_PAUSED;
-				pthread_cond_wait(&scanner->cond_pause, &scanner->lock_pause);
-				scanner->status = AM_SCAN_STATUS_RUNNING;
-				pthread_mutex_unlock(&scanner->lock_pause);
-			}
+			AM_DEBUG(1,"request_destory = %#x", scanner->request_destory);
+
+			pthread_mutex_lock(&scanner->lock_pause);
+			scanner->status = AM_SCAN_STATUS_PAUSED;
+			pthread_mutex_unlock(&scanner->lock_pause);
+
+			SIGNAL_EVENT(AM_SCAN_EVT_SIGNAL, (void*)&si);
 
 			/* Analog processing */
 			scanner->curr_ts->type = AM_SCAN_TS_ANALOG;
 			scanner->curr_ts->analog.freq = formatted_freq;
-            
+
 			//scanner->curr_ts->analog.std = scanner->start_para.atv_para.default_std;
 			scanner->curr_ts->analog.std = scanner->fe_evt.parameters.u.analog.std;
 			//scanner->curr_ts->analog.std = dvb_fend_para(cur_fe_para)->u.analog.std;
 			/*添加到搜索结果列表*/
 			APPEND_TO_LIST(AM_SCAN_TS_t, scanner->curr_ts, scanner->result.tses);
+
+			//check if auto pause
+			if (!scanner->request_destory
+				&& (scanner->proc_mode | AM_SCAN_PROCMODE_AUTOPAUSE_ON_ATV_FOUND))
+			{
+				pthread_mutex_lock(&scanner->lock_pause);
+				while (scanner->status == AM_SCAN_STATUS_PAUSED)
+					pthread_cond_wait(&scanner->cond_pause, &scanner->lock_pause);
+				pthread_mutex_unlock(&scanner->lock_pause);
+			}
+
 			if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL)
 			{
 				AM_DEBUG(1, "ATV manual scan done!");
@@ -5580,6 +5589,9 @@ AM_ErrorCode_t AM_SCAN_Destroy(AM_SCAN_Handle_t handle, AM_Bool_t store)
 	{
 		pthread_t t;
 
+		AM_DEBUG(1, "scan destroy");
+		scanner->request_destory = 1;
+
 		pthread_mutex_lock(&scanner->lock_pause);
 		pthread_cond_signal(&scanner->cond_pause);
 		pthread_mutex_unlock(&scanner->lock_pause);
@@ -5592,8 +5604,10 @@ AM_ErrorCode_t AM_SCAN_Destroy(AM_SCAN_Handle_t handle, AM_Bool_t store)
 		pthread_cond_signal(&scanner->cond);
 		pthread_mutex_unlock(&scanner->lock);
 
-		if (t != pthread_self())
+		if (t != pthread_self()) {
+			AM_DEBUG(1, "waiting scan thread.");
 			pthread_join(t, NULL);
+		}
 	}
 
 	return AM_SUCCESS;
@@ -5671,6 +5685,7 @@ AM_ErrorCode_t AM_SCAN_Resume(AM_SCAN_Handle_t handle)
 	if (scanner)
 	{
 		pthread_mutex_lock(&scanner->lock_pause);
+		scanner->status = AM_SCAN_STATUS_RUNNING;
 		pthread_cond_signal(&scanner->cond_pause);
 		pthread_mutex_unlock(&scanner->lock_pause);
 	}

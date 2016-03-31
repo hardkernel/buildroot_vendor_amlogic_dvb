@@ -314,9 +314,11 @@ struct AM_SCAN_Scanner_s
 
 	pthread_mutex_t     			lock_pause;
 	pthread_cond_t      			cond_pause;
+	int                                     request_destory;
 
 	int                                     status;
 	int                                     proc_mode;
+
 };
 
 

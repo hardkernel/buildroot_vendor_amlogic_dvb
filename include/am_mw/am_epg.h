@@ -327,6 +327,9 @@ extern void AM_EPG_FreeEvents(int event_count, AM_EPG_Event_t *pevents);
 
 extern AM_ErrorCode_t AM_EPG_SetTablesCallback(AM_EPG_Handle_t handle, int table_type, AM_EPG_TAB_UpdateCB_t cb, void *user_data);
 
+extern AM_ErrorCode_t AM_EPG_DisableDefProc(AM_EPG_Handle_t handle, AM_Bool_t disable);
+
+
 #ifdef __cplusplus
 }
 #endif
