@@ -4748,7 +4748,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 
 			//check if auto pause
 			if (!scanner->request_destory
-				&& (scanner->proc_mode | AM_SCAN_PROCMODE_AUTOPAUSE_ON_ATV_FOUND))
+				&& (scanner->proc_mode & AM_SCAN_PROCMODE_AUTOPAUSE_ON_ATV_FOUND))
 			{
 				pthread_mutex_lock(&scanner->lock_pause);
 				while (scanner->status == AM_SCAN_STATUS_PAUSED)
