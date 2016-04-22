@@ -72,6 +72,9 @@ static AM_INLINE AM_ErrorCode_t aout_get_openned_dev(int dev_no, AM_AOUT_Device_
 /**\brief 重新设定音频输出*/
 static AM_ErrorCode_t aout_reset(AM_AOUT_Device_t *dev)
 {
+    if(dev->drv->set_pre_gain)
+        dev->drv->set_pre_gain(dev, dev->pre_gain);
+
 	if(dev->drv->set_volume)
 		dev->drv->set_volume(dev, dev->volume);
 
@@ -390,3 +393,60 @@ AM_ErrorCode_t AM_AOUT_SetDriver(int dev_no, const AM_AOUT_Driver_t *drv, void *
 	return AM_SUCCESS;
 }
 
+/**\brief 设定预增益
+ * \param dev_no 音频输出设备号
+ * \param gain 预增益值
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_aout.h)
+ */
+AM_ErrorCode_t AM_AOUT_SetPreGain(int dev_no, float gain)
+{
+	AM_AOUT_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_TRY(aout_get_openned_dev(dev_no, &dev));
+
+	pthread_mutex_lock(&dev->lock);
+
+	if(dev->pre_gain!=gain)
+	{
+		if(dev->drv && dev->drv->set_pre_gain)
+			ret = dev->drv->set_pre_gain(dev, gain);
+
+		if(ret==AM_SUCCESS)
+		{
+			dev->pre_gain = gain;
+
+			AM_EVT_Signal(dev_no, AM_AOUT_EVT_PREGAIN_CHANGED, (void*)&gain);
+		}
+	}
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+/**\brief 取得当前预增益
+ * \param dev_no 音频输出设备号
+ * \param[out] gain 返回当前预增益值
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_aout.h)
+ */
+AM_ErrorCode_t AM_AOUT_GetPreGain(int dev_no, float *gain)
+{
+	AM_AOUT_Device_t *dev;
+
+	assert(gain);
+
+	AM_TRY(aout_get_openned_dev(dev_no, &dev));
+
+	pthread_mutex_lock(&dev->lock);
+
+	*gain = dev->pre_gain;
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return AM_SUCCESS;
+}

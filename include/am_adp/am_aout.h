@@ -60,6 +60,7 @@ enum AM_AOUT_EventType
 	AM_AOUT_EVT_VOLUME_CHANGED,          /**< 音量改变，参数为改变后音量值(int 0~100)*/
 	AM_AOUT_EVT_MUTE_CHANGED,            /**< mute状态变化，参数为mute状态(AM_Bool_t)*/
 	AM_AOUT_EVT_OUTPUT_MODE_CHANGED,     /**< 音频输出模式发生变化，参数为新的模式类型(AM_AOUT_OutputMode_t)*/
+	AM_AOUT_EVT_PREGAIN_CHANGED,         /**< 预增益改变，参数为改变后的预增益值*/
 	AM_AOUT_EVT_END
 };
 
@@ -156,6 +157,24 @@ extern AM_ErrorCode_t AM_AOUT_SetOutputMode(int dev_no, AM_AOUT_OutputMode_t mod
  *   - 其他值 错误代码(见am_aout.h)
  */
 extern AM_ErrorCode_t AM_AOUT_GetOutputMode(int dev_no, AM_AOUT_OutputMode_t *mode);
+
+/**\brief 设定预增益
+ * \param dev_no 音频输出设备号
+ * \param gain 预增益值
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_aout.h)
+ */
+extern AM_ErrorCode_t AM_AOUT_SetPreGain(int dev_no, float gain);
+
+/**\brief 取得当前预增益值
+ * \param dev_no 音频输出设备号
+ * \param[out] gain 返回当前预增益值
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_aout.h)
+ */
+extern AM_ErrorCode_t AM_AOUT_GetPreGain(int dev_no, float *gain);
 
 #ifdef __cplusplus
 }
