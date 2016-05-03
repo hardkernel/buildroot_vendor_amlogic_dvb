@@ -431,6 +431,7 @@ static AM_ErrorCode_t adec_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute);
 static AM_ErrorCode_t adec_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_OutputMode_t mode);
 static AM_ErrorCode_t adec_close(AM_AOUT_Device_t *dev);
 static AM_ErrorCode_t adec_set_pre_gain(AM_AOUT_Device_t *dev, float gain);
+static AM_ErrorCode_t adec_set_pre_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute);
 
 const AM_AOUT_Driver_t adec_aout_drv =
 {
@@ -440,6 +441,7 @@ const AM_AOUT_Driver_t adec_aout_drv =
 .set_output_mode = adec_set_output_mode,
 .close        = adec_close,
 .set_pre_gain = adec_set_pre_gain,
+.set_pre_mute = adec_set_pre_mute,
 };
 
 /*音频控制（通过amplayer2）操作*/
@@ -626,7 +628,7 @@ static AM_ErrorCode_t adec_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 	int ret=0;
 
 	UNUSED(dev);
-
+	AM_DEBUG(1, "set_mute %d\n", mute?1:0);
 	ret = audio_decode_set_mute(adec_handle, mute?1:0);
 
 	if(ret==-1)
@@ -706,6 +708,7 @@ static AM_ErrorCode_t adec_set_pre_gain(AM_AOUT_Device_t *dev, float gain)
 #ifdef CHIP_8626X
 	ret = -1;
 #else
+	AM_DEBUG(1, "set_pre_gain %f\n", gain);
 	ret = audio_decode_set_pre_gain(adec_handle,gain);
 #endif
 	if(ret==-1)
@@ -714,6 +717,29 @@ static AM_ErrorCode_t adec_set_pre_gain(AM_AOUT_Device_t *dev, float gain)
 		return AM_SUCCESS;
 #endif
 }
+
+static AM_ErrorCode_t adec_set_pre_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
+{
+#ifndef ADEC_API_NEW
+	return AM_FAILURE;
+#else
+	int ret=0;
+
+	UNUSED(dev);
+
+#ifdef CHIP_8626X
+	ret = -1;
+#else
+	AM_DEBUG(1, "set_pre_mute %d\n", mute?1:0);
+	ret = audio_decode_set_pre_mute(adec_handle,mute?1:0);
+#endif
+	if(ret==-1)
+		return AM_FAILURE;
+	else
+		return AM_SUCCESS;
+#endif
+}
+
 
 
 /*音频控制（通过amplayer2）操作*/

@@ -38,6 +38,7 @@ struct AM_AOUT_Driver
 	AM_ErrorCode_t (*set_output_mode)(AM_AOUT_Device_t *dev, AM_AOUT_OutputMode_t mode);
 	AM_ErrorCode_t (*close)(AM_AOUT_Device_t *dev);
 	AM_ErrorCode_t (*set_pre_gain)(AM_AOUT_Device_t *dev, float gain);
+	AM_ErrorCode_t (*set_pre_mute)(AM_AOUT_Device_t *dev, AM_Bool_t mute);
 };
 
 /**\brief 音频输出设备*/
@@ -53,6 +54,7 @@ struct AM_AOUT_Device
 	AM_AOUT_OutputMode_t    mode;      /**< 当前输出模式*/
 	AM_AOUT_OpenPara_t      open_para; /**< 开启参数*/
 	float                   pre_gain;  /**< 当前预增益*/
+	AM_Bool_t               pre_mute;  /**< 当前预静音*/
 };
 
 /****************************************************************************

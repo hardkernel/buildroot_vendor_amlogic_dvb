@@ -249,8 +249,8 @@ AM_ErrorCode_t AM_AOUT_SetMute(int dev_no, AM_Bool_t mute)
 	AM_TRY(aout_get_openned_dev(dev_no, &dev));
 	
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->mute!=mute)
+	AM_DEBUG(1, "SetMute %d\n", mute?1:0);
+	//if(dev->mute!=mute)
 	{
 		if(dev->drv && dev->drv->set_mute)
 			ret = dev->drv->set_mute(dev, mute);
@@ -409,7 +409,8 @@ AM_ErrorCode_t AM_AOUT_SetPreGain(int dev_no, float gain)
 
 	pthread_mutex_lock(&dev->lock);
 
-	if(dev->pre_gain!=gain)
+	AM_DEBUG(1, "SetPreGain %f\n", gain);
+	//if(dev->pre_gain!=gain)
 	{
 		if(dev->drv && dev->drv->set_pre_gain)
 			ret = dev->drv->set_pre_gain(dev, gain);
@@ -445,6 +446,65 @@ AM_ErrorCode_t AM_AOUT_GetPreGain(int dev_no, float *gain)
 	pthread_mutex_lock(&dev->lock);
 
 	*gain = dev->pre_gain;
+
+	pthread_mutex_unlock(&dev->lock);
+
+	AM_DEBUG(1, "GetPreGain %f\n", *gain);
+	return AM_SUCCESS;
+}
+
+/**\brief 预静音/取消预静音
+ * \param dev_no 音频输出设备号
+ * \param mute AM_TRUE表示静音，AM_FALSE表示取消静音
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_aout.h)
+ */
+AM_ErrorCode_t AM_AOUT_SetPreMute(int dev_no, AM_Bool_t mute)
+{
+	AM_AOUT_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_TRY(aout_get_openned_dev(dev_no, &dev));
+
+	pthread_mutex_lock(&dev->lock);
+	AM_DEBUG(1, "SetPreMute %d\n", mute?1:0);
+	//if(dev->pre_mute!=mute)
+	{
+		if(dev->drv && dev->drv->set_pre_mute)
+			ret = dev->drv->set_pre_mute(dev, mute);
+
+		if(ret==AM_SUCCESS)
+		{
+			dev->pre_mute = mute;
+
+			AM_EVT_Signal(dev_no, AM_AOUT_EVT_PREMUTE_CHANGED, (void*)(long)mute);
+		}
+	}
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+/**\brief 取得当前预静音状态
+ * \param dev_no 音频输出设备号
+ * \param[out] mute 返回当前预静音状态
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_aout.h)
+ */
+AM_ErrorCode_t AM_AOUT_GetPreMute(int dev_no, AM_Bool_t *mute)
+{
+	AM_AOUT_Device_t *dev;
+
+	assert(mute);
+
+	AM_TRY(aout_get_openned_dev(dev_no, &dev));
+
+	pthread_mutex_lock(&dev->lock);
+
+	*mute = dev->pre_mute;
 
 	pthread_mutex_unlock(&dev->lock);
 
