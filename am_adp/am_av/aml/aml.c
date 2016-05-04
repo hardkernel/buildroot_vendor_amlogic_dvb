@@ -1203,16 +1203,20 @@ int aml_set_tsync_enable(int enable)
 	char *path = "/sys/class/tsync/enable";
 	char  bcmd[16];
 
-	fd=open(path, O_CREAT|O_RDWR | O_TRUNC, 0644);
-	if(fd>=0)
-	{
-		snprintf(bcmd,sizeof(bcmd),"%d",enable);
-		write(fd,bcmd,strlen(bcmd));
-		close(fd);
-		return 0;
-	}
+	snprintf(bcmd,sizeof(bcmd),"%d",enable);
+	
+	return AM_FileEcho(path, bcmd);
 
-	return -1;
+	// fd=open(path, O_CREAT|O_RDWR | O_TRUNC, 0644);
+	// if(fd>=0)
+	// {
+	// 	snprintf(bcmd,sizeof(bcmd),"%d",enable);
+	// 	write(fd,bcmd,strlen(bcmd));
+	// 	close(fd);
+	// 	return 0;
+	// }
+
+	// return -1;
 }
 
 
@@ -3753,12 +3757,14 @@ static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 {
 	AV_TSData_t *ts;
 	int fd;
-
+	
 	if (destroy_thread && dev->ts_player.av_thread_running)
 	{
 		dev->ts_player.av_thread_running = AM_FALSE;
 		pthread_cond_broadcast(&gAVMonCond);
+		AM_DEBUG(1, "TV aml_close_ts_mode---broardcast end join start\r\n");
 		pthread_join(dev->ts_player.av_mon_thread, NULL);
+		AM_DEBUG(1, "TV aml_close_ts_mode---join end\r\n");
 	}
 
 	adec_stop_decode();
@@ -4506,6 +4512,8 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 	if(ctrl_fd>=0){
 		ioctl(ctrl_fd, AMSTREAM_IOC_SET_VSYNC_UPINT, 0);
 		close(ctrl_fd);
+	}else{
+		AM_DEBUG(1, "open /dev/amvideo error");
 	}
 
 	switch(mode)

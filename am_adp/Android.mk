@@ -1,5 +1,7 @@
 LOCAL_PATH := $(call my-dir)
 AMLOGIC_LIBPLAYER :=y
+
+
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libam_adp
@@ -21,7 +23,6 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_userdata/am_userdata.c\
 		   am_userdata/aml/aml.c\
 		   am_userdata/emu/emu.c
-
 
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND 
@@ -53,7 +54,6 @@ else
 LOCAL_SHARED_LIBRARIES+=libcutils liblog libdl libc libamadec libamcodec
 endif
 
-
 LOCAL_PRELINK_MODULE := false
 
 LOCAL_32_BIT_ONLY := true
@@ -83,6 +83,8 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 	   am_userdata/aml/aml.c\
 	   am_userdata/emu/emu.c
 
+
+
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND
 ifeq ($(AMLOGIC_LIBPLAYER), y)
 LOCAL_CFLAGS+=-DAMLOGIC_LIBPLAYER
@@ -111,6 +113,7 @@ LOCAL_SHARED_LIBRARIES+=libamplayer libcutils liblog libdl libc
 else
 LOCAL_SHARED_LIBRARIES+=libcutils liblog libdl libc libamadec libamcodec
 endif
+
 LOCAL_PRELINK_MODULE := false
 
 LOCAL_32_BIT_ONLY := true

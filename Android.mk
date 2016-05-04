@@ -15,4 +15,9 @@
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
+
+ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 22)))
+include $(LOCAL_PATH)/am_sysfs/Android.mk $(LOCAL_PATH)/am_adp/Android.mk $(LOCAL_PATH)/am_mw/Android.mk $(LOCAL_PATH)/am_ver/Android.mk
+else
 include $(LOCAL_PATH)/am_adp/Android.mk $(LOCAL_PATH)/am_mw/Android.mk $(LOCAL_PATH)/am_ver/Android.mk
+endif

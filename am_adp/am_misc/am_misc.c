@@ -25,7 +25,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <assert.h>
-
+#include <dlfcn.h>
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
@@ -33,12 +33,60 @@
 /****************************************************************************
  * Static functions
  ***************************************************************************/
+int (*Write_Sysfs_ptr)(const char *path, char *value);
+int (*ReadNum_Sysfs_ptr)(const char *path, char *value, int size);
+int (*Read_Sysfs_ptr)(const char *path, char *value);
+
+static int AM_SYSTEMCONTROL_INIT=0;
 
 #ifdef ANDROID
 
 # define SUN_LEN(ptr) ((size_t) (((struct sockaddr_un*) 0)->sun_path) + strlen ((ptr)->sun_path) )
 
 #endif
+
+/**\brief init systemcontrol rw api ptr
+ * \param null
+ * \param[in] null
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码
+ */
+static AM_ErrorCode_t am_init_syscontrol_api()
+{
+	if(AM_SYSTEMCONTROL_INIT==0)
+	{
+		void* handle = NULL;
+		if(handle == NULL) {
+			handle = dlopen("libam_sysfs.so", RTLD_NOW);//RTLD_NOW  RTLD_LAZY
+		}
+		if(handle==NULL)
+		{
+			AM_DEBUG(1, "open lib error--\r\n");
+			return AM_FAILURE;
+		}
+		AM_DEBUG(1, "open lib ok--\r\n");
+		Write_Sysfs_ptr = dlsym(handle, "AM_SystemControl_Write_Sysfs");
+		ReadNum_Sysfs_ptr = dlsym(handle, "AM_SystemControl_ReadNum_Sysfs");
+		Read_Sysfs_ptr = dlsym(handle, "AM_SystemControl_Read_Sysfs");
+
+		AM_SYSTEMCONTROL_INIT=1;
+		if(Write_Sysfs_ptr==NULL)
+		{
+			AM_DEBUG(1, "cannot get write sysfs api\r\n");
+		}
+		if(ReadNum_Sysfs_ptr==NULL)
+		{
+			AM_DEBUG(1, "cannot get read num sysfs api\r\n");
+		}
+		if(Read_Sysfs_ptr==NULL)
+		{
+			AM_DEBUG(1, "cannot get read sysfs api\r\n");
+		}
+	}
+	return AM_SUCCESS;
+}
+
 static AM_ErrorCode_t try_write(int fd, const char *buf, int len)
 {
 	const char *ptr = buf;
@@ -102,6 +150,12 @@ AM_ErrorCode_t AM_FileEcho(const char *name, const char *cmd)
 	
 	assert(name && cmd);
 	
+	am_init_syscontrol_api();
+	if(Write_Sysfs_ptr!=NULL)
+	{
+		return Write_Sysfs_ptr(name,cmd);
+	}
+
 	fd = open(name, O_WRONLY);
 	if(fd==-1)
 	{
@@ -138,7 +192,13 @@ AM_ErrorCode_t AM_FileRead(const char *name, char *buf, int len)
 	char *ret;
 	
 	assert(name && buf);
-	
+	am_init_syscontrol_api();
+	if(ReadNum_Sysfs_ptr!=NULL)
+	{
+		return ReadNum_Sysfs_ptr(name,buf,len);
+	}
+
+
 	fp = fopen(name, "r");
 	if(!fp)
 	{
