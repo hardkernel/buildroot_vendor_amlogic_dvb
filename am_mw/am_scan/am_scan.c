@@ -5593,6 +5593,7 @@ AM_ErrorCode_t AM_SCAN_Destroy(AM_SCAN_Handle_t handle, AM_Bool_t store)
 		scanner->request_destory = 1;
 
 		pthread_mutex_lock(&scanner->lock_pause);
+		scanner->status = AM_SCAN_STATUS_RUNNING;
 		pthread_cond_signal(&scanner->cond_pause);
 		pthread_mutex_unlock(&scanner->lock_pause);
 
@@ -5603,11 +5604,11 @@ AM_ErrorCode_t AM_SCAN_Destroy(AM_SCAN_Handle_t handle, AM_Bool_t store)
 		t = scanner->thread;
 		pthread_cond_signal(&scanner->cond);
 		pthread_mutex_unlock(&scanner->lock);
-
 		if (t != pthread_self()) {
 			AM_DEBUG(1, "waiting scan thread.");
 			pthread_join(t, NULL);
 		}
+		AM_DEBUG(1, "scan destroy done.");
 	}
 
 	return AM_SUCCESS;
@@ -5681,6 +5682,8 @@ AM_ErrorCode_t AM_SCAN_Pause(AM_SCAN_Handle_t handle)
 AM_ErrorCode_t AM_SCAN_Resume(AM_SCAN_Handle_t handle)
 {
 	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)handle;
+
+	AM_DEBUG(1, "AM_SCAN_Resume");
 
 	if (scanner)
 	{
