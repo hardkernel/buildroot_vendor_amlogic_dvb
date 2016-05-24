@@ -77,6 +77,7 @@ enum AM_SCAN_ProgressEvt
 	AM_SCAN_PROGRESS_DVBT2_PLP_BEGIN,	/**< Start a DVB-T2 data PLP, parameter is AM_SCAN_PLPProgress_t*/
 	AM_SCAN_PROGRESS_DVBT2_PLP_END,	/**< DVB-T2 PLP search end, parameter is AM_SCAN_PLPProgress_t*/
 	AM_SCAN_PROGRESS_SCAN_EXIT,
+	AM_SCAN_PROGRESS_NEW_PROGRAM_MORE,
 };
 
 /**\brief 搜索事件类型*/
@@ -176,6 +177,7 @@ typedef enum
 	AM_SCAN_SORT_BY_LCN,			/**< 按照LCN排序*/
 	AM_SCAN_SORT_BY_HD_SD,
 }AM_SCAN_DTVSortMethod_t;
+
 
 /**\brief 频点进度数据*/
 typedef struct
@@ -278,6 +280,7 @@ typedef struct AM_SCAN_TS_s
 	};
 
 	int tp_index; /**< 位于频率表中的位置*/
+
 	struct AM_SCAN_TS_s *p_next;	/**< 指向下一个TS*/
 }AM_SCAN_TS_t;
 
@@ -353,6 +356,11 @@ struct AM_SCAN_CreatePara_s
 	AM_SCAN_DTVCreatePara_t dtv_para;	/**< DTV 搜索参数*/
 	int proc_mode;
 };
+
+typedef struct AM_SCAN_NewProgram_Data_s {
+	AM_SCAN_Result_t *result;
+	AM_SCAN_TS_t      *newts;
+}AM_SCAN_NewProgram_Data_t;
 
 
 /****************************************************************************

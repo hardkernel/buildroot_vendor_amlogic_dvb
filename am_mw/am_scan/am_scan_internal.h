@@ -301,7 +301,7 @@ struct AM_SCAN_Scanner_s
 	struct
 	{
 		AM_Bool_t start;
-        AM_Bool_t (*am_scan_atv_cvbs_lock)(void*);/*同步delay函数*/
+		AM_Bool_t (*am_scan_atv_cvbs_lock)(void*);/*同步delay函数*/
 		int start_idx;		/**< 起始频点参数在start_freqs中的索引*/
 		int range_check;
 		int direction;	/**< -1/+1*/

@@ -3875,12 +3875,18 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 		 */
 		if (scanner->curr_ts != NULL)
 		{
+			AM_SCAN_NewProgram_Data_t npd;
+
 			if (cur_fe_para.m_type == FE_ANALOG)
 				store_analog_ts(NULL, &scanner->result, scanner->curr_ts);
 			else if (dtv_start_para.standard == AM_SCAN_DTV_STD_ATSC)
 				store_atsc_ts(NULL, &scanner->result, scanner->curr_ts);
 			else
 				store_dvb_ts(NULL, &scanner->result, scanner->curr_ts, NULL);
+
+			npd.result = &scanner->result;
+			npd.newts = scanner->curr_ts;
+			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_NEW_PROGRAM_MORE, (void*)&npd);
 		}
 
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_END, scanner->curr_ts);
@@ -4721,6 +4727,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 		{
 			AM_SCAN_DTVSignalInfo_t si;
 			int formatted_freq;
+			AM_SCAN_NewProgram_Data_t npd;
 			
 			AM_DEBUG(1, "cvbs lock !");
 			formatted_freq = am_scan_format_atv_freq(scanner->atvctl.afc_locked_freq);
@@ -4743,8 +4750,13 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			//scanner->curr_ts->analog.std = scanner->start_para.atv_para.default_std;
 			scanner->curr_ts->analog.std = scanner->fe_evt.parameters.u.analog.std;
 			//scanner->curr_ts->analog.std = dvb_fend_para(cur_fe_para)->u.analog.std;
+
 			/*添加到搜索结果列表*/
 			APPEND_TO_LIST(AM_SCAN_TS_t, scanner->curr_ts, scanner->result.tses);
+
+			npd.result = &scanner->result;
+			npd.newts = scanner->curr_ts;
+			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_NEW_PROGRAM_MORE, (void*)&npd);
 
 			//check if auto pause
 			if (!scanner->request_destory
