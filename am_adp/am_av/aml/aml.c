@@ -82,7 +82,7 @@ void *adec_handle = NULL;
 #if 0
 #define ENABLE_DROP_BFRAME
 #endif
-#define ENABLE_BYPASS_DI
+//#define ENABLE_BYPASS_DI
 #define ENABLE_PCR
 
 #define ADEC_START_AUDIO_LEVEL       256
@@ -93,7 +93,7 @@ void *adec_handle = NULL;
 #define UP_RESAMPLE_AUDIO_LEVEL      128
 #define UP_RESAMPLE_VIDEO_LEVEL      1024
 #define DOWN_RESAMPLE_CACHE_TIME     90000*2
-#define NO_DATA_CHECK_TIME           4000
+#define NO_DATA_CHECK_TIME           4000*2
 #define VMASTER_REPLAY_TIME          4000
 #define SCRAMBLE_CHECK_TIME          1000
 #define TIMESHIFT_INJECT_DIFF_TIME	 4
@@ -4368,13 +4368,22 @@ static void* aml_av_monitor_thread(void *arg)
 		/*AM_DEBUG(1, "apts_dmx_stop: %d arp_stop: %d vpts_dmx_stop: %d vrp_stop: %d",
 					dmx_apts_stop_dur, arp_stop_dur, dmx_vpts_stop_dur, vrp_stop_dur);*/
 		need_replay = AM_FALSE;
-		if((!no_audio_data && adec_start && !av_paused && (dmx_apts_stop_dur == 0) && (arp_stop_dur > NO_DATA_CHECK_TIME)) ||
-				(!no_video_data && !av_paused && (dmx_vpts_stop_dur == 0) && (vrp_stop_dur > NO_DATA_CHECK_TIME)))
+		if(!no_video_data && !av_paused && (dmx_vpts_stop_dur == 0) && (vrp_stop_dur > NO_DATA_CHECK_TIME))
+		{
 			need_replay = AM_TRUE;
+			AM_DEBUG(1, "apts_dmx_stop: %d arp_stop: %d vpts_dmx_stop: %d vrp_stop: %d",
+					dmx_apts_stop_dur, arp_stop_dur, dmx_vpts_stop_dur, vrp_stop_dur);
+		}
 		if(vbuf_level * 6 > vbuf_size * 5)
+		{
 			need_replay = AM_TRUE;
+			AM_DEBUG(1, "1 replay ts vlevel %d vbuf_size %d",vbuf_level*6, vbuf_size*5);
+		}
 		if(abuf_level * 6 > abuf_size * 5)
+		{
 			need_replay = AM_TRUE;
+			AM_DEBUG(1, "2 replay ts vlevel %d vbuf_size %d",abuf_level*6, abuf_size*5);
+		}
 		//if(adec_start && !av_paused && has_amaster && !apts_stop_dur && !vpts_stop_dur && (vmaster_dur > VMASTER_REPLAY_TIME))
 			//need_replay = AM_TRUE;
 		//AM_DEBUG(0, "vdec status %08x", vdec_status);
