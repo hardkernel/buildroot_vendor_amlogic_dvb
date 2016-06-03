@@ -288,6 +288,7 @@ typedef struct
 {
     void* pData;
     v4l2_std_id pOutColorSTD;
+    int checkStable;
 } AM_SCAN_ATV_LOCK_PARA_t;
 
 /**\brief ATV搜索参数定义*/

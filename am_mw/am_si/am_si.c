@@ -1423,7 +1423,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 		/*video pid and video format*/
 		case 0x1:
 		case 0x2:
-		case 0x80:
+		//case 0x80:/*do not support*/
 			vfmt_tmp = VFORMAT_MPEG12;
 			break;
 		case 0x10:

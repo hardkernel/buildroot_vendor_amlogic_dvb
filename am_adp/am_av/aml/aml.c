@@ -152,6 +152,10 @@ void *adec_handle = NULL;
 #define AV_THRESHOLD_MIN_FILE "/sys/class/tsync/av_threshold_min"
 #define AV_THRESHOLD_MAX_FILE "/sys/class/tsync/av_threshold_max"
 #define AVS_PLUS_DECT_FILE "/sys/module/amvdec_avs/parameters/profile"
+#define DEC_CONTROL_H264 "/sys/module/amvdec_h264/parameters/dec_control"
+#define DEC_CONTROL_MPEG12 "/sys/module/amvdec_mpeg12/parameters/dec_control"
+
+#define DEC_CONTROL_PROP "media.dec_control"
 
 #define CANVAS_ALIGN(x)    (((x)+7)&~7)
 #define JPEG_WRTIE_UNIT    (32*1024)
@@ -3572,6 +3576,42 @@ static void set_arc_freq(int hi)
 	}
 }
 
+static AM_ErrorCode_t set_dec_control(AM_Bool_t enable)
+{
+	char v[32], vv[32];
+	int dc=0;
+	char *pch = v;
+
+	static char *dec_control[] = {
+		DEC_CONTROL_H264,
+		DEC_CONTROL_MPEG12
+	};
+	int cnt = sizeof(dec_control)/sizeof(dec_control[0]);
+	int i;
+	if (enable) {
+		property_get(DEC_CONTROL_PROP, v, "");
+		for (i=0; i<cnt; i++) {
+			dc = 0;
+			if (!pch || !pch[0])
+				break;
+			int j = sscanf(pch, "%i", &dc);
+			if (j) {
+				sprintf(vv, "%#x", dc);
+				AM_FileEcho(dec_control[i], vv);
+				AM_DEBUG(1, "dec control: %d==%s\n", i, vv);
+			}
+			pch = strchr(pch, '|');
+			if (pch)
+				pch++;
+		}
+	} else {
+		for (i=0; i<cnt; i++)
+			AM_FileEcho(dec_control[i], "0");
+	}
+
+	return AM_SUCCESS;
+}
+
 static AM_ErrorCode_t aml_open_ts_mode(AM_AV_Device_t *dev)
 {
 	AV_TSData_t *ts;
@@ -3616,6 +3656,9 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	AM_DEBUG(1, "aml start ts: V[%d:%d] A[%d:%d] P[%d]", tp->vpid, tp->vfmt, tp->apid, tp->afmt, tp->pcrpid);
 
 	ts = (AV_TSData_t*)dev->ts_player.drv_data;
+
+	/*patch dec control*/
+	set_dec_control(has_video);
 
 	if(has_video && has_audio)
 	{
@@ -3839,6 +3882,9 @@ static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 //#endif /*ENABLE_PCR*/
 
 	//set_arc_freq(0);
+
+	/*unpatch dec control*/
+	set_dec_control(AM_FALSE);
 
 	return 0;
 }

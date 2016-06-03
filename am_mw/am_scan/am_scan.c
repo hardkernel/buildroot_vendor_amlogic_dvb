@@ -4704,6 +4704,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 		if (cur_fe_para.m_type == FE_ANALOG )
 		{
 			atv_lock_para.pData = scanner->user_data;
+			atv_lock_para.checkStable = (scanner->proc_mode & AM_SCAN_PROCMODE_AUTOPAUSE_ON_ATV_FOUND) ? 1 : 0;
 			if(!(scanner->atvctl.am_scan_atv_cvbs_lock(&atv_lock_para)))
 			{
 				AM_DEBUG(1, "cvbs unlock !");
