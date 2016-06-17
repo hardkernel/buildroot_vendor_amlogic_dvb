@@ -792,9 +792,9 @@ AM_ErrorCode_t AM_DB_Setup(char *path, sqlite3 *defhandle)
 	assert(path || defhandle);
 	//showboz, sqlite3_threadsafe() only get complite-time thread flags,can not get run-time thread flags.
 	//tvapi(tvserver) run-time thread flags is serial.so del it	
-	//multithread = 
-	//	(sqlite3_threadsafe()==SQLITE_CONFIG_MULTITHREAD)?1:0;
-	multithread = 0;//tvserver use serial
+	multithread = 
+		(sqlite3_threadsafe()==SQLITE_CONFIG_MULTITHREAD)?1:0;
+	//multithread = 0;//tvserver use serial
 	if(dbpath)
 	{
 		AM_DEBUG(1, "DBase:Setup Already");
