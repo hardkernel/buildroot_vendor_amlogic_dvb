@@ -398,6 +398,7 @@ static AM_ErrorCode_t aml_timeshift_fill_data(AM_AV_Device_t *dev, uint8_t *data
 static AM_ErrorCode_t aml_timeshift_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *para);
 static AM_ErrorCode_t aml_timeshift_get_info(AM_AV_Device_t *dev, AM_AV_TimeshiftInfo_t *info);
 static AM_ErrorCode_t aml_set_vpath(AM_AV_Device_t *dev);
+static AM_ErrorCode_t aml_switch_ts_audio_fmt(AM_AV_Device_t *dev);
 static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt);
 static AM_ErrorCode_t aml_reset_audio_decoder(AM_AV_Device_t *dev);
 static AM_ErrorCode_t aml_set_drm_mode(AM_AV_Device_t *dev, int enable);
@@ -3971,7 +3972,13 @@ static void* aml_av_monitor_thread(void *arg)
 		pthread_cond_timedwait(&gAVMonCond, &gAVMonLock, &rt);
 		if (! dev->ts_player.av_thread_running)
 			break;
-
+		//switch audio pid or fmt
+		if(dev->audio_switch == AM_TRUE)
+		{
+			aml_switch_ts_audio_fmt(dev);
+			dev->audio_switch = AM_FALSE;	
+		}
+		
 		AM_TIME_GetClock(&now);
 
 		if(ioctl(ts->fd, AMSTREAM_IOC_AB_STATUS, (unsigned long)&astatus) != -1){
@@ -6018,6 +6025,68 @@ static AM_ErrorCode_t aml_switch_ts_audio_legacy(AM_AV_Device_t *dev, uint16_t a
 	return AM_SUCCESS;
 }
 
+static AM_ErrorCode_t aml_switch_ts_audio_fmt(AM_AV_Device_t *dev)
+{
+	int fd = -1;
+	uint16_t apid; 
+	AM_AV_AFormat_t afmt;
+	apid = dev->ts_player.play_para.apid ;
+	afmt = dev->ts_player.play_para.afmt;
+	AM_Bool_t audio_valid = (VALID_PID(apid) && audio_get_format_supported(afmt));
+	AM_Bool_t has_video = VALID_PID(dev->ts_player.play_para.vpid);
+
+	AM_DEBUG(1, "switch ts audio: A[%d:%d]", apid, afmt);
+
+	if(dev->ts_player.drv_data)
+		fd = ((AV_TSData_t*)dev->ts_player.drv_data)->fd;
+
+	if (fd < 0)
+	{
+		AM_DEBUG(1, "ts_player fd < 0, error!");
+		return AM_AV_ERR_SYS;
+	}
+
+	adec_stop_decode();
+
+	/*Set Audio PID & fmt*/
+	if(audio_valid)
+	{
+		if(ioctl(fd, AMSTREAM_IOC_AFORMAT, (int)afmt)==-1)
+		{
+			AM_DEBUG(1, "set audio format failed");
+			return AM_AV_ERR_SYS;
+		}
+		if(ioctl(fd, AMSTREAM_IOC_AID, (int)apid)==-1)
+		{
+			AM_DEBUG(1, "set audio PID failed");
+			return AM_AV_ERR_SYS;
+		}
+	}
+	else
+	{
+		return AM_SUCCESS;
+	}
+
+	/*reset audio*/
+	if(ioctl(fd, AMSTREAM_IOC_AUDIO_RESET, 0)==-1)
+	{
+		AM_DEBUG(1, "audio reset failed");
+		return AM_AV_ERR_SYS;
+	}
+
+#ifdef ENABLE_PCR
+	if(!show_first_frame_nosync()) {
+		property_set("sys.amplayer.drop_pcm", "1");
+	}
+	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
+	AM_FileEcho(TSYNC_MODE_FILE, "2");
+
+	adec_start_decode(fd, afmt, has_video);
+#endif /*ENABLE_PCR*/
+	AM_DEBUG(1, "switch ts audio: end");
+	return AM_SUCCESS;
+}
+
 static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt)
 {
 	AV_TSPlayPara_t *tp = &dev->ts_player.play_para;
@@ -6025,13 +6094,17 @@ static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM
 
 	AM_DEBUG(1, "switch ts audio: A[%d:%d]", apid, afmt);
 
-	err = aml_close_ts_mode(dev, AM_TRUE);
+	dev->audio_switch = AM_TRUE;
+    tp->apid = apid;
+    tp->afmt = afmt;
 
-	tp->apid = apid;
-	tp->afmt = afmt;
+	// err = aml_close_ts_mode(dev, AM_TRUE);
 
-	err = aml_open_ts_mode(dev);
-	err = aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_TRUE);
+	// tp->apid = apid;
+	// tp->afmt = afmt;
+
+	// err = aml_open_ts_mode(dev);
+	// err = aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_TRUE);
 
 	return err;
 }

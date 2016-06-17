@@ -80,7 +80,7 @@ AM_ErrorCode_t AM_SystemControl_Read_Sysfs(const char *path, char *value)
         AM_DEBUG(1,"[false]AM_SystemControl_Read_Sysfs path or value is null");
         return AM_FAILURE;
     }
-    AM_DEBUG(1,"AM_SystemControl_Read_Sysfs:%s",path);
+    //AM_DEBUG(1,"AM_SystemControl_Read_Sysfs:%s",path);
     const sp < ISystemControlService > &scs = getSystemControlService();
     if (scs != 0)
     {
@@ -91,7 +91,7 @@ AM_ErrorCode_t AM_SystemControl_Read_Sysfs(const char *path, char *value)
             return AM_SUCCESS;
         }
     }
-    AM_DEBUG(1,"[false]AM_SystemControl_Read_Sysfs%s,",path);
+    //AM_DEBUG(1,"[false]AM_SystemControl_Read_Sysfs%s,",path);
     return AM_FAILURE;
 }
 /**\brief read num sysfs value
@@ -109,7 +109,7 @@ AM_ErrorCode_t AM_SystemControl_ReadNum_Sysfs(const char *path, char *value, int
         AM_DEBUG(1,"[false]AM_SystemControl_ReadNum_Sysfs path or value is null");
         return AM_FAILURE;
     }
-    AM_DEBUG(1,"AM_SystemControl_ReadNum_Sysfs:%s",path);
+    //AM_DEBUG(1,"AM_SystemControl_ReadNum_Sysfs:%s",path);
     const sp < ISystemControlService > &scs = getSystemControlService();
     if (scs != 0 && value != NULL && access(path, 0) != -1)
     {
@@ -118,7 +118,7 @@ AM_ErrorCode_t AM_SystemControl_ReadNum_Sysfs(const char *path, char *value, int
         {
             if (v.size() != 0)
             {
-                AM_DEBUG(1,"readSysfs ok:%s,%s,%d", path, String8(v).string(), String8(v).size());
+                //AM_DEBUG(1,"readSysfs ok:%s,%s,%d", path, String8(v).string(), String8(v).size());
                 memset(value, 0, size);
                 if (size <= String8(v).size() + 1)
                 {
@@ -134,7 +134,7 @@ AM_ErrorCode_t AM_SystemControl_ReadNum_Sysfs(const char *path, char *value, int
             }
         }
     }
-    AM_DEBUG(1,"[false]AM_SystemControl_ReadNum_Sysfs%s,",path);
+    //AM_DEBUG(1,"[false]AM_SystemControl_ReadNum_Sysfs%s,",path);
     return AM_FAILURE;
 }
 /**\brief write sysfs value
@@ -151,7 +151,7 @@ AM_ErrorCode_t AM_SystemControl_Write_Sysfs(const char *path, char *value)
         AM_DEBUG(1,"[false]AM_SystemControl_Write_Sysfs path or value is null");
         return AM_FAILURE;
     }
-    AM_DEBUG(1,"AM_SystemControl_Write_Sysfs:%s",path);
+    //AM_DEBUG(1,"AM_SystemControl_Write_Sysfs:%s",path);
     const sp < ISystemControlService > &scs = getSystemControlService();
     if (scs != 0)
     {
@@ -162,6 +162,6 @@ AM_ErrorCode_t AM_SystemControl_Write_Sysfs(const char *path, char *value)
             return AM_SUCCESS;
         }
     }
-    AM_DEBUG(1,"[false]AM_SystemControl_Write_Sysfs%s,",path);
+    //AM_DEBUG(1,"[false]AM_SystemControl_Write_Sysfs%s,",path);
     return AM_FAILURE;
 }

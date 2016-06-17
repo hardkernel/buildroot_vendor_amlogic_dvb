@@ -243,6 +243,7 @@ struct AM_AV_Device
 	int              video_contrast;       /**< 视频对比度*/
 	int              video_saturation;     /**< 视频饱和度*/
 	int              video_brightness;     /**< 视频亮度*/
+	AM_Bool_t        audio_switch;         /**< 音频是否需要切换*/
 	AM_Bool_t        video_enable;         /**< 视频层是否显示*/
 	AM_Bool_t        video_blackout;       /**< 无数据时是否黑屏*/
 	AM_AV_VideoAspectRatio_t     video_ratio;  /**< 视频长宽比*/
