@@ -4905,7 +4905,8 @@ static int am_scan_check_fend_evt(AM_SCAN_Scanner_t *scanner)
 		{
 			AM_DEBUG(1, "Analog frequency exceeds afc_range, expected/got:(%u/%u)", 
 				dvb_fend_para(cur_fe_para)->frequency, freq);
-			//return -1; //ignore
+			if (scanner->fe_evt.status & FE_TIMEDOUT)
+				return -1; //ignore
 		}
 	}
 	else if (dtv_start_para.source == FE_QPSK)
