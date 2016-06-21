@@ -4589,9 +4589,44 @@ static AM_ErrorCode_t am_scan_stop_atv(AM_SCAN_Scanner_t *scanner)
 {
 	if (scanner->atvctl.start)
 	{
+		AM_SCAN_TS_t *ts, *tnext;
+		int i;
+
 		AM_DEBUG(1, "Stopping atv ...");
 		AM_DEBUG(1, "Closing AFE device ...");
 
+		ts = scanner->result.tses;
+		while (ts)
+		{
+			tnext = ts->p_next;
+			if(ts->type == AM_SCAN_TS_DIGITAL) {
+				for (i=0; i<ts->digital.dvbt2_data_plp_num; i++)
+				{
+					if(ts->digital.dvbt2_data_plps[i].pats == ts->digital.pats)
+						ts->digital.pats = NULL;
+					if(ts->digital.dvbt2_data_plps[i].pmts == ts->digital.pmts)
+						ts->digital.pmts = NULL;
+					if(ts->digital.dvbt2_data_plps[i].sdts == ts->digital.sdts)
+						ts->digital.sdts = NULL;
+
+					RELEASE_TABLE_FROM_LIST(dvbpsi_pat_t, ts->digital.dvbt2_data_plps[i].pats);
+					RELEASE_TABLE_FROM_LIST(dvbpsi_pmt_t, ts->digital.dvbt2_data_plps[i].pmts);
+					RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.dvbt2_data_plps[i].sdts);
+				}
+
+				RELEASE_TABLE_FROM_LIST(dvbpsi_pat_t, ts->digital.pats);
+				RELEASE_TABLE_FROM_LIST(dvbpsi_pmt_t, ts->digital.pmts);
+				RELEASE_TABLE_FROM_LIST(dvbpsi_cat_t, ts->digital.cats);
+				RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.sdts);
+				RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.vcts);
+				RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.mgts);
+			}
+
+			free(ts);
+
+			ts = tnext;
+		}
+		scanner->result.tses = NULL;
 
 
 		scanner->atvctl.start = 0;
