@@ -1784,12 +1784,12 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 			dvbpsi_sdt_service_t *srv;
 			dvbpsi_sdt_t *sdt;
 
-			AM_SI_LIST_BEGIN(ts->digital.sdts, sdt)
+			AM_SI_LIST_BEGIN(sdt_list, sdt)
 			AM_SI_LIST_BEGIN(sdt->p_first_service, srv)
 				AM_Bool_t found_in_pmt = AM_FALSE;
 
 				/* Is already added in PMT? */
-				AM_SI_LIST_BEGIN(ts->digital.pmts, pmt)
+				AM_SI_LIST_BEGIN(pmt_list, pmt)
 					if (srv->i_service_id == pmt->i_program_number)
 					{
 						found_in_pmt = AM_TRUE;
