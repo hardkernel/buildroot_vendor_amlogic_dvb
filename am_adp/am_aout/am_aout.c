@@ -72,14 +72,17 @@ static AM_INLINE AM_ErrorCode_t aout_get_openned_dev(int dev_no, AM_AOUT_Device_
 /**\brief 重新设定音频输出*/
 static AM_ErrorCode_t aout_reset(AM_AOUT_Device_t *dev)
 {
-    if(dev->drv->set_pre_gain)
-        dev->drv->set_pre_gain(dev, dev->pre_gain);
-
 	if(dev->drv->set_volume)
 		dev->drv->set_volume(dev, dev->volume);
 
 	if(dev->drv->set_mute)
 		dev->drv->set_mute(dev, dev->mute);
+
+	if(dev->drv->set_pre_gain)
+	    dev->drv->set_pre_gain(dev, dev->pre_gain);
+
+	if(dev->drv->set_pre_mute)
+	    dev->drv->set_pre_mute(dev, dev->pre_mute);
 
 	if(dev->drv->set_output_mode)
 		dev->drv->set_output_mode(dev, dev->mode);
