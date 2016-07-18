@@ -32,6 +32,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include "am_kl.h"
 
 /****************************************************************************
  * Macro definitions
@@ -70,15 +71,15 @@ static void section_cbf(int dev_no, int fid, const uint8_t *data, int len, void 
 	UNUSED(len);
 	UNUSED(user_data);
 	int i;
-
+	
 	printf("section:\n");
-	for (i = 0; i < 8; i++)
+	for(i=0;i<8;i++)
 	{
 		printf("%02x ", data[i]);
-		if (((i+1)%16) == 0) printf("\n");
+		if(((i+1)%16)==0) printf("\n");
 	}
-
-	if ((i%16) != 0) printf("\n");
+	
+	if((i%16)!=0) printf("\n");
 }
 
 static void pes_cbf(int dev_no, int fid, const uint8_t *data, int len, void *user_data)
@@ -89,16 +90,16 @@ static void pes_cbf(int dev_no, int fid, const uint8_t *data, int len, void *use
 	UNUSED(len);
 	UNUSED(user_data);
 
-#if 0
+#if 0	
 	int i;
 	printf("pes:\n");
-	for (i=0;i<len;i++)
+	for(i=0;i<len;i++)
 	{
 		printf("%02x ", data[i]);
-		if (((i+1)%16) == 0) printf("\n");
+		if(((i+1)%16)==0) printf("\n");
 	}
-
-	if ((i%16) != 0) printf("\n");
+	
+	if((i%16)!=0) printf("\n");
 #endif
 }
 
@@ -127,7 +128,7 @@ static void start_si(void)
 	AM_DMX_SetSecFilter(DMX_DEV_NO, f, &param);\
 	AM_DMX_SetBufferSize(DMX_DEV_NO, f, 32*1024);\
 	AM_DMX_StartFilter(DMX_DEV_NO, f);
-
+		
 	if (pat_fid == -1)
 	{
 		SET_FILTER(pat_fid, 0, 0)
@@ -145,7 +146,7 @@ static void stop_si(void)
 #define FREE_FILTER(f)\
 	AM_DMX_StopFilter(DMX_DEV_NO, f);\
 	AM_DMX_FreeFilter(DMX_DEV_NO, f);
-
+	
 	if (pat_fid != -1)
 	{
 		FREE_FILTER(pat_fid)
@@ -163,21 +164,13 @@ static void stop_si(void)
 static void reverse_arr(char *src, char *dest, int len)
 {
 	int i;
-	for (i=0; i<len; i++)
+	for(i=0;i<len;i++)	
 	{
 		dest[len-i-1] = src[i];
 	}
 }
 
 #endif
-void reverse(unsigned char key[16])
-{
-    unsigned char tmp[16];
-    int i;
-    for (i=0; i<16; i++)
-        tmp[i] = key[15-i];
-    memcpy(key, tmp, 16);
-}
 
 static int g_from_kl = 0;
 void start_dsc(int dsc, int src, int pid_cnt, int *pids)
@@ -186,35 +179,40 @@ void start_dsc(int dsc, int src, int pid_cnt, int *pids)
 	int dscc[8];
 	int i;
 	int ret;
-
-	uint8_t key2[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
-	uint8_t key1[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
+	struct meson_kl_config kl_config = {0};
+	
+	uint8_t ekey2[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
+	uint8_t ekey1[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
 	uint8_t ecw[16] = {0xe7,0xda,0x69,0xed,0xb7,0x64,0x6b,0xcf,0xe7,0xda,0x69,0xed,0xb7,0x64,0x6b,0xcf}; //For 1234567890abcdef
 	//{0xe0,0x63,0xfb,0x95,0xae,0xf1,0xef,0xe5,0xe0,0x63,0xfb,0x95,0xae,0xf1,0xef,0xe5}; //For 10
 	//{0x64,0xb0,0x53,0x75,0x10,0x2e,0x55,0x18,0x64,0xb0,0x53,0x75,0x10,0x2e,0x55,0x18}; //For 01
 	//{0xd3,0x4b,0x29,0xa3,0x7d,0xd4,0x51,0x68,0xd3,0x4b,0x29,0xa3,0x7d,0xd4,0x51,0x68}; //For key 00000000
-
-	reverse(ecw);
-	if (g_from_kl)
-	{
-		ret = set_keyladder(key2, key1, ecw);
-		if (ret == AM_FAILURE)
-			printf("set_keyladder failed\n");
+	
+	memcpy(kl_config.ekey2, ekey2, 16);
+	memcpy(kl_config.ekey1, ekey1, 16);
+	memcpy(kl_config.ecw, ecw, 16);
+	kl_config.kl_levels = 3;
+	
+	if(g_from_kl)
+	{	
+		ret = set_keyladder(&kl_config);
+		if(ret==AM_FAILURE)
+			printf("Set_keyladder failed!!\n");
 	}
 
 	memset(&dsc_para, 0, sizeof(AM_DSC_OpenPara_t));
 	ret = AM_DSC_Open(dsc, &dsc_para);
 
-	for (i=0; i<pid_cnt; i++) {
-		for (i=0; i<pid_cnt; i++) {
-			if (pids[i]>0) {
+	for(i=0; i<pid_cnt; i++) {
+		for(i=0; i<pid_cnt; i++) {
+			if(pids[i]>0) {
 				int ret;
 				char key[8] = {0};//{0x12,0x34,0x56,0x78,0x90,0xab,0xcd,0xef};
 
 				ret = AM_DSC_SetSource(dsc, src);
 				ret = AM_DSC_AllocateChannel(dsc, &dscc[i]);
 				ret = AM_DSC_SetChannelPID(dsc, dscc[i], pids[i]);
-#if 1
+#if 1	
 				ret = AM_DSC_SetKey(dsc, dscc[i],
 					AM_DSC_KEY_TYPE_ODD | (g_from_kl ? AM_DSC_KEY_FROM_KL : 0),
 					(const uint8_t*)key);
@@ -226,7 +224,6 @@ void start_dsc(int dsc, int src, int pid_cnt, int *pids)
 			}
 		}
 	}
-
 }
 
 void stop_dsc(int dsc)
@@ -252,7 +249,7 @@ static int dvr_data_write(int fd, uint8_t *buf, int size)
 			}
 			ret = 0;
 		}
-
+		
 		left -= ret;
 		p += ret;
 	}
@@ -266,7 +263,7 @@ static void* dvr_data_thread(void *arg)
 	uint8_t buf[256*1024];
 
 	AM_DEBUG(1, "Data thread for DVR%d start ,record file will save to '%s'", dd->id, dd->file_name);
-
+	
 	while (dd->running)
 	{
 		cnt = AM_DVR_Read(dd->id, buf, sizeof(buf), 1000);
@@ -292,11 +289,11 @@ static void* dvr_data_thread(void *arg)
 
 	return NULL;
 }
-
+	
 static void start_data_thread(int dev_no)
 {
 	DVRData *dd = &data_threads[dev_no];
-
+	
 	if (dd->running)
 		return;
 	dd->fd = open(dd->file_name, O_TRUNC | O_WRONLY | O_CREAT, 0666);
@@ -329,12 +326,12 @@ int start_dvr_test(void)
 
 	display_usage();
 	pat_fid = sdt_fid = -1;
-
+	
 	while (go)
 	{
 		if (fgets(buf, sizeof(buf), stdin))
 		{
-			if (!strncmp(buf, "quit", 4))
+			if(!strncmp(buf, "quit", 4))
 			{
 				go = AM_FALSE;
 				continue;
@@ -356,11 +353,11 @@ int start_dvr_test(void)
 				}
 				if (pid_cnt > 8)
 					pid_cnt = 8;
-
+					
 				strcpy(data_threads[dev_no].file_name, name);
 				spara.pid_count = pid_cnt;
 				memcpy(&spara.pids, pids, sizeof(pids));
-
+				
 				if (AM_DVR_StartRecord(dev_no, &spara) == AM_SUCCESS)
 				{
 					start_data_thread(dev_no);
@@ -370,7 +367,7 @@ int start_dvr_test(void)
 			else if (!strncmp(buf, "stop", 4))
 			{
 				int dev_no;
-
+				
 				sscanf(buf + 4, "%d", &dev_no);
 				if (dev_no < 0 || dev_no >= DVR_DEV_COUNT)
 				{
@@ -398,7 +395,7 @@ int start_dvr_test(void)
 			else if (!strncmp(buf, "setsrc", 6))
 			{
 				int dev_no, fifo_id;
-
+				
 				sscanf(buf + 6, "%d %d", &dev_no, &fifo_id);
 
 				AM_DVR_SetSource(dev_no, fifo_id);
@@ -424,14 +421,25 @@ int start_dvr_test(void)
 			}
 		}
 	}
-
+	
 	return 0;
 }
 
 static void handle_signal(int signal)
 {
+	int i;
 	UNUSED(signal);
 	AM_FileEcho("/sys/class/graphics/fb0/blank","0");
+	for (i=0; i< DVR_DEV_COUNT; i++) {
+		AM_DVR_Close(i);
+		AM_DEBUG(1, "Closing DMX%d...", i);
+		AM_DMX_Close(i);
+	}
+#ifndef PLAY_FILE
+	AM_FEND_Close(FEND_DEV_NO);
+#endif
+	if(g_from_kl)
+		keyladder_release();
 	exit(0);
 }
 
@@ -453,7 +461,7 @@ static int start_record(int pid0, int pid1, int len)
 	pid_cnt = len;
 	pids[0] = pid0;
 	pids[1] = pid1;
-
+	
 	strcpy(data_threads[dev_no].file_name, name);
 	spara.pid_count = pid_cnt;
 	memcpy(&spara.pids, pids, sizeof(pids));
@@ -490,14 +498,14 @@ static void* inject_entry(void *arg)
 		ret = read(sock, buf+left, len);
 		if (ret > 0) {
 			AM_DEBUG(1, "recv %d bytes", ret);
-			if (!cnt) {
+			if(!cnt){
 				cnt=50;
 				printf("recv %d\n", ret);
 			}
 			cnt--;
 			left += ret;
 		} else {
-			if (inject_loop && ((ret == 0) ||(errno == EAGAIN))) {
+			if (inject_loop && ((ret==0) ||(errno == EAGAIN))) {
 				printf("loop\n");
 				lseek(sock, 0, SEEK_SET);
 				left=0;
@@ -652,18 +660,18 @@ int main(int argc, char **argv)
 	struct dvb_frontend_parameters p;
 	fe_status_t status;
 	int freq = 0;
-	if (argc>1)
+	if(argc>1)
 	{
 		sscanf(argv[1], "%d", &freq);
 	}
-
-	if (freq)
+	
+	if(freq)
 	{
 		memset(&fpara, 0, sizeof(fpara));
 		AM_TRY(AM_FEND_Open(FEND_DEV_NO, &fpara));
 
 		p.frequency = freq;
-#if 1
+#if 1	
 		p.inversion = INVERSION_AUTO;
 		p.u.ofdm.bandwidth = BANDWIDTH_8_MHZ;
 		p.u.ofdm.code_rate_HP = FEC_AUTO;
@@ -672,15 +680,15 @@ int main(int argc, char **argv)
 		p.u.ofdm.guard_interval = GUARD_INTERVAL_AUTO;
 		p.u.ofdm.hierarchy_information = HIERARCHY_AUTO;
 		p.u.ofdm.transmission_mode = TRANSMISSION_MODE_AUTO;
-#else
+#else		
 		p.u.qam.symbol_rate = 6875000;
 		p.u.qam.fec_inner = FEC_AUTO;
 		p.u.qam.modulation = QAM_64;
-#endif
-
+#endif		
+		
 		AM_TRY(AM_FEND_Lock(FEND_DEV_NO, &p, &status));
-
-		if (status & FE_HAS_LOCK)
+		
+		if(status&FE_HAS_LOCK)
 		{
 			printf("locked\n");
 		}
@@ -690,6 +698,13 @@ int main(int argc, char **argv)
 		}
 	}
 #endif //end PLAY_FILE
+
+	if(g_from_kl){
+		if(keyladder_init() != AM_SUCCESS){
+			printf("Keyladder init failed\n");
+			return AM_FAILURE;
+		}
+	}
 
 	for (i=0; i< DVR_DEV_COUNT; i++)
 //	for (i=0; i< 1; i++)
@@ -708,7 +723,6 @@ int main(int argc, char **argv)
 		memset(&dpara, 0, sizeof(dpara));
 		AM_TRY(AM_DVR_Open(i, &dpara));
 		AM_DVR_SetSource(0 /*dev_no*/, 0 /*fifo_id*/);
-
 		data_threads[i].id = i;
 		data_threads[i].fd = -1;
 		data_threads[i].running = 0;
@@ -725,7 +739,7 @@ int main(int argc, char **argv)
 		inject_play_file(name, fmt, pids[0] /*vpid*/, pids[1] /*apid*/,
 				/*VFORMAT_H264*/VFORMAT_MPEG12 /*vfmt*/, AFORMAT_MPEG /*afmt*/, 0 /*loop*/);
 	}
-
+	
 	start_dvr_test();
 
 	for (i=0; i< DVR_DEV_COUNT; i++)
@@ -737,12 +751,14 @@ int main(int argc, char **argv)
 		AM_DEBUG(1, "Closing DMX%d...", i);
 		AM_DMX_Close(i);
 	}
-
+	
 #ifndef PLAY_FILE
 	AM_FEND_Close(FEND_DEV_NO);
 #endif
 
 end:
 	AM_FileEcho("/sys/class/graphics/fb0/blank","0");
+	if(g_from_kl)
+		keyladder_release();
 	return 0;
 }

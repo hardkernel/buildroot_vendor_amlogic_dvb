@@ -1,6 +1,6 @@
 LOCAL_PATH := $(call my-dir)
 
-#include $(CLEAR_VARS)
+include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= am_dvr_keyladder_test.c am_kl.c
 
@@ -20,8 +20,9 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../include/am_adp $(LOCAL_PATH)/../../andro
 
 LOCAL_STATIC_LIBRARIES := libam_adp
 LOCAL_SHARED_LIBRARIES := libamplayer libcutils liblog libc libdl
+include $(BUILD_EXECUTABLE)
 
-#include $(CLEAR_VARS)
+include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= am_dvr_aes_test.c am_kl.c
 
