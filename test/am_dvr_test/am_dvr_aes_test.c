@@ -24,6 +24,7 @@
 #include <am_dvr.h>
 #include <errno.h>
 #include <am_dsc.h>
+#include "am_kl.h"
 
 /****************************************************************************
  * Macro definitions
@@ -63,8 +64,8 @@ void start_dsc(int dsc, int src, int pid_cnt, int *pids)
 	memset(&dsc_para, 0, sizeof(AM_DSC_OpenPara_t));
 	ret = AM_DSC_Open(dsc, &dsc_para);
 
-	for (i = 0; i < pid_cnt; i++) {
-		if (pids[i] > 0) {
+	for(i=0; i<pid_cnt; i++) {
+		if(pids[i]>0) {
 			int ret;
 			//char key[8] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07};
 			char key[8] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
@@ -82,7 +83,7 @@ void reverse(unsigned char key[16])
 {
     unsigned char tmp[16];
     int i;
-    for (i = 0; i < 16; i++)
+    for(i=0;i<16;i++)
         tmp[i] = key[15-i];
     memcpy(key, tmp, 16);
 }
@@ -94,9 +95,9 @@ void start_aes(int dsc, int src, int pid_cnt, int *pids)
 	int dscc[8];
 	int i;
 	int ret;
-
-	uint8_t key2[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
-	uint8_t key1[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
+	struct meson_kl_config kl_config = {0};
+	uint8_t ekey2[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
+	uint8_t ekey1[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
 	uint8_t ecw[16] =
 	//{0xd3,0x4b,0x29,0xa3,0x7d,0xd4,0x51,0x68,0x64,0xb0,0x53,0x75,0x10,0x2e,0x55,0x18}; //For 000000001
 	//{0xe0,0x63,0xfb,0x95,0xae,0xf1,0xef,0xe5,0xd3,0x4b,0x29,0xa3,0x7d,0xd4,0x51,0x68}; //For 1000000000000000
@@ -105,49 +106,53 @@ void start_aes(int dsc, int src, int pid_cnt, int *pids)
 	//{0xd3,0x4b,0x29,0xa3,0x7d,0xd4,0x51,0x68,0xd3,0x4b,0x29,0xa3,0x7d,0xd4,0x51,0x68}; //For key 00000000
 	memset(&dsc_para, 0, sizeof(AM_DSC_OpenPara_t));
 	ret = AM_DSC_Open(dsc, &dsc_para);
+	
+	memcpy(kl_config.ekey2, ekey2, 16);
+	memcpy(kl_config.ekey1, ekey1, 16);
+	memcpy(kl_config.ecw, ecw, 16);
+	kl_config.kl_levels = 3;
 
-	reverse(ecw);
-	if (g_from_kl)
-	{
-		ret = set_keyladder(key2, key1, ecw);
-		if (ret == AM_FAILURE)
+	if(g_from_kl)
+	{	
+		ret = set_keyladder(&kl_config);
+		if(ret==AM_FAILURE)
 			printf("set_keyladder failed\n");
 	}
 
 	memset(&dsc_para, 0, sizeof(AM_DSC_OpenPara_t));
 	ret = AM_DSC_Open(dsc, &dsc_para);
-	for (i=0; i<pid_cnt; i++) {
-		if (pids[i]>0) {
+	for(i=0; i<pid_cnt; i++) {
+		if(pids[i]>0) {
 #if 1
-			char key[16] =
+			char key[16] = 
 			{1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
-			char iv_key[16] =
+			char iv_key[16] = 
 			{0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
-			//{0x1, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf};
-			//{0x8, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x0f, 0xe, 0xd, 0xc, 0xb, 0xa, 0x0, 0x9};
+			//{0x1, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf}; 
+			//{0x8, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x0f, 0xe, 0xd, 0xc, 0xb, 0xa, 0x0, 0x9}; 
 #else
 			char key1[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15};
 			char key2[16] = {0x00};//, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15};
 			char *key;
-			if (i == 0)  key = key1;
-			else if (i == 1) key = key2;
+			if(i==0)  key = key1;
+			else if(i==1) key = key2;
 #endif
 			ret = AM_DSC_SetSource(dsc, src);
 			ret=AM_DSC_AllocateChannel(dsc, &dscc[i]);
 			ret=AM_DSC_SetChannelPID(dsc, dscc[i], pids[i]);
 			//Set iv key
-			ret = AM_DSC_SetKey(dsc, dscc[i],
-				AM_DSC_KEY_TYPE_AES_IV_EVEN | (g_from_kl ? AM_DSC_KEY_FROM_KL : 0),
+			ret = AM_DSC_SetKey(dsc, dscc[i], 
+				AM_DSC_KEY_TYPE_AES_IV_EVEN | (g_from_kl ? AM_DSC_KEY_FROM_KL : 0), 
 				iv_key);
-			ret = AM_DSC_SetKey(dsc, dscc[i],
-				AM_DSC_KEY_TYPE_AES_IV_ODD |( g_from_kl ? AM_DSC_KEY_FROM_KL : 0),
+			ret = AM_DSC_SetKey(dsc, dscc[i], 
+				AM_DSC_KEY_TYPE_AES_IV_ODD |( g_from_kl ? AM_DSC_KEY_FROM_KL : 0), 
 				iv_key);
 			//Set key
 			ret=AM_DSC_SetKey(dsc,dscc[i],
 				AM_DSC_KEY_TYPE_AES_EVEN | (g_from_kl ? AM_DSC_KEY_FROM_KL : 0),
 				(const uint8_t*)key);
 			ret=AM_DSC_SetKey(dsc,dscc[i],
-				AM_DSC_KEY_TYPE_AES_ODD | (g_from_kl ? AM_DSC_KEY_FROM_KL : 0),
+				AM_DSC_KEY_TYPE_AES_ODD | (g_from_kl ? AM_DSC_KEY_FROM_KL : 0), 
 				(const uint8_t*)key);
 			printf("dsc[%d] set 16Byte aes default key for pid[%d]\n", dsc, pids[i]);
 		}
@@ -253,7 +258,7 @@ static void* inject_entry(void *arg)
 	int len, left=0, send, ret;
 
 	AM_DEBUG(1, "inject thread start");
-	while (inject_running)
+	while(inject_running)
 	{
 		//config PID
 		//AM_FileEcho("/sys/class/amlogic/debug", "write 0 c 0x16f3");//#define TS_PL_PID_INDEX (STB_CBUS_BASE + 0xf3) // 0x16f3
@@ -263,7 +268,7 @@ static void* inject_entry(void *arg)
 		AM_FileEcho("/sys/class/amlogic/debug", "write 0xf000 c 0x1602");
 		//config DEMUX_CONTROL
 		//AM_FileEcho("/sys/class/amlogic/debug", "write 0x650 c 0x1604");
-
+		
 		#if 0
 		AM_FileEcho("/sys/class/amlogic/debug", "read c 0x1602");////#define FEC_INPUT_CONTROL       (STB_CBUS_BASE + DEMUX_1_OFFSET + 0x02)  // 0x1602
 		AM_FileEcho("/sys/class/amlogic/debug", "read c 0x16f0");//#define STB_TOP_CONFIG          (STB_CBUS_BASE + 0xf0) // 0x16f0
@@ -275,13 +280,13 @@ static void* inject_entry(void *arg)
 		//#define CIPLUS_KEY2   0x16fa
 		//#define CIPLUS_KEY3   0x16fb
 		AM_FileEcho("/sys/class/amlogic/debug", "read c 0x16f8"); //#define CIPLUS_KEY0   0x16f8
-		AM_FileEcho("/sys/class/amlogic/debug", "read c 0x16f9"); //#define CIPLUS_KEY0
-		AM_FileEcho("/sys/class/amlogic/debug", "read c 0x16fa"); //#define CIPLUS_KEY0
-		AM_FileEcho("/sys/class/amlogic/debug", "read c 0x16fb"); //#define CIPLUS_KEY0
+		AM_FileEcho("/sys/class/amlogic/debug", "read c 0x16f9"); //#define CIPLUS_KEY0   
+		AM_FileEcho("/sys/class/amlogic/debug", "read c 0x16fa"); //#define CIPLUS_KEY0  
+		AM_FileEcho("/sys/class/amlogic/debug", "read c 0x16fb"); //#define CIPLUS_KEY0   
 
 		len = sizeof(buf)-left;
 		ret = read(sock, buf+left, len);
-		if (ret > 0)
+		if(ret>0)
 		{
 			//AM_DEBUG(1, "recv %d bytes", ret);
 			left += ret;
@@ -291,17 +296,17 @@ static void* inject_entry(void *arg)
 			AM_DEBUG(1, "read failed");
 			//break;
 		}
-		if (stop == 1) {
+		if(stop == 1){
 			break;
 		}
-		if (left)
+		if(left)
 		{
 			send = left;
 			AM_AV_InjectData(AV_DEV_NO, AM_AV_INJECT_MULTIPLEX, buf, &send, -1);
-			if (send)
+			if(send)
 			{
 				left -= send;
-				if (left)
+				if(left)
 					memmove(buf, buf+send, left);
 				AM_DEBUG(0, "inject %d bytes", send);
 			}
@@ -331,7 +336,7 @@ int main(int argc, char **argv)
 	char *name = "/data/record.ts";
 
 	pid_cnt = strtoul(argv[1], NULL, 10);
-	if (pid_cnt >= 1)
+	if(pid_cnt >= 1)
 		pids[0]= strtoul(argv[2], NULL, 10);
 	else if(pid_cnt == 2)
 		pids[1]= strtoul(argv[3], NULL, 10);
@@ -368,6 +373,12 @@ int main(int argc, char **argv)
 	AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_HIU);
 	AM_AV_StartInject(AV_DEV_NO, &av_para);
 	AM_DVR_SetSource(0, 0);
+	if(g_from_kl){
+		if(keyladder_init() != AM_SUCCESS){
+			printf("Keyladder init failed\n");
+			return -1;
+		}
+	}
 
 	printf("cnt %d pid %d %d\n", pid_cnt, pids[0], pids[1]);
 	dsc = 0;
@@ -405,6 +416,7 @@ int main(int argc, char **argv)
 	}
 	close(dd->fd);
 	AM_FileEcho("/sys/class/graphics/fb0/blank","0");
-
+	if(g_from_kl)
+		keyladder_release();
 	return 0;
 }
