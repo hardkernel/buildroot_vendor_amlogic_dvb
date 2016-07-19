@@ -97,14 +97,14 @@ void add_vct_channel_info(vct_channel_info_t **head, vct_channel_info_t *info)
 INT32S atsc_psip_parse_vct(INT8U* data, INT32U length, vct_section_info_t *info)
 {
 	INT8U *sect_data = data;
-	INT32U sect_len = length;
+	INT32S sect_len = length;
 	vct_section_info_t *sect_info = info;
 	vct_section_header_t *sect_head = NULL;
 	vct_sect_chan_info_t *vct_sect_chan = NULL;
 	vct_channel_info_t *tmp_chan_info = NULL;
 	INT8U num_channels_in_section = 0;
 	INT8U *ptr = NULL;
-	INT16U desc_len;
+	INT16S desc_len;
 	INT8U *desc_ptr;
 	int chan_name_len;
 

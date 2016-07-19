@@ -94,12 +94,12 @@ void add_mgt_table_info(com_table_info_t **head, com_table_info_t *info)
 INT32S atsc_psip_parse_mgt(INT8U* data, INT32U length, mgt_section_info_t *info)
 {
     INT8U *sect_data = data;
-    INT32U sect_len = length;
+    INT32S sect_len = length;
     mgt_section_info_t *sect_info = info;
     mgt_section_header_t *sect_head = NULL;
     mgt_table_info_t *table_info = NULL;
     com_table_info_t *tmp_table_info = NULL;
-    INT16U tables_num = 0;
+    INT16S tables_num = 0;
     INT8U *ptr = NULL;
 
     if(data && length && info)

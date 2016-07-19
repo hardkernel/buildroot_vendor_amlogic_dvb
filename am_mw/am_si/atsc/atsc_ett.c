@@ -62,13 +62,13 @@ static void add_ett_section_info(ett_section_info_t **head, ett_section_info_t *
 INT32S atsc_psip_parse_ett(INT8U* data, INT32U length, ett_section_info_t *info)
 {
 	INT8U *sect_data = data;
-	INT32U sect_len = length;
+	INT32S sect_len = length;
 	ett_section_info_t *sect_info = info;
 	ett_section_header_t *sect_head = NULL;
 	ett_event_sect_info_t *ett_sect_evt = NULL;
 	ett_event_info_t *tmp_evt_info = NULL;	
 	INT8U *ptr = NULL;
-	INT16U desc_len, desc_len_back;
+	INT16S desc_len, desc_len_back;
 	INT8U *desc_ptr;
 
 	if(data && length && info)
