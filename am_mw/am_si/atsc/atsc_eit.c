@@ -99,14 +99,14 @@ void add_eit_event_info(eit_event_info_t **head, eit_event_info_t *info)
 INT32S atsc_psip_parse_eit(INT8U* data, INT32U length, eit_section_info_t *info)
 {
 	INT8U *sect_data = data;
-	INT32U sect_len = length;
+	INT32S sect_len = length;
 	eit_section_info_t *sect_info = info;
 	eit_section_header_t *sect_head = NULL;
 	event_sect_info_t *eit_sect_evt = NULL;
 	eit_event_info_t *tmp_evt_info = NULL;
 	INT8U num_events_in_section = 0;
 	INT8U *ptr = NULL;
-	INT16U desc_len, desc_len_back;
+	INT16S desc_len, desc_len_back;
 	INT8U *desc_ptr;
 
 	if(data && length && info)

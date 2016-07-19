@@ -18,6 +18,7 @@ extern "C"
 *****************************************************************************/
 typedef int8_t		INT8S;
 typedef uint8_t		INT8U;
+typedef int16_t	    INT16S;
 typedef uint16_t	INT16U;
 typedef int32_t		INT32S;
 typedef uint32_t	INT32U;

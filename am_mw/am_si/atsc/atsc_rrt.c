@@ -96,14 +96,14 @@ void add_rrt_dimensions_info(rrt_dimensions_info_t **head, rrt_dimensions_info_t
 INT32S atsc_psip_parse_rrt(INT8U* data, INT32U length, rrt_section_info_t *info)
 {
 	INT8U *sect_data = data;
-	INT32U sect_len = length;
+	INT32S sect_len = length;
 	rrt_section_info_t *sect_info = info;
 	rrt_section_header_t *sect_head = NULL;
 	rrt_dimensions_info_t *tmp_dimensions_info = NULL;
 	INT8U dimensions_defined = 0;
-	INT8U rating_region_name_len;
-	INT8U dimensions_name_len;
-	INT8U values_defined, text_len;
+	INT8S rating_region_name_len;
+	INT8S dimensions_name_len;
+	INT8S values_defined, text_len;
 	INT8U i;
 	INT8U *ptr = NULL;
 
