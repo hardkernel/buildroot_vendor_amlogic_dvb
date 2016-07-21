@@ -1410,11 +1410,38 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 						AM_DEBUG(1, "!!Found DTS Descriptor!!!");
 						afmt_tmp = AFORMAT_DTS;
 						break;
-                                        case AM_SI_DESCR_DRA:
-                                                 AM_DEBUG(1, "!!Found DRA Descriptor!!!");
-                                                 afmt_tmp = AFORMAT_DRA;
-                                                 break;
-
+					case AM_SI_DESCR_DRA:
+						AM_DEBUG(1, "!!Found DRA Descriptor!!!");
+						afmt_tmp = AFORMAT_DRA;
+						break;
+					case AM_SI_DESCR_REGISTRATION:
+						AM_DEBUG(1, "!!Found Registeration Descriptor!!!");
+						if (descr->p_decoded != NULL)
+						{
+							dvbpsi_registration_dr_t *pregd = (dvbpsi_registration_dr_t*)descr->p_decoded;
+							switch (pregd->i_format_identifier)
+							{
+								case 0x44545331:
+									AM_DEBUG(1, "found  format identifier for [DTS1]");
+									afmt_tmp = AFORMAT_DTS;
+									break;
+								case 0x44545332:
+									AM_DEBUG(1, "found  format identifier for [DTS2]");
+									afmt_tmp = AFORMAT_DTS;
+									break;
+								case 0x44545333:
+									AM_DEBUG(1, "found  format identifier for [DTS3]");
+									afmt_tmp = AFORMAT_DTS;
+									break;
+								case 0x44545348:
+									AM_DEBUG(1, "found  format identifier for [DTSH]");
+									afmt_tmp = AFORMAT_DTS;
+									break;
+								default:
+									break;
+							}
+						}
+						break;
 					default:
 						break;
 				}
@@ -1456,10 +1483,10 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 			afmt_tmp = AFORMAT_AC3;
 			break;
 		case 0x8A:
-        case 0x82:
-        case 0x85:
-        case 0x86:
-        	afmt_tmp = AFORMAT_DTS;
+		case 0x82:
+		case 0x85:
+		case 0x86:
+			afmt_tmp = AFORMAT_DTS;
 			break;
 		default:
 			break;
