@@ -85,9 +85,9 @@ void *adec_handle = NULL;
 //#define ENABLE_BYPASS_DI
 #define ENABLE_PCR
 
-#define ADEC_START_AUDIO_LEVEL       256
+#define ADEC_START_AUDIO_LEVEL       1024
 #define ADEC_START_VIDEO_LEVEL       2048
-#define ADEC_FORCE_START_AUDIO_LEVEL 1024
+#define ADEC_FORCE_START_AUDIO_LEVEL 2048
 #define DEC_STOP_AUDIO_LEVEL         16
 #define DEC_STOP_VIDEO_LEVEL         512
 #define UP_RESAMPLE_AUDIO_LEVEL      128
@@ -158,6 +158,7 @@ void *adec_handle = NULL;
 #define VIDEO_NEW_FRAME_COUNT_FILE "/sys/module/amvideo/parameters/new_frame_count"
 
 #define DEC_CONTROL_PROP "media.dec_control"
+#define AC3_AMASTER_PROP "media.ac3_amaster"
 
 #define CANVAS_ALIGN(x)    (((x)+7)&~7)
 #define JPEG_WRTIE_UNIT    (32*1024)
@@ -3655,6 +3656,7 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	int val;
 	AM_Bool_t has_video = VALID_PID(tp->vpid);
 	AM_Bool_t has_audio = (VALID_PID(tp->apid) && audio_get_format_supported(tp->afmt));
+	AM_Bool_t ac3_amaster = AM_FALSE;
 
 	AM_DEBUG(1, "aml start ts: V[%d:%d] A[%d:%d] P[%d]", tp->vpid, tp->vfmt, tp->apid, tp->afmt, tp->pcrpid);
 
@@ -3663,7 +3665,20 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	/*patch dec control*/
 	set_dec_control(has_video);
 
-	if(has_video && has_audio)
+
+	if ((tp->afmt == AFORMAT_AC3) || (tp->afmt == AFORMAT_EAC3))
+	{
+		char buf[32];
+		property_get(AC3_AMASTER_PROP, buf, "0");
+
+		if (!strcmp(buf, "1"))
+		{
+			ac3_amaster = AM_TRUE;
+		}
+	}
+
+
+	if (has_video && has_audio && !ac3_amaster)
 	{
 		AM_DEBUG(1, "%s, enable pcr_master", __FUNCTION__);
 		gAVPcrEnable = AM_TRUE;
@@ -3811,7 +3826,7 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 		AM_FileEcho(TSYNC_MODE_FILE, "2");
 	}
 
-	if(has_audio) {
+	if (has_audio && !ac3_amaster) {
 		if(!show_first_frame_nosync()) {
 			property_set("sys.amplayer.drop_pcm", "1");
 		}
@@ -3958,7 +3973,7 @@ static void* aml_av_monitor_thread(void *arg)
 	}
 #else
 	av_paused  = AM_FALSE;
-	adec_start = AM_TRUE;
+	adec_start = (adec_handle != NULL);
 #endif
 
 	AM_FileEcho(VID_BLACKOUT_FILE, "0");
@@ -4321,6 +4336,28 @@ static void* aml_av_monitor_thread(void *arg)
 				}
 			}
 #endif
+		}
+
+#else /*defined(ENABLE_PCR)*/
+		if (has_audio && !adec_start) {
+			adec_start = AM_TRUE;
+
+			if (abuf_level < ADEC_START_AUDIO_LEVEL)
+				adec_start = AM_FALSE;
+
+			if (has_video) {
+				if (vbuf_level < ADEC_START_VIDEO_LEVEL) {
+					adec_start = AM_FALSE;
+				}
+			}
+
+			if (abuf_level >= ADEC_FORCE_START_AUDIO_LEVEL)
+				adec_start = AM_TRUE;
+
+			if (adec_start) {
+				adec_start_decode(ts->fd, dev->ts_player.play_para.afmt, has_video);
+				AM_DEBUG(1, "start audio decoder vlevel %d alevel %d", vbuf_level, abuf_level);
+			}
 		}
 #endif /*!defined ENABLE_PCR*/
 
