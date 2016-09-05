@@ -51,7 +51,7 @@ extern void si_decode_descriptor(dvbpsi_descriptor_t *des);
 dvbpsi_descriptor_t* dvbpsi_NewDescriptor(uint8_t i_tag, uint8_t i_length,
 		uint8_t* p_data)
 {
-	AM_DEBUG(1, "malloc descriptor\n");
+	//AM_DEBUG(1, "malloc descriptor\n");
 	dvbpsi_descriptor_t* p_descriptor
 		= (dvbpsi_descriptor_t*)malloc(sizeof(dvbpsi_descriptor_t));
 	if(!p_descriptor)
@@ -83,7 +83,7 @@ dvbpsi_descriptor_t* dvbpsi_NewDescriptor(uint8_t i_tag, uint8_t i_length,
 			p_descriptor->p_next = NULL;
 
 			/*Decode it*/
-			AM_DEBUG(1,"About to decode descriptor\n");
+			//AM_DEBUG(1,"About to decode descriptor\n");
 			si_decode_descriptor(p_descriptor);
 		}
 		else

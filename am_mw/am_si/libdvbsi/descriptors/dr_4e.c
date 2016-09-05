@@ -82,22 +82,22 @@ dvbpsi_extended_event_dr_t * dvbpsi_DecodeExtendedEventDr(dvbpsi_descriptor_t * 
     	p_descriptor->i_length, text_len);
     return NULL;
   }
-  AM_DEBUG(0, "dr_4e decoder,sub_len:%d, length_of_item:%d, text_len:%d",
-  	p_descriptor->i_length, length_of_item, text_len);
+  //AM_DEBUG(0, "dr_4e decoder,sub_len:%d, length_of_item:%d, text_len:%d",
+  //	p_descriptor->i_length, length_of_item, text_len);
   //check length_of_item
   int check_item = 0;
   for( p = &p_descriptor->p_data[5]; p < &p_descriptor->p_data[5+length_of_item]; )
   {
-  	  AM_DEBUG(0, "dr_4e, ==>1 item_description_length:%d",  p[0]);
+      //AM_DEBUG(0, "dr_4e, ==>1 item_description_length:%d",  p[0]);
       p += 1 + p[0];
 	  check_item += (p[0]+1);
 
 
-	  AM_DEBUG(0, "dr_4e, ==>2 item_length:%d", p[0]);
+	  //AM_DEBUG(0, "dr_4e, ==>2 item_length:%d", p[0]);
       p += 1 + p[0];
 	  check_item += (p[0]+1);
   }
-  AM_DEBUG(0, "dr_4e, ==> check_item:%d, length_of_item:%d", check_item, length_of_item);
+  //AM_DEBUG(0, "dr_4e, ==> check_item:%d, length_of_item:%d", check_item, length_of_item);
   if(length_of_item < check_item)
   {
 	AM_DEBUG(0, "dr_4e check length_of_item error");
