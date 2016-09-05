@@ -348,6 +348,19 @@ static int normal_cmd(const char *cmd)
 			}
 		}
 	}
+	else if(!strncmp(cmd, "adon", 4))
+	{
+		int pid, fmt;
+		AM_ErrorCode_t err;
+		sscanf(cmd+5, "%i %i", &pid, &fmt);
+		err = AM_AV_SetAudioAd(AV_DEV_NO, 1, pid, fmt);
+		printf("SetAudioAd [on] [%d:%d] [err:%d]\n", pid, fmt, err);
+	}
+	else if(!strncmp(cmd, "adoff", 5))
+	{
+		AM_ErrorCode_t err = AM_AV_SetAudioAd(AV_DEV_NO, 0, 0, 0);
+		printf("SetAudioAd [off] [err:%d]\n", err);
+	}
 	else
 	{
 		return 0;
@@ -447,7 +460,7 @@ static void file_play(const char *name, int loop, int pos)
 	AM_DMX_Close(DMX_DEV_NO);
 }
 
-static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, int femode, int argc, char *argv[])
+static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, int femod, int argc, char *argv[])
 {
 	int running = 1;
 	char buf[256];
@@ -489,14 +502,14 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, 
 		p.frequency = freq;
 		if(para.mode == FE_ATSC)
 		{
-			printf("femode: %d\n",femode);
-			p.u.vsb.modulation = femode;
+			printf("femode: %d\n",femod);
+			p.u.vsb.modulation = femod;
 		}
 		else if(para.mode == FE_QAM)
 		{
 			p.u.qam.symbol_rate = 6875000;
 			p.u.qam.fec_inner = FEC_AUTO;
-			p.u.qam.modulation = femode;//QAM_64;
+			p.u.qam.modulation = femod;//QAM_64;
 		}
 		else
 		{
@@ -511,11 +524,11 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, 
 
 		}
 		AM_FEND_Lock(FEND_DEV_NO, &p, &status);
-		
+
 		printf("lock status: 0x%x\n", status);
 	}
 	
-	AM_AV_StartTS(AV_DEV_NO, vpid, apid, vfmt, afmt);
+	AM_AV_StartTSWithPCR(AV_DEV_NO, vpid, apid, vpid, vfmt, afmt);
 
 	while(argc--)
 		normal_cmd(argv[argc]);
@@ -1010,7 +1023,7 @@ static void inject_play_file(char *name, int fmt, int vpid, int apid, int vfmt, 
 	if(fd<0)
 		printf("file[%s] open fail. [%d:%s]\n", name, errno, strerror(errno));
 	else
-		printf("file[%s] opened\n", name);
+		printf("file[%s] opened loop\n", name);
 
 	para.vid_fmt = vfmt;
 	para.aud_fmt = afmt;
@@ -1099,7 +1112,7 @@ int main(int argc, char **argv)
 	if(strcmp(argv[1], "dvb")==0)
 	{
 		int tssrc=AM_DMX_SRC_TS0;
-		int fe_mode = VSB_8;
+		int fe_mod = VSB_8;
 
 		if(argc<3)
 			usage();
@@ -1108,7 +1121,7 @@ int main(int argc, char **argv)
 		
 		if(argc>3)
 			apid = strtol(argv[3], NULL, 0);
-		
+
 		if(argc>4)
 			vfmt = strtol(argv[4], NULL, 0);
 		
@@ -1122,9 +1135,9 @@ int main(int argc, char **argv)
 			tssrc = strtol(argv[7], NULL, 0);
 		
 		if(argc>8)
-			fe_mode = strtol(argv[8], NULL, 0);
+			fe_mod = strtol(argv[8], NULL, 0);
 	
-		dvb_play(vpid, apid, vfmt, afmt, freq, tssrc, fe_mode, argc, argv);
+		dvb_play(vpid, apid, vfmt, afmt, freq, tssrc, fe_mod, argc, argv);
 	}
 	else if(strcmp(argv[1], "ves")==0)
 	{
@@ -1191,7 +1204,7 @@ int main(int argc, char **argv)
 	else if(strcmp(argv[1], "finject")==0)
 	{
 		int fmt = PFORMAT_TS;
-		int loop = 1;
+		int loop = 0;
 
 		if(argc<5)
 			usage();

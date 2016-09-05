@@ -43,16 +43,14 @@ typedef struct
 	uint16_t        pcrpid;          /**< PCR PID*/
 	AM_AV_VFormat_t vfmt;            /**< 视频流格式*/
 	AM_AV_AFormat_t afmt;            /**< 音频流格式*/
+	uint16_t        sub_apid;        /**< sub音频流PID*/
+	AM_AV_AFormat_t sub_afmt;        /**< sub音频流格式*/
 } AV_TSPlayPara_t;
 
 /**\brief TS流播放器*/
 struct AV_TSPlayer
 {
 	void            *drv_data;       /**< 解码驱动相关数据*/
-	uint16_t         aud_pid;        /**< 音频PID*/
-	uint16_t         vid_pid;        /**< 视频PID*/
-	AM_AV_AFormat_t  aud_fmt;        /**< 音频压缩格式*/
-	AM_AV_VFormat_t  vid_fmt;        /**< 视频压缩格式*/
 	AM_AV_TSSource_t src;            /**< TS源*/
 	pthread_t	av_mon_thread;	/**< 监控Audio Video buffer数据变化线程*/
 	AM_Bool_t	av_thread_running;
@@ -86,16 +84,30 @@ struct AV_DataPlayer
 	AV_DataPlayPara_t para;          /**< 播放参数*/
 };
 
+typedef struct {
+	AM_AV_InjectPara_t para;
+	int                sub_aud_pid;
+	AM_AV_AFormat_t    sub_aud_fmt;
+}AV_InjectPlayPara_t;
+
 /**\brief 数据注入播放器参数*/
 struct AV_InjectPlayer
 {
 	void            *drv_data;       /**< 解码驱动相关数据*/
+	AV_InjectPlayPara_t para;
 };
+
+typedef struct {
+	AM_AV_TimeshiftPara_t para;
+	int                sub_aud_pid;
+	AM_AV_AFormat_t    sub_aud_fmt;
+}AV_TimeShiftPlayPara_t;
 
 /**\brief Timeshift播放器参数*/
 struct AV_TimeshiftPlayer
 {
 	void            *drv_data;       /**< 解码驱动相关数据*/
+	AV_TimeShiftPlayPara_t para;
 };
 
 /**\brief JPEG解码参数*/
@@ -200,11 +212,12 @@ struct AM_AV_Driver
 	AM_ErrorCode_t (*switch_ts_audio)(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt);
 	AM_ErrorCode_t (*reset_audio_decoder)(AM_AV_Device_t *dev);
 	AM_ErrorCode_t (*set_drm_mode)(AM_AV_Device_t *dev, int enable);
+	AM_ErrorCode_t (*set_audio_ad)(AM_AV_Device_t *dev, int enable, uint16_t apid, AM_AV_AFormat_t afmt);
 };
 
 /**\brief 音视频播放参数*/
 typedef struct {
-	AM_AV_InjectPara_t    inject;
+	AV_InjectPlayPara_t   inject;
 	AV_TSPlayPara_t       ts;
 	AV_FilePlayPara_t     file;
 	char                  file_name[256];
@@ -215,7 +228,7 @@ typedef struct {
 	int                   pos;
 	AV_DataPlayPara_t     aes;
 	AV_DataPlayPara_t     ves;
-	AM_AV_TimeshiftPara_t time_shift;
+	AV_TimeShiftPlayPara_t   time_shift;
 }AM_AV_PlayPara_t;
 
 /**\brief 音视频解码设备*/

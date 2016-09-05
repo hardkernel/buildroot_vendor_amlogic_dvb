@@ -11,7 +11,6 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_scan/am_scan.c\
 		   am_sub2/am_sub.c am_sub2/dvb_sub.c \
 		   am_tt2/am_tt.c \
-		   am_ad/am_ad.c\
 		   am_si/am_si.c\
 		   am_si/libdvbsi/tables/bat.c\
 		   am_si/libdvbsi/tables/sdt.c\
@@ -59,6 +58,8 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/libdvbsi/descriptors/dr_87.c\
 		   am_si/libdvbsi/descriptors/dr_88.c\
 		   am_si/libdvbsi/descriptors/dr_5d.c\
+		   am_si/libdvbsi/descriptors/dr_6a.c\
+		   am_si/libdvbsi/descriptors/dr_7a.c\
 		   am_si/libdvbsi/psi.c\
 		   am_si/libdvbsi/dvbpsi.c\
 		   am_si/libdvbsi/descriptor.c\
@@ -72,7 +73,6 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/atsc/huffman_decode.c\
 		   am_fend_ctrl/am_sec.c\
 		   am_fend_ctrl/am_fend_ctrl.c\
-		   am_pes/am_pes.c \
 		   am_caman/am_caman.c \
 		   am_caman/ca_dummy.c \
 		   am_ci/libdvben50221/asn_1.c \
@@ -164,7 +164,6 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_scan/am_scan.c\
 		   am_sub2/am_sub.c am_sub2/dvb_sub.c \
 		   am_tt2/am_tt.c \
-		   am_ad/am_ad.c \
 		   am_si/am_si.c\
 		   am_si/libdvbsi/tables/bat.c\
 		   am_si/libdvbsi/tables/sdt.c\
@@ -212,6 +211,8 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/libdvbsi/descriptors/dr_87.c\
 		   am_si/libdvbsi/descriptors/dr_88.c\
 		   am_si/libdvbsi/descriptors/dr_5d.c\
+		   am_si/libdvbsi/descriptors/dr_6a.c\
+		   am_si/libdvbsi/descriptors/dr_7a.c\
 		   am_si/libdvbsi/psi.c\
 		   am_si/libdvbsi/dvbpsi.c\
 		   am_si/libdvbsi/descriptor.c\
@@ -225,7 +226,6 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/atsc/huffman_decode.c\
 		   am_fend_ctrl/am_sec.c\
 		   am_fend_ctrl/am_fend_ctrl.c\
-		   am_pes/am_pes.c \
 		   am_caman/am_caman.c \
 		   am_caman/ca_dummy.c \
 		   am_ci/libdvben50221/asn_1.c \

@@ -223,7 +223,7 @@ const char *sql_stmts[MAX_STMT] =
 	 current_ttx=-1,ttx_pids=?,ttx_types=?,ttx_magazine_nos=?,ttx_page_nos=?,ttx_langs=?,\
 	 skip=0,lock=0,chan_num=?,major_chan_num=?,minor_chan_num=?,access_controlled=?,hidden=?,\
 	 hide_guide=?, source_id=?,favor=?,db_sat_para_id=?,scrambled_flag=?,lcn=-1,hd_lcn=-1,sd_lcn=-1,\
-	 default_chan_num=-1,chan_order=?,lcn_order=0,service_id_order=0,hd_sd_order=0,pmt_pid=?,dvbt2_plp_id=?,sdt_ver=?,pcr_pid=? where db_id=?",
+	 default_chan_num=-1,chan_order=?,lcn_order=0,service_id_order=0,hd_sd_order=0,pmt_pid=?,dvbt2_plp_id=?,sdt_ver=?,pcr_pid=?,aud_exten=? where db_id=?",
 /*QUERY_SRV_BY_TYPE,*/	             "select db_id,service_type from srv_table where db_ts_id=? order by service_id",
 /*UPDATE_CHAN_NUM,*/	             "update srv_table set chan_num=? where db_id=?",
 /*DELETE_TS_EVTS,*/	             "delete  from evt_table where db_ts_id=?",
@@ -521,7 +521,7 @@ static int insert_srv(sqlite3_stmt **stmts, int db_net_id, int db_ts_id, int plp
 }
 
 /**\brief 将audio数据格式化成字符串已便存入数据库*/
-static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, char *langs,char *audio_type)
+static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, char *langs,char *audio_type,char *audio_exten)
 {
 	int i;
 	
@@ -532,6 +532,7 @@ static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, 
 	fmts[0] = 0;
 	langs[0] = 0;
 	audio_type[0] = 0;
+	audio_exten[0] = 0;
 	for (i=0; i<ai->audio_count; i++)
 	{
 		if (i == 0)
@@ -540,6 +541,8 @@ static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, 
 			snprintf(fmts, 256, "%d", ai->audios[i].fmt);
 			sprintf(langs, "%s", ai->audios[i].lang);
 			snprintf(audio_type, 256, "%d",ai->audios[i].audio_type);
+			snprintf(audio_exten, 256, "%d",ai->audios[i].audio_exten);
+			//AM_DEBUG(1, "@@ exten=[0x%x][%d]@@",ai->audios[i].audio_exten,ai->audios[i].audio_exten);
 		}
 		else
 		{
@@ -547,6 +550,8 @@ static void format_audio_strings(AM_SI_AudioInfo_t *ai, char *pids, char *fmts, 
 			snprintf(fmts, 256, "%s %d", fmts, ai->audios[i].fmt);
 			snprintf(langs, 256, "%s %s", langs, ai->audios[i].lang);
 			snprintf(audio_type, 256, "%s %d",audio_type,ai->audios[i].audio_type);
+			snprintf(audio_exten, 256, "%s %d",audio_exten,ai->audios[i].audio_exten);
+			//AM_DEBUG(1, "@@ exten=[0x%x][%d]@@",ai->audios[i].audio_exten,ai->audios[i].audio_exten);
 		}
 	}
 }
@@ -971,7 +976,7 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 {	
 #define str(i) (char*)(strings + i)
 
-	static char strings[14][256];
+	static char strings[15][256];
 
 	if (srv_info->src != FE_ANALOG)
 	{
@@ -1071,8 +1076,8 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 	AM_DEBUG(1, "Video: pid(%d), fmt(%d)", srv_info->vid,srv_info->vfmt);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 10, srv_info->vid);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 11, srv_info->vfmt);
-	format_audio_strings(&srv_info->aud_info, str(0), str(1), str(2),str(13));
-	AM_DEBUG(1, "Audios: pids(%s), fmts(%s), langs(%s)", str(0), str(1), str(2));
+	format_audio_strings(&srv_info->aud_info, str(0), str(1), str(2),str(13),str(14));
+	AM_DEBUG(1, "Audios: pids(%s), fmts(%s), langs(%s) type(%s), exten(%s)", str(0), str(1), str(2),str(13),str(14));
 	sqlite3_bind_text(stmts[UPDATE_SRV], 12, str(0), strlen(str(0)), SQLITE_STATIC);
 	sqlite3_bind_text(stmts[UPDATE_SRV], 13, str(1), strlen(str(1)), SQLITE_STATIC);
 	sqlite3_bind_text(stmts[UPDATE_SRV], 14, str(2), strlen(str(2)), SQLITE_STATIC);
@@ -1108,7 +1113,9 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 	sqlite3_bind_int(stmts[UPDATE_SRV], 38, srv_info->plp_id);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 39, srv_info->sdt_version);
 	sqlite3_bind_int(stmts[UPDATE_SRV], 40, srv_info->pcr_pid);
-	sqlite3_bind_int(stmts[UPDATE_SRV], 41, srv_info->srv_dbid);
+	/*add audio exten*/
+	sqlite3_bind_text(stmts[UPDATE_SRV], 41, str(14),strlen(str(14)), SQLITE_STATIC);
+	sqlite3_bind_int(stmts[UPDATE_SRV], 42, srv_info->srv_dbid);
 	sqlite3_step(stmts[UPDATE_SRV]);
 	sqlite3_reset(stmts[UPDATE_SRV]);
 }

@@ -204,6 +204,13 @@ typedef struct
     uint8_t		last_sec_num;		/**< last_section_number*/
 }AM_SI_SectionHeader_t;
 
+/**\brief SI模块错误代码*/
+enum AM_Audio_Exten
+{
+	AM_Audio_AC3MAIN=1,	/*ac3 main service*/
+	AM_Audio_AC3ASVC,   /**< ac3 ASVC,associated service*/
+	AM_Audio_NOUSE
+};
 /**\brief ES流中描述的音视频数据*/
 typedef struct
 {
@@ -212,8 +219,12 @@ typedef struct
 	{
 		int		pid;	/**< audio PID*/
 		int		fmt;	/**< audio format*/
-		char	lang[10];	/**< audio language*/	
-		int 		audio_type;   /**<audio type*/
+		char	lang[10];	/**< audio language*/
+		int 	audio_type;   /**<audio type*/
+		/*audio_exten is 32 bit,31:24 bit: exten type,the value is enum AM_Audio_Exten vaue*/
+		/*23:16:mainid or asvc id,8 bit*/
+		/*15:0 bit:no use*/
+		int 	audio_exten;/*now used to save ac3 mainid or asvc*/
 	}audios[AM_SI_MAX_AUD_CNT];
 }AM_SI_AudioInfo_t;
 

@@ -1158,6 +1158,12 @@ extern AM_ErrorCode_t AM_AV_ResetAudioDecoder(int dev_no);
 
 extern AM_ErrorCode_t AM_AV_SetVdecErrorRecoveryMode(int dev_no, uint8_t error_recovery_mode);
 
+/**
+* \param apid sub音频流PID
+* \param afmt sub音频压缩格式
+*/
+extern AM_ErrorCode_t AM_AV_SetAudioAd(int dev_no, int enable, uint16_t apid, AM_AV_AFormat_t afmt);
+
 #ifdef __cplusplus
 }
 #endif

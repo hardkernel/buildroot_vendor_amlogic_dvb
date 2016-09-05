@@ -16,6 +16,7 @@
 #include <am_debug.h>
 #include <am_dmx.h>
 #include <am_fend.h>
+#include <am_pes.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -49,23 +50,39 @@ static char *u_ext[USER_MAX]={[0 ... USER_MAX-1] = NULL};
 static int u_bs[USER_MAX]={[0 ... USER_MAX-1] = 0};
 static int u_para_g;
 static FILE *fp[USER_MAX];
+static FILE *fp_e[USER_MAX];
+
+static AM_PES_Handle_t h_pes[USER_MAX];
+static char *u_path_g;
+static char u_path_g_b[256];
 /*
    u_para format:
 	d1 - 0:sec 1:pes
 	d2 - 1:crc : sec only
 	d3 - 1:print
-	d5 - 1:swfilter
-	d6 - 1:ts_tap :pes only
-	d4 - 1:w2file
+	d4 - 1:swfilter
+	d5 - 1:ts_tap :pes only
+	d6 - 1:w2file
 */
-#define UPARA_TYPE     0xf
-#define UPARA_CRC      0xf0
-#define UPARA_PR       0xf00
-#define UPARA_SF       0xf000
-#define UPARA_DMX_TAP  0xf0000
-#define UPARA_FILE     0xf00000
+#define UPARA_TYPE      0xf
+#define UPARA_CRC       0xf0
+#define UPARA_PR        0xf00
+#define UPARA_SF        0xf000
+#define UPARA_DMX_TAP   0xf0000
+#define UPARA_FILE      0xf00000
+#define UPARA_PES2ES    0xf000000
 
 #define get_upara(_i) (u_para[(_i)]? u_para[(_i)] : u_para_g)
+
+
+static void pes_cb(AM_PES_Handle_t handle, uint8_t *buf, int size) {
+	int u = (int)(long)AM_PES_GetUserData(handle);
+	printf("pes cb u=%d b=%p, s:%d\n", u, buf, size);
+	int ret = fwrite(buf, 1, size, fp_e[u-1]);
+	if (ret != size)
+		printf("data w lost\n");
+
+}
 
 static void dump_bytes(int dev_no, int fid, const uint8_t *data, int len, void *user_data)
 {
@@ -136,12 +153,21 @@ static void dump_bytes(int dev_no, int fid, const uint8_t *data, int len, void *
 		}
 
 		if(get_upara(u-1)&UPARA_PR)
-			printf("[%d:%d] %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", u-1, u_pid[u-1],
+			printf("[%d:%d %d] %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", u-1, u_pid[u-1], len,
 				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
 		if(get_upara(u-1)&UPARA_FILE){
-			int ret = fwrite(data, 1, len, fp[(int)(long)user_data-1]);
-			if(ret!=len)
-				printf("data w lost\n");
+			{
+				int ret = fwrite(data, 1, len, fp[u-1]);
+				if (ret != len)
+					printf("data w lost\n");
+			}
+			if (get_upara(u-1)&UPARA_PES2ES) {
+				if (!h_pes[u-1]) {
+					AM_PES_Para_t para = {.packet = pes_cb, .user_data = (void*)u, .payload_only = AM_TRUE,};
+					AM_PES_Create(&h_pes[u-1], &para);
+				}
+				AM_PES_Decode(h_pes[u-1], data, len);
+			}
 		}
 	}
 #endif
@@ -359,9 +385,13 @@ static int get_section(int dmx, int timeout)
 
 			if(get_upara(i)&UPARA_FILE) {
 				char name[32];
-				sprintf(name, "/storage/external_storage/u_%d.dump", i);
+				sprintf(name, "%s/u_%d.dump", u_path_g, i);
 				fp[i] = fopen(name, "wb");
-				if(fp[i])
+				if (fp[i])
+					printf("file open:[%s]\n", name);
+				sprintf(name, "%s/u_%d.es.dump", u_path_g, i);
+				fp_e[i] = fopen(name, "wb");
+				if (fp_e[i])
 					printf("file open:[%s]\n", name);
 			}
 
@@ -465,6 +495,17 @@ int get_para(char *argv)
 	else CASE("bs3", 3, "%i", u_bs[3])
 	else CASE("bs4", 3, "%i", u_bs[4])
 	else CASE("para", 4, "%x", u_para_g)
+	else CASESTR("path", 4, "%s", u_path_g)
+
+	if (u_path_g) {
+		char *e = strchr(u_path_g, ' ');
+		if (e) {
+			int l = e - u_path_g;
+			memcpy(u_path_g_b, u_path_g, l);
+			u_path_g_b[l] = '\0';
+			u_path_g = u_path_g_b;
+		}
+	}
 
 	return 0;
 }
@@ -483,7 +524,7 @@ int main(int argc, char **argv)
 	if(argc==1)
 	{
 		printf(
-			"Usage:%s [freq=] [src=] [dmx=] [layer=] [timeout=] [pat=] [eit=] [bat=] [nit=] [pidx=] [parax=] [para=] [extx=] [bsx=]\n"
+			"Usage:%s [freq=] [src=] [dmx=] [layer=] [timeout=] [pat=] [eit=] [bat=] [nit=] [pidx=] [parax=] [para=] [extx=] [bsx=] [out=]\n"
 			"  default   - src:0 dmx:0 layer:-1 parax:0\n"
 			"  x         - 0~4\n"
 			"  para      - d6->|111111|<-d1\n"
@@ -493,14 +534,16 @@ int main(int argc, char **argv)
 			"    d4 - 1:swfilter\n"
 			"    d5 - 1:ts tap : pes only\n"
 			"    d6 - 1:w2file\n"
+			"    d7 - 1:convert pes to es format, pes only\n"
 			"  ext       - tid....\n"
-			"    eg. 0x82:0xff,0x02:0xff"
-			"    up to 16 filter data:mask(s)"
+			"    eg. 0x82:0xff,0x02:0xff\n"
+			"    up to 16 filter data:mask(s)\n"
 			"  bs        - buffersize\n"
+			"  path      - output path\n"
 			, argv[0]);
 		return 0;
 	}
-	
+
 	for(i=1; i< argc; i++)
 		get_para(argv[i]);
 

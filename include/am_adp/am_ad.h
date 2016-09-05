@@ -47,6 +47,8 @@ typedef struct
 	int pid;    /**< AD 音频的PID*/
 }AM_AD_Para_t;
 
+typedef void (*AM_AD_Callback_t) (const uint8_t *data, int len, void *user_data);
+
 /**\brief 创建AD解析句柄
  * \param[out] handle 返回创建的新句柄
  * \param[in] para AD解析参数
@@ -90,6 +92,7 @@ extern AM_ErrorCode_t AM_AD_Stop(AM_AD_Handle_t handle);
  */
 extern AM_ErrorCode_t AM_AD_SetVolume(AM_AD_Handle_t handle, int vol);
 
+extern AM_ErrorCode_t AM_AD_SetCallback(AM_AD_Handle_t handle, AM_AD_Callback_t cb, void *user);
 #ifdef __cplusplus
 }
 #endif

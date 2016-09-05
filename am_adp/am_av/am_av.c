@@ -61,12 +61,12 @@ static AM_AV_Device_t av_devices[AV_DEV_COUNT] =
 /**\brief 根据设备号取得设备结构指针*/
 static AM_INLINE AM_ErrorCode_t av_get_dev(int dev_no, AM_AV_Device_t **dev)
 {
-	if((dev_no<0) || (dev_no>=AV_DEV_COUNT))
+	if ((dev_no < 0) || (dev_no >= AV_DEV_COUNT))
 	{
 		AM_DEBUG(1, "invalid AV device number %d, must in(%d~%d)", dev_no, 0, AV_DEV_COUNT-1);
 		return AM_AV_ERR_INVALID_DEV_NO;
 	}
-	
+
 	*dev = &av_devices[dev_no];
 	return AM_SUCCESS;
 }
@@ -75,22 +75,22 @@ static AM_INLINE AM_ErrorCode_t av_get_dev(int dev_no, AM_AV_Device_t **dev)
 static AM_INLINE AM_ErrorCode_t av_get_openned_dev(int dev_no, AM_AV_Device_t **dev)
 {
 	AM_TRY(av_get_dev(dev_no, dev));
-	
-	if(!(*dev)->openned)
+
+	if (!(*dev)->openned)
 	{
 		AM_DEBUG(1, "AV device %d has not been openned", dev_no);
 		return AM_AV_ERR_INVALID_DEV_NO;
 	}
-	
+
 	return AM_SUCCESS;
 }
 
 /**\brief 释放数据参数中的相关资源*/
 static void av_free_data_para(AV_DataPlayPara_t *para)
 {
-	if(para->need_free)
+	if (para->need_free)
 	{
-		munmap((uint8_t*)para->data, para->len);
+		munmap((uint8_t *)para->data, para->len);
 		close(para->fd);
 		para->need_free = AM_FALSE;
 	}
@@ -99,12 +99,12 @@ static void av_free_data_para(AV_DataPlayPara_t *para)
 /**\brief 结束播放*/
 static AM_ErrorCode_t av_stop(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 {
-	if(!(dev->mode&mode))
+	if (!(dev->mode&mode))
 		return AM_SUCCESS;
-	
-	if(dev->drv->close_mode)
+
+	if (dev->drv->close_mode)
 		dev->drv->close_mode(dev, mode);
-	
+
 	switch(mode)
 	{
 		case AV_PLAY_VIDEO_ES:
@@ -118,7 +118,7 @@ static AM_ErrorCode_t av_stop(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 		default:
 		break;
 	}
-	
+
 	dev->mode &= ~mode;
 	return AM_SUCCESS;
 }
@@ -126,23 +126,23 @@ static AM_ErrorCode_t av_stop(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 /**\brief 结束所有播放*/
 static AM_ErrorCode_t av_stop_all(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 {
-	if(mode&AV_PLAY_VIDEO_ES)
+	if (mode & AV_PLAY_VIDEO_ES)
 		av_stop(dev, AV_PLAY_VIDEO_ES);
-	if(mode&AV_PLAY_AUDIO_ES)
+	if (mode & AV_PLAY_AUDIO_ES)
 		av_stop(dev, AV_PLAY_AUDIO_ES);
-	if(mode&AV_GET_JPEG_INFO)
+	if (mode & AV_GET_JPEG_INFO)
 		av_stop(dev, AV_GET_JPEG_INFO);
-	if(mode&AV_DECODE_JPEG)
+	if (mode & AV_DECODE_JPEG)
 		av_stop(dev, AV_DECODE_JPEG);
-	if(mode&AV_PLAY_TS)
+	if (mode & AV_PLAY_TS)
 		av_stop(dev, AV_PLAY_TS);
-	if(mode&AV_PLAY_FILE)
+	if (mode & AV_PLAY_FILE)
 		av_stop(dev, AV_PLAY_FILE);
-	if(mode&AV_INJECT)
+	if (mode & AV_INJECT)
 		av_stop(dev, AV_INJECT);
-	if(mode&AV_TIMESHIFT)
+	if (mode & AV_TIMESHIFT)
 		av_stop(dev, AV_TIMESHIFT);
-	
+
 	return AM_SUCCESS;
 }
 
@@ -152,9 +152,9 @@ static AM_ErrorCode_t av_start(AM_AV_Device_t *dev, AV_PlayMode_t mode, void *pa
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_PlayMode_t stop_mode;
 	AV_DataPlayPara_t *dp_para;
-	
+
 	/*检查需要停止的播放模式*/
-	switch(mode)
+	switch (mode)
 	{
 		case AV_PLAY_VIDEO_ES:
 			stop_mode = AV_DECODE_JPEG|AV_GET_JPEG_INFO|AV_PLAY_TS|AV_PLAY_FILE|AV_INJECT|AV_TIMESHIFT;
@@ -184,50 +184,50 @@ static AM_ErrorCode_t av_start(AM_AV_Device_t *dev, AV_PlayMode_t mode, void *pa
 			stop_mode = 0;
 		break;
 	}
-	
-	if(stop_mode)
+
+	if (stop_mode)
 		av_stop_all(dev, stop_mode);
-	
-	if(dev->drv->open_mode && !(dev->mode&mode))
+
+	if (dev->drv->open_mode && !(dev->mode&mode))
 	{
 		ret = dev->drv->open_mode(dev, mode);
-		if(ret!=AM_SUCCESS)
+		if (ret != AM_SUCCESS)
 			return ret;
 	}
-	else if(!dev->drv->open_mode)
+	else if (!dev->drv->open_mode)
 	{
 		AM_DEBUG(1, "do not support the operation");
 		return AM_AV_ERR_NOT_SUPPORTED;
 	}
-	
+
 	dev->mode |= mode;
-	
+
 	/*记录相关参数数据*/
-	switch(mode)
+	switch (mode)
 	{
 		case AV_PLAY_VIDEO_ES:
 		case AV_GET_JPEG_INFO:
 		case AV_DECODE_JPEG:
-			dp_para = (AV_DataPlayPara_t*)para;
+			dp_para = (AV_DataPlayPara_t *)para;
 			dev->vid_player.para = *dp_para;
 			para = dp_para->para;
 		break;
 		case AV_PLAY_AUDIO_ES:
-			dp_para = (AV_DataPlayPara_t*)para;
+			dp_para = (AV_DataPlayPara_t *)para;
 			dev->aud_player.para = *dp_para;
 			para = dp_para->para;
 		break;
 		default:
 		break;
 	}
-	
+
 	/*开始播放*/
-	if(dev->drv->start_mode)
+	if (dev->drv->start_mode)
 	{
 		ret = dev->drv->start_mode(dev, mode, para);
-		if(ret!=AM_SUCCESS)
+		if (ret != AM_SUCCESS)
 		{
-			switch(mode)
+			switch (mode)
 			{
 				case AV_PLAY_VIDEO_ES:
 				case AV_GET_JPEG_INFO:
@@ -243,26 +243,26 @@ static AM_ErrorCode_t av_start(AM_AV_Device_t *dev, AV_PlayMode_t mode, void *pa
 			return ret;
 		}
 	}
-	
+
 	return AM_SUCCESS;
 }
 
 /**\brief 视频输出模式变化事件回调*/
 static void av_vout_format_changed(long dev_no, int event_type, void *param, void *data)
 {
-	AM_AV_Device_t *dev = (AM_AV_Device_t*)data;
+	AM_AV_Device_t *dev = (AM_AV_Device_t *)data;
 
 	UNUSED(dev_no);
-	
-	if(event_type==AM_VOUT_EVT_FORMAT_CHANGED)
+
+	if (event_type == AM_VOUT_EVT_FORMAT_CHANGED)
 	{
 		AM_VOUT_Format_t fmt = (AM_VOUT_Format_t)param;
 		int w, h;
-		
+
 		w = dev->vout_w;
 		h = dev->vout_h;
-		
-		switch(fmt)
+
+		switch (fmt)
 		{
 			case AM_VOUT_FORMAT_576CVBS:
 				w = 720;
@@ -303,25 +303,24 @@ static void av_vout_format_changed(long dev_no, int event_type, void *param, voi
 			default:
 			break;
 		}
-		
-		if((w!=dev->vout_w) || (h!=dev->vout_h))
+
+		if ((w != dev->vout_w) || (h != dev->vout_h))
 		{
 			int nx, ny, nw, nh;
 
-			if(dev->video_w == 0 || dev->video_h == 0)
+			if (dev->video_w == 0 || dev->video_h == 0)
 			{
 				dev->video_w = dev->vout_w;
 				dev->video_h = dev->vout_h;
 			}
-			
-			
+
 			nx = dev->video_x*w/dev->vout_w;
 			ny = dev->video_y*h/dev->vout_h;
 			nw = dev->video_w*w/dev->vout_w;
 			nh = dev->video_h*h/dev->vout_h;
 
 			AM_AV_SetVideoWindow(dev->dev_no, nx, ny, nw, nh);
-			
+
 			dev->vout_w = w;
 			dev->vout_h = h;
 		}
@@ -336,60 +335,60 @@ extern AM_ErrorCode_t av_set_vpath(AM_AV_Device_t *dev, AM_AV_FreeScalePara_t fs
 	dev->vpath_di = di;
 	dev->vpath_ppmgr = pp;
 
-	if(dev->mode & AV_TIMESHIFT){
-		if(dev->drv->timeshift_cmd){
+	if (dev->mode & AV_TIMESHIFT) {
+		if (dev->drv->timeshift_cmd) {
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_RESET_VPATH, NULL);
 		}
-	}else{
+	} else {
 		int mode = dev->mode & ~AV_PLAY_AUDIO_ES;
 		AM_AV_PlayPara_t para = dev->curr_para;
 		void *p = NULL;
 
-		if(mode&AV_PLAY_VIDEO_ES){
+		if (mode & AV_PLAY_VIDEO_ES) {
 			p = &para.ves;
 			dev->vid_player.para.need_free = AM_FALSE;
-		}else if(mode&AV_PLAY_TS){
+		} else if(mode & AV_PLAY_TS) {
 			p = &para.ts;
-		}else if(mode&AV_PLAY_FILE){
+		} else if(mode & AV_PLAY_FILE) {
 			AM_AV_PlayStatus_t status;
 
 			p = &para.file;
-			if(dev->drv->file_status){
-				if(dev->drv->file_status(dev, &status)==AM_SUCCESS){
+			if (dev->drv->file_status) {
+				if (dev->drv->file_status(dev, &status) == AM_SUCCESS) {
 					para.pos = status.position;
 				}
 			}
-		}else if(mode&AV_INJECT){
+		} else if (mode & AV_INJECT) {
 			p = &para.inject;
 		}
 
-		if(mode){
+		if (mode) {
 			av_stop_all(dev, mode);
 		}
 
-		if(dev->drv->set_vpath){
+		if (dev->drv->set_vpath) {
 			ret = dev->drv->set_vpath(dev);
 		}
 
-		if(mode){
+		if (mode) {
 			av_start(dev, mode, p);
 		}
 
-		if(mode&AV_PLAY_VIDEO_ES){
-		}else if(mode&AV_PLAY_TS){
-		}else if(mode&AV_PLAY_FILE){
-			if(para.start && dev->drv->file_cmd){
+		if (mode & AV_PLAY_VIDEO_ES) {
+		} else if (mode & AV_PLAY_TS) {
+		} else if (mode & AV_PLAY_FILE) {
+			if (para.start && dev->drv->file_cmd) {
 				dev->drv->file_cmd(dev, AV_PLAY_SEEK, (void*)(long)para.pos);
-				if(para.pause)
+				if (para.pause)
 					dev->drv->file_cmd(dev, AV_PLAY_PAUSE, NULL);
-				else if(para.speed>0)
+				else if (para.speed>0)
 					dev->drv->file_cmd(dev, AV_PLAY_FF, (void*)(long)para.speed);
-				else if(para.speed<0)
+				else if (para.speed<0)
 					dev->drv->file_cmd(dev, AV_PLAY_FB, (void*)(long)para.speed);
 			}
-		}else if(mode&AV_INJECT){
-			if(para.pause){
-				if(dev->drv->inject_cmd){
+		} else if (mode & AV_INJECT) {
+			if (para.pause) {
+				if (dev->drv->inject_cmd) {
 					dev->drv->inject_cmd(dev, AV_PLAY_PAUSE, NULL);
 				}
 			}
@@ -414,20 +413,20 @@ AM_ErrorCode_t AM_AV_Open(int dev_no, const AM_AV_OpenPara_t *para)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	assert(para);
-	
+
 	AM_TRY(av_get_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&am_gAdpLock);
-	
-	if(dev->openned)
+
+	if (dev->openned)
 	{
 		AM_DEBUG(1, "AV device %d has already been openned", dev_no);
 		ret = AM_AV_ERR_BUSY;
 		goto final;
 	}
-	
+
 	dev->dev_no  = dev_no;
 	pthread_mutex_init(&dev->lock, NULL);
 	dev->openned = AM_TRUE;
@@ -450,22 +449,22 @@ AM_ErrorCode_t AM_AV_Open(int dev_no, const AM_AV_OpenPara_t *para)
 	dev->vpath_fs         = -1;
 	dev->vpath_di         = -1;
 	dev->vpath_ppmgr      = -1;
-	
-	if(dev->drv->open)
+
+	if (dev->drv->open)
 	{
 		ret = dev->drv->open(dev, para);
 		if(ret!=AM_SUCCESS)
 			goto final;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
 		AM_EVT_Subscribe(dev->vout_dev_no, AM_VOUT_EVT_FORMAT_CHANGED, av_vout_format_changed, dev);
 	}
-	
+
 final:
 	pthread_mutex_unlock(&am_gAdpLock);
-	
+
 	return ret;
 }
 
@@ -479,27 +478,27 @@ AM_ErrorCode_t AM_AV_Close(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&am_gAdpLock);
-	
+
 	/*注销事件*/
 	AM_EVT_Unsubscribe(dev->vout_dev_no, AM_VOUT_EVT_FORMAT_CHANGED, av_vout_format_changed, dev);
-	
+
 	/*停止播放*/
 	av_stop_all(dev, dev->mode);
-	
-	if(dev->drv->close)
+
+	if (dev->drv->close)
 		dev->drv->close(dev);
-	
+
 	/*释放资源*/
 	pthread_mutex_destroy(&dev->lock);
-	
+
 	dev->openned = AM_FALSE;
-	
+
 	pthread_mutex_unlock(&am_gAdpLock);
-	
+
 	return ret;
 }
 
@@ -514,19 +513,19 @@ AM_ErrorCode_t AM_AV_SetTSSource(int dev_no, AM_AV_TSSource_t src)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->drv->ts_source)
+
+	if (dev->drv->ts_source)
 		ret = dev->drv->ts_source(dev, src);
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 		dev->ts_player.src = src;
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -546,24 +545,25 @@ AM_ErrorCode_t AM_AV_StartTSWithPCR(int dev_no, uint16_t vpid, uint16_t apid, ui
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_TSPlayPara_t para;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	para.vpid = vpid;
 	para.vfmt = vfmt;
 	para.apid = apid;
 	para.afmt = afmt;
 	para.pcrpid = pcrpid;
-	
+	para.sub_apid = -1;
+
 	ret = av_start(dev, AV_PLAY_TS, &para);
-	if(ret==AM_SUCCESS){
+	if (ret == AM_SUCCESS) {
 		dev->curr_para.ts = para;
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -592,15 +592,15 @@ AM_ErrorCode_t AM_AV_StopTS(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_stop(dev, AV_PLAY_TS);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -618,20 +618,20 @@ AM_ErrorCode_t AM_AV_StartFile(int dev_no, const char *fname, AM_Bool_t loop, in
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_FilePlayPara_t para;
-	
+
 	assert(fname);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	para.name = fname;
 	para.loop = loop;
 	para.pos  = pos;
 	para.start= AM_TRUE;
-	
+
 	ret = av_start(dev, AV_PLAY_FILE, &para);
-	if(ret==AM_SUCCESS)
+	if (ret == AM_SUCCESS)
 	{
 		snprintf(dev->file_player.name, sizeof(dev->file_player.name), "%s", fname);
 		dev->file_player.speed = 0;
@@ -642,9 +642,9 @@ AM_ErrorCode_t AM_AV_StartFile(int dev_no, const char *fname, AM_Bool_t loop, in
 		dev->curr_para.file.name = dev->curr_para.file_name;
 		snprintf(dev->curr_para.file_name, sizeof(dev->curr_para.file_name), "%s", fname);
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -660,18 +660,18 @@ AM_ErrorCode_t AM_AV_AddFile(int dev_no, const char *fname)
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_FilePlayPara_t para;
-	
+
 	assert(fname);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	para.name = fname;
 	para.start= AM_FALSE;
-	
+
 	ret = av_start(dev, AV_PLAY_FILE, &para);
-	if(ret==AM_SUCCESS)
+	if (ret == AM_SUCCESS)
 	{
 		snprintf(dev->file_player.name, sizeof(dev->file_player.name), "%s", fname);
 		dev->file_player.speed = 0;
@@ -682,9 +682,9 @@ AM_ErrorCode_t AM_AV_AddFile(int dev_no, const char *fname)
 		dev->curr_para.file.name = dev->curr_para.file_name;
 		snprintf(dev->curr_para.file_name, sizeof(dev->curr_para.file_name), "%s", fname);
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -698,31 +698,31 @@ AM_ErrorCode_t AM_AV_StartCurrFile(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_PLAY_FILE))
+
+	if (!(dev->mode & AV_PLAY_FILE))
 	{
 		AM_DEBUG(1, "do not in the file play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->file_cmd)
+		if (dev->drv->file_cmd)
 		{
 			ret = dev->drv->file_cmd(dev, AV_PLAY_START, 0);
-			if(ret==AM_SUCCESS){
+			if (ret == AM_SUCCESS) {
 				dev->curr_para.file.start = AM_TRUE;
 				dev->curr_para.start = AM_TRUE;
 			}
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -736,15 +736,15 @@ AM_ErrorCode_t AM_AV_StopFile(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_stop(dev, AV_PLAY_FILE);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -758,30 +758,30 @@ AM_ErrorCode_t AM_AV_PauseFile(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_PLAY_FILE))
+
+	if (!(dev->mode & AV_PLAY_FILE))
 	{
 		AM_DEBUG(1, "do not in the file play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->file_cmd)
+		if (dev->drv->file_cmd)
 		{
 			ret = dev->drv->file_cmd(dev, AV_PLAY_PAUSE, NULL);
-			if(ret==AM_SUCCESS){
+			if (ret == AM_SUCCESS) {
 				dev->curr_para.pause = AM_TRUE;
 			}
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -795,30 +795,30 @@ AM_ErrorCode_t AM_AV_ResumeFile(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_PLAY_FILE))
+
+	if (!(dev->mode & AV_PLAY_FILE))
 	{
 		AM_DEBUG(1, "do not in the file play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->file_cmd)
+		if (dev->drv->file_cmd)
 		{
 			ret = dev->drv->file_cmd(dev, AV_PLAY_RESUME, NULL);
-			if(ret==AM_SUCCESS){
+			if (ret == AM_SUCCESS) {
 				dev->curr_para.pause = AM_FALSE;
 			}
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -832,30 +832,30 @@ AM_ErrorCode_t AM_AV_PauseInject(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_INJECT))
+
+	if (!(dev->mode & AV_INJECT))
 	{
 		AM_DEBUG(1, "do not in the inject mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->inject_cmd)
+		if (dev->drv->inject_cmd)
 		{
 			ret = dev->drv->inject_cmd(dev, AV_PLAY_PAUSE, NULL);
-			if(ret==AM_SUCCESS){
+			if (ret == AM_SUCCESS) {
 				dev->curr_para.pause = AM_TRUE;
 			}
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -869,30 +869,30 @@ AM_ErrorCode_t AM_AV_ResumeInject(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_INJECT))
+
+	if (!(dev->mode & AV_INJECT))
 	{
 		AM_DEBUG(1, "do not in the inject mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->inject_cmd)
+		if (dev->drv->inject_cmd)
 		{
 			ret = dev->drv->inject_cmd(dev, AV_PLAY_RESUME, NULL);
-			if(ret==AM_SUCCESS){
+			if (ret == AM_SUCCESS) {
 				dev->curr_para.pause = AM_FALSE;
 			}
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -909,27 +909,27 @@ AM_ErrorCode_t AM_AV_SeekFile(int dev_no, int pos, AM_Bool_t start)
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_FileSeekPara_t para;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_PLAY_FILE))
+
+	if (!(dev->mode & AV_PLAY_FILE))
 	{
 		AM_DEBUG(1, "do not in the file play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->file_cmd)
+		if (dev->drv->file_cmd)
 		{
 			para.pos   = pos;
 			para.start = start;
 			ret = dev->drv->file_cmd(dev, AV_PLAY_SEEK, &para);
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
 	
 	return ret;
@@ -946,7 +946,7 @@ AM_ErrorCode_t AM_AV_FastForwardFile(int dev_no, int speed)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	if(speed<0)
 	{
 		AM_DEBUG(1, "speed must >= 0");
@@ -954,21 +954,21 @@ AM_ErrorCode_t AM_AV_FastForwardFile(int dev_no, int speed)
 	}
 
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_PLAY_FILE))
+
+	if (!(dev->mode & AV_PLAY_FILE))
 	{
 		AM_DEBUG(1, "do not in the file play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->file_cmd && (dev->file_player.speed!=speed))
+		if (dev->drv->file_cmd && (dev->file_player.speed != speed))
 		{
 			ret = dev->drv->file_cmd(dev, AV_PLAY_FF, (void*)(long)speed);
-			if(ret==AM_SUCCESS)
+			if (ret == AM_SUCCESS)
 			{
 				dev->file_player.speed = speed;
 				dev->curr_para.speed = speed;
@@ -976,9 +976,9 @@ AM_ErrorCode_t AM_AV_FastForwardFile(int dev_no, int speed)
 			}
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -993,29 +993,29 @@ AM_ErrorCode_t AM_AV_FastBackwardFile(int dev_no, int speed)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
-	if(speed<0)
+
+	if (speed < 0)
 	{
 		AM_DEBUG(1, "speed must >= 0");
 		return AM_AV_ERR_INVAL_ARG;
 	}
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_PLAY_FILE))
+
+	if (!(dev->mode & AV_PLAY_FILE))
 	{
 		AM_DEBUG(1, "do not in the file play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->file_cmd && (dev->file_player.speed!=-speed))
+		if (dev->drv->file_cmd && (dev->file_player.speed != -speed))
 		{
 			ret = dev->drv->file_cmd(dev, AV_PLAY_FB, (void*)(long)speed);
-			if(ret==AM_SUCCESS)
+			if (ret == AM_SUCCESS)
 			{
 				dev->file_player.speed = -speed;
 				dev->curr_para.speed = -speed;
@@ -1023,9 +1023,9 @@ AM_ErrorCode_t AM_AV_FastBackwardFile(int dev_no, int speed)
 			}
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1040,29 +1040,29 @@ AM_ErrorCode_t AM_AV_GetCurrFileInfo(int dev_no, AM_AV_FileInfo_t *info)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	assert(info);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_PLAY_FILE))
+
+	if (!(dev->mode & AV_PLAY_FILE))
 	{
 		AM_DEBUG(1, "do not in the file play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->file_info)
+		if (dev->drv->file_info)
 		{
 			ret = dev->drv->file_info(dev, info);
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1077,29 +1077,29 @@ AM_ErrorCode_t AM_AV_GetPlayStatus(int dev_no, AM_AV_PlayStatus_t *status)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	assert(status);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_PLAY_FILE))
+
+	if (!(dev->mode & AV_PLAY_FILE))
 	{
 		AM_DEBUG(1, "do not in the file play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(!dev->drv->file_status)
+		if (!dev->drv->file_status)
 		{
 			AM_DEBUG(1, "do not support file_status");
 			ret = AM_AV_ERR_NOT_SUPPORTED;
 		}
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
 		ret = dev->drv->file_status(dev, status);
 	}
@@ -1120,23 +1120,23 @@ AM_ErrorCode_t AM_AV_StartInject(int dev_no, const AM_AV_InjectPara_t *para)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	assert(para);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_start(dev, AV_INJECT, (void*)para);
-	if(ret==AM_SUCCESS){
-		dev->curr_para.inject = *para;
+	if (ret == AM_SUCCESS) {
+		dev->curr_para.inject.para = *para;
 		dev->curr_para.start = AM_TRUE;
 		dev->curr_para.speed  = 0;
 		dev->curr_para.pause  = AM_FALSE;
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1151,18 +1151,18 @@ AM_ErrorCode_t AM_AV_SetDRMMode(int dev_no, int enable)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_AV_ERR_SYS;
-	
+
 	assert(para);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
 
 	if (dev->drv->set_drm_mode)
 		ret = dev->drv->set_drm_mode(dev, enable);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1180,27 +1180,27 @@ AM_ErrorCode_t AM_AV_InjectData(int dev_no, AM_AV_InjectType_t type, uint8_t *da
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	assert(data && size);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_INJECT))
+
+	if (!(dev->mode & AV_INJECT))
 	{
 		//AM_DEBUG(1, "do not in the file play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->inject)
+		if (dev->drv->inject)
 			ret = dev->drv->inject(dev, type, data, size, timeout);
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1214,15 +1214,15 @@ AM_ErrorCode_t AM_AV_StopInject(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_stop(dev, AV_INJECT);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1243,54 +1243,54 @@ AM_ErrorCode_t AM_AV_GetJPEGInfo(int dev_no, const char *fname, AM_AV_JPEGInfo_t
 	int len;
 	int fd;
 	AV_DataPlayPara_t para;
-	
+
 	assert(fname && info);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	fd = open(fname, O_RDONLY);
-	if(fd==-1)
+	if (fd == -1)
 	{
 		AM_DEBUG(1, "cannot open \"%s\"", fname);
 		return AM_AV_ERR_CANNOT_OPEN_FILE;
 	}
-	
-	if(stat(fname, &sbuf)==-1)
+
+	if (stat(fname, &sbuf) == -1)
 	{
 		AM_DEBUG(1, "stat failed");
 		close(fd);
 		return AM_AV_ERR_SYS;
 	}
-	
+
 	len = sbuf.st_size;
-	
+
 	data = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
-	if(data==(void*)-1)
+	if (data == (void *)-1)
 	{
 		AM_DEBUG(1, "mmap failed");
 		close(fd);
 		return AM_AV_ERR_SYS;
 	}
-	
+
 	para.data  = data;
 	para.len   = len;
 	para.times = 1;
 	para.fd    = fd;
 	para.need_free = AM_TRUE;
 	para.para  = info;
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_start(dev, AV_GET_JPEG_INFO, &para);
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 		av_stop(dev, AV_GET_JPEG_INFO);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
-	if(ret!=AM_SUCCESS)
+
+	if (ret != AM_SUCCESS)
 		av_free_data_para(&para);
-	
+
 	return ret;
 }
 
@@ -1308,30 +1308,30 @@ AM_ErrorCode_t AM_AV_GetJPEGDataInfo(int dev_no, const uint8_t *data, int len, A
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_DataPlayPara_t para;
-	
+
 	assert(data && info);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	para.data  = data;
 	para.len   = len;
 	para.times = 1;
 	para.fd    = -1;
 	para.need_free = AM_FALSE;
 	para.para  = info;
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_start(dev, AV_GET_JPEG_INFO, info);
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 		av_stop(dev, AV_GET_JPEG_INFO);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
-	if(ret!=AM_SUCCESS)
+
+	if (ret != AM_SUCCESS)
 		av_free_data_para(&para);
-	
+
 	return ret;
 }
 
@@ -1355,10 +1355,10 @@ AM_ErrorCode_t AM_AV_DecodeJPEG(int dev_no, const char *fname, const AM_AV_Surfa
 	AV_DataPlayPara_t d_para;
 	AM_AV_SurfacePara_t s_para;
 	AV_JPEGDecodePara_t jpeg;
-	
+
 	assert(fname && surf);
-	
-	if(!para)
+
+	if (!para)
 	{
 		para = &s_para;
 		s_para.width  = 0;
@@ -1366,57 +1366,57 @@ AM_ErrorCode_t AM_AV_DecodeJPEG(int dev_no, const char *fname, const AM_AV_Surfa
 		s_para.angle  = 0;
 		s_para.option = 0;
 	}
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	fd = open(fname, O_RDONLY);
-	if(fd==-1)
+	if (fd == -1)
 	{
 		AM_DEBUG(1, "cannot open \"%s\"", fname);
 		return AM_AV_ERR_CANNOT_OPEN_FILE;
 	}
-	
-	if(stat(fname, &sbuf)==-1)
+
+	if (stat(fname, &sbuf) == -1)
 	{
 		AM_DEBUG(1, "stat failed");
 		close(fd);
 		return AM_AV_ERR_SYS;
 	}
-	
+
 	len = sbuf.st_size;
-	
+
 	data = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
-	if(data==(void*)-1)
+	if (data == (void *)-1)
 	{
 		AM_DEBUG(1, "mmap failed");
 		close(fd);
 		return AM_AV_ERR_SYS;
 	}
-	
+
 	d_para.data  = data;
 	d_para.len   = len;
 	d_para.times = 1;
 	d_para.fd    = fd;
 	d_para.need_free = AM_TRUE;
 	d_para.para  = &jpeg;
-	
+
 	jpeg.surface = NULL;
 	jpeg.para    = *para;
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_start(dev, AV_DECODE_JPEG, &d_para);
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 		av_stop(dev, AV_DECODE_JPEG);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
-	if(ret!=AM_SUCCESS)
+
+	if (ret != AM_SUCCESS)
 		av_free_data_para(&d_para);
 	else
 		*surf = jpeg.surface;
-	
+
 	return ret;
 }
 
@@ -1437,10 +1437,10 @@ AM_ErrorCode_t AM_AV_DacodeJPEGData(int dev_no, const uint8_t *data, int len, co
 	AV_DataPlayPara_t d_para;
 	AM_AV_SurfacePara_t s_para;
 	AV_JPEGDecodePara_t jpeg;
-	
+
 	assert(data && surf);
-	
-	if(!para)
+
+	if (!para)
 	{
 		para = &s_para;
 		s_para.width  = 0;
@@ -1448,32 +1448,32 @@ AM_ErrorCode_t AM_AV_DacodeJPEGData(int dev_no, const uint8_t *data, int len, co
 		s_para.angle  = 0;
 		s_para.option = 0;
 	}
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	d_para.data  = data;
 	d_para.len   = len;
 	d_para.times = 1;
 	d_para.fd    = -1;
 	d_para.need_free = AM_FALSE;
 	d_para.para  = &jpeg;
-	
+
 	jpeg.surface = NULL;
 	jpeg.para    = *para;
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_start(dev, AV_DECODE_JPEG, &d_para);
-	if(ret==AM_SUCCESS)
+	if (ret == AM_SUCCESS)
 		av_stop(dev, AV_DECODE_JPEG);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
-	if(ret!=AM_SUCCESS)
+
+	if (ret != AM_SUCCESS)
 		av_free_data_para(&d_para);
 	else
 		*surf = jpeg.surface;
-	
+
 	return ret;
 }
 
@@ -1494,54 +1494,54 @@ AM_ErrorCode_t AM_AV_StartVideoES(int dev_no, AM_AV_VFormat_t format, const char
 	int len;
 	int fd;
 	AV_DataPlayPara_t para;
-	
+
 	assert(fname);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	fd = open(fname, O_RDONLY);
-	if(fd==-1)
+	if (fd == -1)
 	{
 		AM_DEBUG(1, "cannot open \"%s\"", fname);
 		return AM_AV_ERR_CANNOT_OPEN_FILE;
 	}
-	
-	if(stat(fname, &sbuf)==-1)
+
+	if (stat(fname, &sbuf) == -1)
 	{
 		AM_DEBUG(1, "stat failed");
 		close(fd);
 		return AM_AV_ERR_SYS;
 	}
-	
+
 	len = sbuf.st_size;
-	
+
 	data = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
-	if(data==(void*)-1)
+	if (data == (void *)-1)
 	{
 		AM_DEBUG(1, "mmap failed");
 		close(fd);
 		return AM_AV_ERR_SYS;
 	}
-	
+
 	para.data  = data;
 	para.len   = len;
 	para.times = 1;
 	para.fd    = fd;
 	para.need_free = AM_TRUE;
 	para.para  = (void*)format;
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_start(dev, AV_PLAY_VIDEO_ES, &para);
-	if(ret==AM_SUCCESS){
+	if (ret == AM_SUCCESS) {
 		dev->curr_para.ves = para;
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
-	if(ret!=AM_SUCCESS)
+
+	if (ret != AM_SUCCESS)
 		av_free_data_para(&para);
-	
+
 	return ret;
 }
 
@@ -1559,30 +1559,30 @@ AM_ErrorCode_t AM_AV_StartVideoESData(int dev_no, AM_AV_VFormat_t format, const 
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_DataPlayPara_t para;
-	
+
 	assert(data);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	para.data  = data;
 	para.len   = len;
 	para.times = 1;
 	para.fd    = -1;
 	para.need_free = AM_FALSE;
 	para.para  = (void*)format;
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_start(dev, AV_PLAY_VIDEO_ES, &para);
-	if(ret==AM_SUCCESS){
+	if (ret == AM_SUCCESS) {
 		dev->curr_para.ves = para;
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
-	if(ret!=AM_SUCCESS)
+
+	if (ret != AM_SUCCESS)
 		av_free_data_para(&para);
-	
+
 	return ret;
 }
 
@@ -1604,54 +1604,54 @@ AM_ErrorCode_t AM_AV_StartAudioES(int dev_no, AM_AV_AFormat_t format, const char
 	int len;
 	int fd;
 	AV_DataPlayPara_t para;
-	
+
 	assert(fname);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	fd = open(fname, O_RDONLY);
-	if(fd==-1)
+	if (fd == -1)
 	{
 		AM_DEBUG(1, "cannot open \"%s\"", fname);
 		return AM_AV_ERR_CANNOT_OPEN_FILE;
 	}
-	
-	if(stat(fname, &sbuf)==-1)
+
+	if (stat(fname, &sbuf) == -1)
 	{
 		AM_DEBUG(1, "stat failed");
 		close(fd);
 		return AM_AV_ERR_SYS;
 	}
-	
+
 	len = sbuf.st_size;
-	
+
 	data = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
-	if(data==(void*)-1)
+	if (data == (void *)-1)
 	{
 		AM_DEBUG(1, "mmap failed");
 		close(fd);
 		return AM_AV_ERR_SYS;
 	}
-	
+
 	para.data  = data;
 	para.len   = len;
 	para.times = times;
 	para.fd    = fd;
 	para.need_free = AM_TRUE;
 	para.para  = (void*)format;
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_start(dev, AV_PLAY_AUDIO_ES, &para);
-	if(ret==AM_SUCCESS){
+	if (ret == AM_SUCCESS) {
 		dev->curr_para.aes = para;
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
-	if(ret!=AM_SUCCESS)
+
+	if (ret != AM_SUCCESS)
 		av_free_data_para(&para);
-	
+
 	return ret;
 }
 
@@ -1670,30 +1670,30 @@ AM_ErrorCode_t AM_AV_StartAudioESData(int dev_no, AM_AV_AFormat_t format, const 
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_DataPlayPara_t para;
-	
+
 	assert(data);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	para.data  = data;
 	para.len   = len;
 	para.times = times;
 	para.fd    = -1;
 	para.need_free = AM_FALSE;
 	para.para  = (void*)format;
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_start(dev, AV_PLAY_AUDIO_ES, &para);
-	if(ret==AM_SUCCESS){
+	if (ret == AM_SUCCESS) {
 		dev->curr_para.aes = para;
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
-	if(ret!=AM_SUCCESS)
+
+	if (ret != AM_SUCCESS)
 		av_free_data_para(&para);
-	
+
 	return ret;
 }
 
@@ -1707,15 +1707,15 @@ AM_ErrorCode_t AM_AV_StopVideoES(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_stop(dev, AV_PLAY_VIDEO_ES);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1729,15 +1729,15 @@ AM_ErrorCode_t AM_AV_StopAudioES(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_stop(dev, AV_PLAY_AUDIO_ES);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1756,43 +1756,43 @@ AM_ErrorCode_t AM_AV_SetVideoWindow(int dev_no, int x, int y, int w, int h)
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_VideoWindow_t win;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	win.x = x;
 	win.y = y;
 	win.w = w;
 	win.h = h;
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	//if((dev->video_x!=x) || (dev->video_y!=y) || (dev->video_w!=w) || (dev->video_h!=h))
+
+	//if ((dev->video_x != x) || (dev->video_y != y) || (dev->video_w != w) || (dev->video_h != h))
 	{
-		if(dev->drv->set_video_para)
+		if (dev->drv->set_video_para)
 		{
 			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_WINDOW, &win);
 		}
-	
-		if(ret==AM_SUCCESS)
+
+		if (ret == AM_SUCCESS)
 		{
 			AM_AV_VideoWindow_t win;
-			
+
 			dev->video_x = x;
 			dev->video_y = y;
 			dev->video_w = w;
 			dev->video_h = h;
-			
+
 			win.x = x;
 			win.y = y;
 			win.w = w;
 			win.h = h;
-			
+
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_WINDOW_CHANGED, &win);
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1810,22 +1810,22 @@ AM_ErrorCode_t AM_AV_GetVideoWindow(int dev_no, int *x, int *y, int *w, int *h)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(x)
+
+	if (x)
 		*x = dev->video_x;
-	if(y)
+	if (y)
 		*y = dev->video_y;
-	if(w)
+	if (w)
 		*w = dev->video_w;
-	if(h)
+	if (h)
 		*h = dev->video_h;
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1840,30 +1840,30 @@ AM_ErrorCode_t AM_AV_SetVideoContrast(int dev_no, int val)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
 
 	val = AM_MAX(val, AM_AV_VIDEO_CONTRAST_MIN);
 	val = AM_MIN(val, AM_AV_VIDEO_CONTRAST_MAX);
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->video_contrast!=val)
+
+	if (dev->video_contrast != val)
 	{
-		if(dev->drv->set_video_para)
+		if (dev->drv->set_video_para)
 		{
 			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_CONTRAST, (void*)(long)val);
 		}
-	
-		if(ret==AM_SUCCESS)
+
+		if (ret == AM_SUCCESS)
 		{
 			dev->video_contrast = val;
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_CONTRAST_CHANGED, (void*)(long)val);
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1878,16 +1878,16 @@ AM_ErrorCode_t AM_AV_GetVideoContrast(int dev_no, int *val)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(val)
+
+	if (val)
 		*val = dev->video_contrast;
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1902,30 +1902,30 @@ AM_ErrorCode_t AM_AV_SetVideoSaturation(int dev_no, int val)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	val = AM_MAX(val, AM_AV_VIDEO_SATURATION_MIN);
 	val = AM_MIN(val, AM_AV_VIDEO_SATURATION_MAX);
 
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->video_saturation!=val)
+
+	if (dev->video_saturation != val)
 	{
-		if(dev->drv->set_video_para)
+		if (dev->drv->set_video_para)
 		{
 			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_SATURATION, (void*)(long)val);
 		}
-	
-		if(ret==AM_SUCCESS)
+
+		if (ret == AM_SUCCESS)
 		{
 			dev->video_saturation = val;
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_SATURATION_CHANGED, (void*)(long)val);
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1940,16 +1940,16 @@ AM_ErrorCode_t AM_AV_GetVideoSaturation(int dev_no, int *val)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(val)
+
+	if (val)
 		*val = dev->video_saturation;
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -1964,30 +1964,30 @@ AM_ErrorCode_t AM_AV_SetVideoBrightness(int dev_no, int val)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
 
 	val = AM_MAX(val, AM_AV_VIDEO_BRIGHTNESS_MIN);
 	val = AM_MIN(val, AM_AV_VIDEO_BRIGHTNESS_MAX);
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->video_brightness!=val)
+
+	if (dev->video_brightness != val)
 	{
-		if(dev->drv->set_video_para)
+		if (dev->drv->set_video_para)
 		{
 			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_BRIGHTNESS, (void*)(long)val);
 		}
-	
-		if(ret==AM_SUCCESS)
+
+		if (ret == AM_SUCCESS)
 		{
 			dev->video_brightness = val;
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_BRIGHTNESS_CHANGED, (void*)(long)val);
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2002,16 +2002,16 @@ AM_ErrorCode_t AM_AV_GetVideoBrightness(int dev_no, int *val)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(val)
+
+	if (val)
 		*val = dev->video_brightness;
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2025,27 +2025,27 @@ AM_ErrorCode_t AM_AV_EnableVideo(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	//if(!dev->video_enable)
+
+	//if (!dev->video_enable)
 	{
-		if(dev->drv->set_video_para)
+		if (dev->drv->set_video_para)
 		{
 			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_ENABLE, (void*)AM_TRUE);
 		}
 
-		if(ret==AM_SUCCESS)
+		if (ret == AM_SUCCESS)
 		{
 			dev->video_enable = AM_TRUE;
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_ENABLED, NULL);
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2059,27 +2059,27 @@ AM_ErrorCode_t AM_AV_DisableVideo(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	//if(dev->video_enable)
+
+	//if (dev->video_enable)
 	{
-		if(dev->drv->set_video_para)
+		if (dev->drv->set_video_para)
 		{
 			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_ENABLE, (void*)AM_FALSE);
 		}
 
-		if(ret==AM_SUCCESS)
+		if (ret == AM_SUCCESS)
 		{
 			dev->video_enable = AM_FALSE;
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_DISABLED, NULL);
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2094,24 +2094,24 @@ AM_ErrorCode_t AM_AV_SetVideoAspectRatio(int dev_no, AM_AV_VideoAspectRatio_t ra
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->drv->set_video_para)
+
+	if (dev->drv->set_video_para)
 	{
 		ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_RATIO, (void*)ratio);
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
 		dev->video_ratio = ratio;
 		AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED, (void*)ratio);
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2126,16 +2126,16 @@ AM_ErrorCode_t AM_AV_GetVideoAspectRatio(int dev_no, AM_AV_VideoAspectRatio_t *r
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(ratio)
+
+	if (ratio)
 		*ratio = dev->video_ratio;
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2150,23 +2150,23 @@ AM_ErrorCode_t AM_AV_SetVideoAspectMatchMode(int dev_no, AM_AV_VideoAspectMatchM
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->drv->set_video_para)
+
+	if (dev->drv->set_video_para)
 	{
 		ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_RATIO_MATCH, (void*)mode);
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
 		dev->video_match = mode;
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2181,16 +2181,16 @@ AM_ErrorCode_t AM_AV_GetVideoAspectMatchMode(int dev_no, AM_AV_VideoAspectMatchM
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(mode)
+
+	if (mode)
 		*mode = dev->video_match;
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2204,23 +2204,23 @@ AM_ErrorCode_t AM_AV_EnableVideoBlackout(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->drv->set_video_para)
+
+	if (dev->drv->set_video_para)
 	{
 		ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_BLACKOUT, (void*)AM_TRUE);
 	}
 
-	if(ret==AM_SUCCESS)
+	if (ret == AM_SUCCESS)
 	{
 		dev->video_blackout = AM_TRUE;
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2234,23 +2234,23 @@ AM_ErrorCode_t AM_AV_DisableVideoBlackout(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->drv->set_video_para)
+
+	if (dev->drv->set_video_para)
 	{
 		ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_BLACKOUT, (void*)AM_FALSE);
 	}
 
-	if(ret==AM_SUCCESS)
+	if (ret == AM_SUCCESS)
 	{
 		dev->video_blackout = AM_FALSE;
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2265,27 +2265,27 @@ AM_ErrorCode_t AM_AV_SetVideoDisplayMode(int dev_no, AM_AV_VideoDisplayMode_t mo
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->video_mode!=mode)
+
+	if (dev->video_mode != mode)
 	{
-		if(dev->drv->set_video_para)
+		if (dev->drv->set_video_para)
 		{
 			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_MODE, (void*)mode);
 		}
-	
-		if(ret==AM_SUCCESS)
+
+		if (ret == AM_SUCCESS)
 		{
 			dev->video_mode = mode;
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_DISPLAY_MODE_CHANGED, (void*)mode);
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2300,16 +2300,16 @@ AM_ErrorCode_t AM_AV_GetVideoDisplayMode(int dev_no, AM_AV_VideoDisplayMode_t *m
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(mode)
+
+	if (mode)
 		*mode = dev->video_mode;
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2323,18 +2323,18 @@ AM_ErrorCode_t AM_AV_ClearVideoBuffer(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->drv->set_video_para)
+
+	if (dev->drv->set_video_para)
 	{
 		ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_CLEAR_VBUF, NULL);
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2351,26 +2351,26 @@ AM_ErrorCode_t AM_AV_GetVideoFrame(int dev_no, const AM_AV_SurfacePara_t *para, 
 	AM_AV_Device_t *dev;
 	AM_AV_SurfacePara_t real_para;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	assert(s);
-	
-	if(!para)
+
+	if (!para)
 	{
 		memset(&real_para, 0, sizeof(real_para));
 		para = &real_para;
 	}
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->drv->video_frame)
+
+	if (dev->drv->video_frame)
 		ret = dev->drv->video_frame(dev, para, s);
 	else
 		ret = AM_AV_ERR_NOT_SUPPORTED;
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2386,18 +2386,18 @@ AM_ErrorCode_t AM_AV_GetVideoStatus(int dev_no,AM_AV_VideoStatus_t *status)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->drv->get_video_status)
+
+	if (dev->drv->get_video_status)
 		ret = dev->drv->get_video_status(dev,status);
 	else
 		ret = AM_AV_ERR_NOT_SUPPORTED;
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2412,18 +2412,18 @@ AM_ErrorCode_t AM_AV_GetAudioStatus(int dev_no,AM_AV_AudioStatus_t *status)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
 
-	if(dev->drv->get_audio_status)
+	if (dev->drv->get_audio_status)
 		ret = dev->drv->get_audio_status(dev,status);
 	else
 		ret = AM_AV_ERR_NOT_SUPPORTED;
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2438,24 +2438,24 @@ AM_ErrorCode_t AM_AV_StartTimeshift(int dev_no, const AM_AV_TimeshiftPara_t *par
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	assert(para);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_start(dev, AV_TIMESHIFT, (void*)para);
-	if(ret==AM_SUCCESS){
-		dev->curr_para.time_shift = *para;
+	if (ret == AM_SUCCESS) {
+		dev->curr_para.time_shift.para = *para;
 		snprintf(dev->curr_para.file_name, sizeof(dev->curr_para.file_name), "%s", para->file_path);
 		dev->curr_para.start = AM_FALSE;
 		dev->curr_para.speed = 0;
 		dev->curr_para.pause = AM_FALSE;
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2471,27 +2471,27 @@ AM_ErrorCode_t AM_AV_TimeshiftFillData(int dev_no, uint8_t *data, int size)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	assert(data && size);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	/*if(!(dev->mode&AV_TIMESHIFT))
+
+	/*if (!(dev->mode & AV_TIMESHIFT))
 	{
 		AM_DEBUG(1, "do not in the file play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}*/
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->timeshift_fill)
+		if (dev->drv->timeshift_fill)
 			ret = dev->drv->timeshift_fill(dev, data, size);
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2505,15 +2505,15 @@ AM_ErrorCode_t AM_AV_StopTimeshift(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	ret = av_stop(dev, AV_TIMESHIFT);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2527,30 +2527,30 @@ AM_ErrorCode_t AM_AV_PlayTimeshift(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_TIMESHIFT))
+
+	if (!(dev->mode & AV_TIMESHIFT))
 	{
 		AM_DEBUG(1, "do not in the timeshift play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->timeshift_cmd)
+		if (dev->drv->timeshift_cmd)
 		{
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_START, 0);
-			if(ret==AM_SUCCESS){
+			if (ret == AM_SUCCESS) {
 				dev->curr_para.start = AM_TRUE;
 			}
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2564,30 +2564,30 @@ AM_ErrorCode_t AM_AV_PauseTimeshift(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_TIMESHIFT))
+
+	if (!(dev->mode & AV_TIMESHIFT))
 	{
 		AM_DEBUG(1, "do not in the timeshift play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->timeshift_cmd)
+		if (dev->drv->timeshift_cmd)
 		{
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_PAUSE, NULL);
-			if(ret==AM_SUCCESS){
+			if (ret == AM_SUCCESS) {
 				dev->curr_para.pause = AM_TRUE;
 			}
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2601,30 +2601,30 @@ AM_ErrorCode_t AM_AV_ResumeTimeshift(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_TIMESHIFT))
+
+	if (!(dev->mode & AV_TIMESHIFT))
 	{
 		AM_DEBUG(1, "do not in the timeshift play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->timeshift_cmd)
+		if (dev->drv->timeshift_cmd)
 		{
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_RESUME, NULL);
-			if(ret==AM_SUCCESS){
+			if (ret == AM_SUCCESS) {
 				dev->curr_para.pause = AM_FALSE;
 			}
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2641,29 +2641,29 @@ AM_ErrorCode_t AM_AV_SeekTimeshift(int dev_no, int pos, AM_Bool_t start)
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_FileSeekPara_t para;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_TIMESHIFT))
+
+	if (!(dev->mode & AV_TIMESHIFT))
 	{
 		AM_DEBUG(1, "do not in the Timeshift play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->timeshift_cmd)
+		if (dev->drv->timeshift_cmd)
 		{
 			para.pos   = pos;
 			para.start = start;
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_SEEK, &para);
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2678,36 +2678,36 @@ AM_ErrorCode_t AM_AV_FastForwardTimeshift(int dev_no, int speed)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
-	if(speed<0)
+
+	if (speed < 0)
 	{
 		AM_DEBUG(1, "speed must >= 0");
 		return AM_AV_ERR_INVAL_ARG;
 	}
 
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_TIMESHIFT))
+
+	if (!(dev->mode & AV_TIMESHIFT))
 	{
 		AM_DEBUG(1, "do not in the Timeshift play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->timeshift_cmd)
+		if (dev->drv->timeshift_cmd)
 		{
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_FF, (void*)(long)speed);
-			if(ret==AM_SUCCESS){
+			if (ret == AM_SUCCESS) {
 				dev->curr_para.speed = speed;
 			}
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2722,36 +2722,36 @@ AM_ErrorCode_t AM_AV_FastBackwardTimeshift(int dev_no, int speed)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
-	if(speed<0)
+
+	if (speed < 0)
 	{
 		AM_DEBUG(1, "speed must >= 0");
 		return AM_AV_ERR_INVAL_ARG;
 	}
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_TIMESHIFT))
+
+	if (!(dev->mode & AV_TIMESHIFT))
 	{
 		AM_DEBUG(1, "do not in the Timeshift play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->timeshift_cmd)
+		if (dev->drv->timeshift_cmd)
 		{
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_FB, (void*)(long)-speed);
-			if(ret==AM_SUCCESS){
+			if (ret == AM_SUCCESS) {
 				dev->curr_para.speed = -speed;
 			}
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2768,29 +2768,29 @@ AM_ErrorCode_t AM_AV_SwitchTimeshiftAudio(int dev_no, int apid, int afmt)
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_TSPlayPara_t para;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_TIMESHIFT))
+
+	if (!(dev->mode & AV_TIMESHIFT))
 	{
 		AM_DEBUG(1, "do not in the Timeshift play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->timeshift_cmd)
+		if (dev->drv->timeshift_cmd)
 		{
 			para.apid   = apid;
 			para.afmt 	= afmt;
 			ret = dev->drv->timeshift_cmd(dev, AV_PLAY_SWITCH_AUDIO, &para);
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2806,27 +2806,27 @@ AM_ErrorCode_t AM_AV_GetTimeshiftInfo(int dev_no, AM_AV_TimeshiftInfo_t *info)
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	AV_TSPlayPara_t para;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(!(dev->mode&AV_TIMESHIFT))
+
+	if (!(dev->mode & AV_TIMESHIFT))
 	{
 		AM_DEBUG(1, "do not in the Timeshift play mode");
 		ret = AM_AV_ERR_ILLEGAL_OP;
 	}
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->get_timeshift_info)
+		if (dev->drv->get_timeshift_info)
 		{
 			ret = dev->drv->get_timeshift_info(dev, info);
 		}
 	}
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2847,16 +2847,16 @@ AM_AV_SetVPathPara(int dev_no, AM_AV_FreeScalePara_t fs, AM_AV_DeinterlacePara_t
 
 	UNUSED(dev_no);
 	UNUSED(di);
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
 
 	//ret = av_set_vpath(dev, fs, di, pp);
 	ret = av_set_vpath(dev, fs, AM_AV_DEINTERLACE_DISABLE, pp);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2872,16 +2872,16 @@ AM_ErrorCode_t AM_AV_SwitchTSAudio(int dev_no, uint16_t apid, AM_AV_AFormat_t af
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	if ((dev->mode & AV_PLAY_TS) && dev->drv->switch_ts_audio) 
 		ret = dev->drv->switch_ts_audio(dev, apid, afmt);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2889,16 +2889,16 @@ AM_ErrorCode_t AM_AV_ResetAudioDecoder(int dev_no)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
+
 	if ((dev->mode & AV_PLAY_TS) && dev->drv->switch_ts_audio) 
 		ret = dev->drv->reset_audio_decoder(dev);
-	
+
 	pthread_mutex_unlock(&dev->lock);
-	
+
 	return ret;
 }
 
@@ -2910,21 +2910,39 @@ AM_ErrorCode_t AM_AV_ResetAudioDecoder(int dev_no)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_av.h)
  */
-
 AM_ErrorCode_t AM_AV_SetVdecErrorRecoveryMode(int dev_no, uint8_t error_recovery_mode)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
 
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->drv->set_video_para)
+
+	if (dev->drv->set_video_para)
 	{
 		ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_ERROR_RECOVERY_MODE, (void*)(long)error_recovery_mode);
 	}
-	
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+AM_ErrorCode_t AM_AV_SetAudioAd(int dev_no, int enable, uint16_t apid, AM_AV_AFormat_t afmt)
+{
+	AM_AV_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_TRY(av_get_openned_dev(dev_no, &dev));
+
+	pthread_mutex_lock(&dev->lock);
+
+	if (dev->drv->set_audio_ad)
+	{
+		ret = dev->drv->set_audio_ad(dev, enable, apid, afmt);
+	}
+
 	pthread_mutex_unlock(&dev->lock);
 
 	return ret;

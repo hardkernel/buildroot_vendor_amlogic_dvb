@@ -44,6 +44,7 @@ typedef void (*AM_PES_PacketCb_t)(AM_PES_Handle_t handle, uint8_t *buf, int size
 typedef struct
 {
 	AM_PES_PacketCb_t packet;    /**< PES包回调*/
+	AM_Bool_t     payload_only;
 	void             *user_data; /**< 用户定义数据*/
 }AM_PES_Para_t;
 

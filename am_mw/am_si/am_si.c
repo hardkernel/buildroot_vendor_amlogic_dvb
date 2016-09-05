@@ -459,16 +459,17 @@ void si_decode_descriptor(dvbpsi_descriptor_t *des)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_LCN_83, 			dvbpsi_DecodeLogicalChannelNumber83Dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_LCN_87, 			dvbpsi_DecodeLogicalChannelNumber87Dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_LCN_88, 			dvbpsi_DecodeLogicalChannelNumber88Dr)
+		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_AC3, 			dvbpsi_DecodeAC3Dr)
+		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_ENHANCED_AC3, 	dvbpsi_DecodeENAC3Dr)
 		default:
 			break;
 	}
-	
 }
 
 
 /**\brief 将ISO6937转换为UTF-8编码*/
 static AM_ErrorCode_t si_convert_iso6937_to_utf8(const char *src, int src_len, char *dest, int *dest_len)
-{     
+{
 	uint16_t ch;
 	int dlen, i;
 	uint8_t b;
@@ -879,16 +880,16 @@ iso6937_end:
 
 		return iconv_close(handle);
     }
-    
+
     free(ucs2);
-    
+
     return -1;
 } 
 
-static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang[3],int audio_type)
+static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang[3],int audio_type,int audio_exten)
 {
 	int i;
-	
+
 	for (i=0; i<ai->audio_count; i++)
 	{
 		if (ai->audios[i].pid == aud_pid &&
@@ -910,6 +911,7 @@ static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char l
 	ai->audios[ai->audio_count].pid = aud_pid;
 	ai->audios[ai->audio_count].fmt = aud_fmt;
 	ai->audios[ai->audio_count].audio_type = audio_type;
+	ai->audios[ai->audio_count].audio_exten = audio_exten;
 	memset(ai->audios[ai->audio_count].lang, 0, sizeof(ai->audios[ai->audio_count].lang));
 	if (lang[0] != 0)
 	{
@@ -919,8 +921,8 @@ static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char l
 	{
 		snprintf(ai->audios[ai->audio_count].lang, sizeof(ai->audios[ai->audio_count].lang), "Audio%d", ai->audio_count+1);
 	}
-	
-	AM_DEBUG(0, "Add a audio: pid %d, fmt %d, language: %s ,audio_type:%d", aud_pid, aud_fmt, ai->audios[ai->audio_count].lang,audio_type);
+
+	AM_DEBUG(0, "Add a audio: pid %d, fmt %d, language: %s ,audio_type:%d, audio_exten:0x%x", aud_pid, aud_fmt, ai->audios[ai->audio_count].lang,audio_type,audio_exten);
 
 	ai->audio_count++;
 }
@@ -1367,6 +1369,55 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 	}
 }
 
+/**\brief 根据ac3 des 获取audio 的 exten
+ * \param [in] p_decoded dvbpsi_AC3_dr_t
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_si.h)
+ */
+AM_ErrorCode_t AM_SI_GetAudioExten_from_AC3des(dvbpsi_AC3_dr_t *p_decoded,int *p_exten)
+{
+	int i_exten = 0;
+	/*i_exten is 32 bit,31:24 bit: exten type,*/
+	/*23:16:mainid or asvc id,8 bit*/
+	/*15:0 bit:no use*/
+	if (p_decoded->i_mainid_flag == 1)
+	{
+		i_exten = AM_Audio_AC3MAIN<<24 | p_decoded->i_mainid<<16;
+	}
+	if (p_decoded->i_asvc_flag == 1)
+	{
+		i_exten = AM_Audio_AC3ASVC<<24 | p_decoded->i_asvc<<16;
+	}
+	*p_exten = i_exten;
+	AM_DEBUG(1, "audio->audio_exten : 0x%04x", i_exten);
+	return  AM_SUCCESS;
+}
+
+/**\brief 根据enac3 des 获取audio 的 exten
+ * \param [in] p_decoded dvbpsi_ENAC3_dr_t
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_si.h)
+ */
+AM_ErrorCode_t AM_SI_GetAudioExten_from_ENAC3des(dvbpsi_ENAC3_dr_t *p_decoded,int *p_exten)
+{
+	int i_exten = 0;
+	/*i_exten is 32 bit,31:24 bit: exten type,*/
+	/*23:16:mainid or asvc id,8 bit*/
+	/*15:0 bit:no use*/
+	if (p_decoded->i_mainid_flag == 1)
+	{
+		i_exten = AM_Audio_AC3MAIN<<24 | p_decoded->i_mainid<<16;
+	}
+	if (p_decoded->i_asvc_flag == 1)
+	{
+		i_exten = AM_Audio_AC3ASVC<<24 | p_decoded->i_asvc<<16;
+	}
+	*p_exten = i_exten;
+	AM_DEBUG(1, "audio->audio_exten : 0x%04x", i_exten);
+	return  AM_SUCCESS;
+}
 /**\brief 从一个ES流中提取音视频
  * \param [in] es ES流
  * \param [out] vid 提取出的视频PID
@@ -1380,9 +1431,10 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 {
 	char lang_tmp[3];
 	int	audio_type=0;
+	int	audio_exten=0;
 	int afmt_tmp, vfmt_tmp;
 	dvbpsi_descriptor_t *descr;
-	
+
 	afmt_tmp = -1;
 	vfmt_tmp = -1;
 	memset(lang_tmp, 0, sizeof(lang_tmp));
@@ -1397,10 +1449,18 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 					case AM_SI_DESCR_AC3:
 						AM_DEBUG(1, "!!Found AC3 Descriptor!!!");
 						afmt_tmp = AFORMAT_AC3;
+						if (descr->p_decoded != NULL)
+						{
+							AM_SI_GetAudioExten_from_AC3des((dvbpsi_AC3_dr_t*)descr->p_decoded,&audio_exten);
+						}
 						break;
 					case AM_SI_DESCR_ENHANCED_AC3:
 						AM_DEBUG(1, "!!Found Enhanced AC3 Descriptor!!!");
 						afmt_tmp = AFORMAT_EAC3;
+						if (descr->p_decoded != NULL)
+						{
+							AM_SI_GetAudioExten_from_ENAC3des((dvbpsi_ENAC3_dr_t*)descr->p_decoded,&audio_exten);
+						}
 						break;
 					case AM_SI_DESCR_AAC:
 						AM_DEBUG(1, "!!Found AAC Descriptor!!!");
@@ -1505,7 +1565,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 			if (descr->i_tag == AM_SI_DESCR_ISO639 && descr->p_decoded != NULL)
 			{
 				dvbpsi_iso639_dr_t *pisod = (dvbpsi_iso639_dr_t*)descr->p_decoded;
-				if (pisod->i_code_count > 0) 
+				if (pisod->i_code_count > 0)
 				{
 					memcpy(lang_tmp, pisod->code[0].iso_639_code, sizeof(lang_tmp));
 					audio_type = pisod->code[0].i_audio_type;
@@ -1514,9 +1574,9 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 			}
 		AM_SI_LIST_END()
 		/* Add a audio */
-		si_add_audio(aud_info, es->i_pid, afmt_tmp, lang_tmp,audio_type);
+		si_add_audio(aud_info, es->i_pid, afmt_tmp, lang_tmp,audio_type,audio_exten);
 	}
-	
+
 	return AM_SUCCESS;
 }
 
@@ -1533,14 +1593,15 @@ AM_ErrorCode_t AM_SI_ExtractAVFromATSCVC(vct_channel_info_t *vcinfo, int *vid, i
 {
 	char lang_tmp[3];
 	int	audio_type=0;
+	int audio_exten = 0;
 	int afmt_tmp, vfmt_tmp, i;
 	atsc_descriptor_t *descr;
-	
+
 	afmt_tmp = -1;
 	vfmt_tmp = -1;
 	memset(lang_tmp, 0, sizeof(lang_tmp));
 
-	AM_SI_LIST_BEGIN(vcinfo->desc, descr)			
+	AM_SI_LIST_BEGIN(vcinfo->desc, descr)
 		if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE_LOCATION)
 		{
 			atsc_service_location_dr_t *asld = (atsc_service_location_dr_t*)descr->p_decoded;
@@ -1571,7 +1632,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromATSCVC(vct_channel_info_t *vcinfo, int *vid, i
 				{
 					memcpy(lang_tmp, asld->elem[i].iso_639_code, sizeof(lang_tmp));
 					audio_type = asld->elem[i].i_audio_type;
-					si_add_audio(aud_info, asld->elem[i].i_pid, afmt_tmp, lang_tmp,audio_type);
+					si_add_audio(aud_info, asld->elem[i].i_pid, afmt_tmp, lang_tmp,audio_type,audio_exten);
 				}
 			}
 		}
