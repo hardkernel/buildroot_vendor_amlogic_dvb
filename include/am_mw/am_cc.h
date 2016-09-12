@@ -188,6 +188,7 @@ typedef struct
 	AM_CC_DrawEnd_t     draw_end;
 	uint8_t             *bmp_buffer;
 	int                 pitch;
+	int 				bypass_cc_enable;
 	void                *user_data;
 }AM_CC_CreatePara_t;
 

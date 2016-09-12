@@ -26,7 +26,7 @@
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
- 
+
 #define CC_POLL_TIMEOUT 1000
 #define CC_FLASH_PERIOD 1000
 
@@ -34,17 +34,28 @@
 #define VIDEO_WIDTH_FILE "/sys/class/video/frame_width"
 #define VIDEO_HEIGHT_FILE "/sys/class/video/frame_height"
 
+#define _TM_T 'V'
+struct vout_CCparam_s {
+    unsigned int type;
+	unsigned char data1;
+	unsigned char data2;
+};
+#define VOUT_IOC_CC_OPEN           _IO(_TM_T, 0x01)
+#define VOUT_IOC_CC_CLOSE          _IO(_TM_T, 0x02)
+#define VOUT_IOC_CC_DATA           _IOW(_TM_T, 0x03, struct vout_CCparam_s)
+
 
 #define SAFE_TITLE_AREA_WIDTH (672) /* 16 * 42 */
 #define SAFE_TITLE_AREA_HEIGHT (390) /* 26 * 15 */
 #define ROW_W (SAFE_TITLE_AREA_WIDTH/42)
 #define ROW_H (SAFE_TITLE_AREA_HEIGHT/15)
 
- 
+
 /****************************************************************************
  * Static data
  ***************************************************************************/
- static const vbi_opacity opacity_map[AM_CC_OPACITY_MAX] = 
+static int vout_fd = -1;
+ static const vbi_opacity opacity_map[AM_CC_OPACITY_MAX] =
 {
 	VBI_OPAQUE,             /*not used, just take a position*/
 	VBI_TRANSPARENT_SPACE,  /*AM_CC_OPACITY_TRANSPARENT*/
@@ -53,7 +64,7 @@
 	VBI_OPAQUE,             /*AM_CC_OPACITY_FLASH*/
 };
 
-static const vbi_color color_map[AM_CC_COLOR_MAX] = 
+static const vbi_color color_map[AM_CC_COLOR_MAX] =
 {
 	VBI_BLACK, /*not used, just take a position*/
 	VBI_WHITE,
@@ -68,7 +79,7 @@ static const vbi_color color_map[AM_CC_COLOR_MAX] =
 
 static AM_ErrorCode_t am_cc_calc_caption_size(int *w, int *h)
 {
-	int rows, vw, vh;	
+	int rows, vw, vh;
 	char wbuf[32];
 	char hbuf[32];
 	AM_ErrorCode_t ret;
@@ -165,9 +176,9 @@ static uint8_t *am_cc_get_page_canvas(AM_CC_Decoder_t *cc, struct vbi_page *pg)
 
 		r = x + dw->column_count * ROW_W;
 		b = y + dw->row_count * ROW_H;
-		
+
 		AM_DEBUG(2, "x %d, y %d, r %d, b %d", x, y, r, b);
-		
+
 		if (x < 0)
 			x = 0;
 		if (y < 0)
@@ -180,11 +191,11 @@ static uint8_t *am_cc_get_page_canvas(AM_CC_Decoder_t *cc, struct vbi_page *pg)
 		/*calc the real displayed rows & cols*/
 		pg->columns = (r - x) / ROW_W;
 		pg->rows = (b - y) / ROW_H;
-				
+
 		AM_DEBUG(2, "window prio(%d), row %d, cols %d ar %d, ah %d, av %d, "
-			"ap %d, screen position(%d, %d), displayed rows/cols(%d, %d)", 
+			"ap %d, screen position(%d, %d), displayed rows/cols(%d, %d)",
 			dw->priority, dw->row_count, dw->column_count, dw->anchor_relative,
-			dw->anchor_horizontal, dw->anchor_vertical, dw->anchor_point, 
+			dw->anchor_horizontal, dw->anchor_vertical, dw->anchor_point,
 			x, y, pg->rows, pg->columns);
 
 		return cc->cpara.bmp_buffer + y*cc->cpara.pitch + x*4;
@@ -195,14 +206,14 @@ static void am_cc_clear_safe_title(AM_CC_Decoder_t *cc)
 {
 	int i;
 	uint8_t *p = cc->cpara.bmp_buffer;
-	
+
 	for (i=0; i<SAFE_TITLE_AREA_HEIGHT; i++)
 	{
 		memset(p, 0x00, SAFE_TITLE_AREA_WIDTH * 4);
 		p += cc->cpara.pitch;
 	}
 }
-	
+
 static void am_cc_override_by_user_options(AM_CC_Decoder_t *cc, struct vbi_page *pg)
 {
 	int i, j, opacity;
@@ -309,17 +320,17 @@ static void am_cc_vbi_event_handler(vbi_event *ev, void *user_data)
 	if(ev->type != VBI_EVENT_CAPTION)
 		return;
 	pthread_mutex_lock(&cc->lock);
-	
-	AM_DEBUG(2, "VBI Caption event: pgno %d, cur_pgno %d", 
+
+	AM_DEBUG(2, "VBI Caption event: pgno %d, cur_pgno %d",
 			ev->ev.caption.pgno, cc->vbi_pgno);
-	
-	if (cc->vbi_pgno == ev->ev.caption.pgno && 
+
+	if (cc->vbi_pgno == ev->ev.caption.pgno &&
 		(cc->vbi_pgno <= 8 || cc->flash_stat == FLASH_NONE))
 	{
 		cc->render_flag= AM_TRUE;
 		pthread_cond_signal(&cc->cond);
 	}
-	
+
 	pthread_mutex_unlock(&cc->lock);
 }
 
@@ -335,7 +346,7 @@ static void dump_cc_data(uint8_t *buff, int size)
 		sprintf(buf+i*3, "%02x ", buff[i]);
 	}
 
-	AM_DEBUG(2, "%s", buf);
+	AM_DEBUG(3, "%s", buf);
 }
 
 static void am_cc_check_flash(AM_CC_Decoder_t *cc)
@@ -364,40 +375,40 @@ static void am_cc_render(AM_CC_Decoder_t *cc)
 	AM_CC_DrawPara_t draw_para;
 	struct vbi_page sub_pages[8];
 	int sub_pg_cnt, i;
-	
+
 	AM_DEBUG(2, "CC Rendering...");
 
 	/*Flashing?*/
 	am_cc_check_flash(cc);
 
-	if (am_cc_calc_caption_size(&draw_para.caption_width, 
+	if (am_cc_calc_caption_size(&draw_para.caption_width,
 		&draw_para.caption_height) != AM_SUCCESS)
 		return;
-	
+
 	if (cc->cpara.draw_begin)
 		cc->cpara.draw_begin(cc, &draw_para);
 
 	/*clear safe title*/
 	if (cc->vbi_pgno > 8)
 		am_cc_clear_safe_title(cc);
-	
+
 	/*fetch cc pages from libzvbi*/
 	sub_pg_cnt = AM_ARRAY_SIZE(sub_pages);
 	tvcc_fetch_page(&cc->decoder, cc->vbi_pgno, &sub_pg_cnt, sub_pages);
-	
+
 	/*draw each*/
 	for (i=0; i<sub_pg_cnt; i++)
 	{
 		/*Override by user options*/
 		am_cc_override_by_user_options(cc, &sub_pages[i]);
-		
+
 		vbi_draw_cc_page_region(
-			&sub_pages[i], VBI_PIXFMT_RGBA32_LE, 
+			&sub_pages[i], VBI_PIXFMT_RGBA32_LE,
 			am_cc_get_page_canvas(cc, &sub_pages[i]),
-			cc->cpara.pitch, 0, 0, 
+			cc->cpara.pitch, 0, 0,
 			sub_pages[i].columns, sub_pages[i].rows);
 	}
-	
+
 	if (cc->cpara.draw_end)
 		cc->cpara.draw_end(cc, &draw_para);
 }
@@ -416,6 +427,48 @@ static void am_cc_handle_event(AM_CC_Decoder_t *cc, int evt)
 	}
 }
 
+static void am_cc_set_tv(const uint8_t *buf, unsigned int n_bytes)
+{
+	int cc_flag;
+	int cc_count;
+	int i;
+
+	cc_flag = buf[1] & 0x40;
+	if(!cc_flag)
+	{
+		AM_DEBUG(0, "cc_flag is invalid, %d", n_bytes);
+		return;
+	}
+	cc_count = buf[1] & 0x1f;
+	for(i = 0; i < cc_count; ++i)
+	{
+		unsigned int b0;
+		unsigned int cc_valid;
+		unsigned int cc_type;
+		unsigned char cc_data1;
+		unsigned char cc_data2;
+
+		b0 = buf[3 + i * 3];
+		cc_valid = b0 & 4;
+		cc_type = b0 & 3;
+		cc_data1 = buf[4 + i * 3];
+		cc_data2 = buf[5 + i * 3];
+
+		if(cc_type == 0 || cc_type == 1)//NTSC pair
+		{
+			struct vout_CCparam_s cc_param;
+            cc_param.type = cc_type;
+			cc_param.data1 = cc_data1;
+			cc_param.data2 = cc_data2;
+			//AM_DEBUG(0, "cc_type:%#x, write cc data: %#x, %#x", cc_type, cc_data1, cc_data2);
+			if (ioctl(vout_fd, VOUT_IOC_CC_DATA, &cc_param)== -1)
+	            AM_DEBUG(1, "ioctl VOUT_IOC_CC_DATA failed, error:%s", strerror(errno));
+
+			if(!cc_valid || i >= 3)
+				break;
+		}
+	}
+}
 /**\brief CC data thread*/
 static void *am_cc_data_thread(void *arg)
 {
@@ -427,7 +480,7 @@ static void *am_cc_data_thread(void *arg)
 	int last_pkg_idx = -1, pkg_idx;
 	int ud_dev_no = 0;
 	AM_USERDATA_OpenPara_t para;
-	
+
     AM_DEBUG(1, "CC data thread start.");
 
 	memset(&para, 0, sizeof(para));
@@ -441,28 +494,29 @@ static void *am_cc_data_thread(void *arg)
 	while (cc->running)
 	{
 		cc_data_cnt = AM_USERDATA_Read(ud_dev_no, cc_data, sizeof(cc_data), CC_POLL_TIMEOUT);
-		if (cc_data_cnt > 4 && 
+		if (cc_data_cnt > 4 &&
 			cc_data[0] == 0x47 &&
-			cc_data[1] == 0x41 && 
+			cc_data[1] == 0x41 &&
 			cc_data[2] == 0x39 &&
 			cc_data[3] == 0x34)
 		{
 			dump_cc_data(cc_data+4, cc_data_cnt-4);
-			
+
 			if (cc_data[4] != 0x03 /* 0x03 indicates cc_data */)
 			{
-				AM_DEBUG(1, "Unprocessed user_data_type_code 0x%02x, we only expect 0x03", cc_data[4]);	
+				AM_DEBUG(1, "Unprocessed user_data_type_code 0x%02x, we only expect 0x03", cc_data[4]);
 				continue;
 			}
-
+			if(vout_fd != -1)
+				am_cc_set_tv(cc_data+4, cc_data_cnt-4);
 			/*decode this cc data*/
 			tvcc_decode_data(&cc->decoder, 0, cc_data+4, cc_data_cnt-4);
 		}
 	}
-	
+
 	/*Stop the cc data*/
 	AM_USERDATA_Close(ud_dev_no);
-		
+
 	AM_DEBUG(1, "CC data thread exit now");
 	return NULL;
 }
@@ -473,13 +527,13 @@ static void *am_cc_render_thread(void *arg)
 	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)arg;
 	struct timespec ts;
 	int cnt;
-	
+
     AM_DEBUG(1, "CC rendering thread start.");
 
 	pthread_mutex_lock(&cc->lock);
-	
+
 	am_cc_check_flash(cc);
-	
+
 	while (cc->running)
 	{
 		if (cc->timeout > 0)
@@ -491,13 +545,13 @@ static void *am_cc_render_thread(void *arg)
 		{
 			pthread_cond_wait(&cc->cond, &cc->lock);
 		}
-		
+
 		if (cc->evt >= 0)
 		{
 			am_cc_handle_event(cc, cc->evt);
 			cc->evt = 0;
 		}
-		
+
 		if (cc->render_flag)
 		{
 			am_cc_render(cc);
@@ -505,7 +559,7 @@ static void *am_cc_render_thread(void *arg)
 	}
 
 	pthread_mutex_unlock(&cc->lock);
-	
+
 	AM_DEBUG(1, "CC rendering thread exit now");
 	return NULL;
 }
@@ -523,28 +577,36 @@ static void *am_cc_render_thread(void *arg)
 AM_ErrorCode_t AM_CC_Create(AM_CC_CreatePara_t *para, AM_CC_Handle_t *handle)
 {
 	AM_CC_Decoder_t *cc;
-	
+
 	if (para == NULL || handle == NULL)
 		return AM_CC_ERR_INVALID_PARAM;
-	
+
 	cc = (AM_CC_Decoder_t*)malloc(sizeof(AM_CC_Decoder_t));
 	if (cc == NULL)
 		return AM_CC_ERR_NO_MEM;
-	
+	if(para->bypass_cc_enable)
+	{
+		vout_fd= open("/dev/tv", O_RDWR);
+		if(vout_fd == -1)
+		{
+			AM_DEBUG(0, "open vdin error");
+		}
+	}
+
 	memset(cc, 0, sizeof(AM_CC_Decoder_t));
-		
+
 	/* init the tv cc decoder */
 	tvcc_init(&cc->decoder);
 	if (cc->decoder.vbi == NULL)
 		return AM_CC_ERR_LIBZVBI;
-	
+
 	vbi_event_handler_register(cc->decoder.vbi, VBI_EVENT_CAPTION, am_cc_vbi_event_handler, cc);
-	
+
 	pthread_mutex_init(&cc->lock, NULL);
 	pthread_cond_init(&cc->cond, NULL);
 
 	cc->cpara = *para;
-	
+
 	*handle = cc;
 
 	return AM_SUCCESS;
@@ -560,13 +622,16 @@ AM_ErrorCode_t AM_CC_Destroy(AM_CC_Handle_t handle)
 {
 	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)handle;
 
+	if(vout_fd != -1)
+		close(vout_fd);
+
 	if (cc == NULL)
 		return AM_CC_ERR_INVALID_PARAM;
 
 	AM_CC_Stop(handle);
 
 	tvcc_destroy(&cc->decoder);
-	
+
 	pthread_mutex_destroy(&cc->lock);
 	pthread_cond_destroy(&cc->cond);
 
@@ -574,7 +639,7 @@ AM_ErrorCode_t AM_CC_Destroy(AM_CC_Handle_t handle)
 
 	return AM_SUCCESS;
 }
- 
+
 /**\brief 开始CC数据接收处理
  * \param handle CC handle
   * \param [in] para 启动参数
@@ -586,10 +651,10 @@ AM_ErrorCode_t AM_CC_Start(AM_CC_Handle_t handle, AM_CC_StartPara_t *para)
 {
 	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)handle;
 	int rc, ret = AM_SUCCESS;
-	
+
 	if (cc == NULL || para == NULL)
 		return AM_CC_ERR_INVALID_PARAM;
-	
+
 	pthread_mutex_lock(&cc->lock);
 	if (cc->running)
 	{
@@ -605,7 +670,7 @@ AM_ErrorCode_t AM_CC_Start(AM_CC_Handle_t handle, AM_CC_StartPara_t *para)
 	cc->spara = *para;
 	cc->vbi_pgno = para->caption;
 	cc->running = AM_TRUE;
-	
+
 	/* start the rendering thread */
 	rc = pthread_create(&cc->render_thread, NULL, am_cc_render_thread, (void*)cc);
 	if (rc)
@@ -627,9 +692,9 @@ AM_ErrorCode_t AM_CC_Start(AM_CC_Handle_t handle, AM_CC_StartPara_t *para)
 		}
 	}
 
-start_done:	
+start_done:
 	pthread_mutex_unlock(&cc->lock);
-	return ret;	
+	return ret;
 }
 
 /**\brief 停止CC处理
@@ -646,7 +711,7 @@ AM_ErrorCode_t AM_CC_Stop(AM_CC_Handle_t handle)
 
 	if (cc == NULL)
 		return AM_CC_ERR_INVALID_PARAM;
-	
+
 	pthread_mutex_lock(&cc->lock);
 	if (cc->running)
 	{
@@ -656,14 +721,14 @@ AM_ErrorCode_t AM_CC_Stop(AM_CC_Handle_t handle)
 	pthread_mutex_unlock(&cc->lock);
 
 	pthread_cond_broadcast(&cc->cond);
-	
+
 	if (join)
 	{
-		pthread_join(cc->data_thread, NULL);	
+		pthread_join(cc->data_thread, NULL);
 		pthread_join(cc->render_thread, NULL);
 	}
-	
-	return ret;	
+
+	return ret;
 }
 
 /**\brief 设置CC用户选项，用户选项可以覆盖运营商的设置,这些options由应用保存管理
@@ -676,18 +741,18 @@ AM_ErrorCode_t AM_CC_Stop(AM_CC_Handle_t handle)
 AM_ErrorCode_t AM_CC_SetUserOptions(AM_CC_Handle_t handle, AM_CC_UserOptions_t *options)
 {
 	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)handle;
-	
+
 	if (cc == NULL)
 		return AM_CC_ERR_INVALID_PARAM;
-	
+
 	pthread_mutex_lock(&cc->lock);
-	
+
 	cc->spara.user_options = *options;
 	cc->evt = AM_CC_EVT_SET_USER_OPTIONS;
-		
+
 	pthread_mutex_unlock(&cc->lock);
 	pthread_cond_signal(&cc->cond);
-	
+
 	return AM_SUCCESS;
 }
 
