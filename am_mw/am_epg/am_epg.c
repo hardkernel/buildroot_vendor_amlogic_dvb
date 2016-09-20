@@ -2156,14 +2156,20 @@ static int am_epg_check_sdt_update_stage_version(AM_EPG_Monitor_t *mon)
 	row = 1;
 	snprintf(tmpsql, sizeof(tmpsql), "select sdt_ver from srv_table where db_id=%d", mon->mon_service);
 	AM_DB_Select(hdb, tmpsql, &row, "%d", &prev_sdt_ver);
-	if((prev_sdt_ver != 0xff) && (prev_sdt_ver == mon->sdts->i_version))
-		return 1;
+	if (prev_sdt_ver != 0xff) {
+		if (prev_sdt_ver == mon->sdts->i_version) {
+			return 0;
+		} else {
+			AM_DEBUG(1, "sdt version changed, (%d -> %d)", prev_sdt_ver, mon->sdts->i_version);
+			return 1;
+		}
+	}
 
 	db_ts_id = am_epg_get_current_db_ts_id(mon);
 	if (db_ts_id < 0)
 	{
 		AM_DEBUG(1, "SDT update: cannot get current ts(%d)!", db_ts_id);
-		return 1;
+		return 0;
 	}
 
 	/*update sdt_ver.*/
@@ -2181,7 +2187,7 @@ static int am_epg_check_sdt_update_stage_version(AM_EPG_Monitor_t *mon)
 		}
 	}while(row);
 
-	return 0;
+	return -1;
 }
 
 static void am_epg_check_sdt_update_def(AM_EPG_Monitor_t *mon)
@@ -2208,10 +2214,10 @@ static void am_epg_check_sdt_update_def(AM_EPG_Monitor_t *mon)
 		int prev_ts_id, prev_net_id;
 		int row;
 
-		if(am_epg_check_sdt_update_stage_version(mon))
-			return ;
+		int ret = am_epg_check_sdt_update_stage_version(mon);
+		if (ret == 0)
+			return;
 
-		/*sdt version changed or no version stored before.*/
 		db_ts_id = am_epg_get_current_db_ts_id(mon);
 		if (db_ts_id < 0)
 		{
@@ -2219,6 +2225,13 @@ static void am_epg_check_sdt_update_def(AM_EPG_Monitor_t *mon)
 			return;
 		}
 
+		if (ret > 0) {
+			AM_DEBUG(1, "SDT version changed");
+			SIGNAL_EVENT(AM_EPG_EVT_UPDATE_TS, (void*)(long)db_ts_id);
+			return;
+		}
+
+		/*no version stored before.*/
 		/* check ts_id for update */
 		AM_DEBUG(1, "Checking ts_id for ts %d", db_ts_id);
 		row = 1;
