@@ -5044,7 +5044,8 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 			scanner->start_freqs[scanner->curr_freq].
 				fe_para.terrestrial.
 				para.u.ofdm.ofdm_mode = OFDM_DVBT;
-			return am_scan_start_current_ts(scanner);
+			am_scan_start_current_ts(scanner);
+			return;
 		}
 	}
 

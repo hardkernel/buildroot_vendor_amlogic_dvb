@@ -19,6 +19,7 @@ extern "C"
 #endif
 
 #ifdef ANDROID
+#include <malloc.h>
 #include <unicode/ucnv.h>
 #include <android/log.h>
 #include <dlfcn.h>
