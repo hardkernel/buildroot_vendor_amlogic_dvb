@@ -600,7 +600,56 @@ static unsigned int aml_get_pic_type(unsigned int slice_type)
     AM_DEBUG(3, "get slice_type:%d, slice_id:%d, pic_type:%d", slice_type&0xFF, slice_type>>8, pic_type);
     return pic_type;
 }
+int vbi_to_ascii(int c)
+{
+     if (c < 0)
+        return '?';
 
+     c &= 0x7F;
+
+     if (c < 0x20 || c >= 0x7F)
+         return '.';
+
+     return c;
+}
+
+static void dump_cc_ascii(const uint8_t *buf, int poc)
+{
+    int cc_flag;
+    int cc_count;
+    int i;
+
+    cc_flag = buf[1] & 0x40;
+	if (!cc_flag)
+    {
+        AM_DEBUG(0, "### cc_flag is invalid");
+        return;
+    }
+    cc_count = buf[1] & 0x1f;
+
+	for (i = 0; i < cc_count; ++i)
+    {
+        unsigned int b0;
+        unsigned int cc_valid;
+        unsigned int cc_type;
+        unsigned char cc_data1;
+        unsigned char cc_data2;
+
+        b0 = buf[3 + i * 3];
+        cc_valid = b0 & 4;
+        cc_type = b0 & 3;
+        cc_data1 = buf[4 + i * 3];
+        cc_data2 = buf[5 + i * 3];
+
+
+		if (cc_type == 0 ) //NTSC pair, Line 21
+        {
+            AM_DEBUG(0, "### get poc:%d, cc data: %c %c", poc, vbi_to_ascii(cc_data1), vbi_to_ascii(cc_data2));
+			if (!cc_valid || i >= 3)
+                break;
+        }
+    }
+}
 static void *aml_userdata_thread(void *arg)
 {
 	AM_USERDATA_Device_t *dev = (AM_USERDATA_Device_t*)arg;
@@ -609,7 +658,8 @@ static void *aml_userdata_thread(void *arg)
 	uint8_t *p;
 	uint8_t cc_data[256];/*In fact, 99 is enough*/
 	uint8_t cc_data_cnt;
-	int cnt, left, fd, ud_format = INVALID_TYPE, min_bytes_valid = 0, poc;
+	int fd, ud_format = INVALID_TYPE, poc;
+	unsigned int cnt, left, min_bytes_valid = 0;
 	struct pollfd fds;
 	aml_ud_header_t pheader;
 	struct aml_ud_reorder reorder;
@@ -690,42 +740,67 @@ static void *aml_userdata_thread(void *arg)
 						if(p[0] == 0xb5 && p[3] == 0x47 && p[4] == 0x41
 							&& p[5] == 0x39 && p[6] == 0x34)
 						{
-
-							if(cnt >= 72)
+							if (cnt > DMA_BLOCK_LEN)
 							{
-								memset(&poc_block, 0, sizeof(userdata_poc_info_t));
 								min_bytes_valid = 11 + (buf[8] & 0x1F)*3;
-								slice_type = 0;
-								ioctl(fd, AMSTREAM_IOC_UD_POC, &poc_block);
-								if(first_check == 0)
+								if (cnt >= min_bytes_valid)
 								{
-									AM_DEBUG(1,"@@@ check_first pocinfo:%#x, poc:%d ,jump %d %d data\n",
-										poc_block.poc_info&0xFFFF, poc_block.poc_number,
-										(poc_block.poc_info&0xFFFF)/71, ((poc_block.poc_info&0xFFFF)/71-1)*72);
-									if(cnt>72 && (poc_block.poc_info&0xFFFF) > 0x47)
+									memset(&poc_block, 0, sizeof(userdata_poc_info_t));
+									min_bytes_valid = 11 + (buf[8] & 0x1F)*3;
+									slice_type = 0;
+									ioctl(fd, AMSTREAM_IOC_UD_POC, &poc_block);
+									/*
+									 *	通常本地播放从pos=0开始播放, 都能产生正确的poc-userdata配对, 但是如果Seek, 或者DTV播放, 这样的场景
+									 *	我们的驱动会产生错误的poc, 需要丢弃当前的数据以及poc, 否则cc会乱码. poc_info 可以计算出当前的poc是
+									 *  kernel送出来的第几帧poc, 如果发现开始播放第一次取出来的poc并不是第一帧poc, 那么就要丢弃这个poc,
+									 * 	并且cc数据也要一起丢弃.
+									 */
+									if (first_check == 0)
 									{
-
-										AM_DEBUG(1,"break, pocinfo:%#x, poc:%d ,jump %d %d data\n",
+										unsigned int driver_userdata_pkt_len = min_bytes_valid;
+										while (driver_userdata_pkt_len%DMA_BLOCK_LEN)
+											driver_userdata_pkt_len++;
+										AM_DEBUG(1, "read cc cnt:%d, min_bytes_valid:%d, pkt_len:%d", cnt, min_bytes_valid, driver_userdata_pkt_len);
+										AM_DEBUG(1,"@@@ check_first pocinfo:%#x, poc:%d ,jump %d package\n",
 											poc_block.poc_info&0xFFFF, poc_block.poc_number,
-											(poc_block.poc_info&0xFFFF)/71, ((poc_block.poc_info&0xFFFF)/71-1)*72);
-										cnt = 0;
-										break;
+											(poc_block.poc_info&0xFFFF)/min_bytes_valid);
+										if (cnt > driver_userdata_pkt_len && (poc_block.poc_info&0xFFFF) > min_bytes_valid)
+										{
+
+											AM_DEBUG(1,"break, pocinfo:%#x, poc:%d ,jump %d package\n",
+												poc_block.poc_info&0xFFFF, poc_block.poc_number,
+												(poc_block.poc_info&0xFFFF)/min_bytes_valid);
+											cnt = 0;
+											break;
+										}
+										first_check = 1;
 									}
-									first_check = 1;
+
+								    reorder.drv_data = drv_data;
+									reorder.picture_coding_type = 0;
+									reorder.picture_structure = FRAME_PICTURE;
+									reorder.picture_temporal_reference = 2;
+									if (cnt >= min_bytes_valid) {
+										#ifdef DEBUG_CC_ENABLE
+										dump_cc_ascii(p+3+4, poc_block.poc_number);
+										#endif
+										aml_h264_reorder_user_data(&reorder, p+3, min_bytes_valid-3, poc_block.poc_number, p_header);//skip 0xb5 0x00 0x31
+									}
+
+									while (min_bytes_valid%DMA_BLOCK_LEN)
+										min_bytes_valid++;
+									cnt -= min_bytes_valid;
+									p += min_bytes_valid;
+									continue;
 								}
-							    reorder.drv_data = drv_data;
-								reorder.picture_coding_type = 0;
-								reorder.picture_structure = FRAME_PICTURE;
-								reorder.picture_temporal_reference = 2;
-								#if 1
-								if(cnt >= min_bytes_valid)
-									aml_h264_reorder_user_data(&reorder, p+3, min_bytes_valid-3, poc_block.poc_number, p_header);//skip 0xb5 0x00 0x31
 								else
-									aml_h264_reorder_user_data(&reorder, p+3, cnt-3, poc_block.poc_number, p_header);//skip 0xb5 0x00 0x31
-								#endif
-								cnt -= 72;
-								p += 72;
-								continue;
+								{
+									left = cnt;
+									memmove(buf, p, left);
+									aml_swap_data(buf, left);
+									AM_DEBUG(1, "memmove %d buf", left);
+									break;
+								}
 							}
 							else if(cnt > 0)
 							{
@@ -735,7 +810,6 @@ static void *aml_userdata_thread(void *arg)
 								AM_DEBUG(1, "memmove %d buf", left);
 								break;
 							}
-
 						}
 						cnt -= DMA_BLOCK_LEN;
 						p += DMA_BLOCK_LEN;
