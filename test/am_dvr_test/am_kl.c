@@ -98,7 +98,7 @@ int set_keyladder_cr(unsigned char key2[16], unsigned nounce[16], unsigned dnoun
 	memcpy(arg.cr, nounce, sizeof(nounce));
 	memcpy(arg.ekn1, key2, sizeof(key2));
 	ret = ioctl(m_kl_fd, MESON_KL_CR, &arg);
-	memset(dnounce, arg.cr, 16);
+	memcpy(dnounce, arg.cr, 16);
 	if(ret != -1)
 		return AM_SUCCESS;
 	else
