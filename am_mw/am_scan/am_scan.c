@@ -5283,6 +5283,8 @@ handle_events:
 		/* close atv devices */
 	}
 
+	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_SCAN_EXIT, 100);
+
 	pthread_mutex_unlock(&scanner->lock);
 
 	/*反注册前端事件*/
@@ -5294,8 +5296,6 @@ handle_events:
 	if (atv_start_para.fe_paras != NULL)
 		free(atv_start_para.fe_paras);
 	free(scanner);		
-
-	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_SCAN_EXIT, 100);
 
 	return NULL;
 }
