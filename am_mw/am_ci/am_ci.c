@@ -311,6 +311,21 @@ static int ci_ai_callback(void *arg, uint8_t slot_id, uint16_t session_number,
 	return 0;
 }
 
+static int ci_ca_pmt_relay_callback(void *arg, uint8_t slot_id, uint16_t session_number,
+							struct en50221_app_pmt_reply *reply,
+						  uint32_t reply_size)
+{
+		if (reply == NULL) {
+			AM_DEBUG(1, "pmt relay pro:---");
+		} else {
+				AM_DEBUG(1, "pmt relay pro:%d enable= %d ca flag= %d\r\n",
+						reply->program_number,
+						reply->CA_enable_flag,
+						reply->CA_enable);
+		}
+		return 0;
+}
+
 static int ci_ca_info_callback(void *arg, uint8_t slot_id, uint16_t session_number, uint32_t ca_id_count, uint16_t *ca_ids)
 {
 	_ci_t *ci = (_ci_t*) arg;
@@ -695,6 +710,7 @@ static AM_ErrorCode_t ci_open_stdcam(_ci_t *ci, int dev, int slot_num)
 	// hook up the CA callbacks
 	if (stdcam->ca_resource) {
 		en50221_app_ca_register_info_callback(stdcam->ca_resource, ci_ca_info_callback, ci);
+		en50221_app_ca_register_pmt_reply_callback(stdcam->ca_resource, ci_ca_pmt_relay_callback, ci);
 	}
 
 	// hook up the MMI callbacks

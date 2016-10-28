@@ -694,6 +694,7 @@ static int match_ca_auto(_caman_t *caman, _ts_t *ts, dvbpsi_ca_dr_t *cadesr)
 	_ca_t *cai, *n;
 	struct list_head tmp, *pos;
 
+	INIT_LIST_HEAD(&tmp);
 	/*check current unmatched ca in ts's calist*/
 	list_for_each_entry_safe(cai, n, &ts->calist, head)
 	{

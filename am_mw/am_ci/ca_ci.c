@@ -401,7 +401,9 @@ static int ca_ci_startpmt(void *arg, int service_id, unsigned char *pmt, unsigne
 	AM_TRY_FINAL(AM_CI_App_ca_pmt(dev, capmt, capmt_size));
 
 	ca_ci->pmt_size = size;
-	assert(ca_ci->pmt = realloc(ca_ci->pmt, size));
+	//assert(ca_ci->pmt = realloc(ca_ci->pmt, size));
+	ca_ci->pmt = realloc(ca_ci->pmt, size);
+	assert(ca_ci->pmt);
 	memcpy(ca_ci->pmt, pmt, size);
 
 final:
