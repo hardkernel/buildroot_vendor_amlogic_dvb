@@ -93,7 +93,7 @@ void *adec_handle = NULL;
 #define UP_RESAMPLE_AUDIO_LEVEL      128
 #define UP_RESAMPLE_VIDEO_LEVEL      1024
 #define DOWN_RESAMPLE_CACHE_TIME     90000*2
-#define NO_DATA_CHECK_TIME           4000*2
+#define NO_DATA_CHECK_TIME           2000*2
 #define VMASTER_REPLAY_TIME          4000
 #define SCRAMBLE_CHECK_TIME          1000
 #define TIMESHIFT_INJECT_DIFF_TIME	 4
