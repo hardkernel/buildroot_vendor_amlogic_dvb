@@ -512,6 +512,25 @@ static void *am_cc_data_thread(void *arg)
 			/*decode this cc data*/
 			tvcc_decode_data(&cc->decoder, 0, cc_data+4, cc_data_cnt-4);
 		}
+		else if(cc_data_cnt > 4 &&
+			cc_data[0] == 0xb5 &&
+			cc_data[1] == 0x00 &&
+			cc_data[2] == 0x2f )
+		{
+			//dump_cc_data(cc_data+4, cc_data_cnt-4);
+			//directv format
+			if (cc_data[3] != 0x03 /* 0x03 indicates cc_data */)
+			{
+				AM_DEBUG(1, "Unprocessed user_data_type_code 0x%02x, we only expect 0x03", cc_data[3]);
+				continue;
+			}
+			cc_data[4] = cc_data[3];// use user_data_type_code in place of user_data_code_length  for extract code
+			if (vout_fd != -1)
+				am_cc_set_tv(cc_data+4, cc_data_cnt-4);
+
+			/*decode this cc data*/
+			tvcc_decode_data(&cc->decoder, 0, cc_data+4, cc_data_cnt-4);
+		}
 	}
 
 	/*Stop the cc data*/

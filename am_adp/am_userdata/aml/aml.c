@@ -29,6 +29,7 @@
 //#define AMSTREAM_IOC_UD_PICTYPE _IOR(AMSTREAM_IOC_MAGIC, 0x55, unsigned long)
 #define AMSTREAM_IOC_UD_LENGTH _IOR(AMSTREAM_IOC_MAGIC, 0x54, unsigned long)
 #define AMSTREAM_IOC_UD_POC _IOR(AMSTREAM_IOC_MAGIC, 0x55, unsigned long)
+#define AMSTREAM_IOC_UD_FLUSH_USERDATA _IOR(AMSTREAM_IOC_MAGIC, 0x56, int)
 
 #define DMA_BLOCK_LEN 8
 #define INVALID_POC 0xFFFFFFF
@@ -37,9 +38,11 @@
 #define MAX_POC_CACHE 5
 
 enum user_data_type {
-	INVALID_TYPE = 0,
-	MPEG_CC_TYPE = 1,
-	H264_CC_TYPE = 2
+	INVALID_TYPE 	= 0,
+	MPEG_CC_TYPE 	= 1,
+	H264_CC_TYPE 	= 2,
+	DIRECTV_CC_TYPE = 3,
+	AVS_CC_TYPE 	=4
 };
 
 enum picture_coding_type {
@@ -561,13 +564,25 @@ static int aml_check_userdata_format(uint8_t *buf, int len)
 	if(tmp_buf[0] == 0xb5 && tmp_buf[3] == 0x47 && tmp_buf[4] == 0x41
 			&& tmp_buf[5] == 0x39 && tmp_buf[6] == 0x34)
 	{
-		AM_DEBUG(1,"check format is h264_cc_type");
+		AM_DEBUG(1,"@check format is h264_cc_type");
 		free(tmp_buf);
 		return H264_CC_TYPE;
 	}
+	else if(tmp_buf[0] == 0xb5 && tmp_buf[1] == 0x00 && tmp_buf[2] == 0x2f)
+	{
+		AM_DEBUG(1,"@check format is directv_cc_type");
+		free(tmp_buf);
+		return DIRECTV_CC_TYPE;
+	}
+	else if(tmp_buf[0] == 0x47 && tmp_buf[1] == 0x41 && tmp_buf[2] == 0x39 && tmp_buf[3] == 0x34)
+	{
+		AM_DEBUG(1,"@check format is avs_cc_type");
+		free(tmp_buf);
+		return AVS_CC_TYPE;
+	}
 	else
 	{
-		AM_DEBUG(1,"check format is mpeg_cc_type");
+		AM_DEBUG(1,"@check format is mpeg_cc_type");
 		free(tmp_buf);
 		return MPEG_CC_TYPE;
 	}
@@ -668,6 +683,7 @@ static void *aml_userdata_thread(void *arg)
 	aml_cc_block_t * 	p_header;
 	int first_check = 0;
 	userdata_poc_info_t poc_block;
+	int flush = 0;
 
     AM_DEBUG(1, "user data thread start.");
 
@@ -689,6 +705,16 @@ static void *aml_userdata_thread(void *arg)
 		if (poll(&fds, 1, 100) > 0)
 		{
 			cnt = read(fd, buf+left, sizeof(buf)-left);
+
+			if (flush == 0)
+			{
+				int ret = ioctl(fd, AMSTREAM_IOC_UD_FLUSH_USERDATA, NULL);
+				AM_DEBUG(1, "==try to flush userdata cache:%d, cache_cnt", ret);
+				flush = 1;
+				continue;
+			}
+
+
 			while(cnt > 0 && ud_format == INVALID_TYPE && drv_data->running)
 			{
 				ud_format = aml_check_userdata_format(buf, cnt);
@@ -729,7 +755,7 @@ static void *aml_userdata_thread(void *arg)
 						cnt = left;
 					}while(cc_data_cnt > 0 && cnt > 0);
 				}
-				else if(ud_format == H264_CC_TYPE)
+				else if(ud_format == H264_CC_TYPE || ud_format == DIRECTV_CC_TYPE || ud_format == AVS_CC_TYPE)
 				{
 					cnt += left;
 					left = 0;
@@ -737,16 +763,24 @@ static void *aml_userdata_thread(void *arg)
 					p = buf;
 					while(cnt > 0)
 					{
-						if(p[0] == 0xb5 && p[3] == 0x47 && p[4] == 0x41
-							&& p[5] == 0x39 && p[6] == 0x34)
+						if ( (p[0] == 0xb5 && p[3] == 0x47 && p[4] == 0x41 && p[5] == 0x39 && p[6] == 0x34)
+							|| (p[0] == 0xb5 && p[1] == 0x0 && p[2] == 0x2f)
+							|| (p[0] == 0x47 && p[1] == 0x41 && p[2] == 0x39 && p[3] == 0x34)
+						   )
 						{
 							if (cnt > DMA_BLOCK_LEN)
 							{
-								min_bytes_valid = 11 + (buf[8] & 0x1F)*3;
+								if (ud_format == H264_CC_TYPE)
+									min_bytes_valid = 11 + (buf[8] & 0x1F)*3;
+								else if(ud_format == DIRECTV_CC_TYPE)
+									min_bytes_valid = 8 + (buf[5] & 0x1F)*3;
+								else
+								{
+									min_bytes_valid = 8 + (buf[5] & 0x1F)*3; //wait avs cc spec
+								}
 								if (cnt >= min_bytes_valid)
 								{
 									memset(&poc_block, 0, sizeof(userdata_poc_info_t));
-									min_bytes_valid = 11 + (buf[8] & 0x1F)*3;
 									slice_type = 0;
 									ioctl(fd, AMSTREAM_IOC_UD_POC, &poc_block);
 									/*
@@ -755,6 +789,8 @@ static void *aml_userdata_thread(void *arg)
 									 *  kernel送出来的第几帧poc, 如果发现开始播放第一次取出来的poc并不是第一帧poc, 那么就要丢弃这个poc,
 									 * 	并且cc数据也要一起丢弃.
 									 */
+									#if 0
+									//driver 增加flush机制, 弃用下面check code.
 									if (first_check == 0)
 									{
 										unsigned int driver_userdata_pkt_len = min_bytes_valid;
@@ -775,6 +811,7 @@ static void *aml_userdata_thread(void *arg)
 										}
 										first_check = 1;
 									}
+									#endif
 
 								    reorder.drv_data = drv_data;
 									reorder.picture_coding_type = 0;
@@ -784,7 +821,14 @@ static void *aml_userdata_thread(void *arg)
 										#ifdef DEBUG_CC_ENABLE
 										dump_cc_ascii(p+3+4, poc_block.poc_number);
 										#endif
-										aml_h264_reorder_user_data(&reorder, p+3, min_bytes_valid-3, poc_block.poc_number, p_header);//skip 0xb5 0x00 0x31
+										if (ud_format == H264_CC_TYPE)
+											aml_h264_reorder_user_data(&reorder, p+3, min_bytes_valid-3, poc_block.poc_number, p_header);//skip 0xb5 0x00 0x31
+										else if(ud_format == DIRECTV_CC_TYPE)
+											aml_h264_reorder_user_data(&reorder, p, min_bytes_valid, poc_block.poc_number, p_header);
+										else if(ud_format == AVS_CC_TYPE){
+										//dump_cc_ascii(p+4, poc_block.poc_number);
+											aml_h264_reorder_user_data(&reorder, p, min_bytes_valid, poc_block.poc_number, p_header);
+											}
 									}
 
 									while (min_bytes_valid%DMA_BLOCK_LEN)
@@ -798,7 +842,7 @@ static void *aml_userdata_thread(void *arg)
 									left = cnt;
 									memmove(buf, p, left);
 									aml_swap_data(buf, left);
-									AM_DEBUG(1, "memmove %d buf", left);
+									AM_DEBUG(1, "####cnt:%d, min_bytes:%d, memmove %d buf", cnt, min_bytes_valid, left);
 									break;
 								}
 							}
@@ -807,7 +851,7 @@ static void *aml_userdata_thread(void *arg)
 								left = cnt;
 								memmove(buf, p, left);
 								aml_swap_data(buf, left);
-								AM_DEBUG(1, "memmove %d buf", left);
+								AM_DEBUG(1, "@@@@memmove %d buf", left);
 								break;
 							}
 						}
