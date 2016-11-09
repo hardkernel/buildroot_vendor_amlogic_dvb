@@ -74,6 +74,7 @@ enum AM_FEND_EventType
 typedef struct
 {
 	int mode;
+	#define FE_AUTO (-1)
 } AM_FEND_OpenPara_t;
 
 /**\brief frontend callback function*/

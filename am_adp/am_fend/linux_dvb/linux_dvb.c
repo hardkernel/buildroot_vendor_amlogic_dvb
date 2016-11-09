@@ -121,10 +121,12 @@ static AM_ErrorCode_t dvb_open (AM_FEND_Device_t *dev, const AM_FEND_OpenPara_t 
 	
 	dev->drv_data = (void*)(long)fd;
 
-	ret = dvb_set_mode(dev, para->mode);
-	if(ret != AM_SUCCESS){
-		close(fd);
-		return ret;
+	if (para->mode != -1) {
+		ret = dvb_set_mode(dev, para->mode);
+		if (ret != AM_SUCCESS) {
+			close(fd);
+			return ret;
+		}
 	}
 
 	return AM_SUCCESS;
