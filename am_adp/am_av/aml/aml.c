@@ -5502,6 +5502,19 @@ static AM_ErrorCode_t aml_get_astatus(AM_AV_Device_t *dev, AM_AV_AudioStatus_t *
 			break;
 	}
 
+	para->lfepresent = -1;
+	para->aud_fmt_orig = -1;
+	para->resolution_orig = -1;
+	para->channels_orig = -1;
+	para->sample_rate_orig = -1;
+	para->lfepresent_orig = -1;
+	rc = audio_decpara_get(adec, &para->sample_rate_orig, &para->channels_orig, &para->lfepresent_orig);
+	if (rc == -1)
+	{
+		AM_DEBUG(1, "cannot get decpara");
+		goto get_fail;
+	}
+
 	rc = get_decoder_status(adec, &armadec);
 	if (rc == -1)
 	{
@@ -5585,6 +5598,19 @@ static AM_ErrorCode_t aml_get_astatus(AM_AV_Device_t *dev, AM_AV_AudioStatus_t *
 		else if (!strncmp(buf,"amadec_dra",10))
 			para->aud_fmt = AFORMAT_DRA;
 	}
+
+	if (para->aud_fmt_orig == -1)
+		para->aud_fmt_orig = para->aud_fmt;
+	if (para->resolution_orig == -1)
+		para->resolution_orig = para->resolution;
+	if (para->sample_rate_orig == -1)
+		para->sample_rate_orig = para->sample_rate;
+	if (para->channels_orig == -1)
+		para->channels_orig = para->channels;
+	if (para->lfepresent_orig == -1)
+		para->lfepresent_orig = 0;
+	if (para->lfepresent == -1)
+		para->lfepresent = 0;
 
 	fd = get_amstream(dev);
 	if (fd == -1)

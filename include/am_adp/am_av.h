@@ -362,6 +362,12 @@ typedef struct
 	int              ab_size;     /**< 音频缓冲区大小*/
 	int              ab_data;     /**< 音频缓冲区中数据占用大小*/
 	int              ab_free;     /**< 音频缓冲区中空闲空间大小*/
+	AM_AV_AFormat_t  aud_fmt_orig;     /**< 原始音频格式*/
+	int              sample_rate_orig; /**< 原始采样率*/
+	int              resolution_orig;  /**< 原始数据精度*/
+	int              channels_orig;    /**< 原始声道数目*/
+	int              lfepresent;       /**< 重低音*/
+	int              lfepresent_orig;  /**< 原始重低音*/
 }AM_AV_AudioStatus_t;
 
 /**\brief Timeshifting 播放模式*/
