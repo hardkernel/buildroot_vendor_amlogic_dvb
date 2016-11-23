@@ -11,36 +11,147 @@
  * \date 2010-08-06: create the document
  ***************************************************************************/
 
-#define AM_DEBUG_LEVEL 5
-
+#include <stdio.h>
+#include <string.h>
 #include <am_debug.h>
 #include <am_mem.h>
 #include "am_dsc_internal.h"
 #include "../am_adp_internal.h"
 #include <assert.h>
 #include "am_misc.h"
+#include <dlfcn.h>
+#include <sys/stat.h>
+#include <am_kl.h>
 
+/****************************************************************************
+ * Structures
+ ***************************************************************************/
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
-
-/****************************************************************************
- * Static data
- ***************************************************************************/
+#ifdef EMU_DSC
+#define dsc_get_driver() &emu_dsc_drv
+#else
+#define dsc_get_driver() &aml_dsc_drv
+#endif
 
 #ifdef EMU_DSC
 extern const AM_DSC_Driver_t emu_dsc_drv;
 #else
 extern const AM_DSC_Driver_t aml_dsc_drv;
 #endif
+extern AM_ErrorCode_t am_kl_get_config(struct meson_kl_config *kl_config);
 
+
+/****************************************************************************
+ * Definations
+ ***************************************************************************/
+#define DISABLE_SEC_DSC 0
+#define TAG "AMDSC"
+#define LOGD(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+
+
+
+/****************************************************************************
+ * Static data
+ ***************************************************************************/
 static AM_DSC_Device_t *dsc_devices;
+static AM_DSC_WorkMode_e g_dsc_sec_mode = DSC_MODE_MAX;
 
-#ifdef EMU_DSC
-#define dsc_get_driver() &emu_dsc_drv
-#else
-#define dsc_get_driver() &aml_dsc_drv
+#if DISABLE_SEC_DSC == 0
+	static void* g_dsc_sec_lib_handle;
 #endif
+
+/****************************************************************************
+ * Functions  According to funcions in sec_dsc.c
+ ***************************************************************************/
+AM_ErrorCode_t (*AM_DSC_SEC_Open)(uint8_t dsc_no);
+AM_ErrorCode_t (*AM_DSC_SEC_SetChannelPid)(uint8_t dsc_no, int channel_num, int pid);
+AM_ErrorCode_t (*AM_DSC_SEC_AllocChannel)(uint8_t dsc_no, uint8_t *channel_num_return);
+AM_ErrorCode_t (*AM_DSC_SEC_FreeChannel)(uint8_t dsc_no, int channel_num);
+AM_ErrorCode_t (*AM_DSC_SEC_SetKey)(
+	uint8_t dsc_no,
+	int stream_path,
+	int pid,
+	int parity,
+	const uint8_t* key,
+	int key_len,
+	AM_DSC_KeyType_t key_type);
+AM_ErrorCode_t (*AM_DSC_SEC_KeyladderRun)(
+	uint8_t dsc_no,
+	int stream_path,
+	int pid,
+	uint8_t parity,
+	struct meson_kl_config *kl_config,
+	AM_DSC_KeyType_t key_type);
+AM_ErrorCode_t (*AM_DSC_SEC_KeyladderCR)(int level, char keys[16]);
+AM_ErrorCode_t (*AM_DSC_SEC_Close)(uint8_t dsc_no);
+AM_ErrorCode_t (*AM_DSC_SEC_SetOutput)(int module, int output);
+
+int (*alloc_dsc_sec_channel)(int* channel);
+
+/***************************************************************************/
+static AM_ErrorCode_t get_functions()
+{
+	AM_DSC_SEC_Open = dlsym(g_dsc_sec_lib_handle, "AM_DSC_SEC_Open");
+	AM_DSC_SEC_SetChannelPid = dlsym(g_dsc_sec_lib_handle, "AM_DSC_SEC_SetChannelPid");
+	AM_DSC_SEC_AllocChannel = dlsym(g_dsc_sec_lib_handle, "AM_DSC_SEC_AllocChannel");
+	AM_DSC_SEC_FreeChannel = dlsym(g_dsc_sec_lib_handle, "AM_DSC_SEC_FreeChannel");
+	AM_DSC_SEC_SetKey = dlsym(g_dsc_sec_lib_handle, "AM_DSC_SEC_SetKey");
+	AM_DSC_SEC_KeyladderRun = dlsym(g_dsc_sec_lib_handle, "AM_DSC_SEC_KeyladderRun");
+	AM_DSC_SEC_KeyladderCR = dlsym(g_dsc_sec_lib_handle, "AM_DSC_SEC_KeyladderCR");
+	AM_DSC_SEC_Close = dlsym(g_dsc_sec_lib_handle, "AM_DSC_SEC_Close");
+	AM_DSC_SEC_SetOutput = dlsym(g_dsc_sec_lib_handle, "AM_DSC_SEC_SetOutput");
+
+	if (!AM_DSC_SEC_Open || !AM_DSC_SEC_SetChannelPid ||
+		!AM_DSC_SEC_AllocChannel || !AM_DSC_SEC_FreeChannel ||
+		!AM_DSC_SEC_SetKey || !AM_DSC_SEC_KeyladderRun ||
+		!AM_DSC_SEC_KeyladderCR|| !AM_DSC_SEC_SetOutput)
+	{
+		printf("ADP_DSC: get sec_dsc functions failed\n");
+		return AM_FALSE;
+	}
+	else
+	{
+		printf("ADP_DSC: get sec_dsc functions ok\n");
+		return AM_SUCCESS;
+	}
+}
+
+static AM_ErrorCode_t get_work_mode()
+{
+/* Try using sec dsc enviorment */
+//TODO: 不允许动态切换，开机之后就固定模式，之后均是返回第一次的值
+#if DISABLE_SEC_DSC == 0
+	int ret;
+	struct stat file_stat;
+	if (DSC_MODE_MAX == g_dsc_sec_mode)
+	{
+		g_dsc_sec_lib_handle = dlopen(DSC_SEC_CaLib, RTLD_NOW);
+		if (!g_dsc_sec_lib_handle)
+		{
+			printf("ADP_DSC: dlopen %s failed\n", DSC_SEC_CaLib);
+			g_dsc_sec_mode = DSC_MODE_NORMAL;
+		}
+		else
+		{
+			printf("ADP_DSC: dlopen %s ok\n", DSC_SEC_CaLib);
+			g_dsc_sec_mode = DSC_MODE_SEC;
+		}
+
+		if (g_dsc_sec_mode == DSC_MODE_SEC)
+		{
+			if (AM_SUCCESS != get_functions())
+				g_dsc_sec_mode = DSC_MODE_NORMAL;
+		}
+	}
+	printf("ADP_DSC: Work mode %s\n", g_dsc_sec_mode==0?"DSC_MODE_NORMAL":"DSC_MODE_SEC");
+	return AM_SUCCESS;
+#else
+	g_dsc_sec_mode = DSC_MODE_NORMAL;
+	return AM_SUCCESS;
+#endif
+}
 
 static AM_ErrorCode_t dsc_init_dev_db( int *dev_num )
 {
@@ -48,21 +159,21 @@ static AM_ErrorCode_t dsc_init_dev_db( int *dev_num )
 	static int num = 1;
 	static int init = 0;
 
-	if(init) {
+	if (init) {
 		*dev_num = num;
 		return AM_SUCCESS;
 	}
 
-	if(AM_FileRead("/sys/module/aml/parameters/dsc_max", buf, sizeof(buf)) >= 0)
+	if (AM_FileRead("/sys/module/aml/parameters/dsc_max", buf, sizeof(buf)) >= 0)
 		sscanf(buf, "%d", &num);
 	else
 		num = 1;
 
-	if(num) {
+	if (num) {
 		int i;
 
-		if(!(dsc_devices = malloc(sizeof(AM_DSC_Device_t)*num))) {
-			AM_DEBUG(1, "no memory for dsc init");
+		if (!(dsc_devices = malloc(sizeof(AM_DSC_Device_t)*num))) {
+			AM_DEBUG(1, "ADP_DSC: no memory for dsc init");
 			*dev_num = 0;
 			return AM_DSC_ERR_NOT_ALLOCATED;
 		}
@@ -80,7 +191,7 @@ static AM_ErrorCode_t dsc_init_dev_db( int *dev_num )
 /****************************************************************************
  * Static functions
  ***************************************************************************/
- 
+
 /**\brief 根据设备号取得设备结构指针*/
 static AM_INLINE AM_ErrorCode_t dsc_get_dev(int dev_no, AM_DSC_Device_t **dev)
 {
@@ -88,9 +199,9 @@ static AM_INLINE AM_ErrorCode_t dsc_get_dev(int dev_no, AM_DSC_Device_t **dev)
 
 	AM_TRY(dsc_init_dev_db(&dev_cnt));
 
-	if((dev_no<0) || (dev_no>=dev_cnt))
+	if ((dev_no<0) || (dev_no >= dev_cnt))
 	{
-		AM_DEBUG(1, "invalid dsc device number %d, must in(%d~%d)", dev_no, 0, dev_cnt-1);
+		AM_DEBUG(1, "ADP_DSC: invalid dsc device number %d, must in(%d~%d)", dev_no, 0, dev_cnt-1);
 		return AM_DSC_ERR_INVALID_DEV_NO;
 	}
 	
@@ -103,9 +214,9 @@ static AM_INLINE AM_ErrorCode_t dsc_get_openned_dev(int dev_no, AM_DSC_Device_t 
 {
 	AM_TRY(dsc_get_dev(dev_no, dev));
 	
-	if(!(*dev)->openned)
+	if (!(*dev)->openned)
 	{
-		AM_DEBUG(1, "dsc device %d has not been openned", dev_no);
+		AM_DEBUG(1, "ADP_DSC: dsc device %d has not been openned", dev_no);
 		return AM_DSC_ERR_INVALID_DEV_NO;
 	}
 	
@@ -117,17 +228,17 @@ static AM_INLINE AM_ErrorCode_t dsc_get_used_chan(AM_DSC_Device_t *dev, int chan
 {
 	AM_DSC_Channel_t *chan;
 	
-	if((chan_id<0) || (chan_id>=DSC_CHANNEL_COUNT))
+	if ((chan_id<0) || (chan_id >= DSC_CHANNEL_COUNT))
 	{
-		AM_DEBUG(1, "invalid channel id, must in %d~%d", 0, DSC_CHANNEL_COUNT-1);
+		AM_DEBUG(1, "ADP_DSC: invalid channel id, must in %d~%d", 0, DSC_CHANNEL_COUNT-1);
 		return AM_DSC_ERR_INVALID_ID;
 	}
 	
 	chan = &dev->channels[chan_id];
 	
-	if(!chan->used)
+	if (!chan->used)
 	{
-		AM_DEBUG(1, "channel %d has not been allocated", chan_id);
+		AM_DEBUG(1, "ADP_DSC: channel %d has not been allocated", chan_id);
 		return AM_DSC_ERR_NOT_ALLOCATED;
 	}
 	
@@ -138,10 +249,10 @@ static AM_INLINE AM_ErrorCode_t dsc_get_used_chan(AM_DSC_Device_t *dev, int chan
 /**\brief 释放解扰通道*/
 static AM_ErrorCode_t dsc_free_chan(AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan)
 {
-	if(!chan->used)
+	if (!chan->used)
 		return AM_SUCCESS;
 	
-	if(dev->drv->free_chan)
+	if (dev->drv->free_chan)
 		dev->drv->free_chan(dev, chan);
 	
 	chan->used = AM_FALSE;
@@ -151,7 +262,6 @@ static AM_ErrorCode_t dsc_free_chan(AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan
 /****************************************************************************
  * API functions
  ***************************************************************************/
-
 /**\brief 打开解扰器设备
  * \param dev_no 解扰器设备号
  * \param[in] para 解扰器设备开启参数
@@ -163,28 +273,32 @@ AM_ErrorCode_t AM_DSC_Open(int dev_no, const AM_DSC_OpenPara_t *para)
 {
 	AM_DSC_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+	void* dl_handle = NULL;
+
 	assert(para);
 	
 	AM_TRY(dsc_get_dev(dev_no, &dev));
-	
+
+	if (AM_SUCCESS != get_work_mode())
+		return AM_FAILURE;
+
 	pthread_mutex_lock(&am_gAdpLock);
 	
-	if(dev->openned)
+	if (dev->openned)
 	{
-		AM_DEBUG(1, "dsc device %d has already been openned", dev_no);
+		AM_DEBUG(1, "ADP_DSC: dsc device %d has already been openned", dev_no);
 		ret = AM_DSC_ERR_BUSY;
 		goto final;
 	}
 	
 	dev->dev_no = dev_no;
 	
-	if(dev->drv->open)
-	{
+	if (g_dsc_sec_mode == DSC_MODE_NORMAL && dev->drv->open)
 		ret = dev->drv->open(dev, para);
-	}
+	else
+		ret = AM_DSC_SEC_Open(dev_no);
 	
-	if(ret==AM_SUCCESS)
+	if (ret == AM_SUCCESS)
 	{
 		pthread_mutex_init(&dev->lock, NULL);
 		dev->openned = AM_TRUE;
@@ -217,33 +331,38 @@ AM_ErrorCode_t AM_DSC_AllocateChannel(int dev_no, int *chan_id)
 	
 	for(i=0; i<DSC_CHANNEL_COUNT; i++)
 	{
-		if(!dev->channels[i].used)
+		if (!dev->channels[i].used)
 		{
 			chan = &dev->channels[i];
 			break;
 		}
 	}
 	
-	if(i>=DSC_CHANNEL_COUNT)
+	if (i >= DSC_CHANNEL_COUNT)
 	{
-		AM_DEBUG(1, "too many channels allocated");
+		AM_DEBUG(1, "ADP_DSC: No more free channels");
 		ret = AM_DSC_ERR_NO_FREE_CHAN;
 	}
 	
-	if(ret==AM_SUCCESS)
+	if (ret == AM_SUCCESS)
 	{
 		chan->id   = i;
 		chan->pid  = 0xFFFF;
 		chan->used = AM_TRUE;
-		
-		if(dev->drv->alloc_chan)
+		if (g_dsc_sec_mode == DSC_MODE_NORMAL)
 		{
-			ret = dev->drv->alloc_chan(dev, chan);
-			if(ret!=AM_SUCCESS)
-			{
-				chan->used = AM_FALSE;
-			}
+			if (dev->drv->alloc_chan)
+				ret = dev->drv->alloc_chan(dev, chan);
 		}
+		else if (g_dsc_sec_mode == DSC_MODE_SEC)
+		{
+			ret = AM_DSC_SEC_AllocChannel(dev_no, &chan->stream_path);
+			printf("AM_DSC_SEC_AllocChannel id: %d\n", chan->stream_path);
+		}
+		else
+			ret = AM_FAILURE;
+		if (ret != AM_SUCCESS)
+			chan->used = AM_FALSE;
 	}
 	
 	pthread_mutex_unlock(&dev->lock);
@@ -272,14 +391,21 @@ AM_ErrorCode_t AM_DSC_SetChannelPID(int dev_no, int chan_id, uint16_t pid)
 	pthread_mutex_lock(&dev->lock);
 	
 	ret = dsc_get_used_chan(dev, chan_id, &chan);
-	
-	if(ret==AM_SUCCESS)
+
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->set_pid)
-			ret = dev->drv->set_pid(dev, chan, pid);
+		/*
+		In kernel path, we set pid into driver, in sec linux, we set pid with
+		other parameters together, so we just need to store pid.
+		 */
+		if (g_dsc_sec_mode == DSC_MODE_NORMAL)
+		{
+			if (dev->drv->set_pid)
+				ret = dev->drv->set_pid(dev, chan, pid);
+		}
 	}
 	
-	if(ret==AM_SUCCESS)
+	if (ret == AM_SUCCESS)
 		chan->pid = pid;
 	
 	pthread_mutex_unlock(&dev->lock);
@@ -301,19 +427,78 @@ AM_ErrorCode_t AM_DSC_SetKey(int dev_no, int chan_id, AM_DSC_KeyType_t type, con
 	AM_DSC_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	AM_DSC_Channel_t *chan;
-	
+	AM_DSC_KeyParity_e parity = 0;
+	struct meson_kl_config kl_config;
+
 	assert(key);
-	
+	/* Ciplus can only set to devno 0 */
+	if (dev_no > 0)
+	{
+		if ((type & (~AM_DSC_KEY_FROM_KL)) > 1)
+		{
+			AM_DEBUG(1, "Ciplus can only set to devno 0\n");
+			return AM_FAILURE;
+		}
+	}
 	AM_TRY(dsc_get_openned_dev(dev_no, &dev));
 	
 	pthread_mutex_lock(&dev->lock);
 	
 	ret = dsc_get_used_chan(dev, chan_id, &chan);
 	
-	if(ret==AM_SUCCESS)
+	if (ret == AM_SUCCESS)
 	{
-		if(dev->drv->set_key)
-			ret = dev->drv->set_key(dev, chan, type, key);
+		if (g_dsc_sec_mode == DSC_MODE_NORMAL)
+		{
+			if (dev->drv->set_key)
+				ret = dev->drv->set_key(dev, chan, type, key);
+		}
+		else if (g_dsc_sec_mode == DSC_MODE_SEC)
+		{
+			switch (type&(~AM_DSC_KEY_FROM_KL))
+			{
+				case AM_DSC_KEY_TYPE_ODD:
+					parity = DSC_KEY_ODD;
+					break;
+
+				case AM_DSC_KEY_TYPE_AES_ODD:
+				case AM_DSC_KEY_TYPE_AES_IV_ODD:
+					parity = DSC_KEY_ODD;
+					break;
+
+				case AM_DSC_KEY_TYPE_EVEN:
+					parity = DSC_KEY_EVEN;
+					break;
+
+				case AM_DSC_KEY_TYPE_AES_EVEN:
+				case AM_DSC_KEY_TYPE_AES_IV_EVEN:
+					parity = DSC_KEY_EVEN;
+					break;
+			};
+
+			if (type & AM_DSC_KEY_FROM_KL)
+			{
+				am_kl_get_config(&kl_config);
+				ret = AM_DSC_SEC_KeyladderRun(
+					dev_no,
+					chan->stream_path,
+					chan->pid,
+					parity,
+					&kl_config,
+					type);
+			}
+			else
+				ret = AM_DSC_SEC_SetKey(
+					dev_no,
+					chan->stream_path,
+					chan->pid,
+					parity,
+					key,
+					16,
+					type);
+		}
+		else
+			ret = AM_FAILURE;
 	}
 	
 	pthread_mutex_unlock(&dev->lock);
@@ -340,9 +525,15 @@ AM_ErrorCode_t AM_DSC_FreeChannel(int dev_no, int chan_id)
 	
 	ret = dsc_get_used_chan(dev, chan_id, &chan);
 	
-	if(ret==AM_SUCCESS)
+	if (ret == AM_SUCCESS)
 	{
-		dsc_free_chan(dev, chan);
+		if (g_dsc_sec_mode == DSC_MODE_NORMAL)
+			ret = dsc_free_chan(dev, chan);
+		else if (g_dsc_sec_mode == DSC_MODE_SEC)
+			ret = AM_DSC_SEC_FreeChannel(dev_no, chan->stream_path);
+		else
+			ret = AM_FAILURE;
+
 		chan->used = AM_FALSE;
 	}
 	
@@ -369,17 +560,35 @@ AM_ErrorCode_t AM_DSC_Close(int dev_no)
 	
 	for(i=0; i<DSC_CHANNEL_COUNT; i++)
 	{
-		dsc_free_chan(dev, &dev->channels[i]);
+		if (g_dsc_sec_mode == DSC_MODE_NORMAL)
+			dsc_free_chan(dev, &dev->channels[i]);
+		else if (g_dsc_sec_mode == DSC_MODE_SEC)
+			ret = AM_DSC_SEC_FreeChannel(dev_no, (&dev->channels[i])->stream_path);
+		else
+			ret = AM_FAILURE;
 	}
 	
-	if(dev->drv->close)
+	if (g_dsc_sec_mode == DSC_MODE_NORMAL)
 	{
-		dev->drv->close(dev);
+		if (dev->drv->close)
+			dev->drv->close(dev);
 	}
+	else if (g_dsc_sec_mode == DSC_MODE_SEC)
+	{
+		ret = AM_DSC_SEC_Close(dev_no);
+		if (g_dsc_sec_lib_handle)
+			dlclose(g_dsc_sec_lib_handle);
+		g_dsc_sec_lib_handle = NULL;
+	}
+	else
+		ret = AM_FAILURE;
 	
 	pthread_mutex_destroy(&dev->lock);
+
+	/* Reset status */
 	dev->openned = AM_FALSE;
-	
+	g_dsc_sec_mode = -1;
+
 	pthread_mutex_unlock(&am_gAdpLock);
 	
 	return ret;
@@ -396,16 +605,34 @@ AM_ErrorCode_t AM_DSC_SetSource(int dev_no, AM_DSC_Source_t src)
 {
 	AM_DSC_Device_t *dev;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
 	AM_TRY(dsc_get_openned_dev(dev_no, &dev));
-	
+
 	pthread_mutex_lock(&dev->lock);
-	
-	if(dev->drv->set_source)
+	if (dev->drv->set_source)
 		ret = dev->drv->set_source(dev, src);
-	
+
 	pthread_mutex_unlock(&dev->lock);
+
+	/* src: demux0 --> 1<<0
+	     src: demux1 --> 1<<1
+	     src: demux2 --> 1<<2
+	*/
+	if (g_dsc_sec_mode == DSC_MODE_SEC)
+		AM_DSC_SEC_SetOutput(dev_no, 1<<src);
 	
 	return ret;
 }
 
+/**\brief 设定解扰器设备的输出
+ * \param dev_no 解扰器设备号
+ * \param src 输出demux
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_dsc.h)
+ */
+AM_ErrorCode_t AM_DSC_SetOutput(int dev_no, int dst)
+{
+	if (g_dsc_sec_mode == DSC_MODE_SEC)
+		AM_DSC_SEC_SetOutput(dev_no, dst);
+	return AM_SUCCESS;
+}

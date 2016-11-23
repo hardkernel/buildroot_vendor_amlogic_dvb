@@ -21,6 +21,9 @@ extern "C"
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
+/* For sec os mode */
+#define DSC_SEC_CaLib 	"libam_sec_dsc.so"
+#define KL_SEC_Lib 		"libam_kl_api.so"
 
 /****************************************************************************
  * Error code definitions
@@ -53,7 +56,27 @@ typedef struct
 	int  foo;
 } AM_DSC_OpenPara_t;
 
-/**\brief Control word's type*/
+/**\brief Work enviorment, tee/kernel */
+typedef enum _work_mode_e{
+	DSC_MODE_NORMAL,
+	DSC_MODE_SEC,
+	DSC_MODE_MAX
+}AM_DSC_WorkMode_e;
+
+/**\brief Parity */
+typedef enum _key_parity{
+	DSC_KEY_ODD,
+	DSC_KEY_EVEN
+}AM_DSC_KeyParity_e;
+
+/**\brief Video encrypt algoritm */
+typedef enum {
+	CW_ALGO_AES = 0,
+	CW_ALGO_DVBCSA = 1,
+	CW_ALGO_MAX = 2,
+} CW_ALGO_T;
+
+/**\brief CW key type */
 typedef enum {
 	AM_DSC_KEY_TYPE_EVEN = 0,        /**< DVB-CSA even control word*/
 	AM_DSC_KEY_TYPE_ODD = 1,         /**< DVB-CSA odd control word*/
@@ -72,8 +95,11 @@ typedef enum {
 	AM_DSC_SRC_BYPASS        /**< Bypass TS data*/
 } AM_DSC_Source_t;
 
+typedef AM_ErrorCode_t (*AM_KL_SEC_GetKeys_t)(int index, int level, unsigned char keys[6][16]);
+
+
 /****************************************************************************
- * Function prototypes  
+ * Function prototypes
  ***************************************************************************/
 
 /**\brief Open a descrambler device
@@ -133,6 +159,14 @@ extern AM_ErrorCode_t AM_DSC_Close(int dev_no);
  * \return Error code
  */
 extern AM_ErrorCode_t AM_DSC_SetSource(int dev_no, AM_DSC_Source_t src);
+
+/**\brief Set the output of descrambler device
+ * \param dev_no Descrambler device number
+ * \param src destination demux
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
+extern AM_ErrorCode_t AM_DSC_SetOutput(int dev_no, int dst);
 
 #ifdef __cplusplus
 }

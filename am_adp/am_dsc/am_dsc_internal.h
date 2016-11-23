@@ -25,6 +25,7 @@ extern "C"
 
 #define DSC_CHANNEL_COUNT    (8)
 
+
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
@@ -53,8 +54,10 @@ struct AM_DSC_Driver
 /**\brief 解扰器通道*/
 struct AM_DSC_Channel
 {
-	int                id;
-	uint16_t           pid;
+	int		id;
+	uint16_t	pid;
+	/* channel handle in secure os. */
+	uint8_t		stream_path;
 	AM_Bool_t          used;
 	void              *drv_data;
 };
@@ -71,7 +74,7 @@ struct AM_DSC_Device
 };
 
 /****************************************************************************
- * Function prototypes  
+ * Function prototypes
  ***************************************************************************/
 
 
