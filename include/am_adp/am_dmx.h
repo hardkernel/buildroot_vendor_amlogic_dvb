@@ -4,6 +4,8 @@
 /**\file
  * \brief 解复用设备模块
  *
+ * 解复用设备基本数据结构定义参见"linux/dvb/dmx.h"
+ *
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2010-05-21: create the document
  ***************************************************************************/

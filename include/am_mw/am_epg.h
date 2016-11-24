@@ -131,6 +131,7 @@ enum AM_EPG_ModeOp
 	AM_EPG_MODE_OP_SET,		 /**< 设置EPG监控模式*/
 };
 
+/**EPG搜索的Section表类型*/
 enum AM_EPG_TAB
 {
 	AM_EPG_TAB_PAT,		/**<PAT*/

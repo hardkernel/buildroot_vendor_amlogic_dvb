@@ -55,13 +55,13 @@ typedef struct
 
 /**\brief 控制字类型*/
 typedef enum {
-        AM_DSC_KEY_TYPE_EVEN = 0,   /**< 偶控制字*/
-        AM_DSC_KEY_TYPE_ODD = 1,     /**< 奇控制字*/
-		AM_DSC_KEY_TYPE_AES_EVEN = 2,
-		AM_DSC_KEY_TYPE_AES_ODD = 3,
-		AM_DSC_KEY_TYPE_AES_IV_EVEN = 4,
-		AM_DSC_KEY_TYPE_AES_IV_ODD = 5,
-		AM_DSC_KEY_FROM_KL = (1<<7)
+	AM_DSC_KEY_TYPE_EVEN = 0,        /**< DVB-CSA 偶控制字*/
+	AM_DSC_KEY_TYPE_ODD = 1,         /**< DVB-CSA 奇控制字*/
+	AM_DSC_KEY_TYPE_AES_EVEN = 2,    /**< AES 偶控制字*/
+	AM_DSC_KEY_TYPE_AES_ODD = 3,     /**< AES 奇控制字*/
+	AM_DSC_KEY_TYPE_AES_IV_EVEN = 4, /**< AES-CBC 偶控制字IV数据*/
+	AM_DSC_KEY_TYPE_AES_IV_ODD = 5,  /**< AES-CBC 奇控制字IV数据*/
+	AM_DSC_KEY_FROM_KL = (1<<7)      /**< 从Keyladder获取控制字*/
 } AM_DSC_KeyType_t;
 
 /**\brief 解扰器输入源*/

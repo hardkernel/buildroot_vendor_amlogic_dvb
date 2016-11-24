@@ -61,15 +61,15 @@ typedef struct
 /**\brief 开始录像参数*/
 typedef struct
 {
-	int		pid_count;
-	int		pids[AM_DVR_MAX_PID_COUNT];
+	int		pid_count; /**< 要录制的PID数目*/
+	int		pids[AM_DVR_MAX_PID_COUNT]; /**< 要录制的PID数组*/
 } AM_DVR_StartRecPara_t;
 
 /**\brief DVR源*/
 typedef enum
 {
-	AM_DVR_SRC_ASYNC_FIFO0,
-	AM_DVR_SRC_ASYNC_FIFO1
+	AM_DVR_SRC_ASYNC_FIFO0, /**< asyncfifo 0*/
+	AM_DVR_SRC_ASYNC_FIFO1  /**< asyncfifo 1*/
 }AM_DVR_Source_t;
 
 /****************************************************************************

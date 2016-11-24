@@ -42,10 +42,13 @@ enum AM_CC_ErrorCode
  * Type definitions
  ***************************************************************************/
 
-/**\brief CC 更新屏幕回调*/
+/**CC句柄*/
 typedef void* AM_CC_Handle_t;
+/**CC绘制参数*/
 typedef struct AM_CC_DrawPara AM_CC_DrawPara_t;
+/**CC 开始绘制回调*/
 typedef void (*AM_CC_DrawBegin_t)(AM_CC_Handle_t handle, AM_CC_DrawPara_t *draw_para);
+/**CC 绘制完成回调*/
 typedef void (*AM_CC_DrawEnd_t)(AM_CC_Handle_t handle, AM_CC_DrawPara_t *draw_para);
 
 typedef enum {
@@ -163,11 +166,11 @@ typedef enum
 	AM_CC_COLOR_MAX
 }AM_CC_Color_t;
 
-/*CC绘制参数*/
+/**CC绘制参数*/
 struct AM_CC_DrawPara
 {
-	int caption_width;
-	int caption_height;
+	int caption_width;   /**< 字幕宽度*/
+	int caption_height;  /**< 字幕高度*/
 };
 
 /**\brief  CC 用户可覆盖选项*/
@@ -184,19 +187,19 @@ typedef struct
 /**\brief CC创建参数*/
 typedef struct
 {
-	AM_CC_DrawBegin_t   draw_begin;
-	AM_CC_DrawEnd_t     draw_end;
-	uint8_t             *bmp_buffer;
-	int                 pitch;
-	int 				bypass_cc_enable;
-	void                *user_data;
+	AM_CC_DrawBegin_t   draw_begin;    /**< 开始绘制CC回调*/
+	AM_CC_DrawEnd_t     draw_end;      /**< CC绘制结束回调*/
+	uint8_t            *bmp_buffer;    /**< 绘制位图缓冲区*/
+	int                 pitch;         /**< 缓冲区行间隔*/
+	int                 bypass_cc_enable; /**< CC数据bypass标志*/
+	void               *user_data;     /**< 用户数据*/
 }AM_CC_CreatePara_t;
 
 /**\brief CC启动参数*/
 typedef struct
 {
-	AM_CC_CaptionMode_t caption; /**< caption mode*/
-	AM_CC_UserOptions_t	user_options;
+	AM_CC_CaptionMode_t    caption;      /**< 模式*/
+	AM_CC_UserOptions_t    user_options; /**< 用户设置选项*/
 }AM_CC_StartPara_t;
 
 

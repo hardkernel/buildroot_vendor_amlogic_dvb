@@ -4,6 +4,8 @@
 /**\file
  * \brief DVB前端设备驱动
  *
+ * 前端基本数据结构定义参见"linux/dvb/frontend.h"
+ *
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2010-06-07: create the document
  ***************************************************************************/
@@ -156,6 +158,15 @@ extern AM_ErrorCode_t AM_FEND_GetTSSource(int dev_no, AM_DMX_Source_t *src);
  *   - 其他值 错误代码(见am_fend.h)
  */
 extern AM_ErrorCode_t AM_FEND_SetPara(int dev_no, const struct dvb_frontend_parameters *para);
+
+/**
+ * 设定前端设备属性
+ * \param dev_no 前端设备号
+ * \param[in] prop 前端设置属性
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
 extern AM_ErrorCode_t AM_FEND_SetProp(int dev_no, const struct dtv_properties *prop);
 
 /**\brief 取得当前端设备设定的参数
@@ -166,6 +177,15 @@ extern AM_ErrorCode_t AM_FEND_SetProp(int dev_no, const struct dtv_properties *p
  *   - 其他值 错误代码(见am_fend.h)
  */
 extern AM_ErrorCode_t AM_FEND_GetPara(int dev_no, struct dvb_frontend_parameters *para);
+
+/**
+ * 获取前端设备属性
+ * \param dev_no 前端设备号
+ * \param[out] prop 前端设置属性
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
 extern AM_ErrorCode_t AM_FEND_GetProp(int dev_no, struct dtv_properties *prop);
 
 /**\brief 取得前端设备当前的锁定状态

@@ -81,12 +81,12 @@ enum AM_AV_EventType
 	AM_AV_EVT_AV_DATA_RESUME,	/**< 在AM_AV_EVT_AV_NO_DATA后，检测到Audio or Video PTS有变化，通知有数据*/
 	AM_AV_EVT_VIDEO_ES_END,     /**< 注入视频ES数据结束*/
 	AM_AV_EVT_AUDIO_ES_END,     /**< 注入音频ES数据结束*/
-	AM_AV_EVT_VIDEO_SCAMBLED,
-	AM_AV_EVT_AUDIO_SCAMBLED,
-	AM_AV_EVT_AUDIO_AC3_NO_LICENCE,
-	AM_AV_EVT_AUDIO_AC3_LICENCE_RESUME,
-	AM_AV_EVT_VIDEO_NOT_SUPPORT,
-	AM_AV_EVT_VIDEO_AVAILABLE,
+	AM_AV_EVT_VIDEO_SCAMBLED,   /**< 视频加扰无法播放*/
+	AM_AV_EVT_AUDIO_SCAMBLED,   /**< 音频加扰无法播放*/
+	AM_AV_EVT_AUDIO_AC3_NO_LICENCE,     /**< AC3音频没有授权无法播放*/
+	AM_AV_EVT_AUDIO_AC3_LICENCE_RESUME, /**< AC3音频恢复播放*/
+	AM_AV_EVT_VIDEO_NOT_SUPPORT,        /**< 视频格式不支持*/
+	AM_AV_EVT_VIDEO_AVAILABLE,  /**< 无法获取视频信息*/
 	AM_AV_EVT_END
 };
 
@@ -193,10 +193,10 @@ typedef vformat_t AM_AV_VFormat_t;
 /**\brief 数据封装格式*/
 typedef enum
 {
-	PFORMAT_ES = 0,
-	PFORMAT_PS,
-	PFORMAT_TS,
-	PFORMAT_REAL
+	PFORMAT_ES = 0, /**< ES流*/
+	PFORMAT_PS,     /**< PS流*/
+	PFORMAT_TS,     /**< TS流*/
+	PFORMAT_REAL    /**< REAL*/
 } AM_AV_PFormat_t;
 
 /**\brief 视频长宽比*/
@@ -364,50 +364,50 @@ typedef struct
 	int              ab_free;     /**< 音频缓冲区中空闲空间大小*/
 }AM_AV_AudioStatus_t;
 
-/**\brief Timeshifting Mode definition*/
+/**\brief Timeshifting 播放模式*/
 typedef enum
 {
-	AM_AV_TIMESHIFT_MODE_TIMESHIFTING, /**< Normal timeshifting*/
-	AM_AV_TIMESHIFT_MODE_PLAYBACK      /**< PVR playback*/
+	AM_AV_TIMESHIFT_MODE_TIMESHIFTING, /**< 时移播放*/
+	AM_AV_TIMESHIFT_MODE_PLAYBACK      /**< PVR回放*/
 }AM_AV_TimeshiftMode_t;
 
-/**\brief Timeshifting media info*/
+/**\brief Timeshifting 媒体信息*/
 typedef struct
 {
-	int duration;
-	char program_name[16];
+	int duration;              /**< 节目总时长*/
+	char program_name[16];     /**< 节目名称*/
 	
-	int vid_pid;
-	int vid_fmt;
+	int vid_pid; /**< 视频PID*/
+	int vid_fmt; /**< 视频格式*/
 
-	int aud_cnt;
+	int aud_cnt; /**< 音频数量*/
 	struct
 	{
-		int pid;
-		int fmt;
-		char lang[4];
-	}audios[8]; /**< audios*/
+		int pid; /**< 音频PID*/
+		int fmt; /**< 音频格式*/
+		char lang[4]; /**< 语言描述*/
+	}audios[8]; /**< 音频信息数组*/
 
-	int sub_cnt;
+	int sub_cnt; /**< 字幕数量*/
 	struct
 	{
-		int pid;
-		int type;
-		int composition_page;
-		int ancillary_page;
-		int magzine_no;
-		int page_no;
-		char lang[4];
-	}subtitles[8]; /**< subtitles*/
+		int pid;  /**< 字幕PID*/
+		int type; /**< 字幕类型*/
+		int composition_page; /**< DVB字幕composition page*/
+		int ancillary_page;   /**< DVB字幕ancillary page*/
+		int magzine_no; /**< teletext 字幕magzine number*/
+		int page_no;  /**< teletext 字幕page number*/
+		char lang[4]; /**< 字幕语言描述*/
+	}subtitles[8]; /**< 字幕信息数组*/
 
-	int ttx_cnt;
+	int ttx_cnt; /**< teletext数量*/
 	struct
 	{
-		int pid;
-		int magzine_no;
-		int page_no;
-		char lang[4];
-	}teletexts[8]; /**< teletexts*/
+		int pid; /**< teletext PID*/
+		int magzine_no; /**< teletext magzine number*/
+		int page_no;    /**< teletext page number*/
+		char lang[4];   /**< teletext 语言描述*/
+	}teletexts[8]; /**< teletext信息数组*/
 }AM_AV_TimeshiftMediaInfo_t;
 
 /**\brief Timeshift播放参数*/
@@ -416,16 +416,16 @@ typedef struct
 	int              dmx_id;      /**< 用于回放的dmx*/
 	char             file_path[256];     /**< 存储文件全路径*/
 	
-	AM_AV_TimeshiftMode_t mode;
-	AM_AV_TimeshiftMediaInfo_t media_info;
+	AM_AV_TimeshiftMode_t mode;   /**< 模仿模式*/
+	AM_AV_TimeshiftMediaInfo_t media_info; /**< 媒体信息*/
 } AM_AV_TimeshiftPara_t;
 
 /**\brief Timeshift播放信息*/
 typedef struct
 {
-	int                   current_time; /**< in seconds*/
-	int                   full_time;
-	int                   status;
+	int                   current_time; /**< 当前时间(秒为单位)*/
+	int                   full_time;    /**< 总时间*/
+	int                   status;       /**< 状态*/
 }AM_AV_TimeshiftInfo_t;
 
 /**\brief 播放器状态信息*/
@@ -1159,9 +1159,15 @@ extern AM_ErrorCode_t AM_AV_ResetAudioDecoder(int dev_no);
 extern AM_ErrorCode_t AM_AV_SetVdecErrorRecoveryMode(int dev_no, uint8_t error_recovery_mode);
 
 /**
-* \param apid sub音频流PID
-* \param afmt sub音频压缩格式
-*/
+ * 设定辅助音频描述输出
+ * \param dev_no 音视频设备号
+ * \param enable 1 开启辅助描述音频输出, 0关闭辅助描述音频输出
+ * \param apid sub音频流PID
+ * \param afmt sub音频压缩格式
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
 extern AM_ErrorCode_t AM_AV_SetAudioAd(int dev_no, int enable, uint16_t apid, AM_AV_AFormat_t afmt);
 
 #ifdef __cplusplus

@@ -568,7 +568,7 @@ WARN_LOGFILE           =
 # directories like "/usr/src/myproject". Separate the files or directories
 # with spaces.
 
-INPUT                  = include
+INPUT                  = include/am_adp/am_dsc.h include/am_adp/am_types.h include/am_adp/am_aout.h include/am_adp/am_dvr.h include/am_adp/am_pes.h include/am_adp/am_userdata.h include/am_adp/am_av.h include/am_adp/am_evt.h include/am_adp/am_smc.h include/am_adp/am_fend_diseqc_cmd.h include/am_adp/am_vout.h include/am_adp/am_dmx.h include/am_adp/am_fend.h include/am_mw/am_caman.h include/am_mw/am_fend_ctrl.h include/am_mw/am_si.h include/am_mw/am_tt2.h include/am_mw/am_cc.h include/am_mw/am_db.h include/am_mw/am_rec.h include/am_mw/am_sub2.h include/am_mw/am_epg.h include/am_mw/am_scan.h
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding, which is
@@ -983,7 +983,7 @@ SEARCHENGINE           = YES
 # If the GENERATE_LATEX tag is set to YES (the default) Doxygen will
 # generate Latex output.
 
-GENERATE_LATEX         = NO
+GENERATE_LATEX         = YES
 
 # The LATEX_OUTPUT tag is used to specify where the LaTeX docs will be put.
 # If a relative path is entered the value of OUTPUT_DIRECTORY will be
@@ -1064,7 +1064,7 @@ LATEX_SOURCE_CODE      = NO
 # The RTF output is optimized for Word 97 and may not look very pretty with
 # other RTF readers or editors.
 
-GENERATE_RTF           = NO
+GENERATE_RTF           = YES
 
 # The RTF_OUTPUT tag is used to specify where the RTF docs will be put.
 # If a relative path is entered the value of OUTPUT_DIRECTORY will be
