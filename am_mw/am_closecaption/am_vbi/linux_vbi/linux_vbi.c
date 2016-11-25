@@ -114,7 +114,7 @@ static AM_ErrorCode_t vbi_alloc_filter(AM_VBI_Device_t *dev, AM_VBI_Filter_t *fi
 	
 	dmx->fd[filter->id] = fd;
 	
-	filter->drv_data = (void*)fd;
+	filter->drv_data = (void*)(long)fd;
 	
 	return AM_SUCCESS;
 }

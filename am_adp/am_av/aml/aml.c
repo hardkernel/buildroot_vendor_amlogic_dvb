@@ -196,6 +196,12 @@ void *adec_handle = NULL;
 
 #define VALID_PID(_pid_) ((_pid_)>0 && (_pid_)<0x1fff)
 
+static int _get_vid_disabled();
+static int _get_aud_disabled();
+
+#define VALID_VIDEO(_pid_, _fmt_) (!_get_vid_disabled() && VALID_PID(_pid_))
+#define VALID_AUDIO(_pid_, _fmt_) (!_get_aud_disabled() && VALID_PID(_pid_) && audio_get_format_supported(_fmt_))
+
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
@@ -544,6 +550,8 @@ static int get_amstream(AM_AV_Device_t *dev)
 
 #define AUD_ASSO_PROP "media.audio.enable_asso"
 #define AUD_ASSO_MIX_PROP "media.audio.mix_asso"
+#define VID_DISABLED_PROP "media.dvb.video.disabled"
+#define AUD_DISABLED_PROP "media.dvb.audio.disabled"
 static int _get_prop_int(char *prop, int def) {
 	char v[32];
 	int val = 0;
@@ -557,6 +565,12 @@ static int _get_asso_enable() {
 }
 static int _get_asso_mix() {
 	return _get_prop_int(AUD_ASSO_MIX_PROP, 50);
+}
+static int _get_vid_disabled() {
+	return _get_prop_int(VID_DISABLED_PROP, 0);
+}
+static int _get_aud_disabled() {
+	return _get_prop_int(AUD_DISABLED_PROP, 0);
 }
 
 static void adec_start_decode(int fd, int fmt, int has_video, void **padec)
@@ -1427,8 +1441,8 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AV_InjectPlayPara_t
 {
 	int vfd=-1, afd=-1;
 	AM_AV_InjectPara_t *para = &inj_para->para;
-	AM_Bool_t has_video = VALID_PID(para->vid_id);
-	AM_Bool_t has_audio = (VALID_PID(para->aud_id) && audio_get_format_supported(para->aud_fmt));
+	AM_Bool_t has_video = VALID_VIDEO(para->vid_id, para->vid_fmt);
+	AM_Bool_t has_audio = VALID_AUDIO(para->aud_id, para->aud_fmt);
 
 	inj->pkg_fmt = para->pkg_fmt;
 
@@ -3153,7 +3167,7 @@ static AM_ErrorCode_t aml_timeshift_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, v
 					data->aud_pid = audio_para->apid;
 					data->aud_fmt = audio_para->afmt;
 					data->aud_idx = i;
-					data->aud_valid = (VALID_PID(data->aud_pid) && audio_get_format_supported(data->aud_fmt));
+					data->aud_valid = VALID_AUDIO(data->aud_pid, data->aud_fmt);
 					break;
 				}
 			}
@@ -3696,8 +3710,8 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 {
 	AV_TSData_t *ts;
 	int val;
-	AM_Bool_t has_video = VALID_PID(tp->vpid);
-	AM_Bool_t has_audio = (VALID_PID(tp->apid) && audio_get_format_supported(tp->afmt));
+	AM_Bool_t has_video = VALID_VIDEO(tp->vpid, tp->vfmt);
+	AM_Bool_t has_audio = VALID_AUDIO(tp->apid, tp->afmt);
 	AM_Bool_t ac3_amaster = AM_FALSE;
 
 	AM_DEBUG(1, "aml start ts: V[%d:%d] A[%d:%d] P[%d]", tp->vpid, tp->vfmt, tp->apid, tp->afmt, tp->pcrpid);
@@ -3976,8 +3990,8 @@ static void* aml_av_monitor_thread(void *arg)
 	AM_AV_Device_t *dev = (AM_AV_Device_t *)arg;
 	AM_Bool_t adec_start = AM_FALSE;
 	AM_Bool_t av_paused = AM_TRUE;
-	AM_Bool_t has_audio = VALID_PID(dev->ts_player.play_para.apid) && audio_get_format_supported(dev->ts_player.play_para.afmt);
-	AM_Bool_t has_video = VALID_PID(dev->ts_player.play_para.vpid);
+	AM_Bool_t has_audio = VALID_AUDIO(dev->ts_player.play_para.apid, dev->ts_player.play_para.afmt);
+	AM_Bool_t has_video = VALID_VIDEO(dev->ts_player.play_para.vpid, dev->ts_player.play_para.vfmt);
 	AM_Bool_t bypass_di = AM_FALSE;
 	AM_Bool_t drop_b_frame = AM_FALSE;
 	AM_Bool_t is_hd_video = AM_FALSE;
@@ -4839,7 +4853,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 				tshift->aud_idx = 0;
 				tshift->aud_pid = tshift_p->para.media_info.audios[0].pid;
 				tshift->aud_fmt = tshift_p->para.media_info.audios[0].fmt;
-				tshift->aud_valid = (VALID_PID(tshift->aud_pid) && audio_get_format_supported(tshift->aud_fmt));
+				tshift->aud_valid = VALID_AUDIO(tshift->aud_pid, tshift->aud_fmt);
 			}
 			if (aml_start_timeshift(tshift, tshift_p, AM_TRUE, AM_TRUE) != AM_SUCCESS)
 				return AM_AV_ERR_SYS;
@@ -6099,8 +6113,8 @@ aml_set_vpath(AM_AV_Device_t *dev)
 static AM_ErrorCode_t aml_switch_ts_audio_legacy(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt)
 {
 	int fd = -1;
-	AM_Bool_t audio_valid = (VALID_PID(apid) && audio_get_format_supported(afmt));
-	AM_Bool_t has_video = VALID_PID(dev->ts_player.play_para.vpid);
+	AM_Bool_t audio_valid = VALID_AUDIO(apid, afmt);
+	AM_Bool_t has_video = VALID_VIDEO(dev->ts_player.play_para.vpid, dev->ts_player.play_para.vfmt);
 	AV_TSData_t *ts = NULL;
 
 	AM_DEBUG(1, "switch ts audio: A[%d:%d]", apid, afmt);
@@ -6184,8 +6198,8 @@ static AM_ErrorCode_t aml_switch_ts_audio_fmt(AM_AV_Device_t *dev)
 	AM_AV_AFormat_t afmt;
 	apid = dev->ts_player.play_para.apid ;
 	afmt = dev->ts_player.play_para.afmt;
-	AM_Bool_t audio_valid = (VALID_PID(apid) && audio_get_format_supported(afmt));
-	AM_Bool_t has_video = VALID_PID(dev->ts_player.play_para.vpid);
+	AM_Bool_t audio_valid = VALID_AUDIO(apid, afmt);
+	AM_Bool_t has_video = VALID_VIDEO(dev->ts_player.play_para.vpid, dev->ts_player.play_para.vfmt);
 	AV_TSData_t *ts = NULL;
 
 	AM_DEBUG(1, "switch ts audio: A[%d:%d]", apid, afmt);
@@ -6328,7 +6342,7 @@ static AM_ErrorCode_t aml_set_drm_mode(AM_AV_Device_t *dev, int enable)
 		return AM_AV_ERR_SYS;
 	}
 
-	if (ioctl(fd, AMSTREAM_IOC_SET_DRMMODE, (void *)enable) == -1)
+	if (ioctl(fd, AMSTREAM_IOC_SET_DRMMODE, (void *)(long)enable) == -1)
 	{
 		return AM_AV_ERR_SYS;
 	}
@@ -6377,7 +6391,7 @@ static AM_ErrorCode_t aml_set_audio_ad(AM_AV_Device_t *dev, int enable, uint16_t
 	void *adec = NULL;
 	uint16_t sub_apid;
 	AM_AV_AFormat_t sub_afmt;
-	AM_Bool_t is_valid_audio = VALID_PID(apid) && audio_get_format_supported(afmt);
+	AM_Bool_t is_valid_audio = VALID_AUDIO(apid, afmt);
 
 	AM_DEBUG(1, "AD aml set audio ad: enable[%d] pid[%d] fmt[%d]", enable, apid, afmt);
 

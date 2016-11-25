@@ -471,7 +471,7 @@ void si_decode_descriptor(dvbpsi_descriptor_t *des)
 static AM_ErrorCode_t si_convert_iso6937_to_utf8(const char *src, int src_len, char *dest, int *dest_len)
 {
 	uint16_t ch;
-	int dlen, i;
+	long dlen, i;
 	uint8_t b;
 	char *ucs2 = NULL;
 
@@ -858,22 +858,24 @@ iso6937_end:
 		char **pin=&ucs2;
 		char **pout=&dest;
 		char *o_dest = dest;
-		
-		handle=iconv_open("utf-8","utf-16");
+		size_t l_dest = *dest_len;
 
+		handle=iconv_open("utf-8","utf-16");
 		if (handle == (iconv_t)-1)
 		{
-			AM_DEBUG(1, "iconv_open err: %s",strerror(errno));
+			AM_DEBUG(1, "iconv_open err: %d", errno);
 			return AM_FAILURE;
 		}
 
-		if((int)iconv(handle,pin,(size_t *)&dlen,pout,(size_t *)dest_len) == -1)
+		if ((int)iconv(handle,pin,(size_t *)&dlen,pout, &l_dest) < 0)
 		{
-		    AM_DEBUG(1, "iconv err: %s", strerror(errno));
+		    int i;
+		    AM_DEBUG(1, "iconv err:%d", errno);
 		    iconv_close(handle);
 		    return AM_FAILURE;
 		}
 
+		*dest_len = l_dest;
 		AM_Check_UTF8(o_dest, *dest_len, o_dest, dest_len);
 		
 		free(org_ucs2);
@@ -1351,14 +1353,14 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 
 		if (handle == (iconv_t)-1)
 		{
-			AM_DEBUG(1, "Covert DVB text code failed, iconv_open err: %s",strerror(errno));
+			AM_DEBUG(1, "Covert DVB text code failed, iconv_open err: %d", errno);
 			return AM_FAILURE;
 		}
 
 		if((int)iconv(handle,pin,(size_t *)&in_len,pout,(size_t *)&out_len) == -1)
 		{
-		    AM_DEBUG(1, "Covert DVB text code failed, iconv err: %s, in_len %d, out_len %d", 
-		    	strerror(errno), in_len, out_len);
+		    AM_DEBUG(1, "Covert DVB text code failed, iconv err: %d, in_len %d, out_len %d",
+				errno, in_len, out_len);
 		    iconv_close(handle);
 		    return AM_FAILURE;
 		}

@@ -31,6 +31,6 @@ ifeq ($(strip $(BOARD_DVB_NO_VERSION)),)
     LOCAL_CFLAGS+=-DLIBDVB_BUILD_NAME=\"${LIBDVB_BUILD_NAME}\"
 endif
 
-LOCAL_32_BIT_ONLY := true
+#LOCAL_32_BIT_ONLY := true
 
 include $(BUILD_SHARED_LIBRARY)

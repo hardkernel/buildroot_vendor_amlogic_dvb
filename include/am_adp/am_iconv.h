@@ -24,6 +24,7 @@ extern "C"
 #include <android/log.h>
 #include <dlfcn.h>
 #include <assert.h>
+#include <errno.h>
 #include "am_util.h"
 
 typedef struct {
@@ -87,8 +88,12 @@ error:
 	{
 		if(U_SUCCESS(err1))
 			am_ucnv_close(cd->target);
+		else
+			errno = err1;//use errno for error code export
 		if(U_SUCCESS(err2))
 			am_ucnv_close(cd->source);
+		else
+			errno = err2;//use errno for error code export
 		free(cd);
 	}
 	return (iconv_t)-1;
@@ -124,8 +129,10 @@ iconv(iconv_t cd, char **inbuf, size_t *inbytesleft, char **outbuf, size_t *outb
 
 	am_ucnv_convertEx(cd->target, cd->source, &tbegin, tend, &sbegin, send,
 			NULL, NULL, NULL, NULL, FALSE, TRUE, &err);
-	if(!U_SUCCESS(err))
+	if(!U_SUCCESS(err)) {
+		errno = err;//use errno for error code export
 		return -1;
+	}
 	
 	*inbuf  = (char*)sbegin;
 	*inbytesleft  = send - sbegin;

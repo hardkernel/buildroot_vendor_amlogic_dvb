@@ -13,6 +13,7 @@
 
 #define AM_DEBUG_LEVEL 1
 
+#include <stdlib.h>
 #include <am_iconv.h>
 #include <am_debug.h>
 
@@ -25,6 +26,8 @@ void (*am_ucnv_convertEx_ptr)(UConverter *targetCnv, UConverter *sourceCnv,
 		UChar **pivotTarget, const UChar *pivotLimit,
 		UBool reset, UBool flush,
 		UErrorCode *pErrorCode);
+void (*am_u_setDataDirectory_ptr)(const char *directory);
+void (*am_u_init_ptr)(long *status);
 
 void
 am_ucnv_dlink(void)
@@ -35,7 +38,6 @@ am_ucnv_dlink(void)
 		handle = dlopen("libicuuc.so", RTLD_LAZY);
 		setenv("ICU_DATA", "/system/usr/icu", 1);
 	}
-	
 	assert(handle);
 
 #define LOAD_UCNV_SYMBOL(name, post)\
@@ -44,7 +46,9 @@ am_ucnv_dlink(void)
 #define LOAD_UCNV_SYMBOLS(post)\
 	LOAD_UCNV_SYMBOL(ucnv_open, post)\
 	LOAD_UCNV_SYMBOL(ucnv_close, post)\
-	LOAD_UCNV_SYMBOL(ucnv_convertEx, post)
+	LOAD_UCNV_SYMBOL(ucnv_convertEx, post)\
+	LOAD_UCNV_SYMBOL(u_setDataDirectory, post)\
+	LOAD_UCNV_SYMBOL(u_init, post)
 
 #define CHECK_LOAD_SYMBOL(name)\
 	if(!am_##name##_ptr){\
@@ -52,7 +56,9 @@ am_ucnv_dlink(void)
 #define CHECK_LOAD_SYMBOLS()\
 	CHECK_LOAD_SYMBOL(ucnv_open)\
 	CHECK_LOAD_SYMBOL(ucnv_close)\
-	CHECK_LOAD_SYMBOL(ucnv_convertEx)
+	CHECK_LOAD_SYMBOL(ucnv_convertEx)\
+	CHECK_LOAD_SYMBOL(u_setDataDirectory)\
+	CHECK_LOAD_SYMBOL(u_init)
 
 	LOAD_UCNV_SYMBOLS("")
 	LOAD_UCNV_SYMBOLS("_48")
@@ -62,5 +68,15 @@ am_ucnv_dlink(void)
 	LOAD_UCNV_SYMBOLS("_56")
 
 	CHECK_LOAD_SYMBOLS()
+
+	if (am_u_setDataDirectory_ptr)
+		am_u_setDataDirectory_ptr("/system/usr/icu");
+	if (am_u_init_ptr) {
+		long status = 0;
+		am_u_init_ptr(&status);
+		if (status > 0) {
+			AM_DEBUG(1, "icu init fail. [%ld]", status);
+		}
+	}
 }
 

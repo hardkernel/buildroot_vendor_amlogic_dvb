@@ -5,6 +5,8 @@
 #define AM_DEBUG_LEVEL 1
 
 #include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "am_debug.h"
 #include "am_ci.h"

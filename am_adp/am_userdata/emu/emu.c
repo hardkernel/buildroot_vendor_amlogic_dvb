@@ -15,6 +15,7 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 #include <fcntl.h>
 #include <am_debug.h>
 #include "../am_userdata_internal.h"

@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
 #include <am_time.h>
 
 #define AM_TT2_MAX_SLICES (32)

@@ -20,7 +20,7 @@ LOCAL_SHARED_LIBRARIES+=libutils  libbinder libsystemcontrolservice
 
 LOCAL_PRELINK_MODULE := false
 
-LOCAL_32_BIT_ONLY := true
+#LOCAL_32_BIT_ONLY := true
 
 include $(BUILD_SHARED_LIBRARY)
 
@@ -43,6 +43,6 @@ LOCAL_SHARED_LIBRARIES+=libutils  libbinder libsystemcontrolservice
 
 LOCAL_PRELINK_MODULE := false
 
-LOCAL_32_BIT_ONLY := true
+#LOCAL_32_BIT_ONLY := true
 
 include $(BUILD_STATIC_LIBRARY)

@@ -9,6 +9,7 @@
 #include "am_debug.h"
 #include "am_xds_internal.h"
 #include "am_xds.h"
+#include "am_epg.h"
 
 #include <am_fend.h>
 #include <am_db.h>

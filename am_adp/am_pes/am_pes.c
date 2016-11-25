@@ -3,6 +3,10 @@
 #endif
 
 #define AM_DEBUG_LEVEL 5
+
+#include <stdlib.h>
+#include <malloc.h>
+#include <string.h>
 #include <am_debug.h>
 #include <am_pes.h>
 #include <am_util.h>

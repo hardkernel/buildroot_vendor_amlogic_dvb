@@ -58,7 +58,7 @@ endif
 
 LOCAL_PRELINK_MODULE := false
 
-LOCAL_32_BIT_ONLY := true
+#LOCAL_32_BIT_ONLY := true
 
 include $(BUILD_SHARED_LIBRARY)
 
@@ -120,7 +120,7 @@ endif
 
 LOCAL_PRELINK_MODULE := false
 
-LOCAL_32_BIT_ONLY := true
+#LOCAL_32_BIT_ONLY := true
 
 include $(BUILD_STATIC_LIBRARY)
 
