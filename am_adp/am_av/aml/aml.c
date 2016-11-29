@@ -12,6 +12,7 @@
  ***************************************************************************/
 
 #define AM_DEBUG_LEVEL 5
+#define _LARGEFILE64_SOURCE
 
 #include <am_debug.h>
 #include <am_misc.h>
@@ -29,11 +30,13 @@
 #include <unistd.h>
 #include <poll.h>
 #include <errno.h>
+#include <signal.h>
 #include <amports/amstream.h>
 #include <cutils/properties.h>
 #include "am_ad.h"
 
 #ifdef ANDROID
+#include <cutils/properties.h>
 #include <sys/system_properties.h>
 #endif
 
@@ -45,17 +48,9 @@
 #include <linux/amports/jpegdec.h>
 #endif
 
-#if defined(ANDROID) || defined(CHIP_8626X)
-  #define PLAYER_API_NEW
-  #define ADEC_API_NEW
-#endif
+#define PLAYER_API_NEW
+#define ADEC_API_NEW
 
-#if !defined(ANDROID) && !defined(CHIP_8626X)
-#define MEDIA_PLAYER
-#include <player_plugins/mp_api.h>
-#include <player_plugins/mp_types.h>
-#include <player_plugins/mp_utils.h>
-#else
 #include "player.h"
 #define PLAYER_INFO_POP_INTERVAL 500
 #define FILENAME_LENGTH_MAX 2048
@@ -64,7 +59,6 @@
 #include <adec-external-ctrl.h>
 
 void *adec_handle = NULL;
-#endif
 
 #ifndef TRICKMODE_NONE
 #define TRICKMODE_NONE      0x00
@@ -3200,10 +3194,7 @@ static AM_ErrorCode_t aml_decode_jpeg(AV_JPEGData_t *jpeg, const uint8_t *data, 
 	const uint8_t *src = data;
 	int left = len;
 	AM_OSD_Surface_t *surf = NULL;
-
-#ifndef ANDROID
 	jpegdec_info_t info;
-#endif
 
 	char tmp_buf[64];
 

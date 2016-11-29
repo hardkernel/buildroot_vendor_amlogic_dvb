@@ -19,6 +19,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <limits.h>
 #include <am_misc.h>
 
 /****************************************************************************

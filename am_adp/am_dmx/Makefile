@@ -12,8 +12,8 @@ ifeq ($(EMU_DEMUX), y)
 	SUBDIRS+=emu
 	am_dmx_OBJS+=emu/emu
 else
-	SUBDIRS+=linux_dvb
-	am_dmx_OBJS+=linux_dvb/linux_dvb
+	SUBDIRS+=linux_dvb dvr
+	am_dmx_OBJS+=linux_dvb/linux_dvb dvr/dvr
 endif
 
 include $(BASE)/rule/rule.mk

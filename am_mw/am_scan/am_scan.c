@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <am_iconv.h>
 #include <am_debug.h>
 #include <am_scan.h>

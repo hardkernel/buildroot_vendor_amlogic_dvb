@@ -502,11 +502,13 @@ static AM_ErrorCode_t dvb_set_afc(AM_FEND_Device_t *dev, unsigned int afc)
 {
 	int fd = (long)dev->drv_data;
 
+#ifdef FE_SET_AFC
 	if(ioctl(fd, FE_SET_AFC, &afc)==-1)
 	{
 		AM_DEBUG(1, "ioctl FE_SET_AFC failed, errno: %s", strerror(errno));
 		return AM_FAILURE;
 	}
+#endif
 
 	return AM_SUCCESS;
 }

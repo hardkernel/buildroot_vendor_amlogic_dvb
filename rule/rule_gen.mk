@@ -1,6 +1,6 @@
 #CFLAGS+=-O0
 ifneq ($(TARGET),android)
-	LDFLAGS+=-lpthread -lrt -lsqlite3
+	LDFLAGS+=-lpthread -lrt -lsqlite3 -lm -ldl
 else
 	ifeq ($(ANDROID_VERSION),2.2)
 		LICUDATA:=-licudata
@@ -27,15 +27,15 @@ endif
 endif
 
 ifneq ($(KERNEL_INCDIR), )
-	CFLAGS+=-I$(KERNEL_INCDIR)
+	CFLAGS+=$(patsubst %,-I%,$(KERNEL_INCDIR))
 endif
 
 ifneq ($(ROOTFS_INCDIR), )
-	CFLAGS+=-I$(ROOTFS_INCDIR)
+	CFLAGS+=$(patsubst %,-I%,$(ROOTFS_INCDIR))
 endif
 
 ifneq ($(NDK_INCDIR), )
-	CFLAGS+=-I$(NDK_INCDIR)
+	CFLAGS+=$(patsubst %,-I%,$(NDK_INCDIR))
 endif
 
 ifneq ($(EX_INCDIR), )
@@ -145,11 +145,7 @@ ifeq ($(EMU_AV), y)
 	CFLAGS+=-DEMU_AV
 else
 ifneq ($(TARGET),android)
-ifneq ($(TARGET),8626x)
-	LDFLAGS+=-lmpapi
-else
 	LDFLAGS+=-Wl,-rpath-link $(ROOTFS_LIBDIR) -lamplayer -lamcodec -lamadec
-endif
 endif
 endif
 

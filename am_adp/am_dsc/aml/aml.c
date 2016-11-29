@@ -21,7 +21,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
-#include <linux/amdsc.h>
+#include <amdsc.h>
 #include <string.h>
 #include <errno.h>
 #include "am_misc.h"

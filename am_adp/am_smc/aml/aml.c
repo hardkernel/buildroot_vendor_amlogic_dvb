@@ -25,7 +25,7 @@
 #include <unistd.h>
 #include "../am_smc_internal.h"
 #include <sys/ioctl.h>
-#include <linux/amsmc.h>
+#include <amsmc.h>
 
 /****************************************************************************
  * Macro definitions

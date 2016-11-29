@@ -188,7 +188,7 @@ static void si_section_callback(int dev_no, int fid, const uint8_t *data, int le
 		/*Print detail*/
 		if (si_sections[t].print)
 			si_sections[t].print(p_table);
-		AM_SI_ReleaseSection(hsi, p_table->i_table_id, (void*)p_table);
+		AM_SI_ReleaseSection(hsi, ((dvbpsi_psi_section_t*)p_table)->i_table_id, (void*)p_table);
 	}
 	else
 	{
@@ -305,7 +305,7 @@ static void start_si_test()
 	
 	while (go)
 	{
-		if (gets(buf))
+		if (fgets(buf, sizeof(buf), stdin))
 		{
 			if (!strncmp(buf, "pat", 3))
 				si_test_restart_section(SI_TEST_PAT);

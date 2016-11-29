@@ -12,11 +12,13 @@
  ***************************************************************************/
 
 #define AM_DEBUG_LEVEL 2
+#define _LARGEFILE64_SOURCE
 
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <sys/stat.h>
 #include <pthread.h>
 #include <assert.h>

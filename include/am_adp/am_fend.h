@@ -98,6 +98,9 @@ typedef struct
 	};
 } AM_FEND_BlindEvent_t;
 
+typedef struct atv_status_s atv_status_t;
+typedef struct tuner_param_s tuner_param_t;
+
 /**\brief 卫星盲扫监控回调函数*/
 typedef void (*AM_FEND_BlindCallback_t) (int dev_no, AM_FEND_BlindEvent_t *evt, void *user_data);
 
