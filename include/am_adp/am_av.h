@@ -375,14 +375,21 @@ typedef struct
 /**\brief Audio decoder status*/
 typedef struct
 {
-	AM_AV_AFormat_t  aud_fmt;     /**< Audio format*/
-	int              sample_rate; /**< Sample rate*/
-	int              resolution;  /**< Data width (8/16bits)*/
-	int              channels;    /**< Channel number*/
-	unsigned int     frames;      /**< Decoded frames number*/
-	int              ab_size;     /**< Audio buffer size*/
-	int              ab_data;     /**< Data size in the audio buffer*/
-	int              ab_free;     /**< Free size in the audio buffer*/
+	AM_AV_AFormat_t  aud_fmt;     		/**< Audio format*/
+	int              sample_rate; 		/**< Sample rate*/
+	int              resolution;  		/**< Data width (8/16bits)*/
+	int              channels;    		/**< Channel number*/
+	unsigned int     frames;      		/**< Decoded frames number*/
+	int              ab_size;     		/**< Audio buffer size*/
+	int              ab_data;     		/**< Data size in the audio buffer*/
+	int              ab_free;     		/**< Free size in the audio buffer*/
+	AM_AV_AFormat_t  aud_fmt_orig;     	/**< original audio format*/
+	int              sample_rate_orig; 	/**< original sample rate*/
+	int              resolution_orig;  	/**< original resolution*/
+	int              channels_orig;    	/**< original channel number*/
+	int              lfepresent;       	/**< low frequency effects present*/
+	int              lfepresent_orig;  	/**< original low frequency effects present*/
+
 }AM_AV_AudioStatus_t;
 
 /**\brief Timeshifting play mode*/
