@@ -214,7 +214,7 @@ extern AM_ErrorCode_t AM_EPG_Destroy(AM_EPG_Handle_t handle);
  * \retval AM_SUCCESS On success
  * \return Error code
  */
-extern AM_ErrorCode_t AM_EPG_ChangeMode(AM_EPG_Handle_t handle, enum AM_EPG_ModeOp op, enum AM_EPG_Mode mode);
+extern AM_ErrorCode_t AM_EPG_ChangeMode(AM_EPG_Handle_t handle, int op, int mode);
 
 /**\brief Set the current service, scan PMT and EIT actual pf
  * \param handle EPG scanner handle

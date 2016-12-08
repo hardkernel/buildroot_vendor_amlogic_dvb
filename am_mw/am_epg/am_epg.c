@@ -3428,7 +3428,7 @@ AM_ErrorCode_t AM_EPG_Destroy(AM_EPG_Handle_t handle)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_epg.h)
  */
-AM_ErrorCode_t AM_EPG_ChangeMode(AM_EPG_Handle_t handle, enum AM_EPG_ModeOp op, enum AM_EPG_Mode mode)
+AM_ErrorCode_t AM_EPG_ChangeMode(AM_EPG_Handle_t handle, int op, int mode)
 {
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 
