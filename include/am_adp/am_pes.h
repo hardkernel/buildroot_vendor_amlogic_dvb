@@ -2,7 +2,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file
- * \brief PES分析模块
+ * \brief PES packet parser module
  *
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2012-08-01: create the document
@@ -24,60 +24,61 @@ extern "C"
  ***************************************************************************/
 
 
-/**\brief PES模块错误代码*/
+/**\brief PES parser module's error code*/
 enum AM_PES_ErrorCode
 {
 	AM_PES_ERROR_BASE=AM_ERROR_BASE(AM_MOD_PES),
-	AM_PES_ERR_INVALID_PARAM,   /**< 参数无效*/
-	AM_PES_ERR_INVALID_HANDLE,  /**< 句柄无效*/
-	AM_PES_ERR_NO_MEM,          /**< 空闲内存不足*/
+	AM_PES_ERR_INVALID_PARAM,   /**< Invalid parameter*/
+	AM_PES_ERR_INVALID_HANDLE,  /**< Invalid handle*/
+	AM_PES_ERR_NO_MEM,          /**< Not enough memory*/
 	AM_PES_ERR_END
 };
 
-/**\brief PES分析器句柄*/
+/**\brief PES parser handle*/
 typedef void* AM_PES_Handle_t;
 
-/**\brief PES包回调函数*/
+/**\brief PES packet callback function
+ * \a handle The PES parser's handle.
+ * \a buf The PES packet.
+ * \a size The packet size in bytes.
+ */
 typedef void (*AM_PES_PacketCb_t)(AM_PES_Handle_t handle, uint8_t *buf, int size);
 
-/**\brief PES过滤器参数*/
+/**\brief PES parser's parameters*/
 typedef struct
 {
-	AM_PES_PacketCb_t packet;    /**< PES包回调*/
-	AM_Bool_t     payload_only;
-	void             *user_data; /**< 用户定义数据*/
+	AM_PES_PacketCb_t packet;       /**< PES packet callback function*/
+	AM_Bool_t         payload_only; /**< Only read PES payload*/
+	void             *user_data;    /**< User dafined data*/
 }AM_PES_Para_t;
 
-/**\brief 创建一个PES分析器
- * \param[out] handle 返回创建的句柄
- * \param[in] para PES分析器参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_sub.h)
+/**\brief Create a new PES parser
+ * \param[out] handle Return the new PES parser's handle
+ * \param[in] para PES parser's parameters
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_PES_Create(AM_PES_Handle_t *handle, AM_PES_Para_t *para);
 
-/**\brief 释放一个PES分析器
- * \param handle 句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_sub.h)
+/**\brief Release an unused PES parser
+ * \param handle The PES parser's handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_PES_Destroy(AM_PES_Handle_t handle);
 
-/**\brief 分析PES数据
- * \param handle 句柄
- * \param[in] buf PES数据缓冲区
- * \param size 缓冲区中数据大小
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_sub.h)
+/**\brief Parse the PES data
+ * \param handle PES parser's handle
+ * \param[in] buf PES data's buffer
+ * \param size Data in the buffer
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_PES_Decode(AM_PES_Handle_t handle, uint8_t *buf, int size);
 
-/**\brief 取得分析器中用户定义数据
- * \param handle 句柄
- * \return 用户定义数据
+/**\brief Get the user defined data of the PES parser
+ * \param handle PES parser's handle
+ * \return The user defined data
  */
 void*          AM_PES_GetUserData(AM_PES_Handle_t handle);
 

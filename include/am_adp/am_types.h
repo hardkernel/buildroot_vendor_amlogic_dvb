@@ -2,7 +2,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file
- * \brief 基本数据类型定义
+ * \brief Basic datatypes
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2010-05-19: create the document
  ***************************************************************************/
@@ -23,74 +23,79 @@ extern "C"
 * Global Definitions
 *****************************************************************************/
 
-/**\brief 布尔值*/
+/**\brief Boolean value*/
 typedef uint8_t        AM_Bool_t;
 
 
-/**\brief 错误返回值,为一个32位数，最高8位为软件模块ID*/
+/**\brief Error code of the function result,
+ * Low 24 bits store the error number.
+ * High 8 bits store the module's index.
+ */
 typedef int            AM_ErrorCode_t;
 
-/**\brief 各软件模块的ID*/
+/**\brief The module's index */
 enum AM_MOD_ID
 {
-	AM_MOD_EVT,    /**< 事件模块*/
-	AM_MOD_DMX,    /**< 解复用模块*/
-	AM_MOD_DVR,    /**< DVR模块*/
-	AM_MOD_NET,    /**< 网络管理模块*/
-	AM_MOD_OSD,    /**< OSD模块*/
-	AM_MOD_AV,     /**< 音视频解码器模块*/
-	AM_MOD_AOUT,   /**< 音频输出模块*/
-	AM_MOD_VOUT,   /**< 视频输出模块*/
-	AM_MOD_SMC,    /**< 智能卡模块*/
-	AM_MOD_INP,    /**< 输入设备模块*/
-	AM_MOD_FEND,   /**< DVB前端模块*/
-	AM_MOD_DSC,    /**< 解扰器模块*/
-	AM_MOD_CFG,    /**< 配置文件分析模块*/
-	AM_MOD_SI,     /**< SI分析模块*/
-	AM_MOD_SCAN,   /**< 频道搜索模块*/
-	AM_MOD_EPG,    /**< EPG模块*/
-	AM_MOD_IMG,    /**< 图片加载模块*/
-	AM_MOD_FONT,   /**< 字体模块*/
-	AM_MOD_DB,     /**< 数据库模块*/
-	AM_MOD_GUI,    /**< GUI模块*/
-	AM_MOD_REC,    /**< 录像管理模块*/
-	AM_MOD_TV,     /**< TV模块*/
-	AM_MOD_SUB,    /**< Subtitle模块*/
-	AM_MOD_SUB2,   /**< Subtitle(version 2)模块*/
-	AM_MOD_TT,     /**< Teletext模块*/
-	AM_MOD_TT2,    /**< Teletext(version 2)模块*/
-	AM_MOD_FEND_DISEQCCMD,/**< Fenddiseqc模块*/
-	AM_MOD_FENDCTRL, /**< Fendctrl模块*/
-	AM_MOD_PES,    /**< PES 分析模块*/
-	AM_MOD_CAMAN,
-	AM_MOD_CI,
-	AM_MOD_USERDATA,
-	AM_MOD_CC,
-	AM_MOD_AD,
-	AM_MOD_UPD,
+	AM_MOD_EVT,    /**< Event module*/
+	AM_MOD_DMX,    /**< Demux module*/
+	AM_MOD_DVR,    /**< DVR module*/
+	AM_MOD_NET,    /**< Network manager module*/
+	AM_MOD_OSD,    /**< OSD module*/
+	AM_MOD_AV,     /**< AV decoder module*/
+	AM_MOD_AOUT,   /**< Audio output device module*/
+	AM_MOD_VOUT,   /**< Video output device module*/
+	AM_MOD_SMC,    /**< Smartcard module*/
+	AM_MOD_INP,    /**< Input device module*/
+	AM_MOD_FEND,   /**< DVB frontend device module*/
+	AM_MOD_DSC,    /**< Descrambler device module*/
+	AM_MOD_CFG,    /**< Configure file manager module*/
+	AM_MOD_SI,     /**< SI decoder module*/
+	AM_MOD_SCAN,   /**< Channel scanner module*/
+	AM_MOD_EPG,    /**< EPG scanner module*/
+	AM_MOD_IMG,    /**< Image loader module*/
+	AM_MOD_FONT,   /**< Font manager module*/
+	AM_MOD_DB,     /**< Database module*/
+	AM_MOD_GUI,    /**< GUI module*/
+	AM_MOD_REC,    /**< Recorder module*/
+	AM_MOD_TV,     /**< TV manager module*/
+	AM_MOD_SUB,    /**< Subtitle module*/
+	AM_MOD_SUB2,   /**< Subtitle(version 2) module*/
+	AM_MOD_TT,     /**< Teletext module*/
+	AM_MOD_TT2,    /**< Teletext(version 2) module*/
+	AM_MOD_FEND_DISEQCCMD,/**< Diseqc command module*/
+	AM_MOD_FENDCTRL, /**< DVB frontend high level control module*/
+	AM_MOD_PES,    /**< PES parser module*/
+	AM_MOD_CAMAN,  /**< CA manager module*/
+	AM_MOD_CI,     /**< DVB-CI module*/
+	AM_MOD_USERDATA, /**< MPEG user data reader device module*/
+	AM_MOD_CC,     /**< Close caption module*/
+	AM_MOD_AD,     /**< Audio description module*/
+	AM_MOD_UPD,    /**< Uploader module*/
 	AM_MOD_MAX
 };
 
-/**\brief 各模块错误代码起始值*/
+/**\brief Get the error code base of each module
+ * \param _mod The module's index
+ */
 #define AM_ERROR_BASE(_mod)    ((_mod)<<24)
 
 #ifndef AM_SUCCESS
-/**\brief 函数执行正常时返回0*/
+/**\brief Function result: Success*/
 #define AM_SUCCESS     (0)
 #endif
 
 #ifndef AM_FAILURE
-/**\brief 函数执行错误时返回一个未0值*/
+/**\brief Function result: Unknown error*/
 #define AM_FAILURE     (-1)
 #endif
 
 #ifndef AM_TRUE
-/**\brief 布尔真*/
+/**\brief Boolean value: true*/
 #define AM_TRUE        (1)
 #endif
 
 #ifndef AM_FALSE
-/**\brief 布尔假*/
+/**\brief Boolean value: false*/
 #define AM_FALSE       (0)
 #endif
 

@@ -2,7 +2,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file
- * \brief Subtitle模块(version 2)
+ * \brief Subtitle module (version 2)
  *
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2012-08-01: create the document
@@ -24,135 +24,130 @@ extern "C"
  * Type definitions
  ***************************************************************************/
 
-/**\brief Subtitle分析器句柄*/
+/**\brief Subtitle parse handle*/
 typedef void* AM_SUB2_Handle_t;
 
-/**\brief Subtitle模块错误代码*/
+/**\brief Error code of the subtitle module*/
 enum AM_SUB2_ErrorCode
 {
 	AM_SUB2_ERROR_BASE=AM_ERROR_BASE(AM_MOD_SUB2),
-	AM_SUB2_ERR_INVALID_PARAM,   /**< 参数无效*/
-	AM_SUB2_ERR_INVALID_HANDLE,  /**< 句柄无效*/
-	AM_SUB2_ERR_NOT_SUPPORTED,   /**< 不支持的操作*/
-	AM_SUB2_ERR_CREATE_DECODE,   /**< 打开SUBTITLE解码器失败*/
-	AM_SUB2_ERR_OPEN_PES,        /**< 打开PES通道失败*/
-	AM_SUB2_ERR_SET_BUFFER,      /**< 失置PES 缓冲区失败*/
-	AM_SUB2_ERR_NO_MEM,                  /**< 空闲内存不足*/
-	AM_SUB2_ERR_CANNOT_CREATE_THREAD,    /**< 无法创建线程*/
-	AM_SUB2_ERR_NOT_RUN,            /**< 无法创建线程*/
-	AM_SUB2_INIT_DISPLAY_FAILED,    /**< 初始化显示屏幕失败*/
+	AM_SUB2_ERR_INVALID_PARAM,   /**< Invalid parameter*/
+	AM_SUB2_ERR_INVALID_HANDLE,  /**< Invalid handle*/
+	AM_SUB2_ERR_NOT_SUPPORTED,   /**< not surport action*/
+	AM_SUB2_ERR_CREATE_DECODE,   /**< open subtitle decode error*/
+	AM_SUB2_ERR_OPEN_PES,        /**< open pes filter error*/
+	AM_SUB2_ERR_SET_BUFFER,      /**< set pes buffer error*/
+	AM_SUB2_ERR_NO_MEM,                  /**< out of memmey*/
+	AM_SUB2_ERR_CANNOT_CREATE_THREAD,    /**< cannot creat thread*/
+	AM_SUB2_ERR_NOT_RUN,            /**< thread run error*/
+	AM_SUB2_INIT_DISPLAY_FAILED,    /**< init display error*/
 	AM_SUB2_ERR_END
 };
 
 /**\brief Subtitle region*/
 typedef struct AM_SUB2_Region
 {
-    int32_t                 left;               /**< X坐标*/
-    int32_t                 top;                /**< Y坐标*/
-    uint32_t                width;              /**< 宽度*/
-    uint32_t                height;             /**< 高度*/
+    int32_t                 left;               /**< subtitle show X coordinate*/
+    int32_t                 top;                /**< subtitle show Y coordinate*/
+    uint32_t                width;              /**< subtitle show width*/
+    uint32_t                height;             /**< subtitle show height*/
 
-    uint32_t                entry;              /**< 调色板颜色数*/
-    AM_OSD_Color_t          clut[256];          /**< 调色板*/
+    uint32_t                entry;              /**< Color palette*/
+    AM_OSD_Color_t          clut[256];          /**< palette*/
 
     /* for background */
-    uint32_t                background;         /**< 背景色*/
+    uint32_t                background;         /**< subtitle background color*/
 
     /* for pixel map */
-    uint8_t                *p_buf;              /**< 位图*/
+    uint8_t                *p_buf;              /**< show subtitle bitmap*/
 
     /* for text */
-    uint32_t                fg;                 /**< 文字前景色*/
-    uint32_t                bg;                 /**< 文字背景色*/
+    uint32_t                fg;                 /**< text Foreground color*/
+    uint32_t                bg;                 /**< text background color*/
 
-    uint32_t                length;             /**< 文字字符串长度*/
-    uint16_t               *p_text;             /**< 文字字符串*/
+    uint32_t                length;             /**< Character string length*/
+    uint16_t               *p_text;             /**< Character string*/
 
-    struct AM_SUB2_Region  *p_next;             /**< 链表中的下一个Region*/
+    struct AM_SUB2_Region  *p_next;             /**< next Region of subtitle list*/
 
 }AM_SUB2_Region_t;
 
-/**\brief Subtitle 显示*/
+/**\brief Subtitle picture*/
 typedef struct AM_SUB2_Picture
 {
-    uint64_t                pts;                /**< 开始显示的PTS*/
-    uint32_t                timeout;            /**< 显示时间(s)*/
+    uint64_t                pts;                /**< PTS*/
+    uint32_t                timeout;            /**< Display time(s)*/
 
-    int32_t                 original_x;         /**< x坐标*/
-    int32_t                 original_y;         /**< y坐标*/
+    int32_t                 original_x;         /**< subtitle show X coordinate*/
+    int32_t                 original_y;         /**< subtitle show Y coordinate*/
 
-    uint32_t                original_width;     /**< 宽度*/
-    uint32_t                original_height;    /**< 高度*/
+    uint32_t                original_width;     /**< subtitle show width*/
+    uint32_t                original_height;    /**< subtitle show height*/
 
-    AM_SUB2_Region_t       *p_region;           /**< Region链表*/
+    AM_SUB2_Region_t       *p_region;           /**< Region list*/
 
-    struct AM_SUB2_Picture *p_prev;             /**< 链表中的前一个Picture*/
-    struct AM_SUB2_Picture *p_next;             /**< 链表中的后一个Picture*/
+    struct AM_SUB2_Picture *p_prev;             /**< pre Picture in the list*/
+    struct AM_SUB2_Picture *p_next;             /**< next Picture in the list*/
 
 }AM_SUB2_Picture_t;
 
-/**\brief Subtitle显示回调*/
+/**\brief Subtitle callback function of show*/
 typedef void (*AM_SUB2_ShowCb_t)(AM_SUB2_Handle_t handle, AM_SUB2_Picture_t* pic);
 
-/**\brief 取得当前PTS*/
+/**\brief get current PTS*/
 typedef uint64_t (*AM_SUB2_GetPTS_t)(AM_SUB2_Handle_t handle, uint64_t pts);
 
-/**\brief Subtitle参数*/
+/**\brief Subtitle parameter*/
 typedef struct
 {
-	AM_SUB2_ShowCb_t show;           /**< 显示回调*/
-	AM_SUB2_GetPTS_t get_pts;        /**< 取得当前PTS*/
+	AM_SUB2_ShowCb_t show;           /**< callback function of show subtitle*/
+	AM_SUB2_GetPTS_t get_pts;        /**< current PTS*/
 	uint16_t         composition_id; /**< Subtitle composition ID*/
 	uint16_t         ancillary_id;   /**< Subtitle ancillary ID*/
-	void            *user_data;      /**< 用户定义数据*/
+	void            *user_data;      /**< user private data*/
 }AM_SUB2_Para_t;
 
-/**\brief 创建subtitle解析句柄
- * \param[out] handle 返回创建的新句柄
- * \param[in] para subtitle解析参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_sub2.h)
+/**\brief creat subtitle parse handle
+ * \param[out] handle subtitle parse handle
+ * \param[in] para subtitle parse parameter
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_SUB2_Create(AM_SUB2_Handle_t *handle, AM_SUB2_Para_t *para);
 
-/**\brief 释放subtitle解析句柄
- * \param handle 要释放的句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_sub2.h)
+/**\brief destroy subtitle parse handle
+ * \param handle subtitle parse handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_SUB2_Destroy(AM_SUB2_Handle_t handle);
 
-/**\brief 取得用户定义数据
- * \param handle 句柄
- * \return 用户定义数据
+/**\brief get user private data
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern void*          AM_SUB2_GetUserData(AM_SUB2_Handle_t handle);
 
-/**\brief 分析subtitle数据
- * \param handle 句柄
- * \param[in] buf PES数据缓冲区
- * \param size 缓冲区内数据大小
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_sub2.h)
+/**\brief parse subtitle data
+ * \param handle subtitle parse handle
+ * \param[in] buf PES buffer
+ * \param size PES buffer length
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_SUB2_Decode(AM_SUB2_Handle_t handle, uint8_t *buf, int size);
 
-/**\brief 开始subtitle显示
- * \param handle 句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_sub2.h)
+/**\brief start show subtitle
+ * \param handle subtitle parse handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_SUB2_Start(AM_SUB2_Handle_t handle);
 
-/**\brief 停止subtitle显示
- * \param handle 句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_sub2.h)
+/**\brief stop show subtitle
+ * \param handle subtitle parse handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_SUB2_Stop(AM_SUB2_Handle_t handle);
 

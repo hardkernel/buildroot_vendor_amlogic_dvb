@@ -2,7 +2,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file
- * \brief Teletext模块(version 2)
+ * \brief Teletext module(version 2)
  *
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2012-08-08: create the document
@@ -24,192 +24,178 @@ extern "C"
  * Type definitions
  ***************************************************************************/
 
-/**\brief Teletext分析器句柄*/
+/**\brief Teletext parse handle*/
 typedef void* AM_TT2_Handle_t;
 
 #define AM_TT2_ANY_SUBNO 0x3F7F
 
-/**\brief Teletext模块错误代码*/
+/**\brief Error code of the Teletext module*/
 enum AM_TT2_ErrorCode
 {
 	AM_TT2_ERROR_BASE=AM_ERROR_BASE(AM_MOD_SUB2),
-	AM_TT2_ERR_INVALID_PARAM,   /**< 参数无效*/
-	AM_TT2_ERR_INVALID_HANDLE,  /**< 句柄无效*/
-	AM_TT2_ERR_NOT_SUPPORTED,   /**< 不支持的操作*/
-	AM_TT2_ERR_CREATE_DECODE,   /**< 打开Teletext解码器失败*/
-	AM_TT2_ERR_OPEN_PES,        /**< 打开PES通道失败*/
-	AM_TT2_ERR_SET_BUFFER,      /**< 设置PES 缓冲区失败*/
-	AM_TT2_ERR_NO_MEM,                  /**< 空闲内存不足*/
-	AM_TT2_ERR_CANNOT_CREATE_THREAD,    /**< 无法创建线程*/
-	AM_TT2_ERR_NOT_RUN,            /**< 无法创建线程*/
-	AM_TT2_INIT_DISPLAY_FAILED,    /**< 初始化显示屏幕失败*/
+	AM_TT2_ERR_INVALID_PARAM,   /**< Invalid parameter*/
+	AM_TT2_ERR_INVALID_HANDLE,  /**< Invalid handle*/
+	AM_TT2_ERR_NOT_SUPPORTED,   /**< not surport action*/
+	AM_TT2_ERR_CREATE_DECODE,   /**< open Teletext decode error*/
+	AM_TT2_ERR_OPEN_PES,        /**< open pes filter error*/
+	AM_TT2_ERR_SET_BUFFER,      /**< set pes buffer error*/
+	AM_TT2_ERR_NO_MEM,                  /**< out of memmey*/
+	AM_TT2_ERR_CANNOT_CREATE_THREAD,    /**< cannot creat thread*/
+	AM_TT2_ERR_NOT_RUN,            /**< thread run error*/
+	AM_TT2_INIT_DISPLAY_FAILED,    /**< init display error*/
 	AM_TT2_ERR_END
 };
 
-/**\brief Teletext颜色*/
+/**\brief Teletext color*/
 typedef enum{
-	AM_TT2_COLOR_RED,           /**< 红色*/
-	AM_TT2_COLOR_GREEN,         /**< 绿色*/
-	AM_TT2_COLOR_YELLOW,        /**< 黄色*/
-	AM_TT2_COLOR_BLUE           /**< 蓝色*/
+	AM_TT2_COLOR_RED,           /**< red*/
+	AM_TT2_COLOR_GREEN,         /**< green*/
+	AM_TT2_COLOR_YELLOW,        /**< yellow*/
+	AM_TT2_COLOR_BLUE           /**< blue*/
 }AM_TT2_Color_t;
 
-/**\brief 开始绘制*/
+/**\brief start draw teletext callback function*/
 typedef void (*AM_TT2_DrawBegin_t)(AM_TT2_Handle_t handle);
 
-/**\brief 结束绘制*/
+/**\brief stop draw teletext callback function*/
 typedef void (*AM_TT2_DrawEnd_t)(AM_TT2_Handle_t handle);
 
-/**\brief 取得当前PTS*/
+/**\brief get PTS callback function */
 typedef uint64_t (*AM_TT2_GetPTS_t)(AM_TT2_Handle_t handle, uint64_t pts);
 
-/**\brief 获取新页回调*/
+/**\brief get new teletext page callback function */
 typedef void (*AM_TT2_NewPage_t)(AM_TT2_Handle_t handle, int pgno, int sub_pgno);
 
-/**\brief Teletext参数*/
+/**\brief Teletext parameter*/
 typedef struct
 {
-	AM_TT2_DrawBegin_t draw_begin;   /**< 开始绘制*/
-	AM_TT2_DrawEnd_t   draw_end;     /**< 结束绘制*/
-	AM_TT2_NewPage_t   new_page;     /**< 取得新页回调*/
-	AM_Bool_t        is_subtitle;    /**< 是否为字幕*/
-	uint8_t         *bitmap;         /**< 绘图缓冲区*/
-	int              pitch;          /**< 绘图缓冲区每行字节数*/
-	void            *user_data;      /**< 用户定义数据*/
-	int             default_region;  /**< 默认区域，参见libzvbi/src/lang.c的vbi_font_descriptors*/
+	AM_TT2_DrawBegin_t draw_begin;   /**< start draw teletext callback function*/
+	AM_TT2_DrawEnd_t   draw_end;     /**< stop draw teletext callback function*/
+	AM_TT2_NewPage_t   new_page;     /**< get new teletext page callback function*/
+	AM_Bool_t        is_subtitle;    /**< is subtitle or not*/
+	uint8_t         *bitmap;         /**< draw bitmap buffer*/
+	int              pitch;          /**< the length of draw bitmap buffer per line*/
+	void            *user_data;      /**< user data*/
+	int             default_region;  /**< default region，see vbi_font_descriptors in libzvbi/src/lang.c*/
 }AM_TT2_Para_t;
 
-/**\brief 创建teletext解析句柄
- * \param[out] handle 返回创建的新句柄
- * \param[in] para teletext解析参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief creat teletext parser handle
+ * \param[out] handle the handle of parser
+ * \param[in] para teletext parse parameter
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_Create(AM_TT2_Handle_t *handle, AM_TT2_Para_t *para);
 
-/**\brief 释放teletext解析句柄
- * \param handle 要释放的句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief destory teletext parser handle
+ * \param handle the handle of parser
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_Destroy(AM_TT2_Handle_t handle);
 
-/**\brief 设定是否为字幕
- * \param handle 要释放的句柄
- * \param subtitle 是否为字幕
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief set subtitle mode
+ * \param handle the handle of parser
+ * \param subtitle true:set subtitle, false:not set
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_SetSubtitleMode(AM_TT2_Handle_t handle, AM_Bool_t subtitle);
 
-/**\brief 取得用户定义数据
- * \param handle 句柄
- * \return 用户定义数据
+/**\brief get user private data
+ * \param handle the handle of parser
+ * \return user private data
  */
 extern void*          AM_TT2_GetUserData(AM_TT2_Handle_t handle);
 
-/**\brief 分析teletext数据
- * \param handle 句柄
- * \param[in] buf PES数据缓冲区
- * \param size 缓冲区内数据大小
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief decode teletext data
+ * \param handle the handle of parser
+ * \param[in] buf teletext buffer
+ * \param size teletext buffer length
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_Decode(AM_TT2_Handle_t handle, uint8_t *buf, int size);
 
-/**\brief 开始teletext显示
- * \param handle 句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief start show teletext
+ * \param handle the handle of parser
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_Start(AM_TT2_Handle_t handle);
 
-/**\brief 停止teletext显示
- * \param handle 句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief stop show teletext
+ * \param handle the handle of parser
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_Stop(AM_TT2_Handle_t handle);
 
-/**\brief 跳转到指定页
- * \param handle 句柄
- * \param page_no 页号
- * \param sub_page_no 子页号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief jump to the specific page
+ * \param handle the handle of parser
+ * \param page_no jump page
+ * \param sub_page_no jump sub page
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_GotoPage(AM_TT2_Handle_t handle, int page_no, int sub_page_no);
 
-/**\brief 跳转到home页
- * \param handle 句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief jump home page
+ * \param handle the handle of parser
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_GoHome(AM_TT2_Handle_t handle);
 
-/**\brief 跳转到下一页
- * \param handle 句柄
- * \param dir 搜索方向，+1为正向，-1为反向
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief jump next page
+ * \param handle the handle of parser
+ * \param dir jump direction，+1:as positive，-1:as reverse
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir);
 
-/**\brief 跳转到下一子页
- * \param handle 句柄
- * \param dir 搜索方向，+1为正向，-1为反向
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief jump next sub page
+ * \param handle the handle of parser
+ * \param dir jump direction，+1:as positive，-1:as reverse
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_NextSubPage(AM_TT2_Handle_t handle, int dir);
 
-/**\brief 获取子页信息
- * \param handle 句柄
- * \param pgno 页号
- * \param[out] subs 返回子页号
- * \param[inout] len 输入数组subs长度，返回实际子页数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief get sub page info
+ * \param handle the handle of parser
+ * \param pgno page number
+ * \param [out] subs sub page number
+ * \param [in] len in:subs length，out:The actual sub pages
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_GetSubPageInfo(AM_TT2_Handle_t handle, int pgno, int *subs, int *len);
 
-/**\brief 根据颜色跳转到指定链接
- * \param handle 句柄
- * \param color 颜色
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief Jump to the specified link according to the color
+ * \param [in] handle the handle of parser
+ * \param [in] color color
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_ColorLink(AM_TT2_Handle_t handle, AM_TT2_Color_t color);
 
-/**\brief 设定搜索字符串
- * \param handle 句柄
- * \param pattern 搜索字符串
- * \param casefold 是否区分大小写
- * \param regex 是否用正则表达式匹配
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief Set search string
+ * \param handle the handle of parser
+ * \param pattern search string
+ * \param casefold Whether Case sensitive
+ * \param regex Whether to use regular expression matching
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_SetSearchPattern(AM_TT2_Handle_t handle, const char *pattern, AM_Bool_t casefold, AM_Bool_t regex);
 
-/**\brief 搜索指定页
- * \param handle 句柄
- * \param dir 搜索方向，+1为正向，-1为反向
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_tt2.h)
+/**\brief Search the specified page
+ * \param handle the handle of parser
+ * \param dir jump direction，+1:as positive，-1:as reverse
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_TT2_Search(AM_TT2_Handle_t handle, int dir);
 

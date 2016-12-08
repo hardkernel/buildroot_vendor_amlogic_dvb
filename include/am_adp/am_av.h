@@ -2,7 +2,16 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file
- * \brief 音视频解码驱动
+ * \brief AV decoder module
+ *
+ * AV decoder device can work in the following modes:
+ *	- play TS stream
+ *	- decode audio ES
+ *	- decode video ES
+ *	- inject AV data to decoder
+ *	- timeshifting play
+ *	- local file playing (not available on android)
+ *	- JPEG hardware decode (not available on android)
  *
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2010-08-06: create the document
@@ -14,7 +23,6 @@
 #include "am_types.h"
 #include "am_osd.h"
 #include "am_evt.h"
-
 #include <amports/vformat.h>
 #include <amports/aformat.h>
 
@@ -27,34 +35,34 @@ extern "C"
  * Macro definitions
  ***************************************************************************/
 
-#define AM_AV_VIDEO_CONTRAST_MIN   -1024  /**< 最小对比度值*/
-#define AM_AV_VIDEO_CONTRAST_MAX   1024   /**< 最大对比度值*/
-#define AM_AV_VIDEO_SATURATION_MIN -1024  /**< 最小色度值*/
-#define AM_AV_VIDEO_SATURATION_MAX 1024   /**< 最大色度值*/
-#define AM_AV_VIDEO_BRIGHTNESS_MIN -1024  /**< 最小对比度值*/
-#define AM_AV_VIDEO_BRIGHTNESS_MAX 1024   /**< 最大对比度值*/
+#define AM_AV_VIDEO_CONTRAST_MIN   -1024  /**< The minimum contrast value*/
+#define AM_AV_VIDEO_CONTRAST_MAX   1024   /**< The maximum contrast value*/
+#define AM_AV_VIDEO_SATURATION_MIN -1024  /**< The minimum saturation value*/
+#define AM_AV_VIDEO_SATURATION_MAX 1024   /**< The maximum saturation value*/
+#define AM_AV_VIDEO_BRIGHTNESS_MIN -1024  /**< The minimum brightness value*/
+#define AM_AV_VIDEO_BRIGHTNESS_MAX 1024   /**< The maximum brightness value*/
 
 /****************************************************************************
  * Error code definitions
  ****************************************************************************/
 
-/**\brief 音视频解码模块错误代码*/
+/**\brief Error code of the AV decoder module*/
 enum AM_AV_ErrorCode
 {
 	AM_AV_ERROR_BASE=AM_ERROR_BASE(AM_MOD_AV),
-	AM_AV_ERR_INVALID_DEV_NO,          /**< 设备号无效*/
-	AM_AV_ERR_BUSY,                    /**< 设备已经被打开*/
-	AM_AV_ERR_ILLEGAL_OP,              /**< 无效的操作*/
-	AM_AV_ERR_INVAL_ARG,               /**< 无效的参数*/
-	AM_AV_ERR_NOT_ALLOCATED,           /**< 设备没有分配*/
-	AM_AV_ERR_CANNOT_CREATE_THREAD,    /**< 无法创建线程*/
-	AM_AV_ERR_CANNOT_OPEN_DEV,         /**< 无法打开设备*/
-	AM_AV_ERR_CANNOT_OPEN_FILE,        /**< 无法打开文件*/
-	AM_AV_ERR_NOT_SUPPORTED,           /**< 不支持的操作*/
-	AM_AV_ERR_NO_MEM,                  /**< 空闲内存不足*/
-	AM_AV_ERR_TIMEOUT,                 /**< 等待设备数据超时*/
-	AM_AV_ERR_SYS,                     /**< 系统操作错误*/
-	AM_AV_ERR_DECODE,                  /**< 解码出错*/
+	AM_AV_ERR_INVALID_DEV_NO,          /**< Invalid decoder device number*/
+	AM_AV_ERR_BUSY,                    /**< The device has already been openned*/
+	AM_AV_ERR_ILLEGAL_OP,              /**< Illegal operation*/
+	AM_AV_ERR_INVAL_ARG,               /**< Invalid argument*/
+	AM_AV_ERR_NOT_ALLOCATED,           /**< The device has not been allocated*/
+	AM_AV_ERR_CANNOT_CREATE_THREAD,    /**< Cannot create a new thread*/
+	AM_AV_ERR_CANNOT_OPEN_DEV,         /**< Cannot open the device*/
+	AM_AV_ERR_CANNOT_OPEN_FILE,        /**< Cannot open the file*/
+	AM_AV_ERR_NOT_SUPPORTED,           /**< Not supported*/
+	AM_AV_ERR_NO_MEM,                  /**< Not enough memory*/
+	AM_AV_ERR_TIMEOUT,                 /**< Timeout*/
+	AM_AV_ERR_SYS,                     /**< System error*/
+	AM_AV_ERR_DECODE,                  /**< Decoder error*/
 	AM_AV_ERR_END
 };
 
@@ -62,32 +70,32 @@ enum AM_AV_ErrorCode
  * Event type definitions
  ****************************************************************************/
 
-/**\brief 音视频模块事件类型*/
+/**\brief Event type of the AV decoder module*/
 enum AM_AV_EventType
 {
 	AM_AV_EVT_BASE=AM_EVT_TYPE_BASE(AM_MOD_AV),
-	AM_AV_EVT_PLAYER_STATE_CHANGED,    /**< 文件播放器状态发生改变,参数为AM_AV_MPState_t*/
-	AM_AV_EVT_PLAYER_SPEED_CHANGED,    /**< 文件播放速度变化,参数为速度值(0为正常播放，<0表示回退播放，>0表示快速向前播放)*/
-	AM_AV_EVT_PLAYER_TIME_CHANGED,     /**< 文件播放当前时间变化，参数为当前时间*/
-	AM_AV_EVT_PLAYER_UPDATE_INFO,	/**< 更新当前文件播放信息*/
-	AM_AV_EVT_VIDEO_WINDOW_CHANGED,    /**< 视频窗口发生变化,参数为新的窗口大小(AM_AV_VideoWindow_t)*/
-	AM_AV_EVT_VIDEO_CONTRAST_CHANGED,  /**< 视频对比度变化，参数为新对比度值(int 0~100)*/
-	AM_AV_EVT_VIDEO_SATURATION_CHANGED,/**< 视频饱和度变化，参数为新饱和度值(int 0~100)*/
-	AM_AV_EVT_VIDEO_BRIGHTNESS_CHANGED,/**< 视频亮度变化，参数为新亮度值(int 0~100)*/
-	AM_AV_EVT_VIDEO_ENABLED,           /**< 视频层显示*/
-	AM_AV_EVT_VIDEO_DISABLED,          /**< 视频曾隐藏*/
-	AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED, /**< 视频长宽比变化，参数为新的长宽比(AM_AV_VideoAspectRatio_t)*/
-	AM_AV_EVT_VIDEO_DISPLAY_MODE_CHANGED, /**< 视频显示模式变化，参数为新的显示模式(AM_AV_VideoDisplayMode_t)*/
-	AM_AV_EVT_AV_NO_DATA,		   /**< 播放过程中检测到Audio PTS 和 Video PTS 一段时间未变化，通知无数据*/
-	AM_AV_EVT_AV_DATA_RESUME,	/**< 在AM_AV_EVT_AV_NO_DATA后，检测到Audio or Video PTS有变化，通知有数据*/
-	AM_AV_EVT_VIDEO_ES_END,     /**< 注入视频ES数据结束*/
-	AM_AV_EVT_AUDIO_ES_END,     /**< 注入音频ES数据结束*/
-	AM_AV_EVT_VIDEO_SCAMBLED,   /**< 视频加扰无法播放*/
-	AM_AV_EVT_AUDIO_SCAMBLED,   /**< 音频加扰无法播放*/
-	AM_AV_EVT_AUDIO_AC3_NO_LICENCE,     /**< AC3音频没有授权无法播放*/
-	AM_AV_EVT_AUDIO_AC3_LICENCE_RESUME, /**< AC3音频恢复播放*/
-	AM_AV_EVT_VIDEO_NOT_SUPPORT,        /**< 视频格式不支持*/
-	AM_AV_EVT_VIDEO_AVAILABLE,  /**< 无法获取视频信息*/
+	AM_AV_EVT_PLAYER_STATE_CHANGED,    /**< File player's state changed, the parameter is the new state(AM_AV_MPState_t)*/
+	AM_AV_EVT_PLAYER_SPEED_CHANGED,    /**< File player's playing speed changed, the parameter is the new speed(0:normal，<0:backward，>0:fast forward)*/
+	AM_AV_EVT_PLAYER_TIME_CHANGED,     /**< File player's current time changed，the parameter is the current time*/
+	AM_AV_EVT_PLAYER_UPDATE_INFO,      /**< Update the current player information*/
+	AM_AV_EVT_VIDEO_WINDOW_CHANGED,    /**< Video window change, the parameter is the new window(AM_AV_VideoWindow_t)*/
+	AM_AV_EVT_VIDEO_CONTRAST_CHANGED,  /**< Video contrast changed，the parameter is the new contrast(int 0~100)*/
+	AM_AV_EVT_VIDEO_SATURATION_CHANGED,/**< Video saturation changed, the parameter is the new saturation(int 0~100)*/
+	AM_AV_EVT_VIDEO_BRIGHTNESS_CHANGED,/**< Video brightness changed, the parameter is the new brightness(int 0~100)*/
+	AM_AV_EVT_VIDEO_ENABLED,           /**< Video layer enabled*/
+	AM_AV_EVT_VIDEO_DISABLED,          /**< Video layer disabled*/
+	AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED, /**< Video aspect ratio changed，the parameter is the new aspect ratio(AM_AV_VideoAspectRatio_t)*/
+	AM_AV_EVT_VIDEO_DISPLAY_MODE_CHANGED, /**< Video display mode changed, the parameter is the new display mode(AM_AV_VideoDisplayMode_t)*/
+	AM_AV_EVT_AV_NO_DATA,		   /**< Audio/Video data stopped*/
+	AM_AV_EVT_AV_DATA_RESUME,	/**< After event AM_AV_EVT_AV_NO_DATA，audio/video data resumed*/
+	AM_AV_EVT_VIDEO_ES_END,     /**< Injected video ES data end*/
+	AM_AV_EVT_AUDIO_ES_END,     /**< Injected audio ES data end*/
+	AM_AV_EVT_VIDEO_SCAMBLED,   /**< Video is scrambled*/
+	AM_AV_EVT_AUDIO_SCAMBLED,   /**< Audio is scrambled*/
+	AM_AV_EVT_AUDIO_AC3_NO_LICENCE,     /**< AC3 audio has not licence*/
+	AM_AV_EVT_AUDIO_AC3_LICENCE_RESUME, /**< AC3 audio resumed*/
+	AM_AV_EVT_VIDEO_NOT_SUPPORT,        /**< Video format is not supported*/
+	AM_AV_EVT_VIDEO_AVAILABLE,  /**< Cannot get valid video information*/
 	AM_AV_EVT_END
 };
 
@@ -96,49 +104,51 @@ enum AM_AV_EventType
  * Type definitions
  ***************************************************************************/
 
-/**\brief 文件播放器状态*/
+/**\cond */
+/**\brief File player's state*/
 typedef enum
 {
-	AM_AV_MP_STATE_UNKNOWN = 0,        /**< 未知状态*/
-	AM_AV_MP_STATE_INITING,            /**< 正在进行初始化*/
-	AM_AV_MP_STATE_NORMALERROR,        /**< 发生错误*/
-	AM_AV_MP_STATE_FATALERROR,         /**< 发生致命错误*/
-	AM_AV_MP_STATE_PARSERED,           /**< 文件信息分析完毕*/
-	AM_AV_MP_STATE_STARTED,            /**< 开始播放*/
-	AM_AV_MP_STATE_PLAYING,            /**< 正在播放*/
-	AM_AV_MP_STATE_PAUSED,             /**< 暂停播放*/
-	AM_AV_MP_STATE_CONNECTING,         /**< 正在连接服务器*/
-	AM_AV_MP_STATE_CONNECTDONE,        /**< 服务器连接完毕*/
-	AM_AV_MP_STATE_BUFFERING,          /**< 正在缓存数据*/
-	AM_AV_MP_STATE_BUFFERINGDONE,      /**< 数据缓存结束*/
-	AM_AV_MP_STATE_SEARCHING,          /**< 正在设定播放位置*/
-	AM_AV_MP_STATE_TRICKPLAY,          /**< 正在进行trick mode播放*/
-	AM_AV_MP_STATE_MESSAGE_EOD,        /**< 消息结束*/
-	AM_AV_MP_STATE_MESSAGE_BOD,        /**< 消息开始*/
-	AM_AV_MP_STATE_TRICKTOPLAY,        /**< 从trick mode切换到play模式*/
-	AM_AV_MP_STATE_FINISHED,           /**< 播放完毕*/
-	AM_AV_MP_STATE_STOPED              /**< 播放器停止*/
+	AM_AV_MP_STATE_UNKNOWN = 0,        /**< Unknown*/
+	AM_AV_MP_STATE_INITING,            /**< Initializing*/
+	AM_AV_MP_STATE_NORMALERROR,        /**< Error occured*/
+	AM_AV_MP_STATE_FATALERROR,         /**< Fatal error occured*/
+	AM_AV_MP_STATE_PARSERED,           /**< The file's header has been parsed*/
+	AM_AV_MP_STATE_STARTED,            /**< Start playing*/
+	AM_AV_MP_STATE_PLAYING,            /**< Playing*/
+	AM_AV_MP_STATE_PAUSED,             /**< Paused*/
+	AM_AV_MP_STATE_CONNECTING,         /**< Connecting to the server*/
+	AM_AV_MP_STATE_CONNECTDONE,        /**< Connected*/
+	AM_AV_MP_STATE_BUFFERING,          /**< Buffering*/
+	AM_AV_MP_STATE_BUFFERINGDONE,      /**< Buffering done*/
+	AM_AV_MP_STATE_SEARCHING,          /**< Set new playing position*/
+	AM_AV_MP_STATE_TRICKPLAY,          /**< Play in trick mode*/
+	AM_AV_MP_STATE_MESSAGE_EOD,        /**< Message begin*/
+	AM_AV_MP_STATE_MESSAGE_BOD,        /**< Message end*/
+	AM_AV_MP_STATE_TRICKTOPLAY,        /**< Trick mode to normal playing mode*/
+	AM_AV_MP_STATE_FINISHED,           /**< File finished*/
+	AM_AV_MP_STATE_STOPED              /**< Palyer stopped*/
 } AM_AV_MPState_t;
+/**\endcond */
 
-/**\brief 视频窗口*/
+/**\brief Video window*/
 typedef struct
 {
-	int x;                               /**< 窗口左上角X坐标*/
-	int y;                               /**< 窗口左上角Y坐标*/
-	int w;                               /**< 窗口宽度*/
-	int h;                               /**< 窗口高度*/
+	int x;                               /**< X coordinate of the top left corner*/
+	int y;                               /**< Y coordinate of the top left corner*/
+	int w;                               /**< Width of the window*/
+	int h;                               /**< Height of the window*/
 } AM_AV_VideoWindow_t;
 
-/**\brief 音视频播放的TS流输入源*/
+/**\brief TS stream input source*/
 typedef enum
 {
-	AM_AV_TS_SRC_TS0,                    /**< TS输入0*/
-	AM_AV_TS_SRC_TS1,                    /**< TS输入1*/
-	AM_AV_TS_SRC_TS2,                    /**< TS输入2*/
-	AM_AV_TS_SRC_HIU,                    /**< HIU 接口*/
-	AM_AV_TS_SRC_DMX0,                   /**< Demux0*/
-	AM_AV_TS_SRC_DMX1,                   /**< Demux1*/
-	AM_AV_TS_SRC_DMX2                    /**< Demux2*/
+	AM_AV_TS_SRC_TS0,                    /**< TS input port 0*/
+	AM_AV_TS_SRC_TS1,                    /**< TS input port 1*/
+	AM_AV_TS_SRC_TS2,                    /**< TS input port 2*/
+	AM_AV_TS_SRC_HIU,                    /**< HIU port (file input)*/
+	AM_AV_TS_SRC_DMX0,                   /**< Demux 0*/
+	AM_AV_TS_SRC_DMX1,                   /**< Demux 1*/
+	AM_AV_TS_SRC_DMX2                    /**< Demux 2*/
 } AM_AV_TSSource_t;
 
 #if 0
@@ -167,7 +177,11 @@ typedef enum {
 	AFORMAT_MAX    = 21
 } AM_AV_AFormat_t;
 #else
-/**\brief 音频压缩格式*/
+/**
+ * Audio format
+ *
+ * detail definition in "linux/amlogic/amports/aformat.h"
+ */
 typedef aformat_t AM_AV_AFormat_t;
 #endif
 
@@ -187,62 +201,67 @@ typedef enum
 	VFORMAT_MAX
 } AM_AV_VFormat_t;
 #else
-/**\brief 视频压缩格式*/
+/**
+ * Video format
+ *
+ * detail definition in "linux/amlogic/amports/vformat.h"
+ */
 typedef vformat_t AM_AV_VFormat_t;
 #endif
 
-/**\brief 数据封装格式*/
+/**\brief AV stream package format*/
 typedef enum
 {
-	PFORMAT_ES = 0, /**< ES流*/
-	PFORMAT_PS,     /**< PS流*/
-	PFORMAT_TS,     /**< TS流*/
-	PFORMAT_REAL    /**< REAL*/
+	PFORMAT_ES = 0, /**< ES stream*/
+	PFORMAT_PS,     /**< PS stream*/
+	PFORMAT_TS,     /**< TS stream*/
+	PFORMAT_REAL    /**< REAL file*/
 } AM_AV_PFormat_t;
 
-/**\brief 视频长宽比*/
+/**\brief Video aspect ratio*/
 typedef enum
 {
-	AM_AV_VIDEO_ASPECT_AUTO,      /**< 自动设定长宽比*/
+	AM_AV_VIDEO_ASPECT_AUTO,      /**< Automatic*/
 	AM_AV_VIDEO_ASPECT_4_3,       /**< 4:3*/
 	AM_AV_VIDEO_ASPECT_16_9       /**< 16:9*/
 } AM_AV_VideoAspectRatio_t;
 
-/**\brief 视频长宽比匹配模式*/
+/**\brief Video aspect ratio match mode*/
 typedef enum
 {
-	AM_AV_VIDEO_ASPECT_MATCH_IGNORE,     /**< 忽略长宽比变化*/
-	AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX, /**< letter box匹配模式*/
-	AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN,   /**< pan scan匹配模式*/
-	AM_AV_VIDEO_ASPECT_MATCH_COMBINED    /**< 混合letter box/pan scan匹配模式*/
+	AM_AV_VIDEO_ASPECT_MATCH_IGNORE,     /**< Ignoring orignal aspect ratio*/
+	AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX, /**< Letter box match mode*/
+	AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN,   /**< Pan scan match mode*/
+	AM_AV_VIDEO_ASPECT_MATCH_COMBINED    /**< Combined letter box/pan scan match mode*/
 } AM_AV_VideoAspectMatchMode_t;
 
-/**\brief 视频屏幕显示模式*/
+/**\brief Video display mode*/
 typedef enum
 {
-	AM_AV_VIDEO_DISPLAY_NORMAL,     /**< 普通显示*/
-	AM_AV_VIDEO_DISPLAY_FULL_SCREEN /**< 全屏显示*/
+	AM_AV_VIDEO_DISPLAY_NORMAL,     /**< Normal display mode*/
+	AM_AV_VIDEO_DISPLAY_FULL_SCREEN /**< Full screaan display mode*/
 } AM_AV_VideoDisplayMode_t;
 
-/**\brief Freescale参数*/
+/**\cond */
+/**\brief Freescale parameter*/
 typedef enum
 {
-	AM_AV_FREE_SCALE_DISABLE,     /**< 不使用freescale*/
-	AM_AV_FREE_SCALE_ENABLE       /**< 使用freescale*/
+	AM_AV_FREE_SCALE_DISABLE,     /**< Disable freescale*/
+	AM_AV_FREE_SCALE_ENABLE       /**< Enable freescale*/
 } AM_AV_FreeScalePara_t;
 
-/**\brief Deinterlace参数*/
+/**\brief Deinterlace parameter*/
 typedef enum
 {
-	AM_AV_DEINTERLACE_DISABLE,    /**< 不使用deinterlace*/
-	AM_AV_DEINTERLACE_ENABLE      /**< 使用deinterlace*/
+	AM_AV_DEINTERLACE_DISABLE,    /**< Disable deinterlace*/
+	AM_AV_DEINTERLACE_ENABLE      /**< Enable deinterlace*/
 } AM_AV_DeinterlacePara_t;
 
-/**\brief PPMGR参数*/
+/**\brief PPMGR parameter*/
 typedef enum
 {
-	AM_AV_PPMGR_DISABLE,	/**< 不使用PPMGR*/
-	AM_AV_PPMGR_ENABLE,		/**< 使用PPMGR*/
+	AM_AV_PPMGR_DISABLE,          /**< Disable PPMGR*/
+	AM_AV_PPMGR_ENABLE,           /**< Enable PPMGR*/
 	/*以下为3D模式设置*/
 	AM_AV_PPMGR_MODE3D_DISABLE,
 	AM_AV_PPMGR_MODE3D_AUTO,
@@ -262,180 +281,175 @@ typedef enum
 	AM_AV_PPMGR_MODE3D_R_3D_TO_2D_BT,
 	AM_AV_PPMGR_MODE3D_MAX,
 } AM_AV_PPMGRPara_t;
+/**\endcond */
 
-/**\brief 音视频解码设备开启参数*/
+/**\brief AV decoder device open parameters*/
 typedef struct
 {
-	int      vout_dev_no;         /**< 音视频播放设备对应的视频输出设备ID*/
+	int      vout_dev_no;         /**< Video output device number*/
 } AM_AV_OpenPara_t;
 
-/**\brief 媒体文件信息*/
+/**\brief Media file information*/
 typedef struct
 {
-	uint64_t size;                /**< 文件大小*/ 
-	int      duration;            /**< 总播放时长*/
+	uint64_t size;                /**< File size in bytes*/
+	int      duration;            /**< Total duration in seconds*/
 } AM_AV_FileInfo_t;
 
-/**\brief 文件播放状态*/
+/**\brief File playing status*/
 typedef struct
 {
-	int      duration;            /**< 总播放时长*/
-	int      position;            /**< 当前播放时间*/
+	int      duration;            /**< Total duration in seconds.*/
+	int      position;            /**< Current time*/
 } AM_AV_PlayStatus_t;
 
-/**\brief JPEG文件属性*/
+/**\brief JPEG file properties*/
 typedef struct
 {
-	int      width;               /**< JPEG宽度*/
-	int      height;              /**< JPEG高度*/
-	int      comp_num;            /**< 颜色数*/
+	int      width;               /**< JPEG image width*/
+	int      height;              /**< JPEG image height*/
+	int      comp_num;            /**< Color number*/
 } AM_AV_JPEGInfo_t;
 
-/**\brief JPEG旋转角度*/
+/**\brief JPEG rotation parameter*/
 typedef enum
 {
-	AM_AV_JPEG_CLKWISE_0    = 0,  /**< 不旋转*/
-	AM_AV_JPEG_CLKWISE_90   = 1,  /**< 顺时针旋转90度*/
-	AM_AV_JPEG_CLKWISE_180  = 2,  /**< 顺时针旋转180度*/
-	AM_AV_JPEG_CLKWISE_270  = 3   /**< 顺时针旋转270度*/
+	AM_AV_JPEG_CLKWISE_0    = 0,  /**< Normal*/
+	AM_AV_JPEG_CLKWISE_90   = 1,  /**< Rotate 90 degrees clockwise*/
+	AM_AV_JPEG_CLKWISE_180  = 2,  /**< Rotate 180 degrees clockwise*/
+	AM_AV_JPEG_CLKWISE_270  = 3   /**< Rotate 270 degrees clockwise*/
 } AM_AV_JPEGAngle_t;
 
-/**\brief JPEG 解码选项*/
+/**\brief JPEG decoder options*/
 typedef enum
 {
-	AM_AV_JPEG_OPT_THUMBNAIL_ONLY     = 1, /**< 按缩略图方式解码*/
-	AM_AV_JPEG_OPT_THUMBNAIL_PREFERED = 2, /**< 按缩略图方式解码*/
-	AM_AV_JPEG_OPT_FULLRANGE          = 4  /**< 全图解码*/
+	AM_AV_JPEG_OPT_THUMBNAIL_ONLY     = 1, /**< Decode in thumbnail only mode*/
+	AM_AV_JPEG_OPT_THUMBNAIL_PREFERED = 2, /**< Decode in thumbnail prefered mode*/
+	AM_AV_JPEG_OPT_FULLRANGE          = 4  /**< Normal*/
 } AM_AV_JPEGOption_t;
 
-/**\brief 取得显示图形表面的参数（用于取得解码JPEG和视频Frame图像）*/
+/**\brief Image surface parameters (used in JPEG decoder)*/
 typedef struct
 {
-	int    width;                 /**< 图形宽度,<=0表示使用原始大小*/
-	int    height;                /**< 图形高度,<=0表示使用原始大小*/
-	AM_AV_JPEGAngle_t  angle;     /**< JPEG图片的旋转角度*/
-	AM_AV_JPEGOption_t option;    /**< JPEG解码选项*/
+	int    width;                 /**< Image width, <=0 means use orignal size*/
+	int    height;                /**< Image height, <=0 means use orignal size*/
+	AM_AV_JPEGAngle_t  angle;     /**< JPEG image ratation parameter*/
+	AM_AV_JPEGOption_t option;    /**< JPEG decoder options*/
 } AM_AV_SurfacePara_t;
 
-/**\brief 注入数据类型*/
+/**\brief Decoder injection data type*/
 typedef enum
 {
-	AM_AV_INJECT_AUDIO,           /**< 音频数据*/
-	AM_AV_INJECT_VIDEO,           /**< 视频数据*/
-	AM_AV_INJECT_MULTIPLEX        /**< 复用数据*/
+	AM_AV_INJECT_AUDIO,           /**< Audio data*/
+	AM_AV_INJECT_VIDEO,           /**< Video data*/
+	AM_AV_INJECT_MULTIPLEX        /**< Multiplexed data*/
 } AM_AV_InjectType_t;
 
-/**\brief 音视频注入参数*/
+/**\brief Decoder injection parameters*/
 typedef struct
 {
-	AM_AV_AFormat_t  aud_fmt;     /**< 音频格式*/
-	AM_AV_VFormat_t  vid_fmt;     /**< 视频格式*/
-	AM_AV_PFormat_t  pkg_fmt;     /**< 数据封装格式*/
-	int              aud_id;      /**< 音频ID, -1表示没有音频*/
-	int              vid_id;      /**< 视频ID, -1表示没有视频*/
-	int              channel;     /**< 音频通道数目(播放PCM音频时使用)*/
-	int              sample_rate; /**< 音频采样率(播放PCM音频时使用)*/
-	int              data_width;  /**< 音频采样数据位数(播放PCM音频时使用)*/
+	AM_AV_AFormat_t  aud_fmt;     /**< Audio format*/
+	AM_AV_VFormat_t  vid_fmt;     /**< Video format*/
+	AM_AV_PFormat_t  pkg_fmt;     /**< Package format*/
+	int              aud_id;      /**< Audio ID, -1 means no audio data*/
+	int              vid_id;      /**< Video ID, -1 means no video data*/
+	int              channel;     /**< Audio channel number (used in playing audio PCM data)*/
+	int              sample_rate; /**< Audio sample rate (used in playing audio PCM data)*/
+	int              data_width;  /**< Audio data width (used in playing audio PCM data)*/
 } AM_AV_InjectPara_t;
 
-/**\brief 视频解码状态*/
+/**\brief Video decoder status*/
 typedef struct
 {
-	AM_AV_VFormat_t  vid_fmt;     /**< 视频格式*/
-	int              src_w;       /**< 视频源宽度*/ 
-	int              src_h;       /**< 视频源高度*/
-	int              fps;         /**< 视频帧率*/
-	char             interlaced;  /**< 是否隔行*/
-	int              frames;      /**< 已经解码的帧数目*/
-	int              vb_size;     /**< 视频缓冲区大小*/
-	int              vb_data;     /**< 视频缓冲区中数据占用空间大小*/
-	int              vb_free;     /**< 视频缓冲区中空闲空间大小*/
+	AM_AV_VFormat_t  vid_fmt;     /**< Video format*/
+	int              src_w;       /**< Video source width*/
+	int              src_h;       /**< Video source height*/
+	int              fps;         /**< Frames per second*/
+	char             interlaced;  /**< Is interlaced ? */
+	int              frames;      /**< Decoded frames number*/
+	int              vb_size;     /**< Video buffer size*/
+	int              vb_data;     /**< Data size in the video buffer*/
+	int              vb_free;     /**< Free size in the video buffer*/
 }AM_AV_VideoStatus_t;
 
-/**\brief 音频解码状态*/
+/**\brief Audio decoder status*/
 typedef struct
 {
-	AM_AV_AFormat_t  aud_fmt;     /**< 音频格式*/
-	int              sample_rate; /**< 采样率*/
-	int              resolution;  /**< 数据精度(8/16bits)*/
-	int              channels;    /**< 声道数目*/
-	unsigned int     frames;      /**< 已解码的采样数目*/
-	int              ab_size;     /**< 音频缓冲区大小*/
-	int              ab_data;     /**< 音频缓冲区中数据占用大小*/
-	int              ab_free;     /**< 音频缓冲区中空闲空间大小*/
-	AM_AV_AFormat_t  aud_fmt_orig;     /**< 原始音频格式*/
-	int              sample_rate_orig; /**< 原始采样率*/
-	int              resolution_orig;  /**< 原始数据精度*/
-	int              channels_orig;    /**< 原始声道数目*/
-	int              lfepresent;       /**< 重低音*/
-	int              lfepresent_orig;  /**< 原始重低音*/
+	AM_AV_AFormat_t  aud_fmt;     /**< Audio format*/
+	int              sample_rate; /**< Sample rate*/
+	int              resolution;  /**< Data width (8/16bits)*/
+	int              channels;    /**< Channel number*/
+	unsigned int     frames;      /**< Decoded frames number*/
+	int              ab_size;     /**< Audio buffer size*/
+	int              ab_data;     /**< Data size in the audio buffer*/
+	int              ab_free;     /**< Free size in the audio buffer*/
 }AM_AV_AudioStatus_t;
 
-/**\brief Timeshifting 播放模式*/
+/**\brief Timeshifting play mode*/
 typedef enum
 {
-	AM_AV_TIMESHIFT_MODE_TIMESHIFTING, /**< 时移播放*/
-	AM_AV_TIMESHIFT_MODE_PLAYBACK      /**< PVR回放*/
+	AM_AV_TIMESHIFT_MODE_TIMESHIFTING, /**< Normal timeshifting mode*/
+	AM_AV_TIMESHIFT_MODE_PLAYBACK      /**< PVR playback mode*/
 }AM_AV_TimeshiftMode_t;
 
-/**\brief Timeshifting 媒体信息*/
+/**\brief Timeshifting media information*/
 typedef struct
 {
-	int duration;              /**< 节目总时长*/
-	char program_name[16];     /**< 节目名称*/
+	int duration;              /**< Duration in seconds*/
+	char program_name[16];     /**< Program name*/
 	
-	int vid_pid; /**< 视频PID*/
-	int vid_fmt; /**< 视频格式*/
+	int vid_pid; /**< Video PID*/
+	int vid_fmt; /**< Video format*/
 
-	int aud_cnt; /**< 音频数量*/
+	int aud_cnt; /**< Audio number*/
 	struct
 	{
-		int pid; /**< 音频PID*/
-		int fmt; /**< 音频格式*/
-		char lang[4]; /**< 语言描述*/
-	}audios[8]; /**< 音频信息数组*/
+		int pid; /**< Audio PID*/
+		int fmt; /**< Audio format*/
+		char lang[4]; /**< Lanuguage descripton*/
+	}audios[8]; /**< Audio information array*/
 
-	int sub_cnt; /**< 字幕数量*/
+	int sub_cnt; /**< Subtitle number*/
 	struct
 	{
-		int pid;  /**< 字幕PID*/
-		int type; /**< 字幕类型*/
-		int composition_page; /**< DVB字幕composition page*/
-		int ancillary_page;   /**< DVB字幕ancillary page*/
-		int magzine_no; /**< teletext 字幕magzine number*/
-		int page_no;  /**< teletext 字幕page number*/
-		char lang[4]; /**< 字幕语言描述*/
-	}subtitles[8]; /**< 字幕信息数组*/
+		int pid;  /**< Subtitle PID*/
+		int type; /**< Subtitle type*/
+		int composition_page; /**< DVB subtitle's composition page*/
+		int ancillary_page;   /**< DVB subtitle's ancillary page*/
+		int magzine_no; /**< Teletext subtitle's magzine number*/
+		int page_no;  /**< Teletext subtitle's page number*/
+		char lang[4]; /**< Language description*/
+	}subtitles[8]; /**< Subtitle information array*/
 
-	int ttx_cnt; /**< teletext数量*/
+	int ttx_cnt; /**< Teletext number*/
 	struct
 	{
-		int pid; /**< teletext PID*/
-		int magzine_no; /**< teletext magzine number*/
-		int page_no;    /**< teletext page number*/
-		char lang[4];   /**< teletext 语言描述*/
-	}teletexts[8]; /**< teletext信息数组*/
+		int pid; /**< Teletext PID*/
+		int magzine_no; /**< Teletext magzine number*/
+		int page_no;    /**< Teletext page number*/
+		char lang[4];   /**< Teletext language description*/
+	}teletexts[8]; /**< Teletext information array*/
 }AM_AV_TimeshiftMediaInfo_t;
 
-/**\brief Timeshift播放参数*/
+/**\brief Timeshift playing parameters*/
 typedef struct
 {
-	int              dmx_id;      /**< 用于回放的dmx*/
-	char             file_path[256];     /**< 存储文件全路径*/
+	int              dmx_id;      /**< Demux device index used*/
+	char             file_path[256];     /**< File path*/
 	
-	AM_AV_TimeshiftMode_t mode;   /**< 模仿模式*/
-	AM_AV_TimeshiftMediaInfo_t media_info; /**< 媒体信息*/
+	AM_AV_TimeshiftMode_t mode;   /**< Playing mode*/
+	AM_AV_TimeshiftMediaInfo_t media_info; /**< Media information*/
 } AM_AV_TimeshiftPara_t;
 
-/**\brief Timeshift播放信息*/
+/**\brief Timeshift lpaying information*/
 typedef struct
 {
-	int                   current_time; /**< 当前时间(秒为单位)*/
-	int                   full_time;    /**< 总时间*/
-	int                   status;       /**< 状态*/
+	int                   current_time; /**< Current time in seconds*/
+	int                   full_time;    /**< Total length in seconds*/
+	int                   status;       /**< Status*/
 }AM_AV_TimeshiftInfo_t;
 
-/**\brief 播放器状态信息*/
+/**\brief Player information*/
 typedef struct player_info
 {
 	char *name;
@@ -461,719 +475,626 @@ typedef struct player_info
  * Function prototypes  
  ***************************************************************************/
 
-/**\brief 打开音视频解码设备
- * \param dev_no 音视频设备号
- * \param[in] para 音视频设备开启参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Open an AV decoder device
+ * \param dev_no AV decoder device number
+ * \param[in] para Device open parameters
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_Open(int dev_no, const AM_AV_OpenPara_t *para);
 
-/**\brief 关闭音视频解码设备
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Close an AV decoder device
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_Close(int dev_no);
 
-/**\brief 设定TS流的输入源
- * \param dev_no 音视频设备号
- * \param src TS输入源
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Set the decoder's TS input source
+ * \param dev_no AV decoder device number
+ * \param src TS input source
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetTSSource(int dev_no, AM_AV_TSSource_t src);
 
-/**\brief 开始解码TS流
- * \param dev_no 音视频设备号
- * \param vpid 视频流PID
- * \param apid 音频流PID
+/**\brief Start TS stream playing with PCR parameter
+ * \param dev_no AV decoder device number
+ * \param vpid Video PID
+ * \param apid Audio PID
  * \param pcrpid PCR PID
- * \param vfmt 视频压缩格式
- * \param afmt 音频压缩格式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+ * \param vfmt Video format
+ * \param afmt Audio format
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StartTSWithPCR(int dev_no, uint16_t vpid, uint16_t apid, uint16_t pcrpid, AM_AV_VFormat_t vfmt, AM_AV_AFormat_t afmt);
 
-/**\brief 开始解码TS流
- * \param dev_no 音视频设备号
- * \param vpid 视频流PID
- * \param apid 音频流PID
- * \param vfmt 视频压缩格式
- * \param afmt 音频压缩格式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Start TS stream playing
+ * \param dev_no AV decoder device number
+ * \param vpid Video PID
+ * \param apid Audio PID
+ * \param vfmt Video format
+ * \param afmt Audio format
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StartTS(int dev_no, uint16_t vpid, uint16_t apid, AM_AV_VFormat_t vfmt, AM_AV_AFormat_t afmt);
 
 
-/**\brief 停止TS流解码
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Stop TS stream playing
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StopTS(int dev_no);
 
-/**\brief 开始TS视频流解码
- * \param dev_no 音视频设备号
- * \param vpid 视频PID
- * \param vfmt 视频格式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
- */
-extern AM_ErrorCode_t AM_AV_StartTSVideo(int dev_no, uint16_t vpid, AM_AV_VFormat_t vfmt);
-
-/**\brief 停止TS视频流解码
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
- */
-extern AM_ErrorCode_t AM_AV_StopTSVideo(int dev_no);
-
-/**\brief 开始TS音频流解码
- * \param dev_no 音视频设备号
- * \param apid 音频PID
- * \param afmt 音频格式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
- */
-extern AM_ErrorCode_t AM_AV_StartTSAudio(int dev_no, uint16_t apid, AM_AV_AFormat_t afmt);
-
-/**\brief 停止TS音频流解码
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
- */
-extern AM_ErrorCode_t AM_AV_StopTSAudio(int dev_no);
-
-/**\brief 开始播放文件
- * \param dev_no 音视频设备号
- * \param[in] fname 媒体文件名
- * \param loop 是否循环播放
- * \param pos 播放的起始位置
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Start a media file playing
+ * \param dev_no AV decoder device number
+ * \param[in] fname Filename
+ * \param loop If play in loop mode.
+ * \param pos Start position in seconds
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StartFile(int dev_no, const char *fname, AM_Bool_t loop, int pos);
 
-/**\brief 切换到文件播放模式但不开始播放
- * \param dev_no 音视频设备号
- * \param[in] fname 媒体文件名
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Switch to file play mode but do not start
+ * \param dev_no AV decoder device number
+ * \param[in] fname Filename
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_AddFile(int dev_no, const char *fname);
 
-/**\brief 开始播放已经添加的文件，在AM_AV_AddFile后调用此函数开始播放
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Start play the file. Invoke after AM_AV_AddFile
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StartCurrFile(int dev_no);
 
-/**\brief 停止播放文件
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Start file playing
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StopFile(int dev_no);
 
-/**\brief 暂停文件播放
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Pause the file playing
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_PauseFile(int dev_no);
 
-/**\brief 恢复文件播放
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Resume the file playing
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_ResumeFile(int dev_no);
 
-/**\brief 设定当前文件播放位置
- * \param dev_no 音视频设备号
- * \param pos 播放位置
- * \param start 是否开始播放
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Set the current file playing position
+ * \param dev_no AV decoder device number
+ * \param pos Playing position in seconds
+ * \param start Start directly or pause on the position
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SeekFile(int dev_no, int pos, AM_Bool_t start);
 
-/**\brief 快速向前播放
- * \param dev_no 音视频设备号
- * \param speed 播放速度
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Fast forward the file
+ * \param dev_no AV decoder device number
+ * \param speed Playing speed (0 means normal)
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_FastForwardFile(int dev_no, int speed);
 
-/**\brief 快速向后播放
- * \param dev_no 音视频设备号
- * \param speed 播放速度
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Fast backward the file
+ * \param dev_no AV decoder device number
+ * \param speed Playing speed
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_FastBackwardFile(int dev_no, int speed);
 
-/**\brief 取得当前媒体文件信息
- * \param dev_no 音视频设备号
- * \param[out] info 返回媒体文件信息
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the current playing file's information
+ * \param dev_no AV decoder device number
+ * \param[out] info Return the file's information
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetCurrFileInfo(int dev_no, AM_AV_FileInfo_t *info);
 
-/**\brief 取得媒体文件播放状态
- * \param dev_no 音视频设备号
- * \param[out] status 返回媒体文件播放状态
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the current player status
+ * \param dev_no AV decoder device number
+ * \param[out] status Return the current player status
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetPlayStatus(int dev_no, AM_AV_PlayStatus_t *status);
 
-/**\brief 取得JPEG图片文件属性
- * \param dev_no 音视频设备号
- * \param[in] fname 图片文件名
- * \param[out] info 文件属性
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the JPEG image file's information
+ * \param dev_no AV decoder device number
+ * \param[in] fname JPEG file name
+ * \param[out] info Return the image's information
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetJPEGInfo(int dev_no, const char *fname, AM_AV_JPEGInfo_t *info);
 
-/**\brief 取得JPEG图片数据属性
- * \param dev_no 音视频设备号
- * \param[in] data 图片数据缓冲区
- * \param len 数据缓冲区大小
- * \param[out] info 文件属性
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the JPEG image data's information
+ * \param dev_no AV decoder device number
+ * \param[in] data JPEG image data buffer
+ * \param len JPEG data length in bytes
+ * \param[out] info Return the image's information
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetJPEGDataInfo(int dev_no, const uint8_t *data, int len, AM_AV_JPEGInfo_t *info);
 
-/**\brief 解码JPEG图片文件
- * \param dev_no 音视频设备号
- * \param[in] fname 图片文件名
- * \param[in] para 输出JPEG的参数
- * \param[out] surf 返回JPEG图片的surface
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Decode the JPEG image file
+ * \param dev_no AV decoder device number
+ * \param[in] fname JPEG filename
+ * \param[in] para JPEG output parameters
+ * \param[out] surf Return the JPEG image
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_DecodeJPEG(int dev_no, const char *fname, const AM_AV_SurfacePara_t *para, AM_OSD_Surface_t **surf);
 
-/**\brief 解码JPEG图片数据
- * \param dev_no 音视频设备号
- * \param[in] data 图片数据缓冲区
- * \param len 数据缓冲区大小
- * \param[in] para 输出JPEG的参数
- * \param[out] surf 返回JPEG图片的surface
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Decode the JPEG data
+ * \param dev_no AV decoder device number
+ * \param[in] data JPEG data buffer
+ * \param len JPEG data length in bytes
+ * \param[in] para JPEG output parameters
+ * \param[out] surf Return the JPEG image
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_DacodeJPEGData(int dev_no, const uint8_t *data, int len, const AM_AV_SurfacePara_t *para, AM_OSD_Surface_t **surf);
 
-/**\brief 解码视频基础流文件
- * \param dev_no 音视频设备号
- * \param format 视频压缩格式
- * \param[in] fname 视频文件名
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Decode video ES data from a file
+ * \param dev_no AV decoder device number
+ * \param format Video format
+ * \param[in] fname ES filename
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StartVideoES(int dev_no, AM_AV_VFormat_t format, const char *fname);
 
-/**\brief 解码视频基础流数据
- * \param dev_no 音视频设备号
- * \param format 视频压缩格式
- * \param[in] data 视频数据缓冲区
- * \param len 数据缓冲区大小
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Decode video ES data from a buffer
+ * \param dev_no AV decoder device number
+ * \param format Video format
+ * \param[in] data Video ES buffer
+ * \param len Video data length in bytes
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StartVideoESData(int dev_no, AM_AV_VFormat_t format, const uint8_t *data, int len);
 
-/**\brief 停止解码视频基础流
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Stop video ES data decoding
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StopVideoES(int dev_no);
 
-/**\brief 解码音频基础流文件
- * \param dev_no 音视频设备号
- * \param format 音频压缩格式
- * \param[in] fname 视频文件名
- * \param times 播放次数，<=0表示一直播放
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Start audio ES data decoding from a file
+ * \param dev_no AV decoder device number
+ * \param format Audio format
+ * \param[in] fname Audio ES filename
+ * \param times Playing times, <=0 means loop forever
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StartAudioES(int dev_no, AM_AV_AFormat_t format, const char *fname, int times);
 
-/**\brief 解码音频基础流数据
- * \param dev_no 音视频设备号
- * \param format 音频压缩格式
- * \param[in] data 音频数据缓冲区
- * \param len 数据缓冲区大小
- * \param times 播放次数，<=0表示一直播放
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Start audio ES data decoding from a buffer
+ * \param dev_no AV decoder device number
+ * \param format Audio format
+ * \param[in] data Audio ES buffer
+ * \param len Audio data length in bytes
+ * \param times Playing times, <=0 means loop forever
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StartAudioESData(int dev_no, AM_AV_AFormat_t format, const uint8_t *data, int len, int times);
 
-/**\brief 停止解码音频基础流
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Stop audio ES decoding
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StopAudioES(int dev_no);
 
-/**\brief Set DRM mode
- * \param dev_no 音视频设备号
+/**\brief Enable/diable decoder's DRM mode
+ * \param dev_no AV decoder device number
  * \param[in] enable enable or disable DRM mode
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetDRMMode(int dev_no, int enable);
 
-/**\brief 开始进入数据注入模式
- * \param dev_no 音视频设备号
- * \param[in] para 注入参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Start AV data injection playing mode
+ * \param dev_no AV decoder device number
+ * \param[in] para Injection parameters
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StartInject(int dev_no, const AM_AV_InjectPara_t *para);
 
-/**\brief 进入数据注入模式后，向音视频设备注入数据
- * \param dev_no 音视频设备号
- * \param type 注入数据类型
- * \param[in] data 注入数据的缓冲区
- * \param[in,out] size 传入要注入数据的长度，返回实际注入数据的长度
- * \param timeout 等待设备的超时时间，以毫秒为单位，<0表示一直等待
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief In injection mode, inject AV data to decoder
+ * \param dev_no AV decoder device number
+ * \param type Input data type
+ * \param[in] data AV data buffer
+ * \param[in,out] size Input the data length, and return the injected data length
+ * \param timeout Timeout in milliseconds
+ * The function will wait until the decoder's input buffer has enough space to receive the AV data.
+ * >0 the function will return immediately to this time.
+ * <0 means waiting forever.
+ * =0 means return immediately.
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_InjectData(int dev_no, AM_AV_InjectType_t type, uint8_t *data, int *size, int timeout);
 
-/**\brief 暂停数据注入
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Pause the decoder in injection mode
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_PauseInject(int dev_no);
 
-/**\brief 恢复注入
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Resume the decoder in injection mode
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_ResumeInject(int dev_no);
 
-/**\brief 进入数据注入模式后，改变播放的视频
- * \param dev_no 音视频设备号
- * \param vid 视频流ID
- * \param vfmt 视频格式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief In injection mode, change the video
+ * \param dev_no AV decoder device number
+ * \param vid Video PID
+ * \param vfmt Video format
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetInjectVideo(int dev_no, int vid, AM_AV_VFormat_t vfmt);
 
-/**\brief 进入数据注入模式后，改变播放的音频
- * \param dev_no 音视频设备号
- * \param aid 音频流ID
- * \param afmt 音频格式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief In injection mode, change the audio
+ * \param dev_no AV decoder device number
+ * \param aid Audio PID
+ * \param afmt Audio format
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetInjectAudio(int dev_no, int aid, AM_AV_AFormat_t afmt);
 
-/**\brief 停止数据注入模式
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Stop the injection mode
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StopInject(int dev_no);
 
-/**\brief 设定视频窗口
- * \param dev_no 音视频设备号
- * \param x 窗口左上顶点x坐标
- * \param y 窗口左上顶点y坐标
- * \param w 窗口宽度
- * \param h 窗口高度
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Set the video window
+ * \param dev_no AV decoder device number
+ * \param x X coordinate of the top left corner
+ * \param y Y coordinate of the top left corner
+ * \param w Window width
+ * \param h Window height
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetVideoWindow(int dev_no, int x, int y, int w, int h);
 
-/**\brief 返回视频窗口
- * \param dev_no 音视频设备号
- * \param[out] x 返回窗口左上顶点x坐标
- * \param[out] y 返回窗口左上顶点y坐标
- * \param[out] w 返回窗口宽度
- * \param[out] h 返回窗口高度
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the video window
+ * \param dev_no AV decoder device number
+ * \param[out] x Return x coordinate of the top left corner
+ * \param[out] y Return y coordinate of the top left corner
+ * \param[out] w Return the window width
+ * \param[out] h Return the window height
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetVideoWindow(int dev_no, int *x, int *y, int *w, int *h);
 
-/**\brief 设定视频对比度(0~100)
- * \param dev_no 音视频设备号
- * \param val 视频对比度值
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Set the video contrast (0~100)
+ * \param dev_no AV decoder device number
+ * \param val New contrast value
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetVideoContrast(int dev_no, int val);
 
-/**\brief 取得当前视频对比度
- * \param dev_no 音视频设备号
- * \param[out] val 返回当前视频对比度值
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the current video contrast value
+ * \param dev_no AV decoder device number
+ * \param[out] val Return the current video contrast value
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetVideoContrast(int dev_no, int *val);
 
-/**\brief 设定视频饱和度(0~100)
- * \param dev_no 音视频设备号
- * \param val 视频饱和度值
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Set the video saturation value (0~100)
+ * \param dev_no AV decoder device number
+ * \param val The new video saturation value
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetVideoSaturation(int dev_no, int val);
 
-/**\brief 取得当前视频饱和度
- * \param dev_no 音视频设备号
- * \param[out] val 返回当前视频饱和度值
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the current video saturation value
+ * \param dev_no AV decoder device number
+ * \param[out] val Return the saturation value
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetVideoSaturation(int dev_no, int *val);
 
-/**\brief 设定视频亮度(0~100)
- * \param dev_no 音视频设备号
- * \param val 视频亮度值
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Set the video brightness value (0~100)
+ * \param dev_no AV decoder device number
+ * \param val New video brightness value
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetVideoBrightness(int dev_no, int val);
 
-/**\brief 取得当前视频亮度
- * \param dev_no 音视频设备号
- * \param[out] val 返回当前视频亮度值
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the current video brightness value
+ * \param dev_no AV decoder device number
+ * \param[out] val Return the current video brightness value
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetVideoBrightness(int dev_no, int *val);
 
-/**\brief 显示视频层
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Enable the video layer
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_EnableVideo(int dev_no);
 
-/**\brief 隐藏视频层
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Disable the video layer
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_DisableVideo(int dev_no);
 
-/**\brief 设定视频长宽比
- * \param dev_no 音视频设备号
- * \param ratio 长宽比
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Set the video aspect ratio
+ * \param dev_no AV decoder device number
+ * \param ratio New aspect ratio value
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetVideoAspectRatio(int dev_no, AM_AV_VideoAspectRatio_t ratio);
 
-/**\brief 取得视频长宽比
- * \param dev_no 音视频设备号
- * \param[out] ratio 长宽比
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the video aspect ratio
+ * \param dev_no AV decoder device number
+ * \param[out] ratio Return the video aspect ratio
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetVideoAspectRatio(int dev_no, AM_AV_VideoAspectRatio_t *ratio);
 
-/**\brief 设定视频长宽比匹配模式
- * \param dev_no 音视频设备号
- * \param mode 长宽比匹配模式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Set the video aspect ratio match mode
+ * \param dev_no AV decoder device number
+ * \param mode New match mode
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetVideoAspectMatchMode(int dev_no, AM_AV_VideoAspectMatchMode_t mode);
 
-/**\brief 取得视频长宽比匹配模式
- * \param dev_no 音视频设备号
- * \param[out] mode 长宽比匹配模式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the video aspect ratio match mode
+ * \param dev_no AV decoder device number
+ * \param[out] mode Return the current match mode
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetVideoAspectMatchMode(int dev_no, AM_AV_VideoAspectMatchMode_t *mode);
 
-/**\brief 设定视频停止时自动隐藏视频层
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Set the video layer disabled automatically when video stopped
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_EnableVideoBlackout(int dev_no);
 
-/**\brief 视频停止时不隐藏视频层
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Set the video layer do not disabled when video stopped
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_DisableVideoBlackout(int dev_no);
 
-/**\brief 设定视频显示模式
- * \param dev_no 音视频设备号
- * \param mode 视频显示模式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Set the video display mode
+ * \param dev_no AV decoder device number
+ * \param mode New display mode
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetVideoDisplayMode(int dev_no, AM_AV_VideoDisplayMode_t mode);
 
-/**\brief 取得当前视频显示模式
- * \param dev_no 音视频设备号
- * \param mode 返回当前视频显示模式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the current video display mode
+ * \param dev_no AV decoder device number
+ * \param[out] mode Return the current display mode
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetVideoDisplayMode(int dev_no, AM_AV_VideoDisplayMode_t *mode);
 
-/**\brief 清除视频缓冲区
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Clear the video layer
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_ClearVideoBuffer(int dev_no);
 
-/**\brief 取得当前视频显示祯图形(此操作只有视频停止后才可进行)
- * \param dev_no 音视频设备号
- * \param[in] para 创建图像表面的参数
- * \param[out] s 返回图像
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the video frame data (after video stopped)
+ *
+ * This function is not available on android.
+ * \param dev_no AV decoder device number
+ * \param[in] para Surface create parameters
+ * \param[out] s Return the video frame
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetVideoFrame(int dev_no, const AM_AV_SurfacePara_t *para, AM_OSD_Surface_t **s);
 
-/**\brief 取得当前视频解码状态
- * \param dev_no 音视频设备号
- * \param[out] status 返回视频解码状态
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the current video decoder's status
+ * \param dev_no AV decoder device number
+ * \param[out] status Return the current video decoder's status
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetVideoStatus(int dev_no, AM_AV_VideoStatus_t *status);
 
-/**\brief 取得当前音频解码状态
- * \param dev_no 音视频设备号
- * \param[out] status 返回视频解码状态
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the current audio decoder's status
+ * \param dev_no AV decoder device number
+ * \param[out] status Return the current audio decoder's status
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetAudioStatus(int dev_no, AM_AV_AudioStatus_t *status);
 
 
-/**\brief 开始进入Timeshift模式
- * \param dev_no 音视频设备号
- * \param[in] para Timeshift参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Start the timeshifting mode
+ * \param dev_no AV decoder device number
+ * \param[in] para Timeshifting parameters
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StartTimeshift(int dev_no, const AM_AV_TimeshiftPara_t *para);
 
-/**\brief 进入Timeshift模式后，写数据到timeshift文件
- * \param dev_no 音视频设备号
- * \param[in] data 注入数据的缓冲区
- * \param[in,out] size 传入要注入数据的长度，返回实际注入数据的长度
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief In timeshifting mode, write AV data to decoder
+ * \param dev_no AV decoder device number
+ * \param[in] data Injected data buffer
+ * \param size Data length in the buffer
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_TimeshiftFillData(int dev_no, uint8_t *data, int size);
 
-/**\brief 停止Timeshift模式
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Stop timeshifting mode
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_StopTimeshift(int dev_no);
 
-/**\brief 开始播放Timeshift
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Start playing in timeshifting mode
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_PlayTimeshift(int dev_no);
 
-/**\brief 暂停Timeshift
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Pause playing in timeshifting mode
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_PauseTimeshift(int dev_no);
 
-/**\brief 恢复Timeshift播放
- * \param dev_no 音视频设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Resume playing in timeshifting mode
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_ResumeTimeshift(int dev_no);
 
-/**\brief 设定当前Timeshift播放位置
- * \param dev_no 音视频设备号
- * \param pos 播放位置
- * \param start 是否开始播放
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Set the current playing position in timeshifting mode
+ * \param dev_no AV decoder device number
+ * \param pos New position in seconds
+ * \param start Start playing directly after seek
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SeekTimeshift(int dev_no, int pos, AM_Bool_t start);
 
-/**\brief 快速向前播放
- * \param dev_no 音视频设备号
- * \param speed 播放速度
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Fast forward playing in timeshifting mode
+ * \param dev_no AV decoder device number
+ * \param speed Playing speed
+ * 0 means normal speed.
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_FastForwardTimeshift(int dev_no, int speed);
 
-/**\brief 快速向后播放
- * \param dev_no 音视频设备号
- * \param speed 播放速度
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Fast backward playing in timeshifting mode
+ * \param dev_no AV decoder device number
+ * \param speed Playing speed
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_FastBackwardTimeshift(int dev_no, int speed);
 
-/**\brief 切换当前Timeshift播放音频
- * \param dev_no 音视频设备号
- * \param apid the audio pid switched to
- * \param afmt the audio fmt switched to
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Switch audio in timeshifting mode
+ * \param dev_no AV decoder device number
+ * \param apid The new audio PID
+ * \param afmt The new audio format
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SwitchTimeshiftAudio(int dev_no, int apid, int afmt);
 
-/**\brief 获取当前Timeshift播放信息
- * \param dev_no 音视频设备号
- * \param [out] info 播放信息
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Get the current timeshifting play information
+ * \param dev_no AV decoder device number
+ * \param [out] info Return the timeshifting information
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetTimeshiftInfo(int dev_no, AM_AV_TimeshiftInfo_t *info);
 
-/**\brief 设置视频通道参数
- * \param dev_no 音视频设备号
- * \param fs free scale参数
- * \param di deinterlace参数
- * \param pp PPMGR参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\cond */
+/**\brief Set video path parameters
+ * \param dev_no AV decoder device number
+ * \param fs free scale parameter
+ * \param di deinterlace parameter
+ * \param pp PPMGR parameter
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetVPathPara(int dev_no, AM_AV_FreeScalePara_t fs, AM_AV_DeinterlacePara_t di, AM_AV_PPMGRPara_t pp);
+/**\endcond */
 
-/**\brief TS播放模式时切换音频，用于多音频切换，需先调用StartTS
- * \param dev_no 音视频设备号
- * \param apid 音频流PID
- * \param afmt 音频压缩格式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+/**\brief Switch audio in TS playing mode
+ * \param dev_no AV decoder device number
+ * \param apid New audio PID
+ * \param afmt New audio format
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SwitchTSAudio(int dev_no, uint16_t apid, AM_AV_AFormat_t afmt);
+
+/**
+ * Reset the audio decoder
+ * \param dev_no AV decoder device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
 extern AM_ErrorCode_t AM_AV_ResetAudioDecoder(int dev_no);
 
 
-/**\brief used to set /sys/module/amvdec_h264/parameters/error_recovery_mode to choose display mosaic or not
- * \param dev_no 音视频设备号
+/**\brief Used to set /sys/module/amvdec_h264/parameters/error_recovery_mode to choose display mosaic or not
+ * \param dev_no AV decoder device number
  * \param error_recovery_mode : 0 ,skip mosaic and reset vdec,2 skip mosaic ,3 display mosaic
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
-
 extern AM_ErrorCode_t AM_AV_SetVdecErrorRecoveryMode(int dev_no, uint8_t error_recovery_mode);
 
 /**
- * 设定辅助音频描述输出
- * \param dev_no 音视频设备号
- * \param enable 1 开启辅助描述音频输出, 0关闭辅助描述音频输出
- * \param apid sub音频流PID
- * \param afmt sub音频压缩格式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_av.h)
+ * Set audio description output in TS playing mode
+ * \param dev_no AV decoder device number
+ * \param enable 1 to enable AD output, 0 to disable AD output
+ * \param apid AD audio PID
+ * \param afmt AD audio format
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetAudioAd(int dev_no, int enable, uint16_t apid, AM_AV_AFormat_t afmt);
 

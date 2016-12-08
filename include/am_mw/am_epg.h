@@ -2,7 +2,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file am_epg.h
- * \brief EPG监控模块头文件
+ * \brief EPG scanner module
  *
  * \author Xia Lei Peng <leipeng.xia@amlogic.com>
  * \date 2010-11-04: create the document
@@ -26,10 +26,10 @@ extern "C"
  * Macro definitions
  ***************************************************************************/
 
-/**\brief 将16位的MJD值转换为秒*/
+/**\brief Convert 16 bits MJD value in SI to seconds*/
 #define AM_EPG_MJD2SEC(m) (((m)-40587)*86400)
 
-/**\brief 将时，分，秒的BCD值转换为秒*/
+/**\brief Convert hour/minute/second BCD value in SI to seconds*/
 #define AM_EPG_BCD2SEC(h,m,s)\
 		((3600 * ((10*(((h) & 0xF0)>>4)) + ((h) & 0xF))) + \
 		(60 * ((10*(((m) & 0xF0)>>4)) + ((m) & 0xF))) + \
@@ -55,83 +55,83 @@ extern "C"
 
 typedef void* AM_EPG_Handle_t;
 
-/**\brief EPG模块错误代码*/
+/**\brief Error code of the EPG scanner module*/
 enum AM_EPG_ErrorCode
 {
 	AM_EPG_ERROR_BASE=AM_ERROR_BASE(AM_MOD_EPG),
-	AM_EPG_ERR_INVALID_PARAM,			/**< 参数无效*/
-	AM_EPG_ERR_NOT_SUPPORTED,           /**< 不支持的操作*/
-	AM_EPG_ERR_NO_MEM,                  /**< 空闲内存不足*/
-	AM_EPG_ERR_CANNOT_CREATE_THREAD,    /**< 无法创建线程*/
-	AM_EPG_ERR_CANNOT_CREATE_SI,		/**< 无法创建SI解析器*/
-	AM_EPG_ERR_SUBSCRIBE_EVENT_FAILED,	/**< 预约EPG事件失败*/
+	AM_EPG_ERR_INVALID_PARAM,			/**< Invalid parameter*/
+	AM_EPG_ERR_NOT_SUPPORTED,           /**< Not supported*/
+	AM_EPG_ERR_NO_MEM,                  /**< Not enough memory*/
+	AM_EPG_ERR_CANNOT_CREATE_THREAD,    /**< Cannot create thread*/
+	AM_EPG_ERR_CANNOT_CREATE_SI,		/**< Cannot create SI parser*/
+	AM_EPG_ERR_SUBSCRIBE_EVENT_FAILED,	/**< Subscribe EPG event failed*/
 	AM_EPG_ERR_END
 };
 
-/**\brief EPG监控模式定义*/
+/**\brief EPG scanner working mode*/
 enum AM_EPG_Mode
 {
-	AM_EPG_SCAN_PAT = 0x01,	/**< 监控PAT*/
-	AM_EPG_SCAN_PMT = 0x02,	/**< 监控PMT*/
-	AM_EPG_SCAN_CAT = 0x04,	/**< 监控CAT*/
-	AM_EPG_SCAN_SDT = 0x08,	/**< 监控SDT*/
-	AM_EPG_SCAN_NIT = 0x10,	/**< 监控NIT*/
-	AM_EPG_SCAN_TDT = 0x20,	/**< 监控TDT*/
-	AM_EPG_SCAN_EIT_PF_ACT 		= 0x40,	/**< 监控当前频点eit pf*/
-	AM_EPG_SCAN_EIT_PF_OTH 		= 0x80,	/**< 监控其他频点eit pf*/
-	AM_EPG_SCAN_EIT_SCHE_ACT	= 0x100,	/**< 监控当前频点eit schedule*/
-	AM_EPG_SCAN_EIT_SCHE_OTH 	= 0x200,	/**< 监控其他频点eit schedule*/
+	AM_EPG_SCAN_PAT = 0x01,	/**< Scan PAT*/
+	AM_EPG_SCAN_PMT = 0x02,	/**< Scan PMT*/
+	AM_EPG_SCAN_CAT = 0x04,	/**< Scan CAT*/
+	AM_EPG_SCAN_SDT = 0x08,	/**< Scan SDT*/
+	AM_EPG_SCAN_NIT = 0x10,	/**< Scan NIT*/
+	AM_EPG_SCAN_TDT = 0x20,	/**< Scan TDT*/
+	AM_EPG_SCAN_EIT_PF_ACT 		= 0x40,	/**< Scan EIF PF of current TS*/
+	AM_EPG_SCAN_EIT_PF_OTH 		= 0x80,	/**< Scan EIT PF of other TS*/
+	AM_EPG_SCAN_EIT_SCHE_ACT	= 0x100,	/**< Scan EIT schedule of current TS*/
+	AM_EPG_SCAN_EIT_SCHE_OTH 	= 0x200,	/**< Scan EIF schedule of other TS*/
 	
 	/*For ATSC*/
-	AM_EPG_SCAN_MGT	= 0x400,	/**< 监控MGT*/
-	AM_EPG_SCAN_VCT	= 0x800,	/**< 监控VCT*/
-	AM_EPG_SCAN_STT	= 0x1000,	/**< 监控STT*/
-	AM_EPG_SCAN_RRT	= 0x2000,	/**< 监控RRT*/
-	AM_EPG_SCAN_PSIP_EIT = 0x4000,	/**< 监控ATSC EIT*/
-	AM_EPG_SCAN_PSIP_ETT = 0x8000,	/**< 监控ATSC ETT*/
+	AM_EPG_SCAN_MGT	= 0x400,	/**< Scan ATSC MGT*/
+	AM_EPG_SCAN_VCT	= 0x800,	/**< Scan ATSC VCT*/
+	AM_EPG_SCAN_STT	= 0x1000,	/**< Scan ATSC STT*/
+	AM_EPG_SCAN_RRT	= 0x2000,	/**< Scan ATSC RRT*/
+	AM_EPG_SCAN_PSIP_EIT = 0x4000,	/**< Scan ATSC EIT*/
+	AM_EPG_SCAN_PSIP_ETT = 0x8000,	/**< Scan ATSC ETT*/
 	
 	/*Composed mode*/
-	AM_EPG_SCAN_EIT_PF_ALL		= AM_EPG_SCAN_EIT_PF_ACT | AM_EPG_SCAN_EIT_PF_OTH,/**< 监控所有eit pf*/
-	AM_EPG_SCAN_EIT_SCHE_ALL 	= AM_EPG_SCAN_EIT_SCHE_ACT | AM_EPG_SCAN_EIT_SCHE_OTH,/**< 监控所有eit schedule*/
-	AM_EPG_SCAN_EIT_ALL 		= AM_EPG_SCAN_EIT_PF_ALL | AM_EPG_SCAN_EIT_SCHE_ALL, /**< 监控所有eit*/
+	AM_EPG_SCAN_EIT_PF_ALL		= AM_EPG_SCAN_EIT_PF_ACT | AM_EPG_SCAN_EIT_PF_OTH,/**< Scan EIT PF of all the TS*/
+	AM_EPG_SCAN_EIT_SCHE_ALL 	= AM_EPG_SCAN_EIT_SCHE_ACT | AM_EPG_SCAN_EIT_SCHE_OTH,/**< Scan EIT schedule of all the TS*/
+	AM_EPG_SCAN_EIT_ALL 		= AM_EPG_SCAN_EIT_PF_ALL | AM_EPG_SCAN_EIT_SCHE_ALL, /**< Scan all EIT*/
 	AM_EPG_SCAN_ALL				= AM_EPG_SCAN_PAT|AM_EPG_SCAN_PMT|AM_EPG_SCAN_CAT|AM_EPG_SCAN_SDT|AM_EPG_SCAN_NIT|AM_EPG_SCAN_TDT|AM_EPG_SCAN_EIT_ALL|
 									AM_EPG_SCAN_MGT|AM_EPG_SCAN_VCT|AM_EPG_SCAN_STT|AM_EPG_SCAN_RRT|AM_EPG_SCAN_PSIP_EIT|AM_EPG_SCAN_PSIP_ETT,
 };
 
-/**\brief EPG监控事件类型*/
+/**\brief EPG event type*/
 enum AM_EPG_EventType
 {
 	AM_EPG_EVT_BASE=AM_EVT_TYPE_BASE(AM_MOD_EPG),
-	AM_EPG_EVT_NEW_PAT,    /**< 发现新版本PAT，参数为dvbpsi_pat_t*/
-	AM_EPG_EVT_NEW_PMT,    /**< 发现新版本PMT，参数为dvbpsi_pmt_t*/
-	AM_EPG_EVT_NEW_CAT,    /**< 发现新版本CAT，参数为dvbpsi_cat_t*/
-	AM_EPG_EVT_NEW_SDT,    /**< 发现新版本SDT，参数为dvbpsi_sdt_t*/
-	AM_EPG_EVT_NEW_NIT,    /**< 发现新版本NIT，参数为dvbpsi_nit_t*/
-	AM_EPG_EVT_NEW_TDT,    /**< 发现新版本NIT，参数为dvbpsi_tot_t*/
-	AM_EPG_EVT_NEW_EIT,	   /**< 接收到新的EIT单个section，参数为dvbpsi_eit_t*/
-	AM_EPG_EVT_NEW_STT,		/**< 发新新版本STT， 参数为stt_section_info_t*/
-	AM_EPG_EVT_NEW_RRT,		/**< 发新新版本RRT， 参数为rrt_section_info_t*/
-	AM_EPG_EVT_NEW_MGT,		/**< 发新新版本MGT， 参数为mgt_section_info_t*/
-	AM_EPG_EVT_NEW_VCT,		/**< 发新新版本VCT， 参数为vct_section_info_t*/
-	AM_EPG_EVT_NEW_PSIP_EIT,/**< 发新新版本ATSC EIT， 参数为eit_section_info_t*/
-	AM_EPG_EVT_NEW_PSIP_ETT,/**< 发新新版本ATSC ETT， 参数为ett_section_info_t*/
-	AM_EPG_EVT_EIT_DONE,   /**< 所有EIT接收完毕*/
-	AM_EPG_EVT_UPDATE_EVENTS,	/**< 通知接收到新的EIT events 数据，用于上层实现更新*/
-	AM_EPG_EVT_UPDATE_PROGRAM_AV,	/**< 节目音视频播放信息更新*/
-	AM_EPG_EVT_UPDATE_PROGRAM_NAME,	/**< 节目名更新*/
-	AM_EPG_EVT_UPDATE_TS,	/**< 节目信息更新*/
+	AM_EPG_EVT_NEW_PAT,    /**< New PAT received, parameter type is dvbpsi_pat_t*/
+	AM_EPG_EVT_NEW_PMT,    /**< New PMT received, parameter type is dvbpsi_pmt_t*/
+	AM_EPG_EVT_NEW_CAT,    /**< New CAT received, parameter type is dvbpsi_cat_t*/
+	AM_EPG_EVT_NEW_SDT,    /**< New SDT received, parameter type is dvbpsi_sdt_t*/
+	AM_EPG_EVT_NEW_NIT,    /**< New NIT received, parameter type is dvbpsi_nit_t*/
+	AM_EPG_EVT_NEW_TDT,    /**< New NIT received, parameter type is dvbpsi_tot_t*/
+	AM_EPG_EVT_NEW_EIT,    /**< New EIT received, parameter type is dvbpsi_eit_t*/
+	AM_EPG_EVT_NEW_STT,    /**< New ATSC STT received, parameter type is stt_section_info_t*/
+	AM_EPG_EVT_NEW_RRT,    /**< New ATSC RRT received, parameter type is rrt_section_info_t*/
+	AM_EPG_EVT_NEW_MGT,    /**< New ATSC MGT received, parameter type is mgt_section_info_t*/
+	AM_EPG_EVT_NEW_VCT,    /**< New ATSC VCT received, parameter type is vct_section_info_t*/
+	AM_EPG_EVT_NEW_PSIP_EIT,/**< New ATSC EIT received, parameter type is eit_section_info_t*/
+	AM_EPG_EVT_NEW_PSIP_ETT,/**< New ATSC ETT received, parameter type is ett_section_info_t*/
+	AM_EPG_EVT_EIT_DONE,   /**< All EIT received*/
+	AM_EPG_EVT_UPDATE_EVENTS,	/**< EIT received, update the application's event information*/
+	AM_EPG_EVT_UPDATE_PROGRAM_AV,	/**< Program's AV information is changed*/
+	AM_EPG_EVT_UPDATE_PROGRAM_NAME,	/**< Program name is changed*/
+	AM_EPG_EVT_UPDATE_TS,	/**< TS information is updated*/
 	AM_EPG_EVT_END
 };
 
-/**\brief 模式操作*/
+/**\brief EPG scanner's operation mode*/
 enum AM_EPG_ModeOp
 {
-	AM_EPG_MODE_OP_ADD, 	 /**< 增加一个或几个监控模式*/
-	AM_EPG_MODE_OP_REMOVE,	 /**< 取消一个或几个监控模式*/
-	AM_EPG_MODE_OP_SET,		 /**< 设置EPG监控模式*/
+	AM_EPG_MODE_OP_ADD, 	 /**< Add new scanning tables*/
+	AM_EPG_MODE_OP_REMOVE,	 /**< Remove scanning tables*/
+	AM_EPG_MODE_OP_SET,      /**< Reset the scanning tables*/
 };
 
-/**EPG搜索的Section表类型*/
+/**EPG Table type*/
 enum AM_EPG_TAB
 {
 	AM_EPG_TAB_PAT,		/**<PAT*/
@@ -145,8 +145,8 @@ enum AM_EPG_TAB
 	AM_EPG_TAB_RRT,		/**<RRT*/
 	AM_EPG_TAB_MGT,		/**<MGT*/
 	AM_EPG_TAB_VCT,		/**<VCT*/
-	AM_EPG_TAB_PSIP_EIT,	/**<PSIPEIT*/
-	AM_EPG_TAB_PSIP_ETT,	/**<PSIPETT*/
+	AM_EPG_TAB_PSIP_EIT,	/**<PSIP EIT*/
+	AM_EPG_TAB_PSIP_ETT,	/**<PSIP ETT*/
 	AM_EPG_TAB_MAX
 };
 
@@ -157,14 +157,14 @@ typedef void (*AM_EPG_PMT_UpdateCB_t) (AM_EPG_Handle_t handle, dvbpsi_pmt_t *pmt
 typedef void (*AM_EPG_TAB_UpdateCB_t) (AM_EPG_Handle_t handle, int type, void *tables, void *user_data);
 
 
-/**\brief EPG创建参数*/
+/**\brief EPG scanner's create parameters*/
 typedef struct
 {
-	int fend_dev;	/**< 前端设备号*/
-	int dmx_dev;	/**< DMX设备号*/
-	int source;	/*< 源标识*/
-	sqlite3	*hdb;	/**< 数据库句柄，可用于预约播放查询等数据库操作*/
-	char text_langs[128]; /**< */
+	int fend_dev;	/**< Frontend device's number*/
+	int dmx_dev;	/**< Demux device's number*/
+	int source;	/**< TS input source*/
+	sqlite3	*hdb;	/**< Database handle*/
+	char text_langs[128];
 }AM_EPG_CreatePara_t;
 
 struct AM_EPG_Event_s {
@@ -192,130 +192,116 @@ struct AM_EPG_Event_s {
  * Function prototypes  
  ***************************************************************************/
  
-/**\brief 在指定源上创建一个EPG监控
- * \param [in] para 创建参数
- * \param [out] handle 返回句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Create a new EPG scanner
+ * \param [in] para Create parameters
+ * \param [out] handle Return the scanner's handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, AM_EPG_Handle_t *handle);
 
-/**\brief 销毀一个EPG监控
- * \param handle 句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Release a EPG scanner
+ * \param handle EPG scanner handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EPG_Destroy(AM_EPG_Handle_t handle);
 
-/**\brief 设置EPG监控模式
- * \param handle 句柄
- * \param op	修改操作，见AM_EPG_ModeOp
- * \param mode 监控模式，见AM_EPG_Mode
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Set the EPG scanner's working mode
+ * \param handle EPG scanner handle
+ * \param op Operation type
+ * \param mode EPG scanning mode
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
-extern AM_ErrorCode_t AM_EPG_ChangeMode(AM_EPG_Handle_t handle, int op, int mode);
+extern AM_ErrorCode_t AM_EPG_ChangeMode(AM_EPG_Handle_t handle, enum AM_EPG_ModeOp op, enum AM_EPG_Mode mode);
 
-/**\brief 设置当前监控的service，监控其PMT和EIT actual pf
- * \param handle 句柄
- * \param db_srv_id	需要监控的service的数据库索引
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Set the current service, scan PMT and EIT actual pf
+ * \param handle EPG scanner handle
+ * \param db_srv_id Service's database record index
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EPG_MonitorService(AM_EPG_Handle_t handle, int db_srv_id);
 
-/**\brief 设置EPG PF 自动更新间隔
- * \param handle 句柄
- * \param distance 检查间隔,ms单位
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Set the interval time of EIT PF scanning
+ * \param handle EPG scanner handle
+ * \param distance Interval time in milliseconds
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EPG_SetEITPFCheckDistance(AM_EPG_Handle_t handle, int distance);
 
-/**\brief 设置EPG Schedule 自动更新间隔
- * \param handle 句柄
- * \param distance 检查间隔,ms单位, 为0时将一直更新
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Set the interval time of EIT schedule scanning
+ * \param handle EPG scanner handle
+ * \param distance Interval time in milliseconds
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EPG_SetEITScheCheckDistance(AM_EPG_Handle_t handle, int distance);
 
 
-/**\brief 字符编码转换
- * \param [in] in_code 需要转换的字符数据
- * \param in_len 需要转换的字符数据长度
- * \param [out] out_code 转换后的字符数据
- * \param out_len 输出字符缓冲区大小
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Convert the string's character encoding type
+ * \param [in] in_code Input characters buffer
+ * \param in_len Input characters length in bytes
+ * \param [out] out_code Output character buffer
+ * \param out_len Output buffer's size
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EPG_ConvertCode(char *in_code,int in_len,char *out_code,int out_len);
 
-/**\brief 获得当前UTC时间
- * \param [out] utc_time UTC时间,单位为秒
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Get the current UTC time received from EPG
+ * \param [out] utc_time UTC time
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EPG_GetUTCTime(int *utc_time);
 
-/**\brief 计算本地时间
- * \param utc_time UTC时间，单位为秒
- * \param [out] local_time 本地时间,单位为秒
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Convert the UTC time to local time
+ * \param utc_time UTC time
+ * \param [out] local_time Local time
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EPG_UTCToLocal(int utc_time, int *local_time);
 
-/**\brief 计算UTC时间
- * \param local_time 本地时间,单位为秒
- * \param [out] utc_time UTC时间，单位为秒
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Convert the local time to UTC time
+ * \param local_time Local time
+ * \param [out] utc_time UTC time
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EPG_LocalToUTC(int local_time, int *utc_time);
 
-/**\brief 设置时区偏移值
- * \param offset 偏移值,单位为秒
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Set the local time offset from the UTC time
+ * \param offset Time offset
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EPG_SetLocalOffset(int offset);
 
-/**\brief 预约一个EPG事件，用于预约播放
- * \param handle EPG句柄
- * \param db_evt_id 事件的数据库索引
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Subscribe an event
+ * \param handle EPG EPG scanner
+ * \param db_evt_id The event's database record index
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EPG_SubscribeEvent(AM_EPG_Handle_t handle, int db_evt_id);
 
-/**\brief 设置用户数据
- * \param handle EPG句柄
- * \param [in] user_data 用户数据
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Set the user defined data to the EPG scanner handle
+ * \param handle EPG scanner handle
+ * \param [in] user_data User defined data
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EPG_SetUserData(AM_EPG_Handle_t handle, void *user_data);
 
-/**\brief 取得用户数据
- * \param handle Scan句柄
- * \param [in] user_data 用户数据
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_epg.h)
+/**\brief Get the user defined data from the EPG scanner handle
+ * \param handle EPG scanner handle
+ * \param [out] user_data Return the user defined data
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EPG_GetUserData(AM_EPG_Handle_t handle, void **user_data);
 

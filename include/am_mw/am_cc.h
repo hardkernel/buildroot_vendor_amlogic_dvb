@@ -2,7 +2,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file am_cc.h
- * \brief CC模块头文件
+ * \brief Close caption parser module
  *
  * \author Xia Lei Peng <leipeng.xia@amlogic.com>
  * \date 2011-12-27: create the document
@@ -25,15 +25,15 @@ extern "C"
 /****************************************************************************
  * Error code definitions
  ****************************************************************************/
-/**\brief CC 模块错误代码*/
+/**\brief Error code of close caption parser*/
 enum AM_CC_ErrorCode
 {
 	AM_CC_ERROR_BASE=AM_ERROR_BASE(AM_MOD_CC),
-	AM_CC_ERR_INVALID_PARAM,   	/**< 参数无效*/
-	AM_CC_ERR_SYS,				/**< 系统错误*/
-	AM_CC_ERR_NO_MEM,
-	AM_CC_ERR_LIBZVBI,
-	AM_CC_ERR_BUSY,
+	AM_CC_ERR_INVALID_PARAM,   	/**< Invalid parameter*/
+	AM_CC_ERR_SYS,                  /**< System error*/
+	AM_CC_ERR_NO_MEM,               /**< Not enough memory*/
+	AM_CC_ERR_LIBZVBI,              /**< libzvbi error*/
+	AM_CC_ERR_BUSY,                 /**< Device is busy*/
 	AM_CC_ERR_END
 };
 
@@ -42,13 +42,13 @@ enum AM_CC_ErrorCode
  * Type definitions
  ***************************************************************************/
 
-/**CC句柄*/
+/**Close caption parser's handle*/
 typedef void* AM_CC_Handle_t;
-/**CC绘制参数*/
+/**Draw parameter of close caption*/
 typedef struct AM_CC_DrawPara AM_CC_DrawPara_t;
-/**CC 开始绘制回调*/
+/**Callback function of beginning of drawing*/
 typedef void (*AM_CC_DrawBegin_t)(AM_CC_Handle_t handle, AM_CC_DrawPara_t *draw_para);
-/**CC 绘制完成回调*/
+/**Callback function of end of drawing*/
 typedef void (*AM_CC_DrawEnd_t)(AM_CC_Handle_t handle, AM_CC_DrawPara_t *draw_para);
 
 typedef enum {
@@ -116,7 +116,7 @@ typedef enum
 	AM_CC_CAPTION_MAX
 }AM_CC_CaptionMode_t;
 
-/**\brief 字体大小定义，详见 CEA-708**/
+/**\brief Font size, see details in CEA-708**/
 typedef enum
 {
 	AM_CC_FONTSIZE_DEFAULT,
@@ -126,7 +126,7 @@ typedef enum
 	AM_CC_FONTSIZE_MAX
 }AM_CC_FontSize_t;
 
-/**\brief 字体风格, 详见 CEA-708*/
+/**\brief Font style, see details in CEA-708*/
 typedef enum
 {
 	AM_CC_FONTSTYLE_DEFAULT,
@@ -140,7 +140,7 @@ typedef enum
 	AM_CC_FONTSTYLE_MAX
 }AM_CC_FontStyle_t;
 
-/**\brief 颜色透明性，详见 CEA-708**/
+/**\brief Color opacity, see details in CEA-708**/
 typedef enum
 {
 	AM_CC_OPACITY_DEFAULT,
@@ -151,7 +151,7 @@ typedef enum
 	AM_CC_OPACITY_MAX
 }AM_CC_Opacity_t;
 
-/**\brief 颜色定义，目前仅支持8种，详见 CEA-708-D**/
+/**\brief Color, see details in CEA-708-D**/
 typedef enum
 {
 	AM_CC_COLOR_DEFAULT,
@@ -166,40 +166,40 @@ typedef enum
 	AM_CC_COLOR_MAX
 }AM_CC_Color_t;
 
-/**CC绘制参数*/
+/**Close caption drawing parameters*/
 struct AM_CC_DrawPara
 {
-	int caption_width;   /**< 字幕宽度*/
-	int caption_height;  /**< 字幕高度*/
+	int caption_width;   /**< Width of the caption*/
+	int caption_height;  /**< Height of the caption*/
 };
 
-/**\brief  CC 用户可覆盖选项*/
+/**\brief User options of close caption*/
 typedef struct
 {
-	AM_CC_FontSize_t        font_size;	/**< 字体大小*/
-	AM_CC_FontStyle_t       font_style;	/**< 字体风格*/
-	AM_CC_Color_t           fg_color;	/**< 前景色*/
-	AM_CC_Opacity_t         fg_opacity;	/**< 前景色透明性*/
-	AM_CC_Color_t           bg_color;	/**< 背景色*/
-	AM_CC_Opacity_t         bg_opacity;	/**< 背景色透明性*/
+	AM_CC_FontSize_t        font_size;	/**< Font size*/
+	AM_CC_FontStyle_t       font_style;	/**< Font style*/
+	AM_CC_Color_t           fg_color;	/**< Frontground color*/
+	AM_CC_Opacity_t         fg_opacity;	/**< Frontground opacity*/
+	AM_CC_Color_t           bg_color;	/**< Background color*/
+	AM_CC_Opacity_t         bg_opacity;	/**< Background opacity*/
 }AM_CC_UserOptions_t;
 
-/**\brief CC创建参数*/
+/**\brief Close caption parser's create parameters*/
 typedef struct
 {
-	AM_CC_DrawBegin_t   draw_begin;    /**< 开始绘制CC回调*/
-	AM_CC_DrawEnd_t     draw_end;      /**< CC绘制结束回调*/
-	uint8_t            *bmp_buffer;    /**< 绘制位图缓冲区*/
-	int                 pitch;         /**< 缓冲区行间隔*/
-	int                 bypass_cc_enable; /**< CC数据bypass标志*/
-	void               *user_data;     /**< 用户数据*/
+	AM_CC_DrawBegin_t   draw_begin;    /**< Drawing beginning callback*/
+	AM_CC_DrawEnd_t     draw_end;      /**< Drawing end callback*/
+	uint8_t            *bmp_buffer;    /**< Drawing buffer*/
+	int                 pitch;         /**< Line pitch of the drawing buffer*/
+	int                 bypass_cc_enable; /**< Bypass CC data flag*/
+	void               *user_data;     /**< User defined data*/
 }AM_CC_CreatePara_t;
 
-/**\brief CC启动参数*/
+/**\brief Close caption parser start parameter*/
 typedef struct
 {
-	AM_CC_CaptionMode_t    caption;      /**< 模式*/
-	AM_CC_UserOptions_t    user_options; /**< 用户设置选项*/
+	AM_CC_CaptionMode_t    caption;      /**< Mode*/
+	AM_CC_UserOptions_t    user_options; /**< User options*/
 }AM_CC_StartPara_t;
 
 
@@ -207,54 +207,47 @@ typedef struct
  * Function prototypes  
  ***************************************************************************/
 
-/**\brief 创建CC
- * \param [in] para 创建参数
- * \param [out] handle 返回句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_cc.h)
+/**\brief Create a new close caption parser
+ * \param [in] para Create parameters
+ * \param [out] handle Return the parser's handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_CC_Create(AM_CC_CreatePara_t *para, AM_CC_Handle_t *handle);
 
-/**\brief 销毁CC
- * \param [out] handle CC句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_cc.h)
+/**\brief Release a close caption parser
+ * \param [out] handle Close caption parser's handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_CC_Destroy(AM_CC_Handle_t handle);
 
-/**\brief 开始CC数据接收处理
- * \param handle CC handle
-  * \param [in] para 启动参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_cc.h)
+/**\brief Start parsing the close caption data
+ * \param handle Close caption parser's handle
+ * \param [in] para Start parameters
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_CC_Start(AM_CC_Handle_t handle, AM_CC_StartPara_t *para);
 
-/**\brief 停止CC处理
- * \param handle CC handle
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_cc.h)
+/**\brief Stop close caption parsing
+ * \param handle Close caption parser's handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_CC_Stop(AM_CC_Handle_t handle);
 
-/**\brief 设置CC用户选项，用户选项可以覆盖运营商的设置,这些options由应用保存管理
- * \param handle CC handle
- * \param [in] options 选项集
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_cc.h)
+/**\brief Set the user options of the close caption
+ * \param handle Close caption parser's handle
+ * \param [in] options User options
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_CC_SetUserOptions(AM_CC_Handle_t handle, AM_CC_UserOptions_t *options);
 
-/**\brief 获取用户数据
- * \param handle CC 句柄
- * \return [out] 用户数据
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_cc.h)
+/**\brief Get the user defined data of the close caption parser
+ * \param handle Close caption parser's handle
+ * \return The user defined data
  */
 extern void *AM_CC_GetUserData(AM_CC_Handle_t handle);
 

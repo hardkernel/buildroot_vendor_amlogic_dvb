@@ -2,8 +2,11 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file
- * \brief 驱动模块事件接口
- *事件是替代Callback函数的一种异步触发机制。每一个事件上可以同时注册多个回调函数。
+ * \brief Driver event module
+ *
+ * Event is driver asyncronized message callback mechanism.
+ * User can register multiply callback functions in one event.
+ *
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2010-09-10: create the document
  ***************************************************************************/
@@ -22,19 +25,18 @@ extern "C"
  * Macro definitions
  ***************************************************************************/
 
-/**\brief 各模块事件类型起始值*/
 #define AM_EVT_TYPE_BASE(no)    ((no)<<24)
 
 /****************************************************************************
  * Error code definitions
  ****************************************************************************/
 
-/**\brief 事件模块错误代码*/
+/**\brief Error code of the event module*/
 enum AM_EVT_ErrorCode
 {
 	AM_EVT_ERROR_BASE=AM_ERROR_BASE(AM_MOD_EVT),
-	AM_EVT_ERR_NO_MEM,                  /**< 空闲内存不足*/
-	AM_EVT_ERR_NOT_SUBSCRIBED,          /**< 事件还没有注册*/
+	AM_EVT_ERR_NO_MEM,                  /**< Not enough memory*/
+	AM_EVT_ERR_NOT_SUBSCRIBED,          /**< The event is not subscribed*/
 	AM_EVT_ERR_END
 };
 
@@ -42,47 +44,46 @@ enum AM_EVT_ErrorCode
  * Type definitions
  ***************************************************************************/
 
-/**\brief 事件回调函数*/
+/**\brief Event callback function
+ * \a dev_no The device number.
+ * \a event_type The event type.
+ * \a param The event callback's parameter.
+ * \a data User defined data registered when event subscribed.
+ */
 typedef void (*AM_EVT_Callback_t)(long dev_no, int event_type, void *param, void *data);
 
 /****************************************************************************
  * Function prototypes  
  ***************************************************************************/
 
-/**\brief 注册一个事件回调函数
- * \param dev_no 回调函数对应的设备ID
- * \param event_type 回调函数对应的事件类型
- * \param cb 回调函数指针
- * \param data 传递给回调函数的用户定义参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码
+/**\brief Subscribe an event
+ * \param dev_no Device number generated the event
+ * \param event_type Event type
+ * \param cb Callback function's pointer
+ * \param data User defined parameter of the callback function
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EVT_Subscribe(long dev_no, int event_type, AM_EVT_Callback_t cb, void *data);
 
-/**\brief 反注册一个事件回调函数
- * \param dev_no 回调函数对应的设备ID
- * \param event_type 回调函数对应的事件类型
- * \param cb 回调函数指针
- * \param data 传递给回调函数的用户定义参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码
+/**\brief Unsubscribe an event
+ * \param dev_no Device number generated the event
+ * \param event_type Event type
+ * \param cb Callback function's pointer
+ * \param data User defined parameter of the callback function
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_EVT_Unsubscribe(long dev_no, int event_type, AM_EVT_Callback_t cb, void *data);
 
-/**\brief 触发一个事件
- * \param dev_no 产生事件的设备ID
- * \param event_type 产生事件的类型
- * \param[in] param 事件参数
+/**\brief Signal an event occured
+ * \param dev_no The device number generate the event
+ * \param event_type Event type
+ * \param[in] param Parameter of the event
  */
 extern AM_ErrorCode_t AM_EVT_Signal(long dev_no, int event_type, void *param);
 
-/*
-*/
 extern AM_ErrorCode_t AM_EVT_Init();
-/*
-*/
 extern AM_ErrorCode_t AM_EVT_Destory();
 
 #ifdef __cplusplus

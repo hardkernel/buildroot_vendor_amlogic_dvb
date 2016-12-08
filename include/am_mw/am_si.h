@@ -2,7 +2,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file am_si.h
- * \brief SI Decoder 模块头文件
+ * \brief SI Decoder module
  *
  * \author Xia Lei Peng <leipeng.xia@amlogic.com>
  * \date 2010-10-14: create the document
@@ -43,7 +43,7 @@ extern "C"
  * Macro definitions
  ***************************************************************************/
 
-/*PID定义*/
+/**\brief PID define*/
 #define AM_SI_PID_PAT	(0x0)
 #define AM_SI_PID_CAT	(0x1)
 #define AM_SI_PID_NIT	(0x10)
@@ -52,10 +52,10 @@ extern "C"
 #define AM_SI_PID_EIT	(0x12)
 #define AM_SI_PID_TDT	(0x14)
 #define AM_SI_PID_TOT	(0x14)
-/*ATSC PSIP base pid*/
+/**\brief ATSC PSIP base pid*/
 #define AM_SI_ATSC_BASE_PID	ATSC_BASE_PID
 
-/*Table ID定义*/
+/**\brief Table ID define*/
 #define AM_SI_TID_PAT			(0x0)
 #define AM_SI_TID_CAT			(0x1)
 #define AM_SI_TID_PMT			(0x2)
@@ -71,7 +71,7 @@ extern "C"
 #define AM_SI_TID_TDT			(0x70)
 #define AM_SI_TID_TOT			(0x73)
 
-/* atsc table */
+/**\brief  atsc table */
 #define AM_SI_TID_PSIP_MGT			ATSC_PSIP_MGT_TID
 #define AM_SI_TID_PSIP_TVCT			ATSC_PSIP_TVCT_TID
 #define AM_SI_TID_PSIP_CVCT			ATSC_PSIP_CVCT_TID
@@ -82,9 +82,8 @@ extern "C"
 #define AM_SI_TID_PSIP_DCCT			ATSC_PSIP_DCCT_TID
 #define AM_SI_TID_PSIP_DCCSCT		ATSC_PSIP_DCCSCT_TID
 
-/*descriptor tag 定义*/
-
-/*ISO/IEC 13818-1*/
+/**\brief descriptor tag define*/
+/**\brief ISO/IEC 13818-1*/
 #define AM_SI_DESCR_VIDEO_STREAM			(0x02)
 #define AM_SI_DESCR_AUDIO_STREAM			(0x03)
 #define AM_SI_DESCR_HIERARCHY				(0x04)
@@ -100,7 +99,7 @@ extern "C"
 #define AM_SI_DESCR_MAX_BITRATE				(0x0e)
 #define AM_SI_DESCR_PRIVATE_DATA_INDICATOR	(0x0f)
 
-/*EN 300 468*/
+/**\brief EN 300 468*/
 #define AM_SI_DESCR_NETWORK_NAME			(0x40)
 #define AM_SI_DESCR_SERVICE_LIST			(0x41)
 #define AM_SI_DESCR_STUFFING				(0x42)
@@ -143,7 +142,7 @@ extern "C"
 #define AM_SI_DESCR_LCN_87                      (0x87)
 #define AM_SI_DESCR_LCN_88                      (0x88)
 
-/*ATSC Table types*/
+/**\brief ATSC Table types*/
 #define AM_SI_ATSC_TT_CURRENT_TVCT	0x0
 #define AM_SI_ATSC_TT_NEXT_TVCT		0x1
 #define AM_SI_ATSC_TT_CURRENT_CVCT	0x2
@@ -155,21 +154,21 @@ extern "C"
 #define AM_SI_ATSC_TT_RRT_RR1		0x301
 #define AM_SI_ATSC_TT_DCCT_ID0		0x1400
 
-/*ATSC descriptor*/
+/**\brief ATSC descriptor*/
 #define AM_SI_DESCR_SERVICE_LOCATION		(0xA1)
 #define AM_SI_DESCR_CONTENT_ADVISORY		(0x87)
 
-/**\brief 遍历SI提供的链表开始*/
+/**\brief  the head of list provided by SI */
 #define AM_SI_LIST_BEGIN(l, v) for ((v)=(l); (v)!=NULL; (v)=(v)->p_next){
 
-/**\brief 遍历SI提供的链表结束*/
+/**\brief the hail of list provided by SI*/
 #define AM_SI_LIST_END() }
 
-/*单个Program最大支持的音频个数*/
+/**\brief Maximum number of single Program supported audio*/
 #define AM_SI_MAX_AUD_CNT 32
-
+/**\brief Maximum number of single Program supported subtitle*/
 #define AM_SI_MAX_SUB_CNT 32
-
+/**\brief Maximum number of single Program supported teletext*/
 #define AM_SI_MAX_TTX_CNT 32
 
 /****************************************************************************
@@ -177,18 +176,18 @@ extern "C"
  ***************************************************************************/
 typedef void* AM_SI_Handle_t;
 
-/**\brief SI模块错误代码*/
+/**\brief Error code of the si module*/
 enum AM_SI_ErrorCode
 {
 	AM_SI_ERROR_BASE=AM_ERROR_BASE(AM_MOD_SI),
-	AM_SI_ERR_INVALID_HANDLE,          /**< 句柄无效*/
-	AM_SI_ERR_NOT_SUPPORTED,           /**< 不支持的操作*/
-	AM_SI_ERR_NO_MEM,                  /**< 空闲内存不足*/
-	AM_SI_ERR_INVALID_SECTION_DATA,		   /**< section数据错误*/
+	AM_SI_ERR_INVALID_HANDLE,          /**< Invalid handle*/
+	AM_SI_ERR_NOT_SUPPORTED,           /**< not surport action*/
+	AM_SI_ERR_NO_MEM,                  /**< out of native memory*/
+	AM_SI_ERR_INVALID_SECTION_DATA,		   /**< data error of the section*/
 	AM_SI_ERR_END
 };
 
-/**\brief section头定义*/
+/**\brief section head define*/
 typedef struct 
 {
 	uint8_t		table_id;			/**< table_id*/
@@ -196,166 +195,167 @@ typedef struct
 	uint8_t		private_indicator;	/**< private_indicator*/
 	uint16_t	length;				/**< section_length*/
 	uint16_t	extension;			/**< table_id_extension*/
-									/**< transport_stream_id for a
-                                             PAT section */
     uint8_t		version;			/**< version_number*/
     uint8_t		cur_next_indicator;	/**< current_next_indicator*/
     uint8_t		sec_num;			/**< section_number*/
     uint8_t		last_sec_num;		/**< last_section_number*/
 }AM_SI_SectionHeader_t;
 
-/**\brief SI模块错误代码*/
+/**\brief audio exten info*/
 enum AM_Audio_Exten
 {
-	AM_Audio_AC3MAIN=1,	/*ac3 main service*/
+	AM_Audio_AC3MAIN=1,	/**<ac3 main service*/
 	AM_Audio_AC3ASVC,   /**< ac3 ASVC,associated service*/
 	AM_Audio_NOUSE
 };
-/**\brief ES流中描述的音视频数据*/
+/**\brief audio info type,audio info in the ES stream,*/
 typedef struct
 {
-	int		audio_count;
+	int		audio_count;		/**<ES stream Contains audio count*/
 	struct
 	{
 		int		pid;	/**< audio PID*/
 		int		fmt;	/**< audio format*/
 		char	lang[10];	/**< audio language*/
 		int 	audio_type;   /**<audio type*/
-		/*audio_exten is 32 bit,31:24 bit: exten type,the value is enum AM_Audio_Exten vaue*/
-		/*23:16:mainid or asvc id,8 bit*/
-		/*15:0 bit:no use*/
-		int 	audio_exten;/*now used to save ac3 mainid or asvc*/
-	}audios[AM_SI_MAX_AUD_CNT];
+		int 	audio_exten;/**<now used to save ac3 mainid or asvc
+												audio_exten is 32 bit
+												31:24 bit: exten type,the value is enum AM_Audio_Exten vaue
+												23:16:mainid or asvc id,8 bit
+												15:0 bit:no use*/
+	}audios[AM_SI_MAX_AUD_CNT];/**<audio info*/
 }AM_SI_AudioInfo_t;
-
+/**\brief subtitle info type*/
 typedef struct
 {
-	int subtitle_count;
+	int subtitle_count;	/**<subtitle count*/
 	struct
 	{
-		int pid;
-		int type;
-		int comp_page_id;
-		int anci_page_id;
-		char lang[16];
-	}subtitles[AM_SI_MAX_SUB_CNT];
+		int pid;					/**<subtitle stream pid*/
+		int type;					/**<subtitle type*/
+		int comp_page_id; /**<subtitle composition page id*/
+		int anci_page_id; /**<subtitle ancillary page id*/
+		char lang[16];		/**<the language of subtitle*/
+	}subtitles[AM_SI_MAX_SUB_CNT];/**<subtitle info*/
 }AM_SI_SubtitleInfo_t;
-
+/**\brief teletext info type*/
 typedef struct
 {
-	int teletext_count;
+	int teletext_count;	/**<teletext count*/
 	struct
 	{
-		int pid;
-		int type;
-		int magazine_no;
-		int page_no;
-		char lang[16];
-	}teletexts[AM_SI_MAX_TTX_CNT];
+		int pid;					/**<teletext stream pid*/
+		int type;					/**<teletext type*/
+		int magazine_no;	/**<teletext magazine number*/
+		int page_no;			/**<teletext page number*/
+		char lang[16];		/**<the language of teletext*/
+	}teletexts[AM_SI_MAX_TTX_CNT];/**<teletext info*/
 }AM_SI_TeletextInfo_t;
 
 /****************************************************************************
  * Function prototypes  
  ***************************************************************************/
 
-/**\brief 创建一个SI解析器
- * \param [out] handle 返回SI解析句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_si.h)
+/**\brief creat a parser of parse si
+ * \param [out] handle the handle of parser
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_Create(AM_SI_Handle_t *handle);
 
-/**\brief 销毀一个SI解析器
- * \param handle SI解析句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_si.h)
+/**\brief destroy a parser of parse si
+ * \param handle the handle of parser
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_Destroy(AM_SI_Handle_t handle);
 
-/**\brief 解析一个section,并返回解析数据
- * 支持的表(相应返回结构):CAT(dvbpsi_cat_t) PAT(dvbpsi_pat_t) PMT(dvbpsi_pmt_t) 
- * SDT(dvbpsi_sdt_t) EIT(dvbpsi_eit_t) TOT(dvbpsi_tot_t) NIT(dvbpsi_nit_t).
- *
- * e.g.解析一个PAT section:
+/**\brief parse a section,surport si table:
+ * CAT(dvbpsi_cat_t) PAT(dvbpsi_pat_t) PMT(dvbpsi_pmt_t)
+ * SDT(dvbpsi_sdt_t) EIT(dvbpsi_eit_t) TOT(dvbpsi_tot_t)
+ *  NIT(dvbpsi_nit_t).
+ * e.g. parse a PAT section:
  * 	dvbpsi_pat_t *pat_sec;
  * 	AM_SI_DecodeSection(hSI, AM_SI_PID_PAT, pat_buf, len, &pat_sec);
  *
- * \param handle SI解析句柄
+ * \param handle the handle of parser
  * \param pid section pid
- * \param [in] buf section原始数据
- * \param len section原始数据长度
- * \param [out] sec 返回section解析后的数据
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_si.h)
+ * \param [in] buf section original data
+ * \param len section original data length
+ * \param [out] sec parsered section data
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, uint8_t *buf, uint16_t len, void **sec);
 
-/**\brief 释放一个从 AM_SI_DecodeSection()返回的section
- * \param handle SI解析句柄
- * \param table_id 表ID
- * \param [in] sec 需要释放的section
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_si.h)
+/**\brief release a section that got from AM_SI_DecodeSection()
+ * \param handle the handle of parser
+ * \param table_id table id
+ * \param [in] sec release section
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_ReleaseSection(AM_SI_Handle_t handle, uint8_t table_id, void *sec);
 
-/**\brief 获得一个section头信息
- * \param handle SI解析句柄
- * \param [in] buf section原始数据
- * \param len section原始数据长度
- * \param [out] sec_header section header信息
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_si.h)
+/**\brief get the head info of a section
+ * \param handle the handle of parser
+ * \param [in] buf section original data
+ * \param len section original data length
+ * \param [out] sec_header store parsered section header info
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_GetSectionHeader(AM_SI_Handle_t handle, uint8_t *buf, uint16_t len, AM_SI_SectionHeader_t *sec_header);
 
-/**\brief 设置默认的DVB编码方式，当前端流未按照DVB标准，即第一个
- * 字符没有指定编码方式时，可以调用该函数来指定一个强制转换的编码。
- * \param [in] coding 默认进行强制转换的字符编码方式,如GB2312，BIG5等.
- * \return
+/**\brief set default text code,you can call this function when the first
+ * character does not specify the encoding method.
+ * \param [in] coding e.g GB2312 、BIG5 and so on.
+ * \return none
  */
 extern void AM_SI_SetDefaultDVBTextCoding(const char *coding);
 
-/**\brief 按DVB标准将输入字符转成UTF-8编码
- * \param [in] in_code 需要转换的字符数据
- * \param in_len 需要转换的字符数据长度
- * \param [out] out_code 转换后的字符数据
- * \param out_len 输出字符缓冲区大小
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_si.h)
+/**\brief convert text to UTF-8 code text
+ * \param [in] in_code Character data that needs to be converted
+ * \param in_len the lenght of in_code
+ * \param [out] out_code Converted character data
+ * \param out_len out_code buf length
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,int out_len);
 
-/**\brief 从一个ES流中提取音视频
- * \param [in] es ES流
- * \param [out] vid 提取出的视频PID
- * \param [out] vfmt 提取出的视频压缩格式
- * \param [out] aud_info 提取出的音频数据
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_si.h)
+/**\brief get audio and video info from ES stream
+ * \param [in] es ES stream
+ * \param [out] vid video PID
+ * \param [out] vfmt video format
+ * \param [out] aud_info audio info
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info);
 
-/**\brief 按ATSC标准从一个ATSC visual channel中提取音视频
- * \param [in] vcinfo 频道信息
- * \param [out] vid 提取出的视频PID
- * \param [out] vfmt 提取出的视频压缩格式
- * \param [out] aud_info 提取出的音频数据
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_si.h)
+/**\brief Extract audio and video from a visual channel ATSC according to ATSC standard
+ * \param [in] vcinfo Channel information
+ * \param [out] vid video PID
+ * \param [out] vfmt video format
+ * \param [out] aud_info audio info
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_ExtractAVFromATSCVC(vct_channel_info_t *vcinfo, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info);
-
+/**\brief get subtitle info from ES stream
+ * \param [in] es ES stream
+ * \param [out] sub_info subtitle info
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
 extern AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_SubtitleInfo_t *sub_info);
-
+/**\brief get Teletext info from ES stream
+ * \param [in] es ES stream
+ * \param [out] ttx_info Teletext info
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
 extern AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_TeletextInfo_t *ttx_info);
 
 #ifdef __cplusplus

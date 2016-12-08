@@ -2,7 +2,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file
- * \brief 音频输出模块
+ * \brief Audio output control module
  *
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2010-08-13: create the document
@@ -23,29 +23,29 @@ extern "C"
  * Macro definitions
  ***************************************************************************/
 
-#define AM_AOUT_VOLUME_MIN 0   /**< 最小音量值*/
-#define AM_AOUT_VOLUME_MAX 100 /**< 最大音量值*/
+#define AM_AOUT_VOLUME_MIN 0   /**< The minimum volumn value */
+#define AM_AOUT_VOLUME_MAX 100 /**< The maximum volumn value */
 
 /****************************************************************************
  * Error code definitions
  ****************************************************************************/
 
-/**\brief 音频输出模块错误代码*/
+/**\brief Error code of the audio output module */
 enum AM_AOUT_ErrorCode
 {
 	AM_AOUT_ERROR_BASE=AM_ERROR_BASE(AM_MOD_AOUT),
-	AM_AOUT_ERR_INVALID_DEV_NO,          /**< 设备号无效*/
-	AM_AOUT_ERR_BUSY,                    /**< 设备已经被打开*/
-	AM_AOUT_ERR_ILLEGAL_OP,              /**< 无效的操作*/
-	AM_AOUT_ERR_INVAL_ARG,               /**< 无效的参数*/
-	AM_AOUT_ERR_NOT_ALLOCATED,           /**< 设备没有分配*/
-	AM_AOUT_ERR_CANNOT_CREATE_THREAD,    /**< 无法创建线程*/
-	AM_AOUT_ERR_CANNOT_OPEN_DEV,         /**< 无法打开设备*/
-	AM_AOUT_ERR_CANNOT_OPEN_FILE,        /**< 无法打开文件*/
-	AM_AOUT_ERR_NOT_SUPPORTED,           /**< 不支持的操作*/
-	AM_AOUT_ERR_NO_MEM,                  /**< 空闲内存不足*/
-	AM_AOUT_ERR_TIMEOUT,                 /**< 等待设备数据超时*/
-	AM_AOUT_ERR_SYS,                     /**< 系统操作错误*/
+	AM_AOUT_ERR_INVALID_DEV_NO,          /**< Invalid audio output device number */
+	AM_AOUT_ERR_BUSY,                    /**< The device has already been openned */
+	AM_AOUT_ERR_ILLEGAL_OP,              /**< Illegal operation */
+	AM_AOUT_ERR_INVAL_ARG,               /**< Invalid argument */
+	AM_AOUT_ERR_NOT_ALLOCATED,           /**< The device has not been allocated */
+	AM_AOUT_ERR_CANNOT_CREATE_THREAD,    /**< Cannot create a new thread */
+	AM_AOUT_ERR_CANNOT_OPEN_DEV,         /**< Cannot open the device */
+	AM_AOUT_ERR_CANNOT_OPEN_FILE,        /**< Cannot open the file */
+	AM_AOUT_ERR_NOT_SUPPORTED,           /**< The operation is not supported */
+	AM_AOUT_ERR_NO_MEM,                  /**< Not enough memory */
+	AM_AOUT_ERR_TIMEOUT,                 /**< Timeout*/
+	AM_AOUT_ERR_SYS,                     /**< System error*/
 	AM_AOUT_ERR_END
 };
 
@@ -53,15 +53,15 @@ enum AM_AOUT_ErrorCode
  * Event type definitions
  ****************************************************************************/
 
-/**\brief 音频输出模块事件类型*/
+/**\brief Event type of the audio output module*/
 enum AM_AOUT_EventType
 {
 	AM_AOUT_EVT_BASE=AM_EVT_TYPE_BASE(AM_MOD_AOUT),
-	AM_AOUT_EVT_VOLUME_CHANGED,          /**< 音量改变，参数为改变后音量值(int 0~100)*/
-	AM_AOUT_EVT_MUTE_CHANGED,            /**< mute状态变化，参数为mute状态(AM_Bool_t)*/
-	AM_AOUT_EVT_OUTPUT_MODE_CHANGED,     /**< 音频输出模式发生变化，参数为新的模式类型(AM_AOUT_OutputMode_t)*/
-	AM_AOUT_EVT_PREGAIN_CHANGED,         /**< 预增益改变，参数为改变后的预增益值*/
-	AM_AOUT_EVT_PREMUTE_CHANGED,         /**< 预静音改变，参数为改变后的预静音值*/
+	AM_AOUT_EVT_VOLUME_CHANGED,          /**< Volumn has been changed，the parameter is the volumn value (int 0~100)*/
+	AM_AOUT_EVT_MUTE_CHANGED,            /**< Mute/Unmute status changed，the parameter is the new mute status (AM_Bool_t)*/
+	AM_AOUT_EVT_OUTPUT_MODE_CHANGED,     /**< Audio output mode changed，the parameter is the new mode (AM_AOUT_OutputMode_t)*/
+	AM_AOUT_EVT_PREGAIN_CHANGED,         /**< Pregain value changed，the parameter is the new pregain value*/
+	AM_AOUT_EVT_PREMUTE_CHANGED,         /**< Premute value changed, the parameter is the new premute value*/
 	AM_AOUT_EVT_END
 };
 
@@ -69,16 +69,16 @@ enum AM_AOUT_EventType
  * Type definitions
  ***************************************************************************/
 
-/**\brief 音频输出模式*/
+/**\brief Audio output mode*/
 typedef enum
 {
-	AM_AOUT_OUTPUT_STEREO,     /**< 立体声输出*/
-	AM_AOUT_OUTPUT_DUAL_LEFT,  /**< 两声道同时输出左声道*/
-	AM_AOUT_OUTPUT_DUAL_RIGHT, /**< 两声道同时输出右声道*/
-	AM_AOUT_OUTPUT_SWAP        /**< 交换左右声道*/
+	AM_AOUT_OUTPUT_STEREO,     /**< Stereo output*/
+	AM_AOUT_OUTPUT_DUAL_LEFT,  /**< Left audio output to dual channel*/
+	AM_AOUT_OUTPUT_DUAL_RIGHT, /**< Right audio output to dual channel*/
+	AM_AOUT_OUTPUT_SWAP        /**< Swap left and right channel*/
 } AM_AOUT_OutputMode_t;
 
-/**\brief 音频输出模块开启参数*/
+/**\brief Audio output device open parameters*/
 typedef struct
 {
 	int   foo;
@@ -88,110 +88,98 @@ typedef struct
  * Function prototypes  
  ***************************************************************************/
 
-/**\brief 打开音频输出设备
- * \param dev_no 音频输出设备号
- * \param[in] para 音频输出设备开启参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_aout.h)
+/**\brief Open an audio output device
+ * \param dev_no Audio output device number
+ * \param[in] para Audio output device open parameters
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AOUT_Open(int dev_no, const AM_AOUT_OpenPara_t *para);
 
-/**\brief 关闭音频输出设备
- * \param dev_no 音频输出设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_aout.h)
+/**\brief Close the audio output device
+ * \param dev_no Audio output device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AOUT_Close(int dev_no);
 
-/**\brief 设定音量(0~100)
- * \param dev_no 音频输出设备号
- * \param vol 音量值
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_aout.h)
+/**\brief Set the volumn of the audio output (0~100)
+ * \param dev_no Audio output device number
+ * \param vol Volumn number (0~100)
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AOUT_SetVolume(int dev_no, int vol);
 
-/**\brief 取得当前音量
- * \param dev_no 音频输出设备号
- * \param[out] vol 返回当前音量值
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_aout.h)
+/**\brief Get the current volumn of the audio output
+ * \param dev_no Audio output device number
+ * \param[out] vol Return the volumn value
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AOUT_GetVolume(int dev_no, int *vol);
 
-/**\brief 静音/取消静音
- * \param dev_no 音频输出设备号
- * \param mute AM_TRUE表示静音，AM_FALSE表示取消静音
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_aout.h)
+/**\brief Mute/unmute the audio output
+ * \param dev_no Audio output device number
+ * \param mute AM_TRUE to mute the output, AM_FALSE to unmute the output
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AOUT_SetMute(int dev_no, AM_Bool_t mute);
 
-/**\brief 取得当前静音状态
- * \param dev_no 音频输出设备号
- * \param[out] mute 返回当前静音状态
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_aout.h)
+/**\brief Get the current mute status of the audio
+ * \param dev_no Audio output device number
+ * \param[out] mute Return the mute status
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AOUT_GetMute(int dev_no, AM_Bool_t *mute);
 
-/**\brief 设定音频输出模式
- * \param dev_no 音频输出设备号
- * \param mode 音频输出模式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_aout.h)
+/**\brief Set the audio output mode
+ * \param dev_no Audio output device number
+ * \param mode New audio output mode
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AOUT_SetOutputMode(int dev_no, AM_AOUT_OutputMode_t mode);
 
-/**\brief 返回当前音频输出模式
- * \param dev_no 音频输出设备号
- * \param[out] mode 返回当前音频输出模式
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_aout.h)
+/**\brief Get the current audio output mode
+ * \param dev_no Audio output device number
+ * \param[out] mode Return the current audio output mode
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AOUT_GetOutputMode(int dev_no, AM_AOUT_OutputMode_t *mode);
 
-/**\brief 设定预增益
- * \param dev_no 音频输出设备号
- * \param gain 预增益值
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_aout.h)
+/**\brief Set the audio pregain value
+ * \param dev_no Audio output device number
+ * \param gain Pregain value
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AOUT_SetPreGain(int dev_no, float gain);
 
-/**\brief 取得当前预增益值
- * \param dev_no 音频输出设备号
- * \param[out] gain 返回当前预增益值
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_aout.h)
+/**\brief Get the current audio pregain value
+ * \param dev_no Audio output device number
+ * \param[out] gain Return the audio pregain value
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AOUT_GetPreGain(int dev_no, float *gain);
 
-/**\brief 预静音/取消预静音
- * \param dev_no 音频输出设备号
- * \param mute AM_TRUE表示静音，AM_FALSE表示取消静音
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_aout.h)
+/**\brief Set premute/preunmute status of the audio
+ * \param dev_no Audio output device number
+ * \param mute AM_TRUE means mute, AM_FALSE means unmute
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AOUT_SetPreMute(int dev_no, AM_Bool_t mute);
 
-/**\brief 取得当前预静音状态
- * \param dev_no 音频输出设备号
- * \param[out] mute 返回当前预静音状态
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_aout.h)
+/**\brief Get the current premute status of the audio
+ * \param dev_no Audio output device number
+ * \param[out] mute Return the current premute status
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_AOUT_GetPreMute(int dev_no, AM_Bool_t *mute);
 

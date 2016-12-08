@@ -2,7 +2,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file am_db.h
- * \brief 数据库模块头文件
+ * \brief Database module
  *
  * \author Xia Lei Peng <leipeng.xia@amlogic.com>
  * \date 2010-10-20: create the document
@@ -23,13 +23,13 @@ extern "C"
  * Macro definitions
  ***************************************************************************/
 
-/**\brief 单个源中最多包含的TS数目*/
+/**\brief Maximum TS number in one source*/
 #define AM_DB_MAX_TS_CNT_PER_SRC 100
 
-/**\brief 单个源中最多包含的service数目*/
+/**\brief Maximum service number in one source*/
 #define AM_DB_MAX_SRV_CNT_PER_SRC 1000
 
-/**\brief 节目名称最大长度定义*/
+/**\brief Maximum service name length*/
 #define AM_DB_MAX_SRV_NAME_LEN 64
 
 #define AM_DB_HANDLE_PREPARE(hdb)	\
@@ -43,15 +43,15 @@ extern "C"
  * Error code definitions
  ****************************************************************************/
 
-/**\brief 数据库模块错误代码*/
+/**\brief Error code of the databasemodule*/
 enum AM_DB_ErrorCode
 {
 	AM_DB_ERROR_BASE=AM_ERROR_BASE(AM_MOD_DB),
-	AM_DB_ERR_OPEN_DB_FAILED,    		/**< 数据库打开失败*/
-	AM_DB_ERR_CREATE_TABLE_FAILED,    	/**< 表创建失败*/
-	AM_DB_ERR_NO_MEM,					/**< 空闲内存不足*/
-	AM_DB_ERR_INVALID_PARAM,			/**< 参数不正确*/
-	AM_DB_ERR_SELECT_FAILED,			/**< 查询失败*/
+	AM_DB_ERR_OPEN_DB_FAILED,    		/**< Open the database failed*/
+	AM_DB_ERR_CREATE_TABLE_FAILED,    	/**< Create table failed*/
+	AM_DB_ERR_NO_MEM,                       /**< Not enough memory*/
+	AM_DB_ERR_INVALID_PARAM,                /**< Invalid parameter*/
+	AM_DB_ERR_SELECT_FAILED,                /**< Select failed*/
 	AM_DB_ERR_END
 };
 
@@ -64,104 +64,98 @@ enum AM_DB_ErrorCode
  * Function prototypes  
  ***************************************************************************/
 
-/**\brief 初始化数据库模块
- * \param [out] handle 返回数据库操作句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_db.h)
+/**\brief Database initialize
+ * \param [out] handle Return the database handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DB_Init(sqlite3 **handle);
 
-/**\brief 初始化数据库模块
- * \param [in]  path   数据库文件路径
- * \param [out] handle 返回数据库操作句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_db.h)
+/**\brief Database initialize
+ * \param [in]  path   Database file path
+ * \param [out] handle Return the database handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DB_Init2(char *path, sqlite3 **handle);
 
-/**\brief 终止数据库模块
- * param [in] handle AM_DB_Init()中返回的handle
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_db.h)
+/**\brief Release the database handle
+ * \param [in] handle The database handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DB_Quit(sqlite3 *handle);
 
-/**\brief 从数据库取数据
- * param [in] handle AM_DB_Init()中返回的handle
- * param [in] sql 用于查询的sql语句,只支持select语句
- * param [in out]max_row  输入指定最大组数，输出返回查询到的组数
- * param [in] fmt 需要查询的数据类型字符串，格式形如"%d, %s:64, %f",
- *				  其中,顺序必须与select语句中的要查询的字段对应,%d对应int, %s对应字符串,:后指定字符串buf大小,%f对应double
- * param 可变参数 参数个数与要查询的字段个数相同，参数类型均为void *
- *
- * e.g.1 从数据库中查询service的db_id为1的service的aud_pid和name(单组记录)
+/**\brief Run a select statement
+ * \param [in] handle Database handle
+ * \param [in] sql SQL select statement
+ * \param [in,out] max_row  Maximum row count, return the real row count
+ * \param [in] fmt Result pattern string
+ * Each field is related to the record field in \a sql.
+ * For example, "%d %s:256 %f":
+ * "%d" means the field is a integer number.
+ * "%s" means the field is a string, "256" after ":" means the length of the string's character buffer..
+ * "%f" means the field is a double precision number.
+ * e.g.1 select the service's audio PID and name which index is 1.
+ * \code
  *	int aud_pid;
- 	char name[256];
- 	int row = 1;
-  	AM_DB_Select(pdb, "select aud1_pid,name from srv_table where db_id='1'", &row,
- 					  "%d, %s:256", (void*)&aud_pid, (void*)name);
- *
- * e.g.2 从数据库中查找service_id大于1的所有service的vid_pid和name(多组记录)
+ *	char name[256];
+ *	int row = 1;
+ * 	AM_DB_Select(pdb, "select aud1_pid,name from srv_table where db_id='1'", &row,
+ *					  "%d, %s:256", (void*)&aud_pid, (void*)name);
+ * \endcode
+ * e.g.2 Select the services' video PID and name which service_id > 1.
+ * \code
  *	int aud_pid[300];
- 	char name[300][256];
- 	int row = 300;
- 	AM_DB_Select(pdb, "select aud1_pid,name from srv_table where service_id > '1'", &row,
- 					  "%d, %s:256",(void*)&aud_pid, (void*)name);
- *
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_db.h)
+ *	char name[300][256];
+ *	int row = 300;
+ *	AM_DB_Select(pdb, "select aud1_pid,name from srv_table where service_id > '1'", &row,
+ *					  "%d, %s:256",(void*)&aud_pid, (void*)name);
+ * \endcode
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DB_Select(sqlite3 *handle, const char *sql, int *max_row, const char *fmt, ...);
 
-/**\brief 在一个指定的数据库中创建表
- * param [in] handle sqlite3数据库句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_db.h)
+/**\brief Create tables in the database
+ * \param [in] handle The database handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DB_CreateTables(sqlite3 *handle);
 
-/**\brief 设置数据库文件路径和默认数据库句柄
- * param [in] path 数据库文件路径
- * param [in] defhandle 默认数据库句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_db.h)
+/**\brief Set the database's file path and database handle
+ * \param [in] path The file path.
+ * \param [in] defhandle Database handle created outside
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DB_Setup(char *path, sqlite3 *defhandle);
 
-/**\brief 释放数据库配置
-		  注意：在sqlite3多线程配置状态下（SQLITE_THREADSAFE=2），
-		        需在所有包含数据库操作的线程退出后执行
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_db.h)
+/**\brief Release the database
+ * In multithread mode (SQLITE_THREADSAFE=2), each thread used database should
+ * invoke this function to release the database.
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DB_UnSetup(void);
 
-/**\brief 获得sqlite3数据库句柄
- * param [out] handle 数据库句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_db.h)
+/**\brief Get the database handle
+ * \param [out] handle Return the database handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DB_GetHandle(sqlite3 **handle);
 
-/**\brief 获得sqlite3 SQL Statement句柄
- * param [out] stmt SQL Statement句柄
- * param [in]  name statement名称，方便再次获取
- * param [in]  sql  生成statement的sql语句
- *                  如果statement不存在，则使用此sql语句生成statement
- * param [in]  reset_if_exist 重新生成statement
- *                  如果statement存在，则重新生成该statement。
- *                  当数据库文件改变导致statement出错时使用
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_db.h)
+/**\brief Get SQL statement object
+ * If the statement is not used, allocate a new statement object.
+ * Or return the old allocated statement object if it is used.
+ * \param [out] stmt Return the statement object
+ * \param [in]  name The name of the statement
+ * \param [in]  sql SQL statement string
+ * \param [in]  reset_if_exist Reallocate the statement object if it is already used
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DB_GetSTMT(sqlite3_stmt **stmt, const char *name, const char *sql, int reset_if_exist);
 

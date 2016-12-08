@@ -2,7 +2,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file
- * \brief Audio descrption模块
+ * \brief Audio description
  *
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2014-03-04: create the document

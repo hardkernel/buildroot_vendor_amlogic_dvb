@@ -2,7 +2,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file am_rec.h
- * \brief 录像管理模块头文件
+ * \brief Record manager module
  *
  * \author Xia Lei Peng <leipeng.xia@amlogic.com>
  * \date 2011-3-30: create the document
@@ -36,18 +36,18 @@ extern "C"
  * Error code definitions
  ****************************************************************************/
 
-/**\brief 数据库模块错误代码*/
+/**\brief Error code of record manager module*/
 enum AM_REC_ErrorCode
 {
 	AM_REC_ERROR_BASE=AM_ERROR_BASE(AM_MOD_REC),
-	AM_REC_ERR_INVALID_PARAM,			/**< 参数不正确*/
-	AM_REC_ERR_NO_MEM,                	/**< 空闲内存不足*/
-	AM_REC_ERR_CANNOT_CREATE_THREAD,	/**< 无法创建线程*/
-	AM_REC_ERR_BUSY,					/**< 已经开始录像*/
-	AM_REC_ERR_CANNOT_OPEN_FILE,		/**< 无法打开录像文件*/
-	AM_REC_ERR_CANNOT_WRITE_FILE,		/**< 写录像文件出错*/
-	AM_REC_ERR_CANNOT_ACCESS_FILE,		/**< 无法访问文件，检查权限*/
-	AM_REC_ERR_DVR,						/**< 操作DVR设备出错*/
+	AM_REC_ERR_INVALID_PARAM,               /**< Invalid parameter*/
+	AM_REC_ERR_NO_MEM,                	/**< Not enough memory*/
+	AM_REC_ERR_CANNOT_CREATE_THREAD,	/**< Cannot create new thread*/
+	AM_REC_ERR_BUSY,                        /**< Recorder is already used*/
+	AM_REC_ERR_CANNOT_OPEN_FILE,		/**< Cannot open the file*/
+	AM_REC_ERR_CANNOT_WRITE_FILE,		/**< Write file failed*/
+	AM_REC_ERR_CANNOT_ACCESS_FILE,		/**< Access deny*/
+	AM_REC_ERR_DVR,                         /**< DVR device error*/
 	AM_REC_ERR_END
 };
 
@@ -55,136 +55,129 @@ enum AM_REC_ErrorCode
  * Type definitions
  ***************************************************************************/
 
+/**Record manager handle*/
 typedef void* AM_REC_Handle_t;
 
-/**\brief 数据库中记录的录像状态*/
+/**\brief State of the recording*/
 enum
 {
-	AM_REC_STAT_NOT_START,	/**< 录像未开始*/
-	AM_REC_STAT_WAIT_START,	/**< 已检测到即将开始，等待用户确认后开始录像*/
-	AM_REC_STAT_RECORDING,	/**< 正在录制*/
-	AM_REC_STAT_COMPLETE,	/**< 录像完成,参数为AM_REC_RecEndPara_t*/
+	AM_REC_STAT_NOT_START,	/**< Not started*/
+	AM_REC_STAT_WAIT_START,	/**< Will start immediately, waiting the user's commit*/
+	AM_REC_STAT_RECORDING,	/**< Recording*/
+	AM_REC_STAT_COMPLETE,	/**< Completed, parameter type is AM_REC_RecEndPara_t*/
 };
 
-/**\brief REC事件类型*/
+/**\brief Event type of the record manager*/
 enum AM_REC_EventType
 {
 	AM_REC_EVT_BASE=AM_EVT_TYPE_BASE(AM_MOD_REC),
-	AM_REC_EVT_RECORD_START,			/**< 录像开始*/
-	AM_REC_EVT_RECORD_END,				/**< 录像停止*/
+	AM_REC_EVT_RECORD_START,			/**< Recording started*/
+	AM_REC_EVT_RECORD_END,				/**< Recording end*/
 	AM_REC_EVT_END
 };
 
-/**\brief 录像结束数据*/
+/**\brief End parameter of the recording*/
 typedef struct
 {
-	AM_REC_Handle_t hrec;	/**< 录像管理器句柄*/
-	int error_code;	/**< 0-正常结束，其他见AM_REC_ErrorCode*/
-	long long total_size;	/**< 录像完成后的文件长度*/
-	int total_time;	/**< 录像完成后的总时长*/
+	AM_REC_Handle_t hrec;	/**< Recording manager handle*/
+	int error_code;	        /**< 0 means success, or M_REC_ErrorCode*/
+	long long total_size;	/**< The file's total length*/
+	int total_time;	        /**< The total duration time in seconds*/
 }AM_REC_RecEndPara_t;
 
- /**\brief 录像管理器创建参数*/
+ /**\brief Record manager's create parameters*/
 typedef struct 
 {
-	int		fend_dev;		/**< 前端设备号*/
-	int		dvr_dev;		/**< 录像使用的DVR设备号, 对于不同的REC需唯一*/
-	int		async_fifo_id;	/**< 连接到硬件的ASYNC FIFO id，对于不同的REC需唯一*/
-	char	store_dir[AM_REC_PATH_MAX];	/**< 录像文件存储位置*/
+	int		fend_dev;		/**< Frontend device number*/
+	int		dvr_dev;		/**< DVR device number*/
+	int		async_fifo_id;	        /**< Ayncfifo device's index*/
+	char	store_dir[AM_REC_PATH_MAX];	/**< Store file's path*/
 }AM_REC_CreatePara_t;
 
-/**\brief 录像参数*/
+/**\brief Recording parameters*/
 typedef struct
 {
-	AM_Bool_t is_timeshift;	/**< 是否是时移录像*/
-	dvbpsi_pat_program_t program;
-	AM_REC_MediaInfo_t media_info;
-	int total_time;			/**< 需要录制的总时间，单位秒，<=0表示一直录像直到调用了Stop*/
-	char prefix_name[AM_REC_NAME_MAX];
-	char suffix_name[AM_REC_SUFFIX_MAX];
+	AM_Bool_t is_timeshift;	        /**< Is timeshifting or not*/
+	dvbpsi_pat_program_t program;   /**< Program information*/
+	AM_REC_MediaInfo_t media_info;  /**< Media information*/
+	int total_time;			/**< Total duration time in seconds, <=0 means recoding will stopped manually*/
+	char prefix_name[AM_REC_NAME_MAX];    /**< Filename prefix*/
+	char suffix_name[AM_REC_SUFFIX_MAX];  /**< Filename suffix*/
 }AM_REC_RecPara_t;
 
-/**\brief 录像信息数据*/
+/**\brief Recording information*/
 typedef struct
 {
-	char file_path[AM_REC_PATH_MAX];	/**< 当前录像文件路径*/
-	long long file_size;	/**< 当前录像文件大小，即已录制数据大小*/
-	int cur_rec_time;	/**< 当前录制的总时间，单位秒*/
-	AM_REC_CreatePara_t create_para;	/**< 由AM_REC_Create传入的参数*/
-	AM_REC_RecPara_t record_para;	/**< 由AM_REC_StartRecord传入的录像参数*/
+	char file_path[AM_REC_PATH_MAX];	/**< Current filename*/
+	long long file_size;	/**< File length*/
+	int cur_rec_time;	/**< Current time in seconds*/
+	AM_REC_CreatePara_t create_para;	/**< Create parameters*/
+	AM_REC_RecPara_t record_para;	/**< Recording parameters*/
 }AM_REC_RecInfo_t;
 
 /****************************************************************************
  * Function prototypes  
  ***************************************************************************/
 
-/**\brief 创建一个录像管理器
- * \param [in] para 创建参数
- * \param [out] handle 返回录像管理器句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
+/**\brief Create a new record manager
+ * \param [in] para Create parameters
+ * \param [out] handle Return the manager's handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_REC_Create(AM_REC_CreatePara_t *para, AM_REC_Handle_t *handle);
 
-/**\brief 销毁一个录像管理器
- * param handle 录像管理器句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
+/**\brief Release a record manager
+ * \param handle Record manager handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_REC_Destroy(AM_REC_Handle_t handle);
 
-/**\brief 开始录像
- * \param handle 录像管理器句柄
- * \param [in] start_para 录像参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
+/**\brief Start recording
+ * \param handle Record manager handle
+ * \param [in] start_para Start parameters
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_REC_StartRecord(AM_REC_Handle_t handle, AM_REC_RecPara_t *start_para);
 
-/**\brief 停止录像
- * \param handle 录像管理器句柄
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
+/**\brief Stop recording
+ * \param handle Record manager handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_REC_StopRecord(AM_REC_Handle_t handle);
 
-/**\brief 设置用户数据
- * \param handle 录像管理器句柄
- * \param [in] user_data 用户数据
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
+/**\brief Set the user defined data to the record manager
+ * \param handle Record manager handle
+ * \param [in] user_data User defined data
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_REC_SetUserData(AM_REC_Handle_t handle, void *user_data);
 
-/**\brief 取得用户数据
- * \param handle 录像管理器句柄
- * \param [in] user_data 用户数据
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
+/**\brief Get the user defined data from the record manager
+ * \param handle Record manager handle
+ * \param [out] user_data Return the user defined data
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_REC_GetUserData(AM_REC_Handle_t handle, void **user_data);
 
-/**\brief 设置录像保存路径
- * \param handle 录像管理器句柄
- * \param [in] path 路径
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
+/**\brief Set the record file's path
+ * \param handle Record manager handle
+ * \param [in] path File path
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_REC_SetRecordPath(AM_REC_Handle_t handle, const char *path);
 
-/**\brief 获取当前录像信息
- * \param handle 录像管理器句柄
- * \param [out] info 当前录像信息
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_rec.h)
+/**\brief Get the current recording information
+ * \param handle Record manager handle
+ * \param [out] info Return the current information
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_REC_GetRecordInfo(AM_REC_Handle_t handle, AM_REC_RecInfo_t *info);
 

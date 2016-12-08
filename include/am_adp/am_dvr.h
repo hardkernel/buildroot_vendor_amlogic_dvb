@@ -2,7 +2,10 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file
- * \brief DVR模块
+ * \brief DVR module
+ *
+ * DVR module use asyncfifo to record TS stream from a demux.
+ * Each demux has a corresponding DVR device.
  *
  * \author Xia Lei Peng <leipeng.xia@amlogic.com>
  * \date 2010-12-13: create the document
@@ -30,42 +33,42 @@ extern "C"
  * Type definitions
  ***************************************************************************/
 
-/**\brief DVR模块错误代码*/
+/**\brief DVR module's error code*/
 enum AM_DVR_ErrorCode
 {
 	AM_DVR_ERROR_BASE=AM_ERROR_BASE(AM_MOD_DVR),
-	AM_DVR_ERR_INVALID_ARG,			/**< 参数无效*/
-	AM_DVR_ERR_INVALID_DEV_NO,		/**< 设备号无效*/
-	AM_DVR_ERR_BUSY,				 /**< 设备已经被打开*/
-	AM_DVR_ERR_NOT_ALLOCATED,           /**< 设备没有分配*/
-	AM_DVR_ERR_CANNOT_CREATE_THREAD,    /**< 无法创建线程*/
-	AM_DVR_ERR_CANNOT_OPEN_DEV,         /**< 无法打开设备*/
-	AM_DVR_ERR_NOT_SUPPORTED,           /**< 不支持的操作*/
-	AM_DVR_ERR_NO_MEM,                  /**< 空闲内存不足*/
-	AM_DVR_ERR_TIMEOUT,                 /**< 等待设备数据超时*/
-	AM_DVR_ERR_SYS,                     /**< 系统操作错误*/
-	AM_DVR_ERR_NO_DATA,                 /**< 没有收到数据*/
-	AM_DVR_ERR_CANNOT_OPEN_OUTFILE,		/**< 无法打开输出文件*/
-	AM_DVR_ERR_TOO_MANY_STREAMS,		/**< PID个数太多*/
-	AM_DVR_ERR_STREAM_ALREADY_ADD,		/**< 重复添加流*/
+	AM_DVR_ERR_INVALID_ARG,			/**< Invalid argument*/
+	AM_DVR_ERR_INVALID_DEV_NO,		/**< Invalid decide number*/
+	AM_DVR_ERR_BUSY,                        /**< The device has already been openned*/
+	AM_DVR_ERR_NOT_ALLOCATED,           /**< The device has not been allocated*/
+	AM_DVR_ERR_CANNOT_CREATE_THREAD,    /**< Cannot create a new thread*/
+	AM_DVR_ERR_CANNOT_OPEN_DEV,         /**< Cannot open the device*/
+	AM_DVR_ERR_NOT_SUPPORTED,           /**< Not supported*/
+	AM_DVR_ERR_NO_MEM,                  /**< Not enough memory*/
+	AM_DVR_ERR_TIMEOUT,                 /**< Timeout*/
+	AM_DVR_ERR_SYS,                     /**< System error*/
+	AM_DVR_ERR_NO_DATA,                 /**< No data received*/
+	AM_DVR_ERR_CANNOT_OPEN_OUTFILE,		/**< Cannot open the output file*/
+	AM_DVR_ERR_TOO_MANY_STREAMS,		/**< PID number is too big*/
+	AM_DVR_ERR_STREAM_ALREADY_ADD,		/**< The elementary stream has already been added*/
 	AM_DVR_ERR_END
 };
 
 
-/**\brief DVR设备开启参数*/
+/**\brief DVR device open parameters*/
 typedef struct
 {
 	int    foo;	
 } AM_DVR_OpenPara_t;
 
-/**\brief 开始录像参数*/
+/**\brief Recording parameters*/
 typedef struct
 {
-	int		pid_count; /**< 要录制的PID数目*/
-	int		pids[AM_DVR_MAX_PID_COUNT]; /**< 要录制的PID数组*/
+	int		pid_count; /**< PID number*/
+	int		pids[AM_DVR_MAX_PID_COUNT]; /**< PID array*/
 } AM_DVR_StartRecPara_t;
 
-/**\brief DVR源*/
+/**\brief DVR recording source*/
 typedef enum
 {
 	AM_DVR_SRC_ASYNC_FIFO0, /**< asyncfifo 0*/
@@ -76,65 +79,58 @@ typedef enum
  * Function prototypes  
  ***************************************************************************/
 
-/**\brief 打开DVR设备
- * \param dev_no DVR设备号
- * \param[in] para DVR设备开启参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_dvr.h)
+/**\brief Open a DVR device
+ * \param dev_no DVR device number
+ * \param[in] para DVR device open parameters
+ * \retval AM_SUCCESS On succes
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DVR_Open(int dev_no, const AM_DVR_OpenPara_t *para);
 
-/**\brief 关闭DVR设备
- * \param dev_no DVR设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_dvr.h)
+/**\brief Close an unused DVR device
+ * \param dev_no DVR device number
+ * \retval AM_SUCCESS On succes
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DVR_Close(int dev_no);
 
-/**\brief 设置DVR设备缓冲区大小
- * \param dev_no DVR设备号
- * \param size 缓冲区大小
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_dvr.h)
+/**\brief Set the DVR device's ring queue buffer size.
+ * \param dev_no DVR device number
+ * \param size Ring queue buffer size
+ * \retval AM_SUCCESS On succes
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DVR_SetBufferSize(int dev_no, int size);
 
-/**\brief 开始录像
- * \param dev_no DVR设备号
- * \param [in] para 录像参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_dvr.h)
+/**\brief Start recording
+ * \param dev_no DVR device number
+ * \param [in] para Recording parameters
+ * \retval AM_SUCCESS On succes
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DVR_StartRecord(int dev_no, const AM_DVR_StartRecPara_t *para);
 
-/**\brief 停止录像
- * \param dev_no DVR设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_dvr.h)
+/**\brief Stop recording
+ * \param dev_no DVR device number
+ * \retval AM_SUCCESS On succes
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DVR_StopRecord(int dev_no);
 
-/**\brief 设置DVR源
- * \param dev_no DVR设备号
- * \param	src DVR源
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_dvr.h)
+/**\brief Set the DVR input source
+ * \param dev_no DVR device number
+ * \param	src DVR input source
+ * \retval AM_SUCCESS On succes
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DVR_SetSource(int dev_no, AM_DVR_Source_t src);
 
-/**\brief 从DVR读取录像数据
- * \param dev_no DVR设备号
- * \param[out] buf 缓冲区
- * \param size	需要读取的数据长度
- * \param timeout_ms 读取超时时间 ms 
- * \return
- *   - 实际读取的字节数
+/**\brief Read TS data from a DVR device
+ * \param dev_no DVR device number
+ * \param[out] buf TS output buffer
+ * \param size	The buffer size in bytes
+ * \param timeout_ms Timeout in milliseconds
+ * \return Read data size in bytes
  */
 extern int AM_DVR_Read(int dev_no, uint8_t *buf, int size, int timeout_ms);
 

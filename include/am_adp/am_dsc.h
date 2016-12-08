@@ -2,7 +2,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file
- * \brief 解扰器模块
+ * \brief Descrambler device module
  *
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2010-08-06: create the document
@@ -26,19 +26,19 @@ extern "C"
  * Error code definitions
  ****************************************************************************/
 
-/**\brief 解扰器模块错误代码*/
+/**\brief Error code of the descrambler module*/
 enum AM_DSC_ErrorCode
 {
 	AM_DSC_ERROR_BASE=AM_ERROR_BASE(AM_MOD_DSC),
-	AM_DSC_ERR_INVALID_DEV_NO,          /**< 设备号无效*/
-	AM_DSC_ERR_BUSY,                    /**< 设备已经被打开*/
-	AM_DSC_ERR_NOT_ALLOCATED,           /**< 设备没有分配*/
-	AM_DSC_ERR_CANNOT_OPEN_DEV,         /**< 无法打开设备*/
-	AM_DSC_ERR_NOT_SUPPORTED,           /**< 不支持的操作*/
-	AM_DSC_ERR_NO_FREE_CHAN,            /**< 没有空闲的通道*/
-	AM_DSC_ERR_NO_MEM,                  /**< 空闲内存不足*/
-	AM_DSC_ERR_SYS,                     /**< 系统操作错误*/
-	AM_DSC_ERR_INVALID_ID,              /**< 无效的设备ID*/
+	AM_DSC_ERR_INVALID_DEV_NO,          /**< Invalid device number*/
+	AM_DSC_ERR_BUSY,                    /**< The device is busy*/
+	AM_DSC_ERR_NOT_ALLOCATED,           /**< The device has not been allocated*/
+	AM_DSC_ERR_CANNOT_OPEN_DEV,         /**< Cannot open the device*/
+	AM_DSC_ERR_NOT_SUPPORTED,           /**< Not supported*/
+	AM_DSC_ERR_NO_FREE_CHAN,            /**< No free channel left*/
+	AM_DSC_ERR_NO_MEM,                  /**< Not enough memory*/
+	AM_DSC_ERR_SYS,                     /**< System error*/
+	AM_DSC_ERR_INVALID_ID,              /**< Invalid channel index*/
 	AM_DSC_ERR_END
 };
 
@@ -47,97 +47,90 @@ enum AM_DSC_ErrorCode
  * Type definitions
  ***************************************************************************/
 
-/**\brief 解扰器设备开启参数*/
+/**\brief Descrambler device open parameters*/
 typedef struct
 {
 	int  foo;
 } AM_DSC_OpenPara_t;
 
-/**\brief 控制字类型*/
+/**\brief Control word's type*/
 typedef enum {
-	AM_DSC_KEY_TYPE_EVEN = 0,        /**< DVB-CSA 偶控制字*/
-	AM_DSC_KEY_TYPE_ODD = 1,         /**< DVB-CSA 奇控制字*/
-	AM_DSC_KEY_TYPE_AES_EVEN = 2,    /**< AES 偶控制字*/
-	AM_DSC_KEY_TYPE_AES_ODD = 3,     /**< AES 奇控制字*/
-	AM_DSC_KEY_TYPE_AES_IV_EVEN = 4, /**< AES-CBC 偶控制字IV数据*/
-	AM_DSC_KEY_TYPE_AES_IV_ODD = 5,  /**< AES-CBC 奇控制字IV数据*/
-	AM_DSC_KEY_FROM_KL = (1<<7)      /**< 从Keyladder获取控制字*/
+	AM_DSC_KEY_TYPE_EVEN = 0,        /**< DVB-CSA even control word*/
+	AM_DSC_KEY_TYPE_ODD = 1,         /**< DVB-CSA odd control word*/
+	AM_DSC_KEY_TYPE_AES_EVEN = 2,    /**< AES even control word*/
+	AM_DSC_KEY_TYPE_AES_ODD = 3,     /**< AES odd control word*/
+	AM_DSC_KEY_TYPE_AES_IV_EVEN = 4, /**< AES-CBC even control word's IV data*/
+	AM_DSC_KEY_TYPE_AES_IV_ODD = 5,  /**< AES-CBC odd control word's IV data*/
+	AM_DSC_KEY_FROM_KL = (1<<7)      /**< Read the control word from hardware keyladder*/
 } AM_DSC_KeyType_t;
 
-/**\brief 解扰器输入源*/
+/**\brief Input source of the descrambler*/
 typedef enum {
-	AM_DSC_SRC_DMX0,         /**< TS输入0*/
-	AM_DSC_SRC_DMX1,         /**< TS输入1*/
-	AM_DSC_SRC_DMX2,         /**< TS输入2*/
-	AM_DSC_SRC_BYPASS        /**< 旁路DSC*/
+	AM_DSC_SRC_DMX0,         /**< Demux device 0*/
+	AM_DSC_SRC_DMX1,         /**< Demux device 1*/
+	AM_DSC_SRC_DMX2,         /**< Demux device 2*/
+	AM_DSC_SRC_BYPASS        /**< Bypass TS data*/
 } AM_DSC_Source_t;
 
 /****************************************************************************
  * Function prototypes  
  ***************************************************************************/
 
-/**\brief 打开解扰器设备
- * \param dev_no 解扰器设备号
- * \param[in] para 解扰器设备开启参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_dsc.h)
+/**\brief Open a descrambler device
+ * \param dev_no Descrambler device number
+ * \param[in] para Device open paramaters
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DSC_Open(int dev_no, const AM_DSC_OpenPara_t *para);
 
-/**\brief 分配一个解扰通道
- * \param dev_no 解扰器设备号
- * \param[out] chan_id 返回解扰通道ID
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_dsc.h)
+/**\brief Allocate a new descrambler channel
+ * \param dev_no Descrambler device number
+ * \param[out] chan_id Return the new channel's index
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DSC_AllocateChannel(int dev_no, int *chan_id);
 
-/**\brief 设定解扰通道对应流的PID值
- * \param dev_no 解扰器设备号
- * \param chan_id 解扰通道ID
- * \param pid 流的PID
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_dsc.h)
+/**\brief Set the descrambler channel's PID value
+ * \param dev_no Descrambler device number
+ * \param chan_id Descrambler channel's index
+ * \param pid PID value
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DSC_SetChannelPID(int dev_no, int chan_id, uint16_t pid);
 
-/**\brief 设定解扰通道的控制字
- * \param dev_no 解扰器设备号
- * \param chan_id 解扰通道ID
- * \param type 控制字类型
- * \param[in] key 控制字
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_dsc.h)
+/**\brief Set the control word to the descrambler channel
+ * \param dev_no Descrambler device number
+ * \param chan_id Descrambler channel's index
+ * \param type Control word's type
+ * \param[in] key Control word
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DSC_SetKey(int dev_no, int chan_id, AM_DSC_KeyType_t type, const uint8_t *key);
 
-/**\brief 释放一个解扰通道
- * \param dev_no 解扰器设备号
- * \param chan_id 解扰通道ID
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_dsc.h)
+/**\brief Release an unused descrambler channel
+ * \param dev_no Descrambler device number
+ * \param chan_id Descrambler channel's index to be released
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DSC_FreeChannel(int dev_no, int chan_id);
 
-/**\brief 关闭解扰器设备
- * \param dev_no 解扰器设备号
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_dsc.h)
+/**\brief Close the descrambler device
+ * \param dev_no Descrambler device number
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DSC_Close(int dev_no);
 
-/**\brief 设定解扰器设备的输入源
- * \param dev_no 解扰器设备号
- * \param src 输入源
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_dsc.h)
+/**\brief Set the input source of the descrambler device
+ * \param dev_no Descrambler device number
+ * \param src Input source
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 extern AM_ErrorCode_t AM_DSC_SetSource(int dev_no, AM_DSC_Source_t src);
 

@@ -2,7 +2,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file am_caman.h
- * \brief CA管理头文件
+ * \brief CA manage
  *
  * \author 
  * \date 
@@ -25,18 +25,17 @@ extern "C"
 /****************************************************************************
  * Error code definitions
  ****************************************************************************/
-
-/**\brief CA管理模块错误代码*/
+/**\brief Error code of the CA manage module*/
 enum AM_CAMAN_ErrorCode
 {
 	AM_CAMAN_ERROR_BASE=AM_ERROR_BASE(AM_MOD_CAMAN),
-	AM_CAMAN_ERROR_CA_UNKOWN,                         /**< 未知CA*/
-	AM_CAMAN_ERROR_CA_EXISTS,                         /**< CA已存在*/
-	AM_CAMAN_ERROR_CA_ERROR,                          /**< CA报错*/
-	AM_CAMAN_ERROR_NO_MEM,                            /**< 内存告急*/
-	AM_CAMAN_ERROR_CANNOT_CREATE_THREAD,              /**< 线程创建失败*/
-	AM_CAMAN_ERROR_BADPARAM,                          /**< 参数错误*/
-	AM_CAMAN_ERROR_NOTOPEN,                           /**< CA管理模块未打开*/
+	AM_CAMAN_ERROR_CA_UNKOWN,                         /**< Unknown CA*/
+	AM_CAMAN_ERROR_CA_EXISTS,                         /**< CA already exists*/
+	AM_CAMAN_ERROR_CA_ERROR,                          /**< CA error*/
+	AM_CAMAN_ERROR_NO_MEM,                            /**< out of memory*/
+	AM_CAMAN_ERROR_CANNOT_CREATE_THREAD,              /**< Thread creation failed*/
+	AM_CAMAN_ERROR_BADPARAM,                          /**< Parameter error*/
+	AM_CAMAN_ERROR_NOTOPEN,                           /**< CA management module is not open*/
 	AM_CAMAN_ERROR_END                                
 };
 
@@ -44,42 +43,42 @@ enum AM_CAMAN_ErrorCode
  * Type definitions
  ***************************************************************************/
  
-/**\brief CA类型标识*/
+/**\brief CA type*/
 typedef enum {
-	AM_CA_TYPE_CA,
-	AM_CA_TYPE_CI
+	AM_CA_TYPE_CA,		/**< CA */
+	AM_CA_TYPE_CI			/**< CI */
 } AM_CA_Type_t;
 
-/**\brief CA消息目的地标识*/
+/**\brief CA message destination identifier*/
 typedef enum {
-	AM_CA_MSG_DST_CA,
-	AM_CA_MSG_DST_CAMAN,
-	AM_CA_MSG_DST_APP
+	AM_CA_MSG_DST_CA,     /**< message destination CA */
+	AM_CA_MSG_DST_CAMAN,  /**< message destination CA manage */
+	AM_CA_MSG_DST_APP			/**< message destination APP */
 } AM_CA_Msg_Dst_t;
 
-/**\brief CAMAN打开参数之一*/
+/**\brief CAMAN parameter of ts*/
 typedef struct {
-	int fend_fd;           /**< frontend设备号*/
-	int dmx_fd;            /**< dmx设备号*/
-	int pmt_timeout;       /**< pmt超时时间，单位毫秒*/
-	int pmt_mon_interval;  /**< pmt监视检测间隔，单位毫秒*/
-	int pat_timeout;       /**< pat超时时间，单位毫秒*/
-	int pat_mon_interval;  /**< pat监视检测间隔，单位毫秒*/
-	int cat_timeout;       /**< cat超时时间，单位毫秒*/
-	int cat_mon_interval;  /**< cat监视检测间隔，单位毫秒*/
+	int fend_fd;           /**< frontend device number*/
+	int dmx_fd;            /**< dmx device number*/
+	int pmt_timeout;       /**< pmt timeout，Unit millisecond*/
+	int pmt_mon_interval;  /**< pmt monitoring detection interval，Unit millisecond*/
+	int pat_timeout;       /**< pat timeout，Unit millisecond*/
+	int pat_mon_interval;  /**< pat monitoring detection interval，Unit millisecond*/
+	int cat_timeout;       /**< cat timeout，Unit millisecond*/
+	int cat_mon_interval;  /**< cat monitoring detection interval，Unit millisecond*/
 } AM_CAMAN_Ts_t;
 
-/**\brief CAMAN打开参数*/
+/**\brief CAMAN open parameter*/
 typedef struct {
 	AM_CAMAN_Ts_t ts;
 } AM_CAMAN_OpenParam_t;
 
-/**\brief CA消息结构*/
+/**\brief CA message structure*/
 typedef struct {
-	int type;             /**< 消息类型，私有*/
-	int dst;              /**< 消息目的地，见AM_CA_Msg_Dst_t*/
-	unsigned char *data; /**< 消息内容，私有*/
-	unsigned int len;    /**< 消息内容长度，单位字节*/
+	int type;             /**< Message type*/
+	int dst;              /**< Message destination, see AM_CA_Msg_Dst_t*/
+	unsigned char *data; /**< Message content*/
+	unsigned int len;    /**< Message content len*/
 } AM_CA_Msg_t;
 
 /*
@@ -135,31 +134,32 @@ typedef struct AM_CA_Ops_s AM_CA_Ops_t;
 
 typedef struct AM_CA_Opt_s AM_CA_Opt_t;
 
-/**\brief CA结构体
-	每个要注册到CA管理模块的CA需要生成如下适配结构体。
-	CA管理模块同过该结构体来操作管理CA
+/**\brief CA operation structure
+* Each CA that is registered to the CA management module needs to generate
+* the AM_CA_Ops_s type object. CA management module with the object to operate
+* management CA
 */
 struct AM_CA_Ops_s{
 	/*init/term the ca*/
-	int (*open)(void *arg, AM_CAMAN_Ts_t *ts);/**< 打开CA*/
-	int (*close)(void *arg);/**< 关闭CA*/
+	int (*open)(void *arg, AM_CAMAN_Ts_t *ts);/**< open CA*/
+	int (*close)(void *arg);/**< close CA*/
 
 	/*check if the ca can work with the ca system marked as the caid*/
-	int (*camatch)(void *arg, unsigned int caid);/**< 判定CA是否匹配*/
+	int (*camatch)(void *arg, unsigned int caid);/**< check if the ca can work with the ca system marked as the caid*/
 
 	/*caman triggers the ca when there is a ts-change event*/
-	int (*ts_changed)(void *arg);/**< 通知CA TS发生变化*/
+	int (*ts_changed)(void *arg);/**< caman triggers the ca when there is a ts-change event*/
 
 	/*notify the new cat*/
-	int (*new_cat)(void *arg, unsigned char *cat, unsigned int size);/**< 通知CA新的CAT表*/
+	int (*new_cat)(void *arg, unsigned char *cat, unsigned int size);/**< notify the new cat*/
 	
 	/*caman ask the ca to start/stop working on a pmt*/
-	int (*start_pmt)(void *arg, int service_id, unsigned char *pmt, unsigned int size);/**< 通知CA开始Service*/
-	int (*stop_pmt)(void *arg, int service_id);/**< 通知CA停止service*/
+	int (*start_pmt)(void *arg, int service_id, unsigned char *pmt, unsigned int size);/**< caman ask the ca to start working on a pmt*/
+	int (*stop_pmt)(void *arg, int service_id);/**< caman ask the ca to stop working on a pmt*/
 
 	/*ca can exchange messages with caman only if enable() is called with a non-zero argument.
 	    ca must stop exchanging msgs with msg funcs after enable(0) is called*/
-	int (*enable)(void *arg, int enable);/**< CA使能，非使能调用后，CA应停止与上层的msg交换*/
+	int (*enable)(void *arg, int enable);/**< CA enable or disable，ca must stop exchanging msgs with msg funcs after enable(0) is called*/
 
 	/*the ca will use the func_msg registered to send msgs to the upper layer through caman
 		send_msg()'s return value:
@@ -167,105 +167,94 @@ struct AM_CA_Ops_s{
 			-1 - wrong name
 			-2 - mem fail
 	*/
-	/**\brief 注册消息发送函数到CA
-		CA使用注册的send_msg函数指针发送消息到APP或CA管理模块本身.
-		send_msg第二个参数Msg结构体中的data数据区需为连续内存块，函数调用完成后需保留，上层使用完毕会通过free()释放空间.
+	/**\brief register message send function into CA manage module
+	*	CA use send_msg Pointer to send message to app or CA manage module
+	*	the msg member of data need continuous memory block，app or ca will free data when use end.
 	*/
-	int (*register_msg_send)(void *arg, char *name, int (*send_msg)(char *name, AM_CA_Msg_t *msg));
+	int (*register_msg_send)(void *arg, char *name, int (*send_msg)(char *name, AM_CA_Msg_t *msg));/**< free message*/
 	/*with which the caman can free the space occupied by the msg*/
-	void (*free_msg)(void *arg, AM_CA_Msg_t *msg);/**< 回收消息空间*/
+	void (*free_msg)(void *arg, AM_CA_Msg_t *msg);/**< free message function*/
 	/*msg replys will come within the arg of this callback*/
-	int (*msg_receive)(void *arg, AM_CA_Msg_t *msg);/**< 推送消息到CA, 第二参数Msg结构及data数据空间在函数调用结束后无保证*/
+	int (*msg_receive)(void *arg, AM_CA_Msg_t *msg);/**< send message to CA manage module,CA manage module Process message in this function*/
 };
-
+/**\brief CA structure*/
 struct AM_CA_s{
 	/*ca type in AM_CA_Type_t*/
-	AM_CA_Type_t type;
-	
+	AM_CA_Type_t type;/**< ca type in AM_CA_Type_t*/
 	/*ca ops*/
-	AM_CA_Ops_t ops;
-
+	AM_CA_Ops_t ops;/**< CA operation */
 	/*ca private args*/
-	void *arg;
-	void (*arg_destroy)(void *arg);
+	void *arg;/**< ca private args */
+	void (*arg_destroy)(void *arg);/**< ca free private args function */
 };
-
+/**\brief CA auto operation structure*/
 struct AM_CA_Opt_s{
 	/*if the ca will be checked for the auto-match*/
-	int auto_disable;
+	int auto_disable;/**< ca auto disable*/
 };
 
 /*CAMAN open/close*/
 
-/**\brief 打开CA管理模块
- * \param [in] para 打开参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+/**\brief Open CA manage module
+ * \param [in] para open parameter
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_Open(AM_CAMAN_OpenParam_t *para);
 
-/**\brief 关闭CA管理模块
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+/**\brief Close CA manage module
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_Close(void);
 
-/**\brief 暂停CA管理模块
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+/**\brief Pause CA manage module
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_Pause(void);
 
-/**\brief 恢复CA管理模块
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+/**\brief Resume CA manage module
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_Resume(void);
 
 /*CA open/close*/
 
-/**\brief 打开已注册CA
- * \param [in] name CA别名
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+/**\brief Open registed CA
+ * \param [in] name CA name
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_openCA(char *name);
 
-/**\brief 关闭已注册CA
- * \param [in] name CA别名
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+/**\brief Close registed CA
+ * \param [in] name CA name
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_closeCA(char *name);
 
-/**\brief 开始解扰Service
+/**\brief Start Descramble Service
  * \param [in] service_id Serviceid
- * \param [in] caname     指定CA解扰或NULL=自动选择已注册CA解扰
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+ * \param [in] caname     select ca by name
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_startService(int service_id, char *caname);
 
-/**\brief 停止解扰Service
+/**\brief Stop Descramble Service
  * \param [in] service_id Serviceid
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_stopService(int service_id);
 
-/**\brief 停止CA解扰工作
- * \param [in] caname     指定CA解扰或NULL=自动选择已注册CA解扰
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+/**\brief Stop CA
+ * \param [in] caname   stop CA name
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_stopCA(char *caname);
 
@@ -273,60 +262,54 @@ AM_ErrorCode_t AM_CAMAN_stopCA(char *caname);
     get -> use -> free
 */
 
-/**\brief 获取CA消息，主动方式取得CA消息，回调方式见AM_CAMAN_setCallback
- * \param [out]    caname 消息由别名为caname的CA发出
- * \param [in,out] msg    传入存放消息指针的指针，*msg指向传出消息。消息空间由调用者调用AM_CAMAN_freeMsg回收
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+/**\brief Get CA Message initiative
+ * \param [out]  caname 	The CA name who send message.
+ * \param [in,out] msg    the pointer of store message pointer，need free by AM_CAMAN_freeMsg
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_getMsg(char *caname, AM_CA_Msg_t **msg);
 
-/**\brief 释放消息
- * \param [in] msg 要释放的消息指针，只能传入由AM_CAMAN_getMsg()获取的消息指针
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+/**\brief free message pointer
+ * \param [in] msg the pointer of store message pointer，get by AM_CAMAN_getMsg()
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_freeMsg(AM_CA_Msg_t *msg);
 
 /*send Msg to CAMAN/CA, it's the caller's responsibility to free the Msg*/
 
-/**\brief 发消息给指定CA或CA管理模块或广播消息
- * \param [in] caname 指定CA或NULL=广播
- * \param [in] msg    msg指向要发送的消息
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+/**\brief send message
+ * \param [in] caname send message to CA name,if name is null,this message will broadcast
+ * \param [in] msg    send message pointer
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_putMsg(char *caname, AM_CA_Msg_t *msg);
 
 /*register/unregister CAs*/
 
-/**\brief 注册CA到CA管理模块
- * \param [in] caname 指定CA别名
- * \param [in] ca     指向要注册的CA结构体
- * \param [in] opt    注册参数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+/**\brief register CA into CA manage module
+ * \param [in] caname register CA name
+ * \param [in] ca     register CA struct obj
+ * \param [in] opt    register parameter
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_registerCA(char *caname, AM_CA_t *ca, AM_CA_Opt_t *opt);
 
-/**\brief 从CA管理模块解除注册CA
- * \param [in] caname 指定CA别名
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+/**\brief unregister CA from CA manage module
+ * \param [in] caname unregister CA name
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_unregisterCA(char *caname);
 
-/**\brief 设定CA消息回调函数，回调方式取得CA消息，主动获取见AM_CAMAN_getMsg
- * \param [in] caname 注册到指定CA或NULL=注册到已注册所有CA
- * \param [in] cb     要注册的回调函数
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_caman.h)
+/**\brief Set CA message callback function，get CA message by callback type
+ * \param [in] caname ca name
+ * \param [in] cb  process message callback function pointer
+ * \retval AM_SUCCESS On success
+ * \return Error code
  */
 AM_ErrorCode_t AM_CAMAN_setCallback(char *caname, int (*cb)(char *name, AM_CA_Msg_t *msg));
 
