@@ -281,6 +281,7 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner);
 static AM_ErrorCode_t am_scan_start_dtv(AM_SCAN_Scanner_t *scanner);
 static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner);
 static AM_ErrorCode_t am_scan_isdbt_prepare_oneseg(AM_SCAN_TS_t *ts);
+static void am_scan_check_need_pause(AM_SCAN_Scanner_t *scanner, int pause_flag);
 
 extern AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,int out_len);
 
@@ -3818,6 +3819,9 @@ static AM_ErrorCode_t am_scan_all_done(AM_SCAN_Scanner_t *scanner)
 static AM_ErrorCode_t am_scan_atv_step_tune(AM_SCAN_Scanner_t *scanner)
 {
 	AM_ErrorCode_t ret = AM_FAILURE;
+
+	//check if user pause
+	am_scan_check_need_pause(scanner, AM_SCAN_STATUS_PAUSED_USER);
 	
 	if (cur_fe_para.m_type == FE_ANALOG)
 	{
@@ -3874,6 +3878,9 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 
 	if (scanner->stage != AM_SCAN_STAGE_TS)
 		scanner->stage = AM_SCAN_STAGE_TS;
+
+	//check if user pause
+	am_scan_check_need_pause(scanner, AM_SCAN_STATUS_PAUSED_USER);
 
 	if (scanner->curr_freq >= 0)
 	{
@@ -4781,9 +4788,13 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 
 			AM_DEBUG(1,"request_destory = %#x", scanner->request_destory);
 
-			pthread_mutex_lock(&scanner->lock_pause);
-			scanner->status = AM_SCAN_STATUS_PAUSED;
-			pthread_mutex_unlock(&scanner->lock_pause);
+			if (scanner->proc_mode & AM_SCAN_PROCMODE_AUTOPAUSE_ON_ATV_FOUND)
+			{
+				AM_DEBUG(1, "AUTOPAUSE ATV FOUND");
+				pthread_mutex_lock(&scanner->lock_pause);
+				scanner->status |= AM_SCAN_STATUS_PAUSED;
+				pthread_mutex_unlock(&scanner->lock_pause);
+			}
 
 			SIGNAL_EVENT(AM_SCAN_EVT_SIGNAL, (void*)&si);
 
@@ -4803,14 +4814,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_NEW_PROGRAM_MORE, (void*)&npd);
 
 			//check if auto pause
-			if (!scanner->request_destory
-				&& (scanner->proc_mode & AM_SCAN_PROCMODE_AUTOPAUSE_ON_ATV_FOUND))
-			{
-				pthread_mutex_lock(&scanner->lock_pause);
-				while (scanner->status == AM_SCAN_STATUS_PAUSED)
-					pthread_cond_wait(&scanner->cond_pause, &scanner->lock_pause);
-				pthread_mutex_unlock(&scanner->lock_pause);
-			}
+			am_scan_check_need_pause(scanner, AM_SCAN_STATUS_PAUSED);
 
 			if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL)
 			{
@@ -5261,7 +5265,10 @@ handle_events:
 		AM_DEBUG(1, "Clear DTV source %d ...", dtv_start_para.source);
 		am_scan_clear_source(hdb, dtv_start_para.source);
 	}
-		
+
+	//check if user pause
+	am_scan_check_need_pause(scanner, AM_SCAN_STATUS_PAUSED_USER);
+
 	/* need store ? */
 	if (scanner->result.tses/* && scanner->stage == AM_SCAN_STAGE_DONE*/ && scanner->store)
 	{
@@ -5291,6 +5298,9 @@ handle_events:
 	{
 		/* close atv devices */
 	}
+
+	//check if user pause
+	am_scan_check_need_pause(scanner, AM_SCAN_STATUS_PAUSED_USER);
 
 	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_SCAN_EXIT, 100);
 
@@ -5404,6 +5414,16 @@ static void am_scan_copy_adtv_feparas(int fe_cnt, AM_FENDCTRL_DVBFrontendParamet
 	AM_DEBUG(1, "ADTV fe_paras count %d", fe_start - start);
 }
 
+static void am_scan_check_need_pause(AM_SCAN_Scanner_t *scanner, int pause_flag)
+{
+	if (!scanner->request_destory)
+	{
+		pthread_mutex_lock(&scanner->lock_pause);
+		while (scanner->status & AM_SCAN_STATUS_PAUSED_USER)
+			pthread_cond_wait(&scanner->cond_pause, &scanner->lock_pause);
+		pthread_mutex_unlock(&scanner->lock_pause);
+	}
+}
  
 /****************************************************************************
  * API functions
@@ -5480,7 +5500,9 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, AM_SCAN_Handle_t *hand
 	}
 	/*数据初始化*/
 	memset(scanner, 0, sizeof(AM_SCAN_Scanner_t));
-	
+
+	scanner->status = AM_SCAN_STATUS_RUNNING;
+
 	/*配置起始频点*/
 	if (para->mode == AM_SCAN_MODE_ADTV)
 	{
@@ -5734,7 +5756,18 @@ AM_ErrorCode_t AM_SCAN_GetStatus(AM_SCAN_Handle_t handle, int *status)
 
 AM_ErrorCode_t AM_SCAN_Pause(AM_SCAN_Handle_t handle)
 {
-	return AM_SCAN_ERR_NOT_SUPPORTED;
+	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)handle;
+
+	AM_DEBUG(1, "AM_SCAN_Pause");
+
+	if (scanner)
+	{
+		pthread_mutex_lock(&scanner->lock_pause);
+		scanner->status |= AM_SCAN_STATUS_PAUSED_USER;
+		pthread_mutex_unlock(&scanner->lock_pause);
+	}
+
+	return AM_SUCCESS;
 }
 
 AM_ErrorCode_t AM_SCAN_Resume(AM_SCAN_Handle_t handle)
@@ -5745,10 +5778,17 @@ AM_ErrorCode_t AM_SCAN_Resume(AM_SCAN_Handle_t handle)
 
 	if (scanner)
 	{
+		int status;
 		pthread_mutex_lock(&scanner->lock_pause);
-		scanner->status = AM_SCAN_STATUS_RUNNING;
+		if (scanner->status & AM_SCAN_STATUS_PAUSED)
+			scanner->status -= AM_SCAN_STATUS_PAUSED;
+		else if (scanner->status & AM_SCAN_STATUS_PAUSED_USER)
+			scanner->status -= AM_SCAN_STATUS_PAUSED_USER;
+		status = scanner->status;
 		pthread_cond_signal(&scanner->cond_pause);
 		pthread_mutex_unlock(&scanner->lock_pause);
+
+		AM_DEBUG(1, "scanner status: %d", status);
 	}
 
 	return AM_SUCCESS;

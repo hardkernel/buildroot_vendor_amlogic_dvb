@@ -151,6 +151,7 @@ enum AM_SCAN_Status
 {
 	AM_SCAN_STATUS_RUNNING,	/**< scan running*/
 	AM_SCAN_STATUS_PAUSED,	/**< scan paused*/
+	AM_SCAN_STATUS_PAUSED_USER	/**< scan paused by user*/
 };
 /**\brief mode of scan process*/
 enum AM_SCAN_PROCMode
