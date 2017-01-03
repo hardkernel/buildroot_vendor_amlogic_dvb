@@ -58,7 +58,9 @@ static void fend_cb(int dev_no, struct dvb_frontend_event *evt, void *user_data)
 			evt->parameters.frequency, evt->parameters.u.ofdm.bandwidth);
 	} else if(info.type == FE_QPSK) {	
 		printf("cb parameters: * can get fe type qpsk! *\n");
-	}else {
+	} else if(info.type == FE_ANALOG){
+		printf("cb parameters: std:%#X\n", evt->parameters.u.analog.std);
+	} else {
 		printf("cb parameters: * can not get fe type! *\n");
 	}
 	printf("cb status: 0x%x\n", evt->status);
@@ -496,8 +498,8 @@ static int open_fend(int *id, int *mode)
 	if(*id<0)
 		return -2;
 
-	printf("Input fontend mode: (0-DVBC, 1-DVBT, 2-DVBS, 3-ISDBT, 4-DTMB, 5-DVBT2)\n");
-	printf("mode(0/1/2/3/4/5): ");
+	printf("Input fontend mode: (0-DVBC, 1-DVBT, 2-DVBS, 3-ISDBT, 4-DTMB, 5-DVBT2, 6-ANALOG)\n");
+	printf("mode(0/1/2/3/4/5/6): ");
 	scanf("%d", mode);
 	para.mode = (*mode==0)?FE_QAM : 
 			(*mode==1)? FE_OFDM : 
@@ -505,6 +507,7 @@ static int open_fend(int *id, int *mode)
 			(*mode==3)? FE_ISDBT :
 			(*mode==4)? FE_DTMB :
 			(*mode==5)? FE_OFDM :
+			(*mode==6)? FE_ANALOG :
 				FE_OFDM;
 
 	AM_TRY(AM_FEND_Open(*id, &para));
@@ -525,8 +528,9 @@ static int lock_fend(int id, int mode)
 	static struct dvb_frontend_parameters p;
 	static int freq, srate, qam;
 	static int bw;
+	static int std, afc, afc_range;
 
-	/*(0-DVBC, 1-DVBT, 2-DVBS, 3-ISDBT, 4-DTMB, 5-DVBT2)*/
+	/*(0-DVBC, 1-DVBT, 2-DVBS, 3-ISDBT, 4-DTMB, 5-DVBT2, 6-ANALOG)*/
 
 	if(mode==-1)
 		return -1;
@@ -643,7 +647,71 @@ static int lock_fend(int id, int mode)
 		p.u.ofdm.guard_interval = GUARD_INTERVAL_AUTO;
 		p.u.ofdm.hierarchy_information = HIERARCHY_AUTO;
 		p.u.ofdm.transmission_mode = TRANSMISSION_MODE_AUTO;
-	}else{
+	}else if (mode == 6) {
+		typedef __u64 v4l2_std_id;
+
+		/* one bit for each */
+		#define V4L2_STD_PAL_B          ((v4l2_std_id)0x00000001)
+		#define V4L2_STD_PAL_B1         ((v4l2_std_id)0x00000002)
+		#define V4L2_STD_PAL_G          ((v4l2_std_id)0x00000004)
+		#define V4L2_STD_PAL_H          ((v4l2_std_id)0x00000008)
+		#define V4L2_STD_PAL_I          ((v4l2_std_id)0x00000010)
+		#define V4L2_STD_PAL_D          ((v4l2_std_id)0x00000020)
+		#define V4L2_STD_PAL_D1         ((v4l2_std_id)0x00000040)
+		#define V4L2_STD_PAL_K          ((v4l2_std_id)0x00000080)
+
+		#define V4L2_STD_PAL_M          ((v4l2_std_id)0x00000100)
+		#define V4L2_STD_PAL_N          ((v4l2_std_id)0x00000200)
+		#define V4L2_STD_PAL_Nc         ((v4l2_std_id)0x00000400)
+		#define V4L2_STD_PAL_60         ((v4l2_std_id)0x00000800)
+
+		#define V4L2_STD_NTSC_M         ((v4l2_std_id)0x00001000)	/* BTSC */
+		#define V4L2_STD_NTSC_M_JP      ((v4l2_std_id)0x00002000)	/* EIA-J */
+		#define V4L2_STD_NTSC_443       ((v4l2_std_id)0x00004000)
+		#define V4L2_STD_NTSC_M_KR      ((v4l2_std_id)0x00008000)	/* FM A2 */
+
+		#define V4L2_STD_SECAM_B        ((v4l2_std_id)0x00010000)
+		#define V4L2_STD_SECAM_D        ((v4l2_std_id)0x00020000)
+		#define V4L2_STD_SECAM_G        ((v4l2_std_id)0x00040000)
+		#define V4L2_STD_SECAM_H        ((v4l2_std_id)0x00080000)
+		#define V4L2_STD_SECAM_K        ((v4l2_std_id)0x00100000)
+		#define V4L2_STD_SECAM_K1       ((v4l2_std_id)0x00200000)
+		#define V4L2_STD_SECAM_L        ((v4l2_std_id)0x00400000)
+		#define V4L2_STD_SECAM_LC       ((v4l2_std_id)0x00800000)
+
+		/* ATSC/HDTV */
+		#define V4L2_STD_ATSC_8_VSB     ((v4l2_std_id)0x01000000)
+		#define V4L2_STD_ATSC_16_VSB    ((v4l2_std_id)0x02000000)
+
+		/*COLOR MODULATION TYPE*/
+		#define V4L2_COLOR_STD_PAL	((v4l2_std_id)0x04000000)
+		#define V4L2_COLOR_STD_NTSC	((v4l2_std_id)0x08000000)
+		#define V4L2_COLOR_STD_SECAM	((v4l2_std_id)0x10000000)
+
+		/*para2 is finetune data */
+		printf("std(-1=default): ");
+		scanf("%d", &std);
+		printf("afc_range(0=off, -1=default): ");
+		scanf("%d", &afc_range);
+		if (std == -1)
+			std = V4L2_COLOR_STD_PAL | V4L2_STD_PAL_D | V4L2_STD_PAL_D1  | V4L2_STD_PAL_K;
+
+		if (afc_range == -1)
+			afc_range = 1000000;
+		afc = 0;
+		if (afc_range == 0)
+			afc &= ~ANALOG_FLAG_ENABLE_AFC;
+		else
+			afc |= ANALOG_FLAG_ENABLE_AFC;
+
+	        p.u.analog.std   =   std;
+	        p.u.analog.afc_range = afc_range;
+		p.u.analog.flag = afc;
+		p.frequency = freq;
+
+	        printf("freq=%dHz, std=%#X, flag=%x, afc_range=%d\n", freq, std, afc, afc_range);
+
+	} else {
 		printf("dvb sx test\n");
 
 		p.frequency = freq;
@@ -652,10 +720,14 @@ static int lock_fend(int id, int mode)
 		scanf("%d", &(p.u.qpsk.symbol_rate));
 	}
 #if 0
-	AM_TRY(AM_FEND_SetPara(/*FEND_DEV_NO*/fe_id, &p));
+	if (mode == 10) {
+		AM_TRY(AM_FEND_SetPara(id, &p));
+	} else
 #else
-	AM_TRY(AM_FEND_Lock(id, &p, &status));
-	printf("lock status: 0x%x\n", status);
+	{
+		AM_TRY(AM_FEND_Lock(id, &p, &status));
+		printf("lock status: 0x%x\n", status);
+	}
 #endif
 
 	return 0;
