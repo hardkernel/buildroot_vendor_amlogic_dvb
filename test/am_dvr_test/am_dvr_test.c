@@ -26,6 +26,10 @@
 #include <errno.h>
 #include <am_dsc.h>
 
+#include<sys/socket.h>
+#include<netinet/in.h>
+#include <errno.h>
+
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
@@ -48,6 +52,9 @@ typedef struct
 	pthread_t thread;
 	int running;
 	int fd;
+	int is_socket;
+	struct sockaddr_in addr;
+	int sockaddr_len;
 }DVRData;
 
 static int pat_fid, sdt_fid;
@@ -88,6 +95,7 @@ static void display_usage(void)
 	printf("usages:\n");
 	printf("\tsetsrc\t[dvr_no async_fifo_no ts_src]\n");
 	printf("\tstart\t[dvr_no FILE pid_cnt pid0...pidN]\n");
+	printf("\tstart\t[dvr_no udp://ip:port pid_cnt pid0...pidN]\n");
 	printf("\tstop\t[dvr_no]\n");
 	printf("\thelp\n");
 	printf("\tquit\n");
@@ -176,6 +184,70 @@ void stop_dsc(int dsc)
 	AM_DSC_Close(dsc);
 }
 
+static int socket_open(char *name, int dev_no)
+{
+	DVRData *dd = &data_threads[dev_no];
+	char ip[64];
+	int port = 0;
+	char *pch = NULL;
+
+	if (strncmp(name, "udp://", 6) != 0) {
+		dd->is_socket = 0;
+		return -1;
+	}
+
+	//this is a socket file
+	dd->is_socket = 1;
+	printf("is socket\n");
+
+	memset(ip, 0, sizeof(ip));
+	if (pch = strchr(name+6, ':'))
+		memcpy(ip, name+6, pch-(name+6));
+	else
+		return -1;
+
+	if (sscanf(pch+1, "%d", &port) != 1)
+		return -1;
+
+	if ((dd->fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+	{
+		printf("socket create fail.\n");
+	}
+	else
+	{
+		int on=1;
+		setsockopt(dd->fd, SOL_SOCKET, SO_REUSEADDR|SO_BROADCAST, &on, sizeof(on));
+
+		memset(&dd->addr, 0, sizeof(dd->addr));
+		dd->addr.sin_family = AF_INET;
+		dd->addr.sin_addr.s_addr = inet_addr(name);
+		dd->addr.sin_port = htons(port);
+		dd->sockaddr_len = sizeof(struct sockaddr_in);
+		printf("socket: %s:%d\n", ip, port);
+	}
+
+	return dd->fd;
+}
+
+static int socket_data_write(int fd, uint8_t *buf, int size, DVRData *dd)
+{
+	int loop = size >> 10;
+	int left = size & 0x400;
+	int count = 0;
+	int i;
+
+	for (i=0; i<loop; i++) {
+		errno = 0;
+		count += sendto(fd, buf+(i<<10), 1024, 0, (struct sockaddr *)&dd->addr, dd->sockaddr_len);
+		if (count<0)
+			printf("sendto fail, errno[%d:%s]\n", errno, strerror(errno));
+	}
+	if (left) {
+		count += sendto(fd, buf+(i<<10), left, 0, (struct sockaddr *)&dd->addr, dd->sockaddr_len);
+	}
+	return count;
+}
+
 static int dvr_data_write(int fd, uint8_t *buf, int size)
 {
 	int ret;
@@ -226,7 +298,10 @@ static void* dvr_data_thread(void *arg)
 		//printf("read from DVR%d return %d bytes\n", dd->id, cnt);
 		if (dd->fd != -1)
 		{
-			size += dvr_data_write(dd->fd, buf, cnt);
+		        if (dd->is_socket)
+				size += socket_data_write(dd->fd, buf, cnt, dd);
+			else
+				size += dvr_data_write(dd->fd, buf, cnt);
 
 			if(nodata) { printf("\n"); nodata = 0; }
 
@@ -248,15 +323,19 @@ static void* dvr_data_thread(void *arg)
 static void start_data_thread(int dev_no)
 {
 	DVRData *dd = &data_threads[dev_no];
-	
+
 	if (dd->running)
 		return;
-	dd->fd = open(dd->file_name, O_TRUNC | O_WRONLY | O_CREAT, 0666);
+
+	dd->fd = socket_open(dd->file_name, dev_no);
+	if (!dd->is_socket)
+		dd->fd = open(dd->file_name, O_TRUNC | O_WRONLY | O_CREAT, 0666);
 	if (dd->fd == -1)
 	{
 		printf("Cannot open record file '%s' for DVR%d\n", dd->file_name, dd->id);
 		return;
 	}
+
 	dd->running = 1;
 	pthread_create(&dd->thread, NULL, dvr_data_thread, dd);
 }
