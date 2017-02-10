@@ -4803,7 +4803,12 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			scanner->curr_ts->analog.freq = formatted_freq;
 
 			//scanner->curr_ts->analog.std = scanner->start_para.atv_para.default_std;
-			scanner->curr_ts->analog.std = scanner->fe_evt.parameters.u.analog.std;
+			//scanner->curr_ts->analog.std = scanner->fe_evt.parameters.u.analog.std;
+			{
+				struct dvb_frontend_parameters para;
+				AM_FEND_GetPara(scanner->start_para.fend_dev_id, &para);
+				scanner->curr_ts->analog.std = para.u.analog.std;
+			}
 			//scanner->curr_ts->analog.std = dvb_fend_para(cur_fe_para)->u.analog.std;
 
 			/*添加到搜索结果列表*/
