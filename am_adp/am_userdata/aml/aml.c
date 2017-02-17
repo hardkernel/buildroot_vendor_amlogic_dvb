@@ -257,8 +257,12 @@ static void aml_h264_userdata_del(aml_cc_block_t * p_header)
 		{
 			free(p_block->p_buf);
 			p_block->p_buf = NULL;
+			p_block->i_len = 0;
 		}
+		p_block->p_next = NULL;
+		p_block->p_prev = NULL;
 		free(p_block);
+		p_block = NULL;
 	}
 	p_header = NULL;
 }
@@ -287,6 +291,10 @@ static void aml_h264_userdata_push(AM_USERDATA_Device_t *dev,
 {
 	int debug_flag = 0;
 	aml_cc_block_t * p_block = p_header->p_next;
+
+    if (dev == NULL || dev->write_package == NULL)
+		return;
+
 	while(p_block != NULL)
 	{
 		if(min_poc == p_block->i_poc)
@@ -693,10 +701,14 @@ static void *aml_userdata_thread(void *arg)
 
 	memset(&reorder, 0, sizeof(reorder));
 	memset(&pheader, 0, sizeof(pheader));
+	memset(buf, 0, sizeof(buf));
+
 	p_header = malloc(sizeof(aml_cc_block_t));
 	p_header->i_poc = INVALID_POC;
 	p_header->p_prev = p_header;
 	p_header->p_next = NULL;
+	p_header->p_buf = NULL;
+	p_header->i_len = 0;
 
 	while (drv_data->running)
 	{
@@ -761,15 +773,16 @@ static void *aml_userdata_thread(void *arg)
 					left = 0;
 					aml_swap_data(buf, cnt);
 					p = buf;
-					while(cnt > 0)
+					while (cnt > 0 && p !=NULL && cnt < sizeof(buf))
 					{
-						if ( (p[0] == 0xb5 && p[3] == 0x47 && p[4] == 0x41 && p[5] == 0x39 && p[6] == 0x34)
-							|| (p[0] == 0xb5 && p[1] == 0x0 && p[2] == 0x2f)
-							|| (p[0] == 0x47 && p[1] == 0x41 && p[2] == 0x39 && p[3] == 0x34)
-						   )
+                        if (cnt > DMA_BLOCK_LEN)
 						{
-							if (cnt > DMA_BLOCK_LEN)
+							if ( (p[0] == 0xb5 && p[3] == 0x47 && p[4] == 0x41 && p[5] == 0x39 && p[6] == 0x34)
+								|| (p[0] == 0xb5 && p[1] == 0x0 && p[2] == 0x2f)
+								|| (p[0] == 0x47 && p[1] == 0x41 && p[2] == 0x39 && p[3] == 0x34)
+							   )
 							{
+
 								if (ud_format == H264_CC_TYPE)
 									min_bytes_valid = 11 + (buf[8] & 0x1F)*3;
 								else if(ud_format == DIRECTV_CC_TYPE)
@@ -846,17 +859,17 @@ static void *aml_userdata_thread(void *arg)
 									break;
 								}
 							}
-							else if(cnt > 0)
-							{
-								left = cnt;
-								memmove(buf, p, left);
-								aml_swap_data(buf, left);
-								AM_DEBUG(1, "@@@@memmove %d buf", left);
-								break;
-							}
+							cnt -= DMA_BLOCK_LEN;
+							p += DMA_BLOCK_LEN;
 						}
-						cnt -= DMA_BLOCK_LEN;
-						p += DMA_BLOCK_LEN;
+						else if(cnt > 0)
+						{
+							left = cnt;
+							memmove(buf, p, left);
+							aml_swap_data(buf, left);
+								AM_DEBUG(1, "@@@@memmove %d buf", left);
+							break;
+						}
 					}
 				}
 			}
@@ -920,6 +933,7 @@ static AM_ErrorCode_t aml_close(AM_USERDATA_Device_t *dev)
 	drv_data->running = AM_FALSE;
 	pthread_join(drv_data->thread, NULL);
 	free(drv_data);
+	dev->drv_data = NULL;
 
 	return AM_SUCCESS;
 }
