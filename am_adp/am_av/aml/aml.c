@@ -152,6 +152,8 @@ void *adec_handle = NULL;
 #define DEC_CONTROL_MPEG12 "/sys/module/amvdec_mpeg12/parameters/dec_control"
 #define VIDEO_NEW_FRAME_COUNT_FILE "/sys/module/amvideo/parameters/new_frame_count"
 
+#define AUDIO_DSP_DIGITAL_RAW_FILE "/sys/class/audiodsp/digital_raw"
+
 #define DEC_CONTROL_PROP "media.dec_control"
 #define AC3_AMASTER_PROP "media.ac3_amaster"
 
@@ -3706,6 +3708,19 @@ static AM_ErrorCode_t aml_open_ts_mode(AM_AV_Device_t *dev)
 	return AM_SUCCESS;
 }
 
+static int aml_get_audio_digital_raw(void)
+{
+	int mode;
+	char buf[32];
+	/*0:pcm 1:spdif 2:hdmi*/
+	if (AM_FileRead(AUDIO_DSP_DIGITAL_RAW_FILE, buf, sizeof(buf)) >= 0) {
+		sscanf(buf, "%d", &mode);
+	} else {
+		mode = 0;
+	}
+	return mode;
+}
+
 static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp, AM_Bool_t create_thread)
 {
 	AV_TSData_t *ts;
@@ -3877,7 +3892,14 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 				return AM_AV_ERR_SYS;
 			}
 		}
-		AM_FileEcho(TSYNC_MODE_FILE, "2");
+		if (aml_get_audio_digital_raw() == 0) {
+			AM_FileEcho(TSYNC_MODE_FILE, "2");
+		} else if (has_audio) {
+			AM_FileEcho(TSYNC_MODE_FILE, "1");
+		} else if (has_video) {
+			AM_FileEcho(TSYNC_MODE_FILE, "0");
+		}
+		/*AM_FileEcho(TSYNC_MODE_FILE, "2");*/
 	}
 
 	if (has_audio && !ac3_amaster) {
@@ -6174,8 +6196,14 @@ static AM_ErrorCode_t aml_switch_ts_audio_legacy(AM_AV_Device_t *dev, uint16_t a
 		property_set("sys.amplayer.drop_pcm", "1");
 	}
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
-	AM_FileEcho(TSYNC_MODE_FILE, "2");
-
+	if (aml_get_audio_digital_raw() == 0) {
+		AM_FileEcho(TSYNC_MODE_FILE, "2");
+	} else if (has_audio) {
+		AM_FileEcho(TSYNC_MODE_FILE, "1");
+	} else if (has_video) {
+		AM_FileEcho(TSYNC_MODE_FILE, "0");
+	}
+	/*AM_FileEcho(TSYNC_MODE_FILE, "2");*/
 	adec_start_decode(fd, afmt, has_video, &ts->adec);
 #endif /*ENABLE_PCR*/
 
@@ -6250,8 +6278,14 @@ static AM_ErrorCode_t aml_switch_ts_audio_fmt(AM_AV_Device_t *dev)
 		property_set("sys.amplayer.drop_pcm", "1");
 	}
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
-	AM_FileEcho(TSYNC_MODE_FILE, "2");
-
+	if (aml_get_audio_digital_raw() == 0) {
+		AM_FileEcho(TSYNC_MODE_FILE, "2");
+	} else if (has_audio) {
+		AM_FileEcho(TSYNC_MODE_FILE, "1");
+	} else if (has_video) {
+		AM_FileEcho(TSYNC_MODE_FILE, "0");
+	}
+	/*AM_FileEcho(TSYNC_MODE_FILE, "2");*/
 	adec_start_decode(fd, afmt, has_video, &ts->adec);
 
 	uint16_t sub_apid = dev->ts_player.play_para.sub_apid ;
