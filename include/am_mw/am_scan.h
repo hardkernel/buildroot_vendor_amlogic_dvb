@@ -159,6 +159,8 @@ enum AM_SCAN_PROCMode
 	AM_SCAN_PROCMODE_NORMAL                  = 0x00,  /**< normal mode*/
 	AM_SCAN_PROCMODE_AUTOPAUSE_ON_ATV_FOUND  = 0x01,	/**< auto pause when found atv*/
 	AM_SCAN_PROCMODE_AUTOPAUSE_ON_DTV_FOUND  = 0x02,	/**< auto pause when found dtv*/
+
+	AM_SCAN_PROCMODE_STORE_CB_COMPLICATED = 0x10,	/**< call store_cb whenever scanner needs*/
 };
 
 /**\brief TS signal type*/

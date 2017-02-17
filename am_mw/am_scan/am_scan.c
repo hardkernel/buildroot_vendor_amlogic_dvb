@@ -3892,12 +3892,23 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 		{
 			AM_SCAN_NewProgram_Data_t npd;
 
-			if (cur_fe_para.m_type == FE_ANALOG)
-				store_analog_ts(NULL, &scanner->result, scanner->curr_ts);
-			else if (dtv_start_para.standard == AM_SCAN_DTV_STD_ATSC)
-				store_atsc_ts(NULL, &scanner->result, scanner->curr_ts);
-			else
-				store_dvb_ts(NULL, &scanner->result, scanner->curr_ts, NULL);
+			{/*notify services found*/
+				if (cur_fe_para.m_type == FE_ANALOG)
+					store_analog_ts(NULL, &scanner->result, scanner->curr_ts);
+				else if (dtv_start_para.standard == AM_SCAN_DTV_STD_ATSC)
+					store_atsc_ts(NULL, &scanner->result, scanner->curr_ts);
+				else
+					store_dvb_ts(NULL, &scanner->result, scanner->curr_ts, NULL);
+			}
+
+			/*store when found*/
+			if (scanner->proc_mode & AM_SCAN_PROCMODE_STORE_CB_COMPLICATED) {
+				if ((scanner->start_para.atv_para.mode == AM_SCAN_ATVMODE_AUTO)
+					|| (scanner->start_para.dtv_para.mode != AM_SCAN_DTVMODE_MANUAL)) {
+					if (scanner->store_cb)
+						scanner->store_cb(&scanner->result);
+				}
+			}
 
 			npd.result = &scanner->result;
 			npd.newts = scanner->curr_ts;
@@ -4808,6 +4819,14 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 
 			/*添加到搜索结果列表*/
 			APPEND_TO_LIST(AM_SCAN_TS_t, scanner->curr_ts, scanner->result.tses);
+
+			/*store when found*/
+			if (scanner->proc_mode & AM_SCAN_PROCMODE_STORE_CB_COMPLICATED) {
+				if (scanner->start_para.atv_para.mode == AM_SCAN_ATVMODE_AUTO) {
+					if (scanner->store_cb)
+						scanner->store_cb(&scanner->result);
+				}
+			}
 
 			npd.result = &scanner->result;
 			npd.newts = scanner->curr_ts;
