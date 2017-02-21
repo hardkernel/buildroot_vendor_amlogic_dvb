@@ -1288,7 +1288,7 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 		else if (fbyte == 0x13)
 			strcpy(cod, "GB2312");
 		else if (fbyte == 0x14)
-			strcpy(cod, "UTF-16BE");
+			strcpy(cod, "big5hk");
 		else if (fbyte == 0x15)
 			strcpy(cod, "utf-8");
 		else if (fbyte >= 0x20)
