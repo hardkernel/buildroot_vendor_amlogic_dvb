@@ -39,7 +39,8 @@ int atsc_convert_code_from_utf16_to_utf8(char *in_code,int in_len,char *out_code
     iconv_t handle;
     char **pin=&in_code;
     char **pout=&out_code;
-
+    size_t inLength=in_len;
+    size_t outLength=*out_len;
 	if (!in_code || !out_code || !out_len || in_len <= 0 || *out_len <= 0)
 		return AM_FAILURE;
 
@@ -53,13 +54,13 @@ int atsc_convert_code_from_utf16_to_utf8(char *in_code,int in_len,char *out_code
     	return -1;
     }
 
-    if(iconv(handle,pin,(size_t *)&in_len,pout,(size_t *)out_len) == (size_t)-1)
+    if (iconv(handle, pin, &inLength, pout, &outLength) == (size_t)-1)
     {
         AM_TRACE("convert_code_to_utf8 iconv err: %s, in_len %d, out_len %d", strerror(errno), in_len, *out_len);
         iconv_close(handle);
         return -1;
     }
-
+    *out_len = (int)outLength;
     return iconv_close(handle);
 }
 

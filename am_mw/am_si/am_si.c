@@ -859,6 +859,7 @@ iso6937_end:
 		char **pout=&dest;
 		char *o_dest = dest;
 		size_t l_dest = *dest_len;
+		size_t l_dlen = dlen;
 
 		handle=iconv_open("utf-8","utf-16");
 		if (handle == (iconv_t)-1)
@@ -867,7 +868,7 @@ iso6937_end:
 			return AM_FAILURE;
 		}
 
-		if ((int)iconv(handle,pin,(size_t *)&dlen,pout, &l_dest) < 0)
+		if ((int)iconv(handle,pin,&l_dlen,pout, &l_dest) < 0)
 		{
 		    int i;
 		    AM_DEBUG(1, "iconv err:%d", errno);
@@ -1349,6 +1350,9 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 	}
 	else
 	{
+		size_t inLength = in_len;
+		size_t outLength = out_len;
+
 		handle=iconv_open("utf-8",cod);
 
 		if (handle == (iconv_t)-1)
@@ -1357,7 +1361,7 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 			return AM_FAILURE;
 		}
 
-		if((int)iconv(handle,pin,(size_t *)&in_len,pout,(size_t *)&out_len) == -1)
+		if ((int)iconv(handle, pin, &inLength, pout, &outLength) == -1)
 		{
 		    AM_DEBUG(1, "Covert DVB text code failed, iconv err: %d, in_len %d, out_len %d",
 				errno, in_len, out_len);
