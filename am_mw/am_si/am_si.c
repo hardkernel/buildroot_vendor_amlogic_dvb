@@ -891,8 +891,12 @@ iso6937_end:
 
 static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang[3],int audio_type,int audio_exten)
 {
-	int i;
-
+	int i, j;
+	int i_exten = 0, sub_id;
+	int id = 0;
+	/*i_exten is 32 bit,31:24 bit: exten type,*/
+	/*23:16:mainid or asvc id,8 bit*/
+	/*15:0 bit:no use*/
 	for (i=0; i<ai->audio_count; i++)
 	{
 		if (ai->audios[i].pid == aud_pid &&
@@ -911,10 +915,27 @@ static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char l
 	}
 	if (ai->audio_count < 0)
 		ai->audio_count = 0;
+
 	ai->audios[ai->audio_count].pid = aud_pid;
 	ai->audios[ai->audio_count].fmt = aud_fmt;
 	ai->audios[ai->audio_count].audio_type = audio_type;
-	ai->audios[ai->audio_count].audio_exten = audio_exten;
+	/*set audio exten flag*/
+	if (aud_fmt == AFORMAT_AC3) {
+		ai->audios[ai->audio_count].audio_exten = audio_exten;
+	} else {
+		if (audio_type == 0) {
+			id = ai->audio_mainid;
+			i_exten = AM_Audio_AC3MAIN<<24 | id<<16;
+			ai->audio_mainid++;
+			if (ai->audio_mainid >= AM_SI_MAX_MAIN_AUD_CNT) {
+				/*max main audio sum is AM_SI_MAX_MAIN_AUD_CNT*/
+				ai->audio_mainid = AM_SI_MAX_MAIN_AUD_CNT-1;
+			}
+			AM_DEBUG(0, "add audio main exten 0x%x mainid index:%d", i_exten, ai->audio_mainid);
+		}
+		ai->audios[ai->audio_count].audio_exten = i_exten;
+	}
+
 	memset(ai->audios[ai->audio_count].lang, 0, sizeof(ai->audios[ai->audio_count].lang));
 	if (lang[0] != 0)
 	{
@@ -925,9 +946,33 @@ static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char l
 		snprintf(ai->audios[ai->audio_count].lang, sizeof(ai->audios[ai->audio_count].lang), "Audio%d", ai->audio_count+1);
 	}
 
-	AM_DEBUG(0, "Add a audio: pid %d, fmt %d, language: %s ,audio_type:%d, audio_exten:0x%x", aud_pid, aud_fmt, ai->audios[ai->audio_count].lang,audio_type,audio_exten);
-
+	AM_DEBUG(0, "---Add a audio: pid %d, fmt %d, language: %s ,audio_type:%d, audio_exten:0x%x", aud_pid, aud_fmt, ai->audios[ai->audio_count].lang,audio_type,audio_exten);
 	ai->audio_count++;
+	/*ad sub audio exten when fmt is not ac3*/
+	for (i=0; i<ai->audio_count; i++)
+	{
+		if (ai->audios[i].fmt != AFORMAT_AC3 && ai->audios[i].audio_type != 0) {
+			AM_DEBUG(0,"sub audio lang :%s ", ai->audios[i].lang);
+			for (j=0; j<ai->audio_count; j++)
+			{
+				if (ai->audios[j].fmt != AFORMAT_AC3 && ai->audios[j].audio_type == 0) {
+					AM_DEBUG(0,"main audio lang :%s ", ai->audios[j].lang);
+					/*get same audio lang*/
+					if (!memcmp(ai->audios[i].lang, ai->audios[j].lang, 3)) {
+						/*get main audio mainid and set sub audio exten*/
+						sub_id = (ai->audios[j].audio_exten&0x00ff0000)>>16;
+						AM_DEBUG(0,"sub audio id index :%d ", sub_id);
+						sub_id = 1 << sub_id;
+						i_exten = AM_Audio_AC3ASVC<<24 | ((sub_id<<16)&0x00ff0000);
+						AM_DEBUG(0, "Add- a sub audio: audio_exten:0x%x main:0x%x",  i_exten, ai->audios[j].audio_exten);
+						break;
+					}
+				}
+			}
+			/*set sub audio exten*/
+			ai->audios[i].audio_exten = i_exten;
+		}
+	}
 }
 
 /****************************************************************************

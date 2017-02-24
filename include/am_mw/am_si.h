@@ -165,6 +165,8 @@ extern "C"
 #define AM_SI_LIST_END() }
 
 /**\brief Maximum number of single Program supported audio*/
+#define AM_SI_MAX_MAIN_AUD_CNT 8
+/**\brief Maximum number of single Program supported audio*/
 #define AM_SI_MAX_AUD_CNT 32
 /**\brief Maximum number of single Program supported subtitle*/
 #define AM_SI_MAX_SUB_CNT 32
@@ -212,6 +214,7 @@ enum AM_Audio_Exten
 typedef struct
 {
 	int		audio_count;		/**<ES stream Contains audio count*/
+	int		audio_mainid;		/**<audio mainid increase value from 1 - 8*/
 	struct
 	{
 		int		pid;	/**< audio PID*/
