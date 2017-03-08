@@ -654,7 +654,7 @@ static AM_Bool_t am_epg_check_program_av(sqlite3 * hdb, int db_srv_id, int vid, 
 		
 		if (ret)
 		{
-			format_audio_strings(&cur_aud_info, str_apids, str_afmts, str_alangs);
+			format_audio_strings(aud_info, str_apids, str_afmts, str_alangs);
 			AM_DEBUG(1, "@@ Video/Audio changed @@");
 			AM_DEBUG(1, "Video pid/fmt: (%d/%d) -> (%d/%d)", prev_vid, prev_vfmt, vid, vfmt);
 			AM_DEBUG(1, "Audio pid/fmt/lang: ('%s'/'%s'/'%s') -> ('%s'/'%s'/'%s')",
