@@ -19,6 +19,41 @@ typedef struct
 	AM_PES_Para_t para;
 }AM_PES_Parser_t;
 
+
+static int calc_invalid_pes_offset(uint8_t  *data, int data_len, int *plen, int *dpos, int *dlen)
+{
+	int posn = 6;
+	int i = 0;
+	int pes_head_len = 0;
+	int found = 0;
+	pes_head_len = data[8];
+	/*find next 00 00 01 head*/
+	for (i=posn; i< data_len - 4; i++)
+	{
+		if ((data[i] == 0) && (data[i+1] == 0) && (data[i+2] == 1))
+		{
+			posn = i;
+			found = 1;
+			break;
+		}
+	}
+	if (found ==1) {
+		if (posn < pes_head_len + 9) {
+	      /*del data*/
+		  *dpos = *dpos + posn;
+		  *dlen = 0;
+		  *plen = posn - 6;
+		} else {
+		  *dpos = *dpos + pes_head_len + 9;
+		  *dlen = posn -(pes_head_len + 9);
+		  *plen = posn - 6;
+		}
+	} else {
+		return -1;
+	}
+	return 0;
+}
+
 static int calc_mpeg1_pes_offset(uint8_t  *data, int data_len)
 {
 	int posn = 6;
@@ -148,6 +183,7 @@ AM_ErrorCode_t AM_PES_Decode(AM_PES_Handle_t handle, uint8_t *buf, int size)
 		int i, plen = 0;
 		int dpos = 0, dlen = 0;
 		int hlen = 0;
+		int invalid = 0;
 
 		for (i=pos; i< parser->len - 4; i++)
 		{
@@ -165,21 +201,36 @@ AM_ErrorCode_t AM_PES_Decode(AM_PES_Handle_t handle, uint8_t *buf, int size)
 		}
 
 		plen = (parser->buf[pos+4]<<8) | (parser->buf[pos+5]);
+		if (plen == 0xffff || plen == 0x0) {
+			invalid = 1;
+		}
 
-		if ((parser->len - pos) < (plen + 6))
+		if ((parser->len - pos) < (plen + 6) && invalid == 0)
 		{
 			goto end;
 		}
 
 		if (parser->para.payload_only) {
-			if ((parser->buf[pos+6] & 0xC0) == 0x80) {
-				hlen = 6 + 3 + parser->buf[pos+8];
+			if (invalid == 1) {
+
+				dpos = pos;
+				if (calc_invalid_pes_offset(parser->buf +pos, parser->len - pos, &plen, &dpos, &dlen) != 0) {
+					AM_DEBUG(1, "pes packet calc error");
+					goto end;
+				} else {
+					AM_DEBUG(1, "pes packet calc plen=[%d]dpos[%d]dlen[%d]", plen, dpos, dlen);
+				}
 			} else {
-				AM_DEBUG(1, "assume MPEG-1 [%#x]\n", parser->buf[pos+6]);
-				hlen = calc_mpeg1_pes_offset(parser->buf +pos, plen);
+				if ((parser->buf[pos+6] & 0xC0) == 0x80) {
+					hlen = 6 + 3 + parser->buf[pos+8];
+				} else {
+					AM_DEBUG(1, "pes packet assume MPEG-1 [%#x]\n", parser->buf[pos+6]);
+					hlen = calc_mpeg1_pes_offset(parser->buf +pos, plen);
+				}
+				dpos = pos + hlen;
+				dlen = plen + 6 - hlen;
 			}
-			dpos = pos + hlen;
-			dlen = plen + 6 - hlen;
+
 		} else {
 			dpos = pos;
 			dlen = plen + 6;
@@ -200,9 +251,7 @@ end:
 	{
 		memmove(parser->buf, parser->buf + pos, left);
 	}
-
 	parser->len = left;
-
 	return AM_SUCCESS;
 }
 
