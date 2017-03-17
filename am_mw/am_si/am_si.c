@@ -461,6 +461,7 @@ void si_decode_descriptor(dvbpsi_descriptor_t *des)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_LCN_88, 			dvbpsi_DecodeLogicalChannelNumber88Dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_AC3, 			dvbpsi_DecodeAC3Dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_ENHANCED_AC3, 	dvbpsi_DecodeENAC3Dr)
+		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_EXTENSION, 	dvbpsi_DecodeEXTENTIONDr)
 		default:
 			break;
 	}
@@ -1620,6 +1621,22 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 				{
 					memcpy(lang_tmp, pisod->code[0].iso_639_code, sizeof(lang_tmp));
 					audio_type = pisod->code[0].i_audio_type;
+					break;
+				}
+			}
+		AM_SI_LIST_END()
+		/*if exist exten des, used exten des info to check audio main or sub*/
+		AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+			if (descr->i_tag == AM_SI_DESCR_EXTENSION && descr->p_decoded != NULL)
+			{
+				dvbpsi_EXTENTION_dr_t *pisod = (dvbpsi_EXTENTION_dr_t*)descr->p_decoded;
+				if (pisod->i_extern_des_tag == AM_SI_EXTEN_DESCR_SUP_AUDIO)
+				{
+					if (pisod->exten_t.sup_audio.lang_code == 1) {
+						memcpy(lang_tmp, pisod->exten_t.sup_audio.iso_639_lang_code, sizeof(lang_tmp));
+					}
+					audio_type = pisod->exten_t.sup_audio.editorial_classification;
+					AM_DEBUG(3, "audio type : %d lang:%s", audio_type, lang_tmp);
 					break;
 				}
 			}

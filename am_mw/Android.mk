@@ -60,6 +60,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/libdvbsi/descriptors/dr_5d.c\
 		   am_si/libdvbsi/descriptors/dr_6a.c\
 		   am_si/libdvbsi/descriptors/dr_7a.c\
+		   am_si/libdvbsi/descriptors/dr_7f.c\
 		   am_si/libdvbsi/psi.c\
 		   am_si/libdvbsi/dvbpsi.c\
 		   am_si/libdvbsi/descriptor.c\

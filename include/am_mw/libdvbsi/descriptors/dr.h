@@ -71,6 +71,7 @@
 #include "dr_5d.h"
 #include "dr_6a.h"
 #include "dr_7a.h"
+#include "dr_7f.h"
 #else
 #error "Multiple inclusions of dr.h"
 #endif
