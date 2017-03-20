@@ -319,6 +319,7 @@ struct AM_SCAN_Scanner_s
 	int                                     status;
 	int                                     proc_mode;
 
+	AM_SCAN_Helper_t          helper[AM_SCAN_HELPER_ID_MAX];
 };
 
 

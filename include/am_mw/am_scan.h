@@ -55,27 +55,27 @@ enum AM_SCAN_ErrorCode
 /**\brief event type of scan process,used in AM_SCAN_Progress_t*/
 enum AM_SCAN_ProgressEvt
 {
-	AM_SCAN_PROGRESS_SCAN_BEGIN,	/**< start scan，Parameter is the scan handle*/
-	AM_SCAN_PROGRESS_SCAN_END,		/**< scan end，Parameter is the scan result code*/
-	AM_SCAN_PROGRESS_NIT_BEGIN,		/**< start get nit table when scan mode is auto mode*/
-	AM_SCAN_PROGRESS_NIT_END,		/**< got nit table end when scan mode is auto mode*/
-	AM_SCAN_PROGRESS_TS_BEGIN,		/**< start scan a ts,Parameter is AM_SCAN_TSProgress_t*/
-	AM_SCAN_PROGRESS_TS_END,		/**< scan for a TS finished*/
-	AM_SCAN_PROGRESS_PAT_DONE,		/**< PAT table search is completed of the current TS，Parameter is dvbpsi_pat_t*/
-	AM_SCAN_PROGRESS_PMT_DONE,		/**< ALL PMT table search is completed of the current TS，Parameter is dvbpsi_pmt_t*/
-	AM_SCAN_PROGRESS_CAT_DONE,		/**< CAT table search is completed of the current TS，Parameter is dvbpsi_cat_t*/
-	AM_SCAN_PROGRESS_SDT_DONE,		/**< SDT table search is completed of the current TS，Parameter is dvbpsi_sdt_t*/
-	AM_SCAN_PROGRESS_MGT_DONE,		/**< MGT table search is completed of the current TS，Parameter is mgt_section_info_t*/
-	AM_SCAN_PROGRESS_VCT_DONE,		/**< VCT table search is completed of the current TS，Parameter is vct_section_info_t*/
-	AM_SCAN_PROGRESS_STORE_BEGIN,	/**< start store*/
-	AM_SCAN_PROGRESS_STORE_END,		/**< store finished*/
-	AM_SCAN_PROGRESS_BLIND_SCAN,	/**< Satellite blind search progress，Parameter is AM_SCAN_BlindScanProgress_t*/
-	AM_SCAN_PROGRESS_ATV_TUNING,	/**< ATV tuning a new frequency*/
-	AM_SCAN_PROGRESS_NEW_PROGRAM,	/**< Searched a new program which will be stored*/
-	AM_SCAN_PROGRESS_DVBT2_PLP_BEGIN,	/**< Start a DVB-T2 data PLP, parameter is AM_SCAN_PLPProgress_t*/
-	AM_SCAN_PROGRESS_DVBT2_PLP_END,	/**< DVB-T2 PLP search end, parameter is AM_SCAN_PLPProgress_t*/
-	AM_SCAN_PROGRESS_SCAN_EXIT,					/**< exit scan*/
-	AM_SCAN_PROGRESS_NEW_PROGRAM_MORE,	/**< new a program*/
+	AM_SCAN_PROGRESS_SCAN_BEGIN = 0,	/**< start scan，Parameter is the scan handle*/
+	AM_SCAN_PROGRESS_SCAN_END = 1,		/**< scan end，Parameter is the scan result code*/
+	AM_SCAN_PROGRESS_NIT_BEGIN = 2,		/**< start get nit table when scan mode is auto mode*/
+	AM_SCAN_PROGRESS_NIT_END = 3,		/**< got nit table end when scan mode is auto mode*/
+	AM_SCAN_PROGRESS_TS_BEGIN = 4,		/**< start scan a ts,Parameter is AM_SCAN_TSProgress_t*/
+	AM_SCAN_PROGRESS_TS_END = 5,		/**< scan for a TS finished*/
+	AM_SCAN_PROGRESS_PAT_DONE = 6,		/**< PAT table search is completed of the current TS，Parameter is dvbpsi_pat_t*/
+	AM_SCAN_PROGRESS_PMT_DONE = 7,		/**< ALL PMT table search is completed of the current TS，Parameter is dvbpsi_pmt_t*/
+	AM_SCAN_PROGRESS_CAT_DONE = 8,		/**< CAT table search is completed of the current TS，Parameter is dvbpsi_cat_t*/
+	AM_SCAN_PROGRESS_SDT_DONE = 9,		/**< SDT table search is completed of the current TS，Parameter is dvbpsi_sdt_t*/
+	AM_SCAN_PROGRESS_MGT_DONE = 10,		/**< MGT table search is completed of the current TS，Parameter is mgt_section_info_t*/
+	AM_SCAN_PROGRESS_VCT_DONE = 11,		/**< VCT table search is completed of the current TS，Parameter is vct_section_info_t*/
+	AM_SCAN_PROGRESS_STORE_BEGIN = 12,	/**< start store*/
+	AM_SCAN_PROGRESS_STORE_END = 13,		/**< store finished*/
+	AM_SCAN_PROGRESS_BLIND_SCAN = 14,	/**< Satellite blind search progress，Parameter is AM_SCAN_BlindScanProgress_t*/
+	AM_SCAN_PROGRESS_ATV_TUNING = 15,	/**< ATV tuning a new frequency*/
+	AM_SCAN_PROGRESS_NEW_PROGRAM = 16,	/**< Searched a new program which will be stored*/
+	AM_SCAN_PROGRESS_DVBT2_PLP_BEGIN = 17,	/**< Start a DVB-T2 data PLP, parameter is AM_SCAN_PLPProgress_t*/
+	AM_SCAN_PROGRESS_DVBT2_PLP_END = 18,	/**< DVB-T2 PLP search end, parameter is AM_SCAN_PLPProgress_t*/
+	AM_SCAN_PROGRESS_SCAN_EXIT = 19,					/**< exit scan*/
+	AM_SCAN_PROGRESS_NEW_PROGRAM_MORE = 20,	/**< new a program*/
 };
 
 /**\brief scan event type*/
@@ -179,6 +179,10 @@ typedef enum
 	AM_SCAN_SORT_BY_HD_SD,		/**< Sorted according to the service Resolving power*/
 }AM_SCAN_DTVSortMethod_t;
 
+enum {
+	AM_SCAN_HELPER_ID_FE_TYPE_CHANGE, /**<request to change fe type, fe_type_t will be used as para*/
+	AM_SCAN_HELPER_ID_MAX,
+};
 
 /**\brief Frequency info of scan progress*/
 typedef struct
@@ -366,6 +370,12 @@ typedef struct AM_SCAN_NewProgram_Data_s {
 	AM_SCAN_TS_t      *newts;	/**< new scan ts*/
 }AM_SCAN_NewProgram_Data_t;
 
+/**\brief helper for scan process*/
+typedef struct AM_SCAN_Helper_s {
+	int id;
+	void *user;
+	int (*cb)(int id, void *para, void *user);
+} AM_SCAN_Helper_t;
 
 /****************************************************************************
  * Function prototypes
@@ -404,20 +414,21 @@ extern AM_ErrorCode_t AM_SCAN_SetUserData(AM_SCAN_Handle_t handle, void *user_da
 
 /**\brief get user data
  * \param [in] handle scan handle
- * \param [out] user_data user data
+ * \param [in] user_data user data
  * \retval AM_SUCCESS On success
  * \return Error code
  */
 extern AM_ErrorCode_t AM_SCAN_GetUserData(AM_SCAN_Handle_t handle, void **user_data);
 /**\brief get scan status
  * \param [in] handle scan handle
- * \param [status] scan status
+ * \param [out] user_data
  * \retval AM_SUCCESS On success
  * \return Error code
  */
 extern AM_ErrorCode_t AM_SCAN_GetStatus(AM_SCAN_Handle_t handle, int *status);
 /**\brief pause scan
- * \param handle scan handle
+ * \param [in] handle scan handle
+ * \param [out] status
  * \retval AM_SUCCESS On success
  * \return Error code
  */
@@ -428,6 +439,13 @@ extern AM_ErrorCode_t AM_SCAN_Pause(AM_SCAN_Handle_t handle);
  * \return Error code
  */
 extern AM_ErrorCode_t AM_SCAN_Resume(AM_SCAN_Handle_t handle);
+/**\brief set helper to assist with the scan process
+ * \param [in] handle scan handle
+ * \param [in] helper to set
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
+extern AM_ErrorCode_t AM_SCAN_SetHelper(AM_SCAN_Handle_t handle, AM_SCAN_Helper_t *helper);
 
 #ifdef __cplusplus
 }
