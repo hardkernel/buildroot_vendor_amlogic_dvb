@@ -362,7 +362,6 @@ static void am_xds_store_process(void)
 
    // prepare database initialization
     AM_DB_Setup(db_path, hdb);
-    sqlite3_set_sync_flag(0);
 
    ret = AM_FEND_GetLastPara(&fparam);
 

@@ -465,7 +465,6 @@ AM_ErrorCode_t AM_Initialize_XDSDataServices(void)
 
         /* init dvb.db for store xds information */
         AM_DB_Setup(db_path, hdb);
-        sqlite3_set_sync_flag(0);	
         AM_DB_HANDLE_PREPARE(hdb);
         memset(&xds_ca_info ,0,sizeof(atsc_content_advisory_dr_t));
         
