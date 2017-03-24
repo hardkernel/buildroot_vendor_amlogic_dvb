@@ -59,7 +59,10 @@ static void fend_cb(int dev_no, struct dvb_frontend_event *evt, void *user_data)
 	} else if(info.type == FE_QPSK) {	
 		printf("cb parameters: * can get fe type qpsk! *\n");
 	} else if(info.type == FE_ANALOG){
-		printf("cb parameters: std:%#X\n", evt->parameters.u.analog.std);
+		//printf("cb parameters: std:%#X\n", evt->parameters.u.analog.std);
+		struct dvb_frontend_parameters para;
+		AM_FEND_GetPara(dev_no, &para);
+		printf("cb parameters: std:%#X\n", para.u.analog.std);
 	} else {
 		printf("cb parameters: * can not get fe type! *\n");
 	}

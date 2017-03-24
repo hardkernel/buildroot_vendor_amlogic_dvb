@@ -18,6 +18,18 @@
 #include "am_dmx.h"
 #include <linux/dvb/frontend.h>
 
+#ifdef FE_SET_FRONTEND
+#undef FE_SET_FRONTEND
+#define FE_SET_FRONTEND FE_SET_FRONTEND_EX
+#endif
+
+#ifdef FE_GET_FRONTEND
+#undef FE_GET_FRONTEND
+#define FE_GET_FRONTEND FE_GET_FRONTEND_EX
+#endif
+
+#define dvb_frontend_parameters dvb_frontend_parameters_ex
+
 #ifdef __cplusplus
 extern "C"
 {
