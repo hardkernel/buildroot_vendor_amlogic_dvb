@@ -48,7 +48,7 @@
 #include <linux/amports/jpegdec.h>
 #endif
 
-#define PLAYER_API_NEW
+//#define PLAYER_API_NEW
 #define ADEC_API_NEW
 
 #include "player.h"
@@ -241,35 +241,8 @@ typedef enum {
 	AV_JPEG_DEC_STAT_DECCONFIG,
 	AV_JPEG_DEC_STAT_RUN
 } AV_JPEGDecState_t;
-#ifdef  MEDIA_PLAYER
-/**\brief 文件播放器应答类型*/
-typedef enum
-{
-	AV_MP_RESP_OK,
-	AV_MP_RESP_ERR,
-	AV_MP_RESP_STOP,
-	AV_MP_RESP_DURATION,
-	AV_MP_RESP_POSITION,
-	AV_MP_RESP_MEDIA
-} AV_MpRespType_t;
 
-/**\brief 文件播放器数据*/
-typedef struct
-{
-	int                media_id;
-	AV_MpRespType_t    resp_type;
-	union
-	{
-		int        duration;
-		int        position;
-		MP_AVMediaFileInfo media;
-	} resp_data;
-	pthread_mutex_t    lock;
-	pthread_cond_t     cond;
-	MP_PlayBackState   state;
-	AM_AV_Device_t    *av;
-} AV_FilePlayerData_t;
-#elif defined(PLAYER_API_NEW)
+#ifdef PLAYER_API_NEW
 /**\brief 文件播放器数据*/
 typedef struct
 {
@@ -816,15 +789,6 @@ static AM_ErrorCode_t amp_open(AM_AOUT_Device_t *dev, const AM_AOUT_OpenPara_t *
 
 static AM_ErrorCode_t amp_set_volume(AM_AOUT_Device_t *dev, int vol)
 {
-#ifdef  MEDIA_PLAYER
-	int media_id = (int)dev->drv_data;
-
-	if (MP_SetVolume(media_id, vol) == -1)
-	{
-		AM_DEBUG(1, "MP_SetVolume failed");
-		return AM_AV_ERR_SYS;
-	}
-#endif
 #ifdef PLAYER_API_NEW
 	int media_id = (long)dev->drv_data;
 
@@ -839,15 +803,6 @@ static AM_ErrorCode_t amp_set_volume(AM_AOUT_Device_t *dev, int vol)
 
 static AM_ErrorCode_t amp_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 {
-#ifdef  MEDIA_PLAYER
-	int media_id = (int)dev->drv_data;
-
-	if (MP_mute(media_id, mute) == -1)
-	{
-		AM_DEBUG(1, "MP_SetVolume failed");
-		return AM_AV_ERR_SYS;
-	}
-#endif
 #ifdef PLAYER_API_NEW
 	int media_id = (long)dev->drv_data;
 
@@ -903,34 +858,6 @@ static int audio_hardware_ctrl( AM_AOUT_OutputMode_t mode)
 
 static AM_ErrorCode_t amp_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_OutputMode_t mode)
 {
-#ifdef  MEDIA_PLAYER
-	int media_id = (int)dev->drv_data;
-
-	MP_Tone tone;
-
-	switch (mode)
-	{
-		case AM_AOUT_OUTPUT_STEREO:
-		default:
-			tone = MP_TONE_STEREO;
-		break;
-		case AM_AOUT_OUTPUT_DUAL_LEFT:
-			tone = MP_TONE_LEFTMONO;
-		break;
-		case AM_AOUT_OUTPUT_DUAL_RIGHT:
-			tone = MP_TONE_RIGHTMONO;
-		break;
-		case AM_AOUT_OUTPUT_SWAP:
-			tone = MP_TONE_SWAP;
-		break;
-	}
-
-	if (MP_SetTone(media_id, tone) == -1)
-	{
-		AM_DEBUG(1, "MP_SetTone failed");
-		return AM_AV_ERR_SYS;
-	}
-#endif
 #ifdef PLAYER_API_NEW
 	int media_id = (long)dev->drv_data;
 	int ret=0;
@@ -1130,134 +1057,7 @@ static void aml_destroy_data_source(AV_DataSource_t *src)
 	free(src);
 }
 
-#ifdef  MEDIA_PLAYER
-
-/**\brief 播放器消息回调*/
-static int aml_fp_msg_cb(void *obj,MP_ResponseMsg *msgt)
-{
-	AV_FilePlayerData_t *fp = (AV_FilePlayerData_t *)obj;
-
-	if (msgt !=NULL)
-	{
-		AM_DEBUG(1, "MPlayer event %d", msgt->head.type);
-		switch (msgt->head.type)
-		{
-			case MP_RESP_STATE_CHANGED:
-				AM_DEBUG(1, "MPlayer state changed to %d", ((MP_StateChangedRespBody *)msgt->auxDat)->state);
-				pthread_mutex_lock(&fp->lock);
-
-				fp->state = ((MP_StateChangedRespBody *)msgt->auxDat)->state;
-				AM_EVT_Signal(fp->av->dev_no, AM_AV_EVT_PLAYER_STATE_CHANGED, (void*)((MP_StateChangedRespBody *)msgt->auxDat)->state);
-
-				pthread_mutex_unlock(&fp->lock);
-				pthread_cond_broadcast(&fp->cond);
-			break;
-			case MP_RESP_DURATION:
-				pthread_mutex_lock(&fp->lock);
-				if (fp->resp_type == AV_MP_RESP_DURATION)
-				{
-					fp->resp_data.duration = *(int *)msgt->auxDat;
-					fp->resp_type = AV_MP_RESP_OK;
-					pthread_cond_broadcast(&fp->cond);
-				}
-				pthread_mutex_unlock(&fp->lock);
-			break;
-			case MP_RESP_TIME_CHANGED:
-				pthread_mutex_lock(&fp->lock);
-				if (fp->resp_type == AV_MP_RESP_POSITION)
-				{
-					fp->resp_data.position = *(int *)msgt->auxDat;
-					fp->resp_type = AV_MP_RESP_OK;
-					pthread_cond_broadcast(&fp->cond);
-				}
-				AM_EVT_Signal(fp->av->dev_no, AM_AV_EVT_PLAYER_TIME_CHANGED, (void *)*(int *)msgt->auxDat);
-				pthread_mutex_unlock(&fp->lock);
-			break;
-			case MP_RESP_MEDIAINFO:
-				pthread_mutex_lock(&fp->lock);
-				if (fp->resp_type == AV_MP_RESP_MEDIA)
-				{
-					MP_AVMediaFileInfo *info = (MP_AVMediaFileInfo *)msgt->auxDat;
-					fp->resp_data.media = *info;
-					fp->resp_type = AV_MP_RESP_OK;
-					pthread_cond_broadcast(&fp->cond);
-				}
-				pthread_mutex_unlock(&fp->lock);
-			break;
-			default:
-			break;
-		}
-
-		MP_free_response_msg(msgt);
-	}
-
-	return 0;
-}
-
-/**\brief 释放文件播放数据*/
-static void aml_destroy_fp(AV_FilePlayerData_t *fp)
-{
-	int rc;
-
-	/*等待播放器停止*/
-	if (fp->media_id != -1)
-	{
-		pthread_mutex_lock(&fp->lock);
-
-		fp->resp_type= AV_MP_RESP_STOP;
-		rc = MP_stop(fp->media_id);
-
-		if (rc == 0)
-		{
-			while ((fp->state != MP_STATE_STOPED) && (fp->state != MP_STATE_NORMALERROR) &&
-					(fp->state != MP_STATE_FATALERROR) && (fp->state != MP_STATE_FINISHED))
-				pthread_cond_wait(&fp->cond, &fp->lock);
-		}
-
-		pthread_mutex_unlock(&fp->lock);
-
-		MP_CloseMediaID(fp->media_id);
-	}
-
-	pthread_mutex_destroy(&fp->lock);
-	pthread_cond_destroy(&fp->cond);
-
-	MP_ReleaseMPClient();
-
-	free(fp);
-}
-
-/**\brief 创建文件播放器数据*/
-static AV_FilePlayerData_t* aml_create_fp(AM_AV_Device_t *dev)
-{
-	AV_FilePlayerData_t *fp;
-
-	fp = (AV_FilePlayerData_t*)malloc(sizeof(AV_FilePlayerData_t));
-	if (!fp)
-	{
-		AM_DEBUG(1, "not enough memory");
-		return NULL;
-	}
-
-	if (MP_CreateMPClient() == -1)
-	{
-		AM_DEBUG(1, "MP_CreateMPClient failed");
-		free(fp);
-		return NULL;
-	}
-
-	memset(fp, 0, sizeof(AV_FilePlayerData_t));
-	pthread_mutex_init(&fp->lock, NULL);
-	pthread_cond_init(&fp->cond, NULL);
-
-	fp->av       = dev;
-	fp->media_id = -1;
-
-	MP_RegPlayerRespMsgListener(fp, aml_fp_msg_cb);
-
-	return fp;
-}
-#elif defined(PLAYER_API_NEW)
+#ifdef PLAYER_API_NEW
 /**\brief 释放文件播放数据*/
 static void aml_destroy_fp(AV_FilePlayerData_t *fp)
 {
@@ -1310,6 +1110,7 @@ static int aml_update_player_info_callback(int pid,player_info_t * info)
 
 	return 0;
 }
+#endif
 
 int aml_set_tsync_enable(int enable)
 {
@@ -1333,8 +1134,6 @@ int aml_set_tsync_enable(int enable)
 	// return -1;
 }
 
-
-#endif
 /**\brief 初始化JPEG解码器*/
 static AM_ErrorCode_t aml_init_jpeg(AV_JPEGData_t *jpeg)
 {
@@ -4677,7 +4476,9 @@ static void* aml_av_monitor_thread(void *arg)
 static AM_ErrorCode_t aml_open_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 {
 	AV_DataSource_t *src;
+#ifdef PLAYER_API_NEW
 	AV_FilePlayerData_t *data;
+#endif
 	AV_JPEGData_t *jpeg;
 	AV_InjectData_t *inj;
 	AV_TimeshiftData_t *tshift;
@@ -4719,6 +4520,7 @@ static AM_ErrorCode_t aml_open_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 				return AM_AV_ERR_SYS;
 		break;
 		case AV_PLAY_FILE:
+#ifdef PLAYER_API_NEW
 			data = aml_create_fp(dev);
 			if (!data)
 			{
@@ -4726,6 +4528,7 @@ static AM_ErrorCode_t aml_open_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 				return AM_AV_ERR_NO_MEM;
 			}
 			dev->file_player.drv_data = data;
+#endif
 		break;
 		case AV_GET_JPEG_INFO:
 		case AV_DECODE_JPEG:
@@ -4768,8 +4571,10 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 	AV_DataSource_t *src;
 	int fd, val;
 	AV_TSPlayPara_t *tp;
+#ifdef PLAYER_API_NEW
 	AV_FilePlayerData_t *data;
 	AV_FilePlayPara_t *pp;
+#endif
 	AV_JPEGData_t *jpeg;
 	AV_InjectPlayPara_t *inj_p;
 	AV_InjectData_t *inj;
@@ -4818,23 +4623,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 			AM_TRY(aml_start_ts_mode(dev, tp, AM_TRUE));
 		break;
 		case AV_PLAY_FILE:
-#ifdef  MEDIA_PLAYER
-			data = (AV_FilePlayerData_t *)dev->file_player.drv_data;
-			pp = (AV_FilePlayPara_t *)para;
-
-			if (pp->start)
-				data->media_id = MP_PlayMediaSource(pp->name, pp->loop, 0);
-			else
-				data->media_id = MP_AddMediaSource(pp->name);
-
-			if (data->media_id == -1)
-			{
-				AM_DEBUG(1, "play file failed");
-				return AM_AV_ERR_SYS;
-			}
-
-			AM_AOUT_SetDriver(AOUT_DEV_NO, &amplayer_aout_drv, (void*)data->media_id);
-#elif defined PLAYER_API_NEW
+#ifdef PLAYER_API_NEW
 			data = (AV_FilePlayerData_t*)dev->file_player.drv_data;
 			pp = (AV_FilePlayPara_t*)para;
 
@@ -4906,7 +4695,9 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 static AM_ErrorCode_t aml_close_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 {
 	AV_DataSource_t *src;
+#ifdef PLAYER_API_NEW
 	AV_FilePlayerData_t *data;
+#endif
 	AV_JPEGData_t *jpeg;
 	AV_InjectData_t *inj;
 	AV_TimeshiftData_t *tshift;
@@ -4934,9 +4725,11 @@ static AM_ErrorCode_t aml_close_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 		ret = aml_close_ts_mode(dev, AM_TRUE);
 		break;
 		case AV_PLAY_FILE:
+#ifdef PLAYER_API_NEW
 			data = (AV_FilePlayerData_t *)dev->file_player.drv_data;
 			aml_destroy_fp(data);
 			adec_cmd("stop");
+#endif
 		break;
 		case AV_GET_JPEG_INFO:
 		case AV_DECODE_JPEG:
@@ -5004,52 +4797,13 @@ static AM_ErrorCode_t aml_ts_source(AM_AV_Device_t *dev, AM_AV_TSSource_t src)
 
 static AM_ErrorCode_t aml_file_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *para)
 {
+#ifdef PLAYER_API_NEW
 	AV_FilePlayerData_t *data;
 	AV_FileSeekPara_t *sp;
 	int rc = -1;
 
 	data = (AV_FilePlayerData_t *)dev->file_player.drv_data;
 
-#ifdef  MEDIA_PLAYER
-	if (data->media_id == -1)
-	{
-		AM_DEBUG(1, "player do not start");
-		return AM_AV_ERR_SYS;
-	}
-
-	switch (cmd)
-	{
-		case AV_PLAY_START:
-			rc = MP_start(data->media_id);
-		break;
-		case AV_PLAY_PAUSE:
-			rc = MP_pause(data->media_id);
-		break;
-		case AV_PLAY_RESUME:
-			rc = MP_resume(data->media_id);
-		break;
-		case AV_PLAY_FF:
-			rc = MP_fastforward(data->media_id, (int)para);
-		break;
-		case AV_PLAY_FB:
-			rc = MP_rewind(data->media_id, (int)para);
-		break;
-		case AV_PLAY_SEEK:
-			sp = (AV_FileSeekPara_t *)para;
-			rc = MP_seek(data->media_id, sp->pos, sp->start);
-		break;
-		default:
-			AM_DEBUG(1, "illegal media player command");
-			return AM_AV_ERR_NOT_SUPPORTED;
-		break;
-	}
-
-	if (rc == -1)
-	{
-		AM_DEBUG(1, "player operation failed");
-		return AM_AV_ERR_SYS;
-	}
-#elif defined PLAYER_API_NEW
 	if (data->media_id < 0)
 	{
 		AM_DEBUG(1, "player do not start");
@@ -5138,6 +4892,7 @@ static AM_ErrorCode_t aml_inject_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void
 
 static AM_ErrorCode_t aml_file_status(AM_AV_Device_t *dev, AM_AV_PlayStatus_t *status)
 {
+#ifdef PLAYER_API_NEW
 	AV_FilePlayerData_t *data;
 	int rc;
 
@@ -5148,50 +4903,7 @@ static AM_ErrorCode_t aml_file_status(AM_AV_Device_t *dev, AM_AV_PlayStatus_t *s
 		return AM_AV_ERR_SYS;
 	}
 
-#ifdef  MEDIA_PLAYER
-	/*Get duration*/
-	pthread_mutex_lock(&data->lock);
-
-	data->resp_type = AV_MP_RESP_DURATION;
-	rc = MP_GetDuration(data->media_id);
-	if (rc == 0)
-	{
-		while (data->resp_type == AV_MP_RESP_DURATION)
-			pthread_cond_wait(&data->cond, &data->lock);
-	}
-
-	status->duration = data->resp_data.duration;
-
-	pthread_mutex_unlock(&data->lock);
-
-	if (rc != 0)
-	{
-		AM_DEBUG(1, "get duration failed");
-		return AM_AV_ERR_SYS;
-	}
-
-	/*Get position*/
-	pthread_mutex_lock(&data->lock);
-
-	data->resp_type = AV_MP_RESP_POSITION;
-	rc = MP_GetPosition(data->media_id);
-	if (rc == 0)
-	{
-		while (data->resp_type == AV_MP_RESP_POSITION)
-			pthread_cond_wait(&data->cond, &data->lock);
-	}
-
-	status->position = data->resp_data.position;
-
-	pthread_mutex_unlock(&data->lock);
-
-	if (rc != 0)
-	{
-		AM_DEBUG(1, "get position failed");
-		return AM_AV_ERR_SYS;
-	}
-#elif defined PLAYER_API_NEW
-	 player_info_t pinfo;
+	player_info_t pinfo;
 
 	if (player_get_play_info(data->media_id,&pinfo) < 0)
 	{
@@ -5206,6 +4918,7 @@ static AM_ErrorCode_t aml_file_status(AM_AV_Device_t *dev, AM_AV_PlayStatus_t *s
 
 static AM_ErrorCode_t aml_file_info(AM_AV_Device_t *dev, AM_AV_FileInfo_t *info)
 {
+#ifdef PLAYER_API_NEW
 	AV_FilePlayerData_t *data;
 	int rc;
 
@@ -5215,29 +4928,8 @@ static AM_ErrorCode_t aml_file_info(AM_AV_Device_t *dev, AM_AV_FileInfo_t *info)
 		AM_DEBUG(1, "player do not start");
 		return AM_AV_ERR_SYS;
 	}
-#ifdef  MEDIA_PLAYER
-	pthread_mutex_lock(&data->lock);
 
-	data->resp_type = AV_MP_RESP_MEDIA;
-	rc = MP_GetMediaInfo(dev->file_player.name, data->media_id);
-	if (rc == 0)
-	{
-		while (data->resp_type == AV_MP_RESP_MEDIA)
-			pthread_cond_wait(&data->cond, &data->lock);
-
-		info->size     = data->resp_data.media.size;
-		info->duration = data->resp_data.media.duration;
-	}
-
-	pthread_mutex_unlock(&data->lock);
-
-	if (rc != 0)
-	{
-		AM_DEBUG(1, "get media information failed");
-		return AM_AV_ERR_SYS;
-	}
-#elif defined PLAYER_API_NEW
-	 media_info_t minfo;
+	media_info_t minfo;
 
 	if (player_get_media_info(data->media_id,&minfo) < 0)
 	{

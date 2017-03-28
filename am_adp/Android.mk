@@ -35,26 +35,12 @@ endif
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../android/ndk/include\
-		    packages/amlogic/LibPlayer/amadec/include\
-		    packages/amlogic/LibPlayer/amcodec/include\
-		    external/icu4c/common\
-		    vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
-		    vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
-		    vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
+		    hardware/amlogic/media/amcodec/include\
+		    hardware/amlogic/LibAudio/amadec/include\
 		    external/icu/icu4c/source/common\
 		    common/include/linux/amlogic
 
-ifeq ($(AMLOGIC_LIBPLAYER), y)
-LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg
-LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amplayer
-endif
-
-
-ifeq ($(AMLOGIC_LIBPLAYER), y)
-LOCAL_SHARED_LIBRARIES+=libamplayer libcutils liblog libdl libc
-else
-LOCAL_SHARED_LIBRARIES+=libcutils liblog libdl libc libamadec libamcodec
-endif
+LOCAL_SHARED_LIBRARIES+=libamadec libcutils liblog libdl libc
 
 LOCAL_PRELINK_MODULE := false
 
@@ -94,29 +80,15 @@ ifeq ($(AMLOGIC_LIBPLAYER), y)
 LOCAL_CFLAGS+=-DAMLOGIC_LIBPLAYER
 endif
 
-LOCAL_ARM_MODE := arm 
+LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
-            $(LOCAL_PATH)/../android/ndk/include\
-	    packages/amlogic/LibPlayer/amadec/include\
-	    packages/amlogic/LibPlayer/amcodec/include\
-	    external/icu4c/common\
-	    vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
-            vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
-            vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
-            external/icu/icu4c/source/common\
-            common/include/linux/amlogic
+		    $(LOCAL_PATH)/../android/ndk/include\
+		    hardware/amlogic/media/amcodec/include\
+		    hardware/amlogic/LibAudio/amadec/include\
+		    external/icu/icu4c/source/common\
+		    common/include/linux/amlogic
 
-ifeq ($(AMLOGIC_LIBPLAYER), y)
-LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg
-LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amplayer
-endif
-
-
-ifeq ($(AMLOGIC_LIBPLAYER), y)
-LOCAL_SHARED_LIBRARIES+=libamplayer libcutils liblog libdl libc
-else
-LOCAL_SHARED_LIBRARIES+=libcutils liblog libdl libc libamadec libamcodec
-endif
+LOCAL_SHARED_LIBRARIES+=libamadec libcutils liblog libdl libc
 
 LOCAL_PRELINK_MODULE := false
 

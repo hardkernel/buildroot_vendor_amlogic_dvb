@@ -121,34 +121,22 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/descriptors\
 		    $(LOCAL_PATH)/../include/am_mw/libdvbsi/tables\
 		    $(LOCAL_PATH)/../include/am_mw/atsc\
-			$(LOCAL_PATH)/am_closecaption/am_vbi\
+		    $(LOCAL_PATH)/am_closecaption/am_vbi\
 		    $(LOCAL_PATH)/../android/ndk/include\
-		    packages/amlogic/LibPlayer/amadec/include\
-		    packages/amlogic/LibPlayer/amcodec/include\
 		    external/libzvbi/src\
 		    external/sqlite/dist\
-		    external/icu4c/common\
-		    vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
-			vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
-			vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
-			external/icu/icu4c/source/common\
+		    hardware/amlogic/media/amcodec/include\
+		    hardware/amlogic/LibAudio/amadec/include\
+		    external/icu/icu4c/source/common\
 		    vendor/amlogic/external/libzvbi/src\
 		    $(LOCAL_PATH)/am_ci
-
-ifeq ($(AMLOGIC_LIBPLAYER), y)
-LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg
-LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amplayer
-endif
 
 ifeq ($(strip $(BOARD_TV_USE_NEW_TVIN_PARAM)),true)
 LOCAL_CFLAGS += -DCC_TV_USE_NEW_TVIN_PARAM=1
 endif
 
-ifeq ($(AMLOGIC_LIBPLAYER), y)
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamplayer liblog libdl libc libcutils
-else
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libdl libc libcutils
-endif
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamadec liblog libdl libc libcutils
+
 LOCAL_PRELINK_MODULE := false
 
 #LOCAL_32_BIT_ONLY := true
@@ -278,30 +266,17 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw/atsc\
 		    $(LOCAL_PATH)/am_scan/libsigdetect\
 		    $(LOCAL_PATH)/../android/ndk/include\
-		    packages/amlogic/LibPlayer/amadec/include\
-		    packages/amlogic/LibPlayer/amcodec/include\
 		    external/libzvbi/src\
 		    external/sqlite/dist\
-		    external/icu4c/common\
-			$(LOCAL_PATH)/am_closecaption/am_vbi\
-		    vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
-			vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
-			vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
-			external/icu/icu4c/source/common\
+		    $(LOCAL_PATH)/am_closecaption/am_vbi\
+		    hardware/amlogic/media/amcodec/include\
+		    hardware/amlogic/LibAudio/amadec/include\
+		    external/icu/icu4c/source/common\
 		    vendor/amlogic/external/libzvbi/src\
 		    $(LOCAL_PATH)/am_ci
 
-ifeq ($(AMLOGIC_LIBPLAYER), y)
-LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amffmpeg
-LOCAL_C_INCLUDES+=packages/amlogic/LibPlayer/amplayer
-endif
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamadec liblog libdl libc libcutils
 
-
-ifeq ($(AMLOGIC_LIBPLAYER), y)    
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamplayer liblog libdl libc libcutils 
-else
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite  liblog libdl libc libcutils
-endif
 LOCAL_PRELINK_MODULE := false
 
 #LOCAL_32_BIT_ONLY := true
