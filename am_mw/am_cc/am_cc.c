@@ -27,7 +27,7 @@
  * Macro definitions
  ***************************************************************************/
 
-#define CC_POLL_TIMEOUT 1000
+#define CC_POLL_TIMEOUT 100
 #define CC_FLASH_PERIOD 1000
 
 #define AMSTREAM_USERDATA_PATH "/dev/amstream_userdata"
