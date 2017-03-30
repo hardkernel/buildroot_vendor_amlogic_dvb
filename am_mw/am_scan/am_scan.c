@@ -169,6 +169,10 @@
 #define dtv_start_para		scanner->start_para.dtv_para
 #define atv_start_para		scanner->start_para.atv_para
 
+#define HELPER_CB(_id_, _para_) do { \
+	if (scanner->helper[(_id_)].cb) \
+		scanner->helper[(_id_)].cb((_id_), (_para_), scanner->helper[(_id_)].user); \
+	}while(0)
 
 /****************************************************************************
  * static data
@@ -1493,8 +1497,6 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	int src = result->start_para->dtv_para.source;
 	int mode = result->start_para->dtv_para.mode;
 	int net_dbid = -1, dbid = -1, orig_net_id = -1, satpara_dbid = -1;
-	char selbuf[256];
-	char insbuf[400];
 	AM_SCAN_ServiceInfo_t srv_info;
 	AM_Bool_t stream_found_in_vct = AM_FALSE;
 	AM_Bool_t program_found_in_vct = AM_FALSE;
@@ -1666,8 +1668,6 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 	int src = result->start_para->dtv_para.source;
 	int mode = result->start_para->dtv_para.mode;
 	int net_dbid = -1, dbid = -1, orig_net_id = -1, satpara_dbid = -1;
-	char selbuf[256];
-	char insbuf[400];
 	AM_SCAN_ServiceInfo_t srv_info;
 	sqlite3 *hdb;
 	AM_Bool_t store = (stmts != NULL);
@@ -3732,6 +3732,8 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner)
 		tp.fend_para = cur_fe_para;
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_BEGIN, (void*)&tp);
 		
+		HELPER_CB(AM_SCAN_HELPER_ID_FE_TYPE_CHANGE, (void*)(cur_fe_para.m_type));
+
 		ret = AM_FENDCTRL_SetPara(scanner->start_para.fend_dev_id, &cur_fe_para);
 		if (ret == AM_SUCCESS)
 		{
@@ -3970,7 +3972,9 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 		AM_DEBUG(1, "Start scanning %s frequency %u ...", 
 			(cur_fe_para.m_type==FE_ANALOG)?"atv":"dtv", 
 			dvb_fend_para(cur_fe_para)->frequency);
-			
+
+		HELPER_CB(AM_SCAN_HELPER_ID_FE_TYPE_CHANGE, (void*)(cur_fe_para.m_type));
+
 		if (cur_fe_para.m_type == FE_ANALOG)
 			scanner->start_freqs[scanner->curr_freq].flag &= ~AM_SCAN_FE_FL_ATV;
 		else
@@ -5817,4 +5821,20 @@ AM_ErrorCode_t AM_SCAN_Resume(AM_SCAN_Handle_t handle)
 
 	return AM_SUCCESS;
 }
+
+AM_ErrorCode_t AM_SCAN_SetHelper(AM_SCAN_Handle_t handle, AM_SCAN_Helper_t *helper)
+{
+	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)handle;
+
+	AM_DEBUG(1, "AM_SCAN_SetHelper [id=%d]", (helper)? helper->id : -1);
+
+	if (scanner)
+	{
+		if (helper && (helper->id >= 0) && (helper->id < AM_SCAN_HELPER_ID_MAX))
+			scanner->helper[helper->id] = *helper;
+	}
+
+	return AM_SUCCESS;
+}
+
 
