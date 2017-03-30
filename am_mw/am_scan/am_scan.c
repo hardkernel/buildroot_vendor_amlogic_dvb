@@ -3732,7 +3732,7 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner)
 		tp.fend_para = cur_fe_para;
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_BEGIN, (void*)&tp);
 		
-		HELPER_CB(AM_SCAN_HELPER_ID_FE_TYPE_CHANGE, (void*)(cur_fe_para.m_type));
+		HELPER_CB(AM_SCAN_HELPER_ID_FE_TYPE_CHANGE, (void*)(long)(cur_fe_para.m_type));
 
 		ret = AM_FENDCTRL_SetPara(scanner->start_para.fend_dev_id, &cur_fe_para);
 		if (ret == AM_SUCCESS)
@@ -3973,7 +3973,7 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 			(cur_fe_para.m_type==FE_ANALOG)?"atv":"dtv", 
 			dvb_fend_para(cur_fe_para)->frequency);
 
-		HELPER_CB(AM_SCAN_HELPER_ID_FE_TYPE_CHANGE, (void*)(cur_fe_para.m_type));
+		HELPER_CB(AM_SCAN_HELPER_ID_FE_TYPE_CHANGE, (void*)(long)(cur_fe_para.m_type));
 
 		if (cur_fe_para.m_type == FE_ANALOG)
 			scanner->start_freqs[scanner->curr_freq].flag &= ~AM_SCAN_FE_FL_ATV;
