@@ -462,6 +462,7 @@ void si_decode_descriptor(dvbpsi_descriptor_t *des)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_AC3, 			dvbpsi_DecodeAC3Dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_ENHANCED_AC3, 	dvbpsi_DecodeENAC3Dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_EXTENSION, 	dvbpsi_DecodeEXTENTIONDr)
+		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_CAPTION_SERVICE,	dvbpsi_DecodeCaptionService86Dr)
 		default:
 			break;
 	}
@@ -1866,6 +1867,63 @@ AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_Teletex
 				AM_DEBUG(0, "Add a teletext: pid %d, language: %s", es->i_pid, ttx_info->teletexts[ttx_info->teletext_count].lang);
 
 				ttx_info->teletext_count++;
+			}
+		}
+	AM_SI_LIST_END()
+
+	return AM_SUCCESS;
+}
+
+AM_ErrorCode_t AM_SI_ExtractATSCCaptionFromES(dvbpsi_pmt_es_t *es, AM_SI_CaptionInfo_t *cap_info)
+{
+	dvbpsi_descriptor_t *descr;
+
+	AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+		if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_CAPTION_SERVICE)
+		{
+			int icap, i;
+			dvbpsi_caption_service_86_t *tmp_cap;
+			dvbpsi_caption_service_86_dr_t *psd = (dvbpsi_caption_service_86_dr_t*)descr->p_decoded;
+
+			for (icap=0; icap<psd->i_caption_services_number; icap++)
+			{
+				tmp_cap = &psd->p_caption_service[icap];
+
+				if (cap_info->caption_count >= AM_SI_MAX_CAP_CNT)
+				{
+					AM_DEBUG(1, "Too many captions, Max count %d", AM_SI_MAX_CAP_CNT);
+					return AM_SUCCESS;
+				}
+
+				if (cap_info->caption_count < 0)
+					cap_info->caption_count = 0;
+
+				if (!tmp_cap->b_digtal_cc)
+					continue;//ignore the analog cc declaration
+
+				cap_info->captions[cap_info->caption_count].service_number = tmp_cap->i_caption_service_number;
+				cap_info->captions[cap_info->caption_count].type         = tmp_cap->b_digtal_cc;
+				cap_info->captions[cap_info->caption_count].pid_or_line21 = tmp_cap->b_digtal_cc ? es->i_pid : tmp_cap->b_line21_field;
+				cap_info->captions[cap_info->caption_count].flags = (tmp_cap->b_easy_reader ? 0x80 : 0) | (tmp_cap->b_wide_aspect_ratio ? 0x40 : 0);
+				if (tmp_cap->iso_639_lang_code[0] == 0)
+				{
+					snprintf(cap_info->captions[cap_info->caption_count].lang,
+						sizeof(cap_info->captions[cap_info->caption_count].lang),
+						"Caption%d", cap_info->caption_count+1);
+				}
+				else
+				{
+					memcpy(cap_info->captions[cap_info->caption_count].lang, tmp_cap->iso_639_lang_code, 3);
+					cap_info->captions[cap_info->caption_count].lang[3] = 0;
+				}
+
+				AM_DEBUG(0, "Add a caption: pid %d, language: %s, digital:%d service:%d",
+					es->i_pid,
+					cap_info->captions[cap_info->caption_count].lang,
+					cap_info->captions[cap_info->caption_count].type,
+					cap_info->captions[cap_info->caption_count].service_number);
+
+				cap_info->caption_count++;
 			}
 		}
 	AM_SI_LIST_END()
