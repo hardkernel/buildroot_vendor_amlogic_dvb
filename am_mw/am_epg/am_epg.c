@@ -1199,7 +1199,9 @@ static void am_epg_proc_eit_section_def(AM_EPG_Monitor_t *mon, void *eit_section
 								and service_id=%d limit 1", mon->curr_ts, pevt_array[0].srv_id);
 	if (AM_DB_Select(hdb, sql, &row, "%d,%d,%d", &net_dbid, &ts_dbid, &srv_dbid) != AM_SUCCESS || row == 0)
 	{
-		/*No such service*/
+		/*No such service,but we need free event*/
+		AM_DEBUG(1, "EPG: AM_DB_Select error free this event");
+		am_epg_eit_free_event_list(evt_cnt, pevt_array);
 		return;
 	}
 
@@ -1382,11 +1384,15 @@ static void am_epg_proc_psip_eit_section_def(AM_EPG_Monitor_t *mon, void *eit_se
 	if (AM_DB_GetSTMT(&stmt, insert_evt_sql_name, insert_evt_sql, 0) != AM_SUCCESS)
 	{
 		AM_DEBUG(1, "EPG: prepare insert events stmt failed");
+		free(name);
+		name = NULL;
 		return;
 	}
 	if (AM_DB_GetSTMT(&update_startend_stmt, update_startend_sql_name, update_startend_sql, 0) != AM_SUCCESS)
 	{
 		AM_DEBUG(1, "EPG: prepare insert events stmt failed");
+		free(name);
+		name = NULL;
 		return;
 	}
 	
@@ -1396,6 +1402,8 @@ static void am_epg_proc_psip_eit_section_def(AM_EPG_Monitor_t *mon, void *eit_se
 	{
 		/*No such source*/
 		AM_DEBUG(1, "No such source %d", eit->source_id);
+		free(name);
+		name = NULL;
 		return;
 	}
 	AM_SI_LIST_BEGIN(eit->eit_event_info, event)
@@ -1494,6 +1502,9 @@ static void am_epg_proc_psip_eit_section_def(AM_EPG_Monitor_t *mon, void *eit_se
 		sqlite3_bind_text(stmt, 17, (const char*)values, -1, SQLITE_STATIC);
 		STEP_STMT(stmt, insert_evt_sql_name, insert_evt_sql);
 	AM_SI_LIST_END()
+
+	free(name);
+	name = NULL;
 }
 
 static void am_epg_proc_psip_ett_section_def(AM_EPG_Monitor_t *mon, void *ett_section)
