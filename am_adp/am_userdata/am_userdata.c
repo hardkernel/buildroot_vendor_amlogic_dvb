@@ -305,7 +305,7 @@ static AM_ErrorCode_t userdata_package_poll(AM_USERDATA_Device_t *dev, int timeo
 		rv = pthread_cond_timedwait(&dev->pkg_buf.cond, &dev->lock, &rt);
 		if (rv == ETIMEDOUT)
 		{
-			AM_DEBUG(1, "poll userdata timeout, timeout = %d ms", timeout);
+			//AM_DEBUG(1, "poll userdata timeout, timeout = %d ms", timeout);
 			ret = AM_FAILURE;
 		}
 		else
