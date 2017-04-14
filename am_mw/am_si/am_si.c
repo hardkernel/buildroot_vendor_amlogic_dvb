@@ -1600,6 +1600,9 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 		case 0x86:
 			afmt_tmp = AFORMAT_DTS;
 			break;
+		case 0x87:
+			afmt_tmp = AFORMAT_EAC3;
+			break;
 		default:
 			break;
 	}
