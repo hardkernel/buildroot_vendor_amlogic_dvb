@@ -95,7 +95,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    external/icu/icu4c/source/common\
 		    common/include/linux/amlogic
 
-LOCAL_SHARED_LIBRARIES+=libamadec libcutils liblog libdl libc
+LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libcutils liblog libdl libc
 
 LOCAL_PRELINK_MODULE := false
 
