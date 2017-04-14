@@ -1,6 +1,15 @@
 LOCAL_PATH := $(call my-dir)
 AMLOGIC_LIBPLAYER :=y
 
+ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 25)))
+AMADEC_C_INCLUDES:=hardware/amlogic/media/amcodec/include\
+       hardware/amlogic/LibAudio/amadec/include
+AMADEC_LIBS:=libamadec
+else
+AMADEC_C_INCLUDES:=vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
+       vendor/amlogic/frameworks/av/LibPlayer/amadec/include
+AMADEC_LIBS:=libamplayer
+endif
 
 include $(CLEAR_VARS)
 
@@ -35,12 +44,11 @@ endif
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../android/ndk/include\
-		    hardware/amlogic/media/amcodec/include\
-		    hardware/amlogic/LibAudio/amadec/include\
+			$(AMADEC_C_INCLUDES)\
 		    external/icu/icu4c/source/common\
 		    common/include/linux/amlogic
 
-LOCAL_SHARED_LIBRARIES+=libamadec libcutils liblog libdl libc
+LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libcutils liblog libdl libc
 
 LOCAL_PRELINK_MODULE := false
 
@@ -83,8 +91,7 @@ endif
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../android/ndk/include\
-		    hardware/amlogic/media/amcodec/include\
-		    hardware/amlogic/LibAudio/amadec/include\
+			$(AMADEC_C_INCLUDES)\
 		    external/icu/icu4c/source/common\
 		    common/include/linux/amlogic
 
