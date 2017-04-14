@@ -1,6 +1,16 @@
 LOCAL_PATH := $(call my-dir)
 AMLOGIC_LIBPLAYER :=y
 
+ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 25)))
+AMADEC_C_INCLUDES:=hardware/amlogic/media/amcodec/include\
+       hardware/amlogic/LibAudio/amadec/include
+AMADEC_LIBS:=libamadec
+else
+AMADEC_C_INCLUDES:=vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
+       vendor/amlogic/frameworks/av/LibPlayer/amadec/include
+AMADEC_LIBS:=libamplayer
+endif
+
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libam_mw
@@ -125,8 +135,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    external/libzvbi/src\
 		    external/sqlite/dist\
-		    hardware/amlogic/media/amcodec/include\
-		    hardware/amlogic/LibAudio/amadec/include\
+			$(AMADEC_C_INCLUDES)\
 		    external/icu/icu4c/source/common\
 		    vendor/amlogic/external/libzvbi/src\
 		    $(LOCAL_PATH)/am_ci
@@ -135,7 +144,7 @@ ifeq ($(strip $(BOARD_TV_USE_NEW_TVIN_PARAM)),true)
 LOCAL_CFLAGS += -DCC_TV_USE_NEW_TVIN_PARAM=1
 endif
 
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamadec liblog libdl libc libcutils
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite $(AMADEC_LIBS) liblog libdl libc libcutils
 
 LOCAL_PRELINK_MODULE := false
 
@@ -269,13 +278,12 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    external/libzvbi/src\
 		    external/sqlite/dist\
 		    $(LOCAL_PATH)/am_closecaption/am_vbi\
-		    hardware/amlogic/media/amcodec/include\
-		    hardware/amlogic/LibAudio/amadec/include\
+			$(AMADEC_C_INCLUDES)\
 		    external/icu/icu4c/source/common\
 		    vendor/amlogic/external/libzvbi/src\
 		    $(LOCAL_PATH)/am_ci
 
-LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite libamadec liblog libdl libc libcutils
+LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite $(AMADEC_LIBS) liblog libdl libc libcutils
 
 LOCAL_PRELINK_MODULE := false
 
