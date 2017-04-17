@@ -158,6 +158,7 @@ extern "C"
 /**\brief ATSC descriptor*/
 #define AM_SI_DESCR_SERVICE_LOCATION		(0xA1)
 #define AM_SI_DESCR_CONTENT_ADVISORY		(0x87)
+#define AM_SI_DESCR_CAPTION_SERVICE		(0x86)
 
 /**\brief  the head of list provided by SI */
 #define AM_SI_LIST_BEGIN(l, v) for ((v)=(l); (v)!=NULL; (v)=(v)->p_next){
@@ -173,6 +174,8 @@ extern "C"
 #define AM_SI_MAX_SUB_CNT 32
 /**\brief Maximum number of single Program supported teletext*/
 #define AM_SI_MAX_TTX_CNT 32
+/**\brief Maximum number of single Program supported caption*/
+#define AM_SI_MAX_CAP_CNT 32
 
 /****************************************************************************
  * Type definitions
@@ -255,6 +258,19 @@ typedef struct
 		char lang[16];		/**<the language of teletext*/
 	}teletexts[AM_SI_MAX_TTX_CNT];/**<teletext info*/
 }AM_SI_TeletextInfo_t;
+/**\brief caption info type*/
+typedef struct
+{
+	int caption_count;	/**<caption count*/
+	struct
+	{
+		int type;			/**< 1: digital cc, 0: analog */
+		int service_number;	/**<caption service number*/
+		int pid_or_line21;  /**<line21 for analog / es pid for digital*/
+		int flags;                  /**<easy reader(mask:0x80) / wide aspect ratio(mask:0x40) for digital*/
+		char lang[16];		/**<the language of caption for digital*/
+	}captions[AM_SI_MAX_CAP_CNT];/**<caption info*/
+}AM_SI_CaptionInfo_t;
 
 /****************************************************************************
  * Function prototypes  
@@ -361,6 +377,13 @@ extern AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_
  * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_TeletextInfo_t *ttx_info);
+/**\brief get Caption info from ES stream
+ * \param [in] es ES stream
+ * \param [out] cap_info Caption info
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
+extern AM_ErrorCode_t AM_SI_ExtractATSCCaptionFromES(dvbpsi_pmt_es_t *es, AM_SI_CaptionInfo_t *cap_info);
 
 #ifdef __cplusplus
 }

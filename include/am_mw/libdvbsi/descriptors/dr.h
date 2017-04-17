@@ -66,6 +66,7 @@
 #include "dr_69.h"
 #include "dr_54.h"
 #include "dr_83.h"
+#include "dr_86.h"
 #include "dr_87.h"
 #include "dr_88.h"
 #include "dr_5d.h"
