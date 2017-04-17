@@ -12,6 +12,7 @@
 #define _AM_CC_H
 
 #include <am_types.h>
+#include <libzvbi.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -50,6 +51,10 @@ typedef struct AM_CC_DrawPara AM_CC_DrawPara_t;
 typedef void (*AM_CC_DrawBegin_t)(AM_CC_Handle_t handle, AM_CC_DrawPara_t *draw_para);
 /**Callback function of end of drawing*/
 typedef void (*AM_CC_DrawEnd_t)(AM_CC_Handle_t handle, AM_CC_DrawPara_t *draw_para);
+/**VBI program information callback.*/
+typedef void (*AM_CC_VBIProgInfoCb_t)(AM_CC_Handle_t handle, vbi_program_info *pi);
+/**VBI network callback.*/
+typedef void (*AM_CC_VBINetworkCb_t)(AM_CC_Handle_t handle, vbi_network *n);
 
 typedef enum {
     CC_STATE_RUNNING      = 0x1001,
@@ -184,6 +189,12 @@ typedef struct
 	AM_CC_Opacity_t         bg_opacity;	/**< Background opacity*/
 }AM_CC_UserOptions_t;
 
+/**\brief Close caption's input.*/
+typedef enum {
+	AM_CC_INPUT_USERDATA, /**< Input from MPEG userdata.*/
+	AM_CC_INPUT_VBI       /**< Input from VBI.*/
+}AM_CC_Input_t;
+
 /**\brief Close caption parser's create parameters*/
 typedef struct
 {
@@ -193,6 +204,9 @@ typedef struct
 	int                 pitch;         /**< Line pitch of the drawing buffer*/
 	int                 bypass_cc_enable; /**< Bypass CC data flag*/
 	void               *user_data;     /**< User defined data*/
+	AM_CC_Input_t       input;         /**< Input type.*/
+	AM_CC_VBIProgInfoCb_t pinfo_cb;    /**< VBI program information callback.*/
+	AM_CC_VBINetworkCb_t  network_cb;  /**< VBI network callback.*/
 }AM_CC_CreatePara_t;
 
 /**\brief Close caption parser start parameter*/
@@ -222,6 +236,22 @@ extern AM_ErrorCode_t AM_CC_Create(AM_CC_CreatePara_t *para, AM_CC_Handle_t *han
  */
 extern AM_ErrorCode_t AM_CC_Destroy(AM_CC_Handle_t handle);
 
+/**
+ * \brief Show close caption.
+ * \param handle Close caption parser's handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
+extern AM_ErrorCode_t AM_CC_Show(AM_CC_Handle_t handle);
+
+/**
+ * \brief Hide close caption.
+ * \param handle Close caption parser's handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
+extern AM_ErrorCode_t AM_CC_Hide(AM_CC_Handle_t handle);
+
 /**\brief Start parsing the close caption data
  * \param handle Close caption parser's handle
  * \param [in] para Start parameters
@@ -250,17 +280,6 @@ extern AM_ErrorCode_t AM_CC_SetUserOptions(AM_CC_Handle_t handle, AM_CC_UserOpti
  * \return The user defined data
  */
 extern void *AM_CC_GetUserData(AM_CC_Handle_t handle);
-
-/*
-** the following Interface added for new architecture of ATSC Close Caption
-*/
-typedef void(*AM_CC_CallBack)(char *str, int cnt, int data_buf[], int cmd_buf[], void *user_data);
-typedef void(*AM_VCHIP_CallBack)(int vchip_stat, void *user_data);
-
-extern void AM_CC_Cmd(int cmd);
-extern void AM_CC_Set_CallBack(AM_CC_CallBack notify, void *user_data);
-extern void AM_Set_CurrentChanNumber(int ntscchannumber);
-extern void AM_VCHIP_Set_CallBack(AM_VCHIP_CallBack notify, void *user_data);
 
 #ifdef __cplusplus
 }

@@ -52,6 +52,7 @@ struct AM_CC_Decoder
 	int flash_stat;
 	int timeout;
 	AM_Bool_t running;
+	AM_Bool_t hide;
 	AM_Bool_t render_flag;
 	pthread_t render_thread;
 	pthread_t data_thread;

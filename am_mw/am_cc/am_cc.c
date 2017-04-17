@@ -22,6 +22,7 @@
 #include "am_misc.h"
 #include "am_cc.h"
 #include "am_cc_internal.h"
+#include "tvin_vbi.h"
 
 /****************************************************************************
  * Macro definitions
@@ -31,6 +32,7 @@
 #define CC_FLASH_PERIOD 1000
 
 #define AMSTREAM_USERDATA_PATH "/dev/amstream_userdata"
+#define VBI_DEV_FILE "/dev/vbi"
 #define VIDEO_WIDTH_FILE "/sys/class/video/frame_width"
 #define VIDEO_HEIGHT_FILE "/sys/class/video/frame_height"
 
@@ -49,6 +51,8 @@ struct vout_CCparam_s {
 #define SAFE_TITLE_AREA_HEIGHT (390) /* 26 * 15 */
 #define ROW_W (SAFE_TITLE_AREA_WIDTH/42)
 #define ROW_H (SAFE_TITLE_AREA_HEIGHT/15)
+
+extern void vbi_decode_caption(vbi_decoder *vbi, int line, uint8_t *buf);
 
 
 /****************************************************************************
@@ -317,21 +321,30 @@ static void am_cc_vbi_event_handler(vbi_event *ev, void *user_data)
 	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)user_data;
 	int pgno, subno;
 
-	if(ev->type != VBI_EVENT_CAPTION)
-		return;
-	pthread_mutex_lock(&cc->lock);
+	if (ev->type == VBI_EVENT_CAPTION) {
+		if (cc->hide)
+			return;
 
-	AM_DEBUG(2, "VBI Caption event: pgno %d, cur_pgno %d",
-			ev->ev.caption.pgno, cc->vbi_pgno);
+		pthread_mutex_lock(&cc->lock);
 
-	if (cc->vbi_pgno == ev->ev.caption.pgno &&
-		(cc->vbi_pgno <= 8 || cc->flash_stat == FLASH_NONE))
-	{
-		cc->render_flag= AM_TRUE;
-		pthread_cond_signal(&cc->cond);
+		AM_DEBUG(2, "VBI Caption event: pgno %d, cur_pgno %d",
+				ev->ev.caption.pgno, cc->vbi_pgno);
+
+		if (cc->vbi_pgno == ev->ev.caption.pgno &&
+			(cc->vbi_pgno <= 8 || cc->flash_stat == FLASH_NONE))
+		{
+			cc->render_flag= AM_TRUE;
+			pthread_cond_signal(&cc->cond);
+		}
+
+		pthread_mutex_unlock(&cc->lock);
+	} else if ((ev->type == VBI_EVENT_ASPECT) || (ev->type == VBI_EVENT_PROG_INFO)) {
+		if (cc->cpara.pinfo_cb)
+			cc->cpara.pinfo_cb(cc, user_data);
+	} else if (ev->type == VBI_EVENT_NETWORK) {
+		if (cc->cpara.network_cb)
+			cc->cpara.network_cb(cc, user_data);
 	}
-
-	pthread_mutex_unlock(&cc->lock);
 }
 
 static void dump_cc_data(uint8_t *buff, int size)
@@ -375,6 +388,9 @@ static void am_cc_render(AM_CC_Decoder_t *cc)
 	AM_CC_DrawPara_t draw_para;
 	struct vbi_page sub_pages[8];
 	int sub_pg_cnt, i;
+
+	if (cc->hide)
+		return;
 
 	AM_DEBUG(2, "CC Rendering...");
 
@@ -469,6 +485,64 @@ static void am_cc_set_tv(const uint8_t *buf, unsigned int n_bytes)
 		}
 	}
 }
+
+static void solve_vbi_data (AM_CC_Decoder_t *cc, struct vbi_data_s *vbi)
+{
+	int line = vbi->line_num;
+
+	if (line != 21)
+		return;
+
+	if (vbi->field_id == VBI_FIELD_2)
+		line = 284;
+
+	vbi_decode_caption(cc->decoder.vbi, line, vbi->b);
+}
+
+/**\brief VBI data thread.*/
+static void *am_vbi_data_thread(void *arg)
+{
+	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)arg;
+	int fd;
+
+	fd = open(VBI_DEV_FILE, O_RDWR);
+	if (fd == -1) {
+		AM_DEBUG(1, "cannot open \"%s\"", VBI_DEV_FILE);
+		return NULL;
+	}
+
+	ioctl(fd, VBI_IOC_SET_TYPE, VBI_TYPE_USCC);
+	ioctl(fd, VBI_IOC_START);
+
+	while (cc->running) {
+		struct pollfd pfd;
+		int           ret;
+
+		pfd.fd     = fd;
+		pfd.events = POLLIN;
+
+		ret = poll(&pfd, 1, CC_POLL_TIMEOUT);
+		if (cc->running && (ret > 0) && (pfd.events & POLLIN)) {
+			struct vbi_data_s  vbi[256];
+			struct vbi_data_s *pd;
+
+			ret = read(fd, vbi, sizeof(vbi));
+			pd  = vbi;
+
+			while (ret >= (int)sizeof(struct vbi_data_s)) {
+				solve_vbi_data(cc, pd);
+
+				pd ++;
+				ret -= sizeof(struct vbi_data_s);
+			}
+		}
+	}
+
+	ioctl(fd, VBI_IOC_STOP);
+	close(fd);
+	return NULL;
+}
+
 /**\brief CC data thread*/
 static void *am_cc_data_thread(void *arg)
 {
@@ -619,7 +693,11 @@ AM_ErrorCode_t AM_CC_Create(AM_CC_CreatePara_t *para, AM_CC_Handle_t *handle)
 	if (cc->decoder.vbi == NULL)
 		return AM_CC_ERR_LIBZVBI;
 
-	vbi_event_handler_register(cc->decoder.vbi, VBI_EVENT_CAPTION, am_cc_vbi_event_handler, cc);
+	vbi_event_handler_register(cc->decoder.vbi,
+			VBI_EVENT_CAPTION|VBI_EVENT_ASPECT
+			|VBI_EVENT_PROG_INFO|VBI_EVENT_NETWORK,
+			am_cc_vbi_event_handler,
+			cc);
 
 	pthread_mutex_init(&cc->lock, NULL);
 	pthread_cond_init(&cc->cond, NULL);
@@ -655,6 +733,42 @@ AM_ErrorCode_t AM_CC_Destroy(AM_CC_Handle_t handle)
 	pthread_cond_destroy(&cc->cond);
 
 	free(cc);
+
+	return AM_SUCCESS;
+}
+
+/**
+ * \brief Show close caption.
+ * \param handle Close caption parser's handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
+AM_ErrorCode_t AM_CC_Show(AM_CC_Handle_t handle)
+{
+	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)handle;
+
+	if (cc == NULL)
+		return AM_CC_ERR_INVALID_PARAM;
+
+	cc->hide = AM_FALSE;
+
+	return AM_SUCCESS;
+}
+
+/**
+ * \brief Hide close caption.
+ * \param handle Close caption parser's handle
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
+AM_ErrorCode_t AM_CC_Hide(AM_CC_Handle_t handle)
+{
+	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)handle;
+
+	if (cc == NULL)
+		return AM_CC_ERR_INVALID_PARAM;
+
+	cc->hide = AM_TRUE;
 
 	return AM_SUCCESS;
 }
@@ -701,7 +815,12 @@ AM_ErrorCode_t AM_CC_Start(AM_CC_Handle_t handle, AM_CC_StartPara_t *para)
 	else
 	{
 		/* start the data source thread */
-		rc = pthread_create(&cc->data_thread, NULL, am_cc_data_thread, (void*)cc);
+		if (cc->cpara.input == AM_CC_INPUT_VBI) {
+			rc = pthread_create(&cc->data_thread, NULL, am_vbi_data_thread, (void*)cc);
+		} else {
+			rc = pthread_create(&cc->data_thread, NULL, am_cc_data_thread, (void*)cc);
+		}
+
 		if (rc)
 		{
 			cc->running = AM_FALSE;
