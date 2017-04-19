@@ -74,48 +74,48 @@ static void util_convert_data_time(long seconds)
     
     //year, we using 365.25 days as one year
     year = seconds/(365*24*3600+25*24*36);
-    AM_DEBUG(1,"The seonds is:%ld, the year is:%d\n", seconds, year);
+    //AM_DEBUG(1,"The seonds is:%ld, the year is:%d\n", seconds, year);
     year_now = base_year+year;
 
     leap_year = 0;
     year_now_leap = 0;
     left_days = 0;
-    AM_DEBUG(1,"The year_now is:%d\n", year_now);
+    //AM_DEBUG(1,"The year_now is:%d\n", year_now);
     for(idx = base_year; idx <= year_now; idx++)
     {
         if(idx%400==0 || ((idx%4==0) && (idx%100!=0))){
             if(idx == year_now){
-                AM_DEBUG(1,"The current year is a leap year.\n");
+                //AM_DEBUG(1,"The current year is a leap year.\n");
                 year_now_leap = 1;
             }else{
                 leap_year++;
-                AM_DEBUG(1,"the %d is a leap year, total leap year:%d.\n", idx, leap_year);
+                //AM_DEBUG(1,"the %d is a leap year, total leap year:%d.\n", idx, leap_year);
             }
         }
     }
     
     left_days = (seconds - (365*24*3600)*year - leap_year*24*3600)/(24*3600);
-    AM_DEBUG(1,"The left days is:%d\n", left_days);
-    AM_DEBUG(1,"The year now is:%d, leap_year:%d\n", year_now, leap_year);
-    AM_DEBUG(1,"the year is:%d, seconds is:%ld, left_days:%d\n",year, seconds, left_days);
+    //AM_DEBUG(1,"The left days is:%d\n", left_days);
+    //AM_DEBUG(1,"The year now is:%d, leap_year:%d\n", year_now, leap_year);
+    //AM_DEBUG(1,"the year is:%d, seconds is:%ld, left_days:%d\n",year, seconds, left_days);
 
     //month
     if(year_now_leap > 0){
-        AM_DEBUG(1,"The current year is a leap year................\n");
+        //AM_DEBUG(1,"The current year is a leap year................\n");
         for(idx = 0; idx < 12; idx++)
             month_days[idx] = month_leap_days[idx];
     }
     
     left_seconds = (seconds-3600*24*leap_year - year*365*24*3600);
     left_days = left_seconds/(3600*24);
-    AM_DEBUG(1,"222 the left days is:%d, left_seconds:%d.\n", left_days, left_seconds);
+    //AM_DEBUG(1,"222 the left days is:%d, left_seconds:%d.\n", left_days, left_seconds);
     for(idx = 0; idx < 12; idx++)
     {
         //Feb should be checked here, but 2014 is not a leap year, so, hehe
         if(month_days[idx] >= left_days)
         {
             month = idx+1;
-            AM_DEBUG(1,"The left days is:%d, month days is:%d, month is:%d\n", left_days, month_days[idx], month);
+            //AM_DEBUG(1,"The left days is:%d, month days is:%d, month is:%d\n", left_days, month_days[idx], month);
             break;
         }
     }
@@ -151,20 +151,20 @@ INT32S atsc_psip_parse_stt(INT8U* data, INT32U length, stt_section_info_t *info)
 
         if(sect->table_id == ATSC_PSIP_STT_TID)
         {
-	     tmp_time = MAKE_WORD_HML(sect->system_time);
-	     GPS_UTC_offset = sect->GPS_UTC_offset;
-             AM_DEBUG(1,"the GPS time is:%d, GPS_UTC_offset:%d", tmp_time, GPS_UTC_offset);
-             util_convert_data_time(tmp_time);
+            tmp_time = MAKE_WORD_HML(sect->system_time);
+            GPS_UTC_offset = sect->GPS_UTC_offset;
+            //AM_DEBUG(1,"the GPS time is:%d, GPS_UTC_offset:%d", tmp_time, GPS_UTC_offset);
+            util_convert_data_time(tmp_time);
 #if 1
-	     info->utc_time = tmp_time + secs_Between_1Jan1970_6Jan1980 - GPS_UTC_offset;
-             util_convert_data_time(info->utc_time);
+            info->utc_time = tmp_time + secs_Between_1Jan1970_6Jan1980 - GPS_UTC_offset;
+            util_convert_data_time(info->utc_time);
 #else	
-		 info->utc_time = tmp_time + secs_Between_1Jan1970_6Jan1980 - GPS_UTC_offset + get_timezone_secondes();
+            info->utc_time = tmp_time + secs_Between_1Jan1970_6Jan1980 - GPS_UTC_offset + get_timezone_secondes();
 #endif
-	#if ATSC_EPG_TIME_RELATE
+#if ATSC_EPG_TIME_RELATE
             g_gps_seconds = tmp_time;
-	    g_gps_seconds_offset = GPS_UTC_offset;
-	#endif
+            g_gps_seconds_offset = GPS_UTC_offset;
+#endif
             return 0;
         }
     }

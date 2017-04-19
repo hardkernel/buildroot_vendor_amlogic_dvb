@@ -161,14 +161,14 @@
 		if ((mon->mode & (f)) && (mon->ctl.fid == -1) && !reset)\
 		{/*开启监控*/\
 			am_epg_request_section(mon, &mon->ctl);\
-			AM_DEBUG(1, "start section -> 0x%x:0x%x", mon->ctl.pid, mon->ctl.tid);\
+			AM_DEBUG(1, "start section -> 0x%x:0x%x [%s]", mon->ctl.pid, mon->ctl.tid, mon->ctl.tname);\
 		}\
 		else if (!(mon->mode & (f)))\
 		{/*关闭监控*/\
 			am_epg_free_filter(mon, &mon->ctl.fid);\
 			RELEASE_TABLE_FROM_LIST(dvbpsi_##table##_t, mon->table##s);\
 			am_epg_tablectl_clear(&mon->ctl);\
-			AM_DEBUG(1, "stop section -> 0x%x:0x%x", mon->ctl.pid, mon->ctl.tid);\
+			AM_DEBUG(1, "stop section -> 0x%x:0x%x [%s]", mon->ctl.pid, mon->ctl.tid, mon->ctl.tname);\
 		}\
 		else if ((mon->mode & (f)) && reset)\
 		{\
@@ -176,7 +176,7 @@
 			RELEASE_TABLE_FROM_LIST(dvbpsi_##table##_t, mon->table##s);\
 			am_epg_tablectl_clear(&mon->ctl);\
 			am_epg_request_section(mon, &mon->ctl);\
-			AM_DEBUG(1, "restart section -> 0x%x:0x%x", mon->ctl.pid, mon->ctl.tid);\
+			AM_DEBUG(1, "restart section -> 0x%x:0x%x [%s]", mon->ctl.pid, mon->ctl.tid, mon->ctl.tname);\
 		}\
 	AM_MACRO_END
 	
@@ -185,7 +185,7 @@
 	AM_MACRO_BEGIN\
 		if (! (mon->evt_flag & sec_ctrl->evt_flag))\
 		{\
-			AM_DEBUG(1, "%s Done!", sec_ctrl->tname);\
+			AM_DEBUG(1, "[%s] Done!", sec_ctrl->tname);\
 			mon->evt_flag |= sec_ctrl->evt_flag;\
 			if (sec_ctrl->tid == AM_SI_TID_PSIP_EIT){\
 				mon->psip_eit_done_flag |= (1<<(sec_ctrl-mon->psip_eitctl));\
@@ -971,6 +971,51 @@ static void am_epg_gen_extended_event_text(ExtendedEventLanguage *all_langs, int
 		item_text[cur_item_len] = 0;
 }
 
+static void am_epg_gen_event_text(atsc_multiple_string_t *multi_string, char *multi_text, int len)
+{
+	const uint8_t split = 0x80;
+	int i, cur_len, tmp_len, n;
+	char text[EXT_TEXT_LEN+1];
+
+#define COPY_BYTES(_d, _dlen, _s, _slen, _curdlen)\
+	AM_MACRO_BEGIN\
+		int copy_len = ((_curdlen+_slen)>=_dlen) ? (_dlen-_curdlen) : _slen;\
+		if (copy_len > 0) {\
+			memcpy(_d+_curdlen, _s, copy_len);\
+			_curdlen += copy_len;\
+		}\
+	AM_MACRO_END
+
+	cur_len = 0;
+	for (i=0; i<multi_string->i_string_count; i++)
+	{
+		text[0] = 0;
+
+		AM_SI_ConvertDVBTextCode((char*)multi_string->string[i].string, 2048,\
+								text, EXT_TEXT_LEN);
+		text[EXT_TEXT_LEN] = 0;
+
+		if (i != 0)
+		{
+			/* extra split mark */
+			COPY_BYTES(multi_text, len, &split, 1, cur_len);
+		}
+		/* 3 bytes language code at first */
+		COPY_BYTES(multi_text, len, multi_string->string[i].iso_639_code, 3, cur_len);
+		/* following by its text */
+		tmp_len = strlen(text);
+		COPY_BYTES(multi_text, len, text, tmp_len, cur_len);
+
+	}
+
+	/* set the ending null byte */
+	if (cur_len >= len)
+		multi_text[len-1] = 0;
+	else
+		multi_text[cur_len] = 0;
+
+}
+
 static void am_epg_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_section, int *evt_cnt, AM_EPG_Event_t **pevt_array)
 {
 	dvbpsi_eit_t *eit = (dvbpsi_eit_t*)eit_section;
@@ -1029,7 +1074,7 @@ static void am_epg_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_section, 
 		end = AM_EPG_BCD2SEC(hour, min, sec);
 
 		end += start;
-		
+
 		/*Donot add the expired event*/
 		AM_EPG_GetUTCTime(&now);
 		if (end < now)
@@ -1135,6 +1180,147 @@ static void am_epg_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_section, 
 		pevt->rrt_ratings[0] = 0;
 		AM_DEBUG(1, "evt: sid/net/ts[%d/%d/%d] evt[%d] start[%d] end[%d]", pevt->srv_id, pevt->net_id, pevt->ts_id, pevt->evt_id, pevt->start, pevt->end);
 	AM_SI_LIST_END()
+
+	*pevt_array = evts;
+}
+
+
+static void am_epg_psip_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_section, int *evt_cnt, AM_EPG_Event_t **pevt_array)
+{
+	eit_section_info_t *eit = (eit_section_info_t*)eit_section;
+	eit_event_info_t *event;
+	atsc_descriptor_t *descr;
+	int start, end, now;
+	int events_cnt = 0;
+	AM_EPG_Event_t *events = NULL, *pevt;
+
+	AM_DEBUG(0, "process psip EIT section");
+
+	events_cnt = eit->num_events_in_section;
+
+	*evt_cnt = events_cnt;
+
+	AM_EPG_Event_t *evts = malloc(sizeof(AM_EPG_Event_t)*events_cnt);
+	if (!evts) {
+		AM_DEBUG(0, "No memory for eit processing, need %d, evt lost:%d",
+			sizeof(AM_EPG_Event_t)*events_cnt, events_cnt);
+		*evt_cnt = 0;
+		*pevt_array = NULL;
+		return;
+	}
+
+	events_cnt = 0;
+	AM_SI_LIST_BEGIN(eit->eit_event_info, event)
+		char *values = NULL;
+
+		pevt = &evts[events_cnt++];
+
+		values = pevt->rrt_ratings;
+
+		start = event->start_time;
+		end = start + event->length_in_seconds;
+
+		/*Donot add the expired event*/
+		AM_EPG_GetUTCTime(&now);
+		if (end < now)
+			continue;
+
+		pevt->name[0] = 0;
+		pevt->desc[0] = 0;
+		pevt->ext_descr[0] = 0;
+
+		/* generate multi-language text */
+		am_epg_gen_event_text(&event->title, pevt->name, sizeof(pevt->name));
+
+		values[0] = 0;
+
+		AM_SI_LIST_BEGIN(event->desc, descr)
+			if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_CONTENT_ADVISORY)
+			{
+				int i, j, dmn_dbid;
+				atsc_content_advisory_dr_t *pcad = (atsc_content_advisory_dr_t*)descr->p_decoded;
+
+				for (i=0; i<pcad->i_region_count; i++)
+				{
+					for (j=0; j<pcad->region[i].i_dimension_count; j++)
+					{
+						if (values[0] == 0)
+							snprintf(values, sizeof(values), "%d %d %d",
+								pcad->region[i].i_rating_region,
+								pcad->region[i].dimension[j].i_dimension_j,
+								pcad->region[i].dimension[j].i_rating_value);
+						else
+							snprintf(values, sizeof(values), "%s,%d %d %d", values,
+								pcad->region[i].i_rating_region,
+								pcad->region[i].dimension[j].i_dimension_j,
+								pcad->region[i].dimension[j].i_rating_value);
+					}
+				}
+			}
+		AM_SI_LIST_END()
+
+		pevt->src = mon->src;
+		pevt->srv_id = eit->source_id;
+		pevt->evt_id = event->event_id;
+		pevt->start = start;
+		pevt->end = end;
+		pevt->source_id = eit->source_id;
+		pevt->ts_id = -1;
+		pevt->net_id = -1;
+		pevt->nibble = 0;
+		pevt->parental_rating = 0;
+		pevt->sub_flag = 0;
+		pevt->sub_status = 0;
+		AM_DEBUG(1, "evt: sid[%d] evt[%d] start[%d] end[%d]", eit->source_id, pevt->evt_id, pevt->start, pevt->end);
+	AM_SI_LIST_END()
+
+	*pevt_array = evts;
+}
+
+static void am_epg_psip_ett_get_event_list(AM_EPG_Monitor_t *mon, void *ett_section, int *evt_cnt, AM_EPG_Event_t **pevt_array)
+{
+	ett_section_info_t *ett = (ett_section_info_t*)ett_section;
+	ett_event_info_t *event;
+	atsc_descriptor_t *descr;
+	AM_EPG_Event_t *events = NULL, *pevt;
+
+	AM_DEBUG(0, "process psip ETT section");
+
+	*evt_cnt = 1;
+
+	AM_EPG_Event_t *evts = malloc(sizeof(AM_EPG_Event_t));
+	if (!evts) {
+		AM_DEBUG(0, "No memory for eit processing, need %d, evt lost:%d",
+			sizeof(AM_EPG_Event_t), 1);
+		*evt_cnt = 0;
+		*pevt_array = NULL;
+		return;
+	}
+
+	pevt = evts;
+
+	pevt->name[0] = 0;
+	pevt->desc[0] = 0;
+	pevt->ext_descr[0] = 0;
+
+	event = ett->ett_event_info;
+
+	/* generate multi-language text */
+	am_epg_gen_event_text(&event->text, pevt->ext_descr, sizeof(pevt->ext_descr));
+
+	pevt->src = mon->src;
+	pevt->srv_id = ett->source_id;
+	pevt->evt_id = event->event_id;
+	pevt->start = 0;
+	pevt->end = 0;
+	pevt->source_id = ett->source_id;
+	pevt->ts_id = -1;
+	pevt->net_id = -1;
+	pevt->nibble = 0;
+	pevt->parental_rating = 0;
+	pevt->sub_flag = 0;
+	pevt->sub_status = 0;
+	AM_DEBUG(1, "evt: sid[%d] evt[%d] start[%d] end[%d]", pevt->source_id, pevt->evt_id, pevt->start, pevt->end);
 
 	*pevt_array = evts;
 }
@@ -1350,8 +1536,6 @@ static void am_epg_proc_psip_eit_section_def(AM_EPG_Monitor_t *mon, void *eit_se
 	eit_section_info_t *eit = (eit_section_info_t*)eit_section;
 	eit_event_info_t *event;
 	char sql[256];
-	char title[256];
-	char dimension_dbids[1024];
 	char values[1024];
 	int srv_dbid, row = 1, starttime, endtime, evt_dbid;
 	AM_Bool_t need_update;
@@ -1942,7 +2126,7 @@ static AM_ErrorCode_t am_epg_request_section(AM_EPG_Monitor_t *mon, AM_EPG_Table
 		AM_TRY(AM_DMX_SetBufferSize(mon->dmx_dev, mcl->fid, 16*1024));
 	AM_TRY(AM_DMX_StartFilter(mon->dmx_dev, mcl->fid));
 
-	AM_DEBUG(1, "EPG Start filter %d for table %s, tid 0x%x, mask 0x%x", 
+	AM_DEBUG(1, "EPG Start filter %d for table %s, tid 0x%x, mask 0x%x",
 				mcl->fid, mcl->tname, mcl->tid, mcl->tid_mask);
 	return AM_SUCCESS;
 }
@@ -2432,6 +2616,8 @@ static void am_epg_proc_eit_section(AM_EPG_Monitor_t *mon, void *eit_section)
 
 static void am_epg_proc_rrt_section(AM_EPG_Monitor_t *mon, void *rrt_section)
 {
+	TAB_CB(mon, AM_EPG_TAB_RRT, rrt_section);
+
 	if (!mon->disable_def_proc)
 		am_epg_proc_rrt_section_def(mon, rrt_section);
 }
@@ -2440,6 +2626,13 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 {
 	TAB_CB(mon, AM_EPG_TAB_PSIP_EIT, eit_section);
 
+	if (mon->evt_cb) {
+		int evt_cnt;
+		AM_EPG_Event_t *pevents;
+		am_epg_psip_eit_get_event_list(mon, eit_section, &evt_cnt, &pevents);
+		mon->evt_cb((AM_EPG_Handle_t)mon, evt_cnt, pevents);
+	}
+
 	if (!mon->disable_def_proc)
 		am_epg_proc_psip_eit_section_def(mon, eit_section);
 }
@@ -2447,6 +2640,13 @@ static void am_epg_proc_psip_eit_section(AM_EPG_Monitor_t *mon, void *eit_sectio
 static void am_epg_proc_psip_ett_section(AM_EPG_Monitor_t *mon, void *ett_section)
 {
 	TAB_CB(mon, AM_EPG_TAB_PSIP_ETT, ett_section);
+
+	if (mon->evt_cb) {
+		int evt_cnt;
+		AM_EPG_Event_t *pevents;
+		am_epg_psip_ett_get_event_list(mon, ett_section, &evt_cnt, &pevents);
+		mon->evt_cb((AM_EPG_Handle_t)mon, evt_cnt, pevents);
+	}
 
 	if (!mon->disable_def_proc)
 		am_epg_proc_psip_ett_section_def(mon, ett_section);
@@ -2736,7 +2936,7 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 	AM_SI_LIST_BEGIN(mon->mgts, mgt)
 	AM_SI_LIST_BEGIN(mgt->com_table_info, table)
 	AM_DEBUG(1, "MGT: table_type 0x%x, pid:0x%x, eit_count:%d", table->table_type, table->table_type_pid, mon->psip_eit_count);
-	if (table->table_type >= AM_SI_ATSC_TT_EIT0 && 
+	if (table->table_type >= AM_SI_ATSC_TT_EIT0 &&
 		table->table_type < (AM_SI_ATSC_TT_EIT0+mon->psip_eit_count))
 	{
 		eit = table->table_type - AM_SI_ATSC_TT_EIT0;
@@ -2751,14 +2951,14 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 					table->table_type_pid, table->table_type_version);
 				mon->psip_eitctl[eit].pid = table->table_type_pid;
 				mon->psip_eitctl[eit].subctl->ver = table->table_type_version;
-                                //we only add EIT0~EIT3
+				//we only add EIT0~EIT3
 				if ((parallel_cnt < PARALLEL_PSIP_EIT_CNT) && (eit < PARALLEL_PSIP_EIT_CNT))
-                                {
+				{
 					am_epg_request_section(mon, &mon->psip_eitctl[parallel_cnt]);
-    					parallel_cnt++;
-				}else{
-                                    AM_DEBUG(1,"MGT done found more EIT version change but filter not be setted.");
- 			        }
+					parallel_cnt++;
+				} else {
+					AM_DEBUG(1,"MGT done found more EIT version change but filter not be setted.");
+				}
 			}
 			else
 			{
@@ -2768,7 +2968,7 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 			}
 		}
 	}
-	else if(table->table_type >= AM_SI_ATSC_TT_ETT0 && 
+	else if (table->table_type >= AM_SI_ATSC_TT_ETT0 &&
 		table->table_type < (AM_SI_ATSC_TT_ETT0+mon->psip_ett_count))
 	{
 		ett = table->table_type - AM_SI_ATSC_TT_ETT0;
@@ -2798,7 +2998,7 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 	}
 	AM_SI_LIST_END()
 	AM_SI_LIST_END()
-	
+
 	/* release for updating new tables */
 	RELEASE_TABLE_FROM_LIST(dvbpsi_mgt_t, mon->mgts);
 	
