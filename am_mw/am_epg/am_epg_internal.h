@@ -167,6 +167,8 @@ struct AM_EPG_Monitor_s
 #define IS_CB_SET(_mon, _type) ((_mon)->tab_cbs[_type].cb)
 
 	int                      disable_def_proc;
+	int                      psip_eit_request;
+	int                      psip_ett_request;
 };
 
 

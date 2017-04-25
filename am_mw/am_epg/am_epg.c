@@ -44,6 +44,9 @@
 #define EIT60_REPEAT_DISTANCE 20000
 #define EIT61_REPEAT_DISTANCE 20000
 
+#define PSIP_EIT_REPEAT_DISTANCE 20000
+#define PSIP_ETT_REPEAT_DISTANCE 30000
+
 /*EIT 数据定时通知时间间隔*/
 #define NEW_EIT_CHECK_DISTANCE 4000
 
@@ -156,21 +159,22 @@
 	AM_MACRO_END
 
 /*判断并设置某个表的监控*/
-#define SET_MODE(table, ctl, f, reset)\
+#define SET_MODE_EX(mode, table, ctl, f, reset)\
 	AM_MACRO_BEGIN\
-		if ((mon->mode & (f)) && (mon->ctl.fid == -1) && !reset)\
+		if (((mode) & (f)) && (mon->ctl.fid == -1) && !(reset))\
 		{/*开启监控*/\
 			am_epg_request_section(mon, &mon->ctl);\
 			AM_DEBUG(1, "start section -> 0x%x:0x%x [%s]", mon->ctl.pid, mon->ctl.tid, mon->ctl.tname);\
 		}\
-		else if (!(mon->mode & (f)))\
+		else if (!((mode) & (f)))\
 		{/*关闭监控*/\
+			if (mon->ctl.fid != -1)\
+				AM_DEBUG(1, "stop section -> 0x%x:0x%x [%s]", mon->ctl.pid, mon->ctl.tid, mon->ctl.tname);\
 			am_epg_free_filter(mon, &mon->ctl.fid);\
 			RELEASE_TABLE_FROM_LIST(dvbpsi_##table##_t, mon->table##s);\
 			am_epg_tablectl_clear(&mon->ctl);\
-			AM_DEBUG(1, "stop section -> 0x%x:0x%x [%s]", mon->ctl.pid, mon->ctl.tid, mon->ctl.tname);\
 		}\
-		else if ((mon->mode & (f)) && reset)\
+		else if (((mode) & (f)) && (reset))\
 		{\
 			am_epg_free_filter(mon, &mon->ctl.fid);\
 			RELEASE_TABLE_FROM_LIST(dvbpsi_##table##_t, mon->table##s);\
@@ -179,7 +183,12 @@
 			AM_DEBUG(1, "restart section -> 0x%x:0x%x [%s]", mon->ctl.pid, mon->ctl.tid, mon->ctl.tname);\
 		}\
 	AM_MACRO_END
-	
+
+#define SET_MODE(table, ctl, f, reset) \
+	SET_MODE_EX(mon->mode, table, ctl, f, reset)
+#define SET_MODE_FORCE(table, ctl, f, reset) \
+	SET_MODE_EX(mon->mode|f, table, ctl, f, reset)
+
 /*表收齐操作*/
 #define TABLE_DONE()\
 	AM_MACRO_BEGIN\
@@ -214,7 +223,10 @@
 				AM_DB_GetSTMT(&(_stmt), _name, _sql, 1);\
 			}\
 	AM_MACRO_END
-	
+
+
+#define HAS_MODE(_ms, _m) (((_ms) & (_m)) == (_m))
+
 /****************************************************************************
  * Static data
  ***************************************************************************/
@@ -222,6 +234,7 @@
 #ifdef USE_TDT_TIME
 /*当前时间管理*/
 static AM_EPG_Time_t curr_time = {0, 0, 0};
+static long curr_gps_time_offset = 0;
 
 /*当前时间锁*/
 static pthread_mutex_t time_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -232,9 +245,9 @@ static pthread_mutex_t time_lock = PTHREAD_MUTEX_INITIALIZER;
  ***************************************************************************/
 static int am_epg_get_current_service_id(AM_EPG_Monitor_t *mon);
 
+#if 0
 static inline int am_epg_convert_fetype_to_source(int fe_type)
 {
-#if 0
 	switch(fe_type)
 	{
 		case FE_QAM:	return AM_FEND_DEMOD_DVBC; break;
@@ -243,11 +256,10 @@ static inline int am_epg_convert_fetype_to_source(int fe_type)
 		case FE_ATSC:	
 		default:			break;
 	}
-	return -1;
-#else
+	return -1#else
 	return fe_type;
-#endif
 }
+#endif
 
 static void am_epg_wait_events_done(AM_EPG_Monitor_t *mon)
 {
@@ -707,6 +719,8 @@ static void am_epg_proc_stt_section(AM_EPG_Monitor_t *mon, void *stt_section)
 	/*取UTC时间*/
 	pthread_mutex_lock(&time_lock);
 	curr_time.tdt_utc_time = p_stt->utc_time;
+	curr_gps_time_offset = GetCurrentGPSOffset();
+
 	/*更新system time，用于时间自动累加*/
 	AM_TIME_GetClock(&curr_time.tdt_sys_time);
 	pthread_mutex_unlock(&time_lock);
@@ -1184,7 +1198,6 @@ static void am_epg_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_section, 
 	*pevt_array = evts;
 }
 
-
 static void am_epg_psip_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_section, int *evt_cnt, AM_EPG_Event_t **pevt_array)
 {
 	eit_section_info_t *eit = (eit_section_info_t*)eit_section;
@@ -1194,7 +1207,7 @@ static void am_epg_psip_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_sect
 	int events_cnt = 0;
 	AM_EPG_Event_t *events = NULL, *pevt;
 
-	AM_DEBUG(0, "process psip EIT section");
+	AM_DEBUG(0, "process psip EIT section sid:0x%x", eit->source_id);
 
 	events_cnt = eit->num_events_in_section;
 
@@ -1212,12 +1225,14 @@ static void am_epg_psip_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_sect
 	events_cnt = 0;
 	AM_SI_LIST_BEGIN(eit->eit_event_info, event)
 		char *values = NULL;
+		int values_size = 0;
 
 		pevt = &evts[events_cnt++];
 
 		values = pevt->rrt_ratings;
+		values_size = sizeof(pevt->rrt_ratings);
 
-		start = event->start_time;
+		start = event->start_time - curr_gps_time_offset;
 		end = start + event->length_in_seconds;
 
 		/*Donot add the expired event*/
@@ -1237,25 +1252,9 @@ static void am_epg_psip_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_sect
 		AM_SI_LIST_BEGIN(event->desc, descr)
 			if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_CONTENT_ADVISORY)
 			{
-				int i, j, dmn_dbid;
+				int i=0, j=0;
 				atsc_content_advisory_dr_t *pcad = (atsc_content_advisory_dr_t*)descr->p_decoded;
-
-				for (i=0; i<pcad->i_region_count; i++)
-				{
-					for (j=0; j<pcad->region[i].i_dimension_count; j++)
-					{
-						if (values[0] == 0)
-							snprintf(values, sizeof(values), "%d %d %d",
-								pcad->region[i].i_rating_region,
-								pcad->region[i].dimension[j].i_dimension_j,
-								pcad->region[i].dimension[j].i_rating_value);
-						else
-							snprintf(values, sizeof(values), "%s,%d %d %d", values,
-								pcad->region[i].i_rating_region,
-								pcad->region[i].dimension[j].i_dimension_j,
-								pcad->region[i].dimension[j].i_rating_value);
-					}
-				}
+				AM_SI_GetRatingString(pcad, values, values_size);
 			}
 		AM_SI_LIST_END()
 
@@ -1271,7 +1270,8 @@ static void am_epg_psip_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_sect
 		pevt->parental_rating = 0;
 		pevt->sub_flag = 0;
 		pevt->sub_status = 0;
-		AM_DEBUG(1, "evt: sid[%d] evt[%d] start[%d] end[%d]", eit->source_id, pevt->evt_id, pevt->start, pevt->end);
+		strncpy(pevt->rrt_ratings, values, sizeof(pevt->rrt_ratings)-1);
+		AM_DEBUG(1, "evt: sid[%d] evt[%d] start[%d] end[%d] r(%s)", eit->source_id, pevt->evt_id, pevt->start, pevt->end, pevt->rrt_ratings);
 	AM_SI_LIST_END()
 
 	*pevt_array = evts;
@@ -1946,7 +1946,7 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 				AM_DEBUG(1, "EPG: section header error");
 				goto handler_done;
 			}
-		
+
 			/*该section是否已经接收过*/
 			if (am_epg_tablectl_test_recved(sec_ctrl, &header))
 			{
@@ -1962,6 +1962,7 @@ static void am_epg_section_handler(int dev_no, int fid, const uint8_t *data, int
 					AM_TIME_GetClock(&now);
 					if (am_epg_tablectl_test_complete(sec_ctrl) && 
 						((now - sec_ctrl->data_arrive_time) > sec_ctrl->repeat_distance)){
+						AM_DEBUG(1, "sec repeat, done.");
 						TABLE_DONE();
 					}
 				}
@@ -2054,6 +2055,83 @@ handler_done:
 
 }
 
+static void am_epg_section_handler_psip_eit_ett(int dev_no, int fid, const uint8_t *data, int len, void *user_data)
+{
+	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)user_data;
+	AM_EPG_TableCtl_t * sec_ctrl;
+	AM_SI_SectionHeader_t header;
+
+	UNUSED(dev_no);
+
+	if (mon == NULL)
+	{
+		AM_DEBUG(1, "EPG: Invalid param user_data in dmx callback");
+		return;
+	}
+	if (!data)
+		return;
+
+	pthread_mutex_lock(&mon->lock);
+	/*获取接收控制数据*/
+	sec_ctrl = am_epg_get_section_ctrl_by_fid(mon, fid);
+	if (sec_ctrl)
+	{
+		{
+			/* for Non-TDT/TOT sections, the section_syntax_indicator bit must be 1 */
+			if ((data[1]&0x80) == 0)
+			{
+				AM_DEBUG(1, "EPG: section_syntax_indicator is 0, skip this section");
+				goto handler_done;
+			}
+			if (AM_SI_GetSectionHeader(mon->hsi, (uint8_t*)data, len, &header) != AM_SUCCESS)
+			{
+				AM_DEBUG(1, "EPG: section header error");
+				goto handler_done;
+			}
+			if (am_epg_tablectl_test_recved(sec_ctrl, &header))
+			{
+				if (sec_ctrl->subs > 1)
+				{
+					int now;
+					AM_TIME_GetClock(&now);
+					if (((now - sec_ctrl->data_arrive_time) > sec_ctrl->repeat_distance)) {
+						AM_DEBUG(1, "tid:0x%02x timeout, done. %x > %x", header.table_id);
+						TABLE_DONE();
+					}
+				}
+			}
+		}
+		/*数据处理*/
+		switch (data[0])
+		{
+			case AM_SI_TID_PSIP_EIT:
+				AM_DEBUG(2, "%s: tid 0x%x, source_id 0x%x received(%x/%x)", sec_ctrl->tname, header.table_id,
+								header.extension, header.sec_num, header.last_sec_num);
+				COLLECT_SECTION(eit_section_info_t, mon->psip_eits);
+				break;
+			case AM_SI_TID_PSIP_ETT:
+				AM_DEBUG(1, "%s: tid 0x%x, source_id 0x%x received(%x/%x)", sec_ctrl->tname, header.table_id,
+								header.extension, header.sec_num, header.last_sec_num);
+				COLLECT_SECTION(ett_section_info_t, mon->psip_etts);
+				break;
+			default:
+				AM_DEBUG(1, "EPG: Unkown section data, table_id 0x%x", data[0]);
+				pthread_mutex_unlock(&mon->lock);
+				return;
+				break;
+		}
+	}
+	else
+	{
+		AM_DEBUG(1, "EPG: Unknown filter id %d in dmx callback", fid);
+	}
+
+handler_done:
+	pthread_mutex_unlock(&mon->lock);
+
+}
+
+
 /**\brief 请求一个表的section数据*/
 static AM_ErrorCode_t am_epg_request_section(AM_EPG_Monitor_t *mon, AM_EPG_TableCtl_t *mcl)
 {
@@ -2070,7 +2148,11 @@ static AM_ErrorCode_t am_epg_request_section(AM_EPG_Monitor_t *mon, AM_EPG_Table
 	/*分配过滤器*/
 	AM_TRY(AM_DMX_AllocateFilter(mon->dmx_dev, &mcl->fid));
 	/*设置处理函数*/
-	AM_TRY(AM_DMX_SetCallback(mon->dmx_dev, mcl->fid, am_epg_section_handler, (void*)mon));
+	if ((!strncmp(mcl->tname, "ATSC EIT", 8) && mcl->tid == AM_SI_TID_PSIP_EIT)
+			|| (!strncmp(mcl->tname, "ATSC ETT", 8) && mcl->tid == AM_SI_TID_PSIP_ETT))
+		AM_TRY(AM_DMX_SetCallback(mon->dmx_dev, mcl->fid, am_epg_section_handler_psip_eit_ett, (void*)mon));
+	else
+		AM_TRY(AM_DMX_SetCallback(mon->dmx_dev, mcl->fid, am_epg_section_handler, (void*)mon));
 	
 	/*设置过滤器参数*/
 	memset(&param, 0, sizeof(param));
@@ -2891,6 +2973,12 @@ static void am_epg_stt_done(AM_EPG_Monitor_t *mon)
 
 	/*设置完成时间以进行下一次刷新*/
 	AM_TIME_GetClock(&mon->sttctl.check_time);
+
+	if (mon->psip_eit_request) {
+		mon->psip_eit_request = 0;
+		AM_DEBUG(1, "eit requested, start mgt:");
+		SET_MODE_FORCE(mgt, mgtctl, AM_EPG_SCAN_MGT, AM_TRUE);
+	}
 }
 
 /**\brief RRT搜索完毕处理*/
@@ -2914,24 +3002,28 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 	
 	am_epg_free_filter(mon, &mon->mgtctl.fid);
 
-	/*触发通知事件*/
-	SIGNAL_EVENT(AM_EPG_EVT_NEW_MGT, (void*)mon->mgts);
+	if (HAS_MODE(mon->mode, AM_EPG_SCAN_MGT)) {
+		/*触发通知事件*/
+		SIGNAL_EVENT(AM_EPG_EVT_NEW_MGT, (void*)mon->mgts);
 	
-	TAB_CB(mon, AM_EPG_TAB_MGT, mon->mgts);
-
-	if (mon->mgts != NULL)
-	{ 
-		int vct_tid;
-		if (mon->mgts->is_cable)
-			vct_tid = AM_SI_TID_PSIP_CVCT;
-		else
-			vct_tid = AM_SI_TID_PSIP_TVCT;
-
-		AM_DEBUG(1, "VCT table type: %s", (vct_tid==AM_SI_TID_PSIP_CVCT) ? "CVCT" : "TVCT");
-		mon->vctctl.tid = vct_tid;
-		SET_MODE(vct, vctctl, AM_EPG_SCAN_VCT, AM_TRUE);
+		TAB_CB(mon, AM_EPG_TAB_MGT, mon->mgts);
 	}
-		
+
+	if (HAS_MODE(mon->mode, AM_EPG_SCAN_VCT)) {
+		if (mon->mgts != NULL)
+		{
+			int vct_tid;
+			if (mon->mgts->is_cable)
+				vct_tid = AM_SI_TID_PSIP_CVCT;
+			else
+				vct_tid = AM_SI_TID_PSIP_TVCT;
+
+			AM_DEBUG(1, "VCT table type: %s", (vct_tid==AM_SI_TID_PSIP_CVCT) ? "CVCT" : "TVCT");
+			mon->vctctl.tid = vct_tid;
+			SET_MODE(vct, vctctl, AM_EPG_SCAN_VCT, AM_TRUE);
+		}
+	}
+
 	/*检查EIT是否需要更新*/
 	AM_SI_LIST_BEGIN(mon->mgts, mgt)
 	AM_SI_LIST_BEGIN(mgt->com_table_info, table)
@@ -2939,6 +3031,13 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 	if (table->table_type >= AM_SI_ATSC_TT_EIT0 &&
 		table->table_type < (AM_SI_ATSC_TT_EIT0+mon->psip_eit_count))
 	{
+		if (!HAS_MODE(mon->mode, AM_EPG_SCAN_PSIP_EIT))
+			continue;
+		if (!curr_time.tdt_utc_time) {
+			mon->psip_eit_request = 1;
+			continue;
+		}
+
 		eit = table->table_type - AM_SI_ATSC_TT_EIT0;
 		
 		if (mon->psip_eitctl[eit].subctl)
@@ -2971,6 +3070,13 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 	else if (table->table_type >= AM_SI_ATSC_TT_ETT0 &&
 		table->table_type < (AM_SI_ATSC_TT_ETT0+mon->psip_ett_count))
 	{
+		if (!HAS_MODE(mon->mode, AM_EPG_SCAN_PSIP_ETT))
+			continue;
+		if (!curr_time.tdt_utc_time) {
+			mon->psip_ett_request = 1;
+			continue;
+		}
+
 		ett = table->table_type - AM_SI_ATSC_TT_ETT0;
 				
 		if (mon->psip_ettctl[ett].subctl)
@@ -2982,7 +3088,7 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 					mon->psip_ettctl[ett].pid, mon->psip_ettctl[ett].subctl->ver,
 						table->table_type_pid, table->table_type_version);
 				mon->psip_ettctl[ett].pid = table->table_type_pid;
-				//mon->psip_ettctl[ett].subctl->ver = table->table_type_version;
+				mon->psip_ettctl[ett].subctl->ver = table->table_type_version;
 				if (ett_parallel_cnt < PARALLEL_PSIP_ETT_CNT)
 				{
 					ett_parallel_cnt++;
@@ -3138,13 +3244,13 @@ static void am_epg_tablectl_data_init(AM_EPG_Monitor_t *mon)
 	{
 		snprintf(name, sizeof(name), "ATSC EIT%d", i);
 		am_epg_tablectl_init(&mon->psip_eitctl[i], AM_EPG_EVT_PSIP_EIT_DONE, 0x1fff, AM_SI_TID_PSIP_EIT,
-							 0xff, name, MAX_EIT_SUBTABLE_CNT, am_epg_psip_eit_done, 0, am_epg_proc_psip_eit_section);
+							 0xff, name, MAX_EIT_SUBTABLE_CNT, am_epg_psip_eit_done, PSIP_EIT_REPEAT_DISTANCE, am_epg_proc_psip_eit_section);
 	}
 	for (i=0; i<(int)AM_ARRAY_SIZE(mon->psip_ettctl); i++)
 	{		
 		snprintf(name, sizeof(name), "ATSC ETT%d", i);        
 		am_epg_tablectl_init(&mon->psip_ettctl[i], AM_EPG_EVT_PSIP_ETT_DONE, 0x1fff, AM_SI_TID_PSIP_ETT,
-							 0xff, name, 10, am_epg_psip_ett_done, 0, am_epg_proc_psip_ett_section);
+							 0xff, name, MAX_EIT_SUBTABLE_CNT, am_epg_psip_ett_done, PSIP_ETT_REPEAT_DISTANCE, am_epg_proc_psip_ett_section);
 	}
 }
 
@@ -3170,6 +3276,7 @@ static void am_epg_set_mode(AM_EPG_Monitor_t *mon, AM_Bool_t reset)
 	SET_MODE(eit, eit51ctl, AM_EPG_SCAN_EIT_SCHE_ACT, reset);
 	SET_MODE(eit, eit60ctl, AM_EPG_SCAN_EIT_SCHE_OTH, reset);
 	SET_MODE(eit, eit61ctl, AM_EPG_SCAN_EIT_SCHE_OTH, reset);
+
 	/*For ATSC*/
 	SET_MODE(stt, sttctl, AM_EPG_SCAN_STT, reset);
 	SET_MODE(mgt, mgtctl, AM_EPG_SCAN_MGT, reset);
@@ -3180,31 +3287,42 @@ static void am_epg_set_mode(AM_EPG_Monitor_t *mon, AM_Bool_t reset)
 	}
 	for (i=0; i<mon->psip_eit_count; i++)
 	{
-	        int idx = 0;
-                if(mon->psip_eitctl[i].subs && mon->psip_eitctl[i].subs > 0 && mon->mode == 0){
-                    //AM_DEBUG(1, "--------->>>>>>> psip eit to reset all subctl if any ------>>>>>>>");
-                    for(idx = 0; idx < mon->psip_eitctl[i].subs; idx++){
-                        mon->psip_eitctl[i].subctl[idx].ver = 0xFF;
-                        //AM_DEBUG(1, "the %d pid:0x%x, fid:0x%x", i, mon->psip_eitctl[i].subctl, mon->psip_eitctl[i].fid);
-                    }
-                }
+		int idx = 0;
+		if (mon->psip_eitctl[i].subs && mon->psip_eitctl[i].subs > 0 && mon->mode == 0) {
+			//AM_DEBUG(1, "--------->>>>>>> psip eit to reset all subctl if any ------>>>>>>>");
+			for (idx = 0; idx < mon->psip_eitctl[i].subs; idx++) {
+				mon->psip_eitctl[i].subctl[idx].ver = 0xFF;
+				//AM_DEBUG(1, "the %d pid:0x%x, fid:0x%x", i, mon->psip_eitctl[i].subctl, mon->psip_eitctl[i].fid);
+			}
+		}
 		if (mon->psip_eitctl[i].fid != -1)
 			SET_MODE(psip_eit, psip_eitctl[i], AM_EPG_SCAN_PSIP_EIT, reset);
+		else
+			mon->psip_eit_request = 1;
 	}
 	for (i=0; i<mon->psip_ett_count; i++)
 	{
-	        if(mon->psip_ettctl[i].subs && mon->psip_ettctl[i].subs > 0 && mon->mode == 0)
-	        {
-	            //AM_DEBUG(1, "--------->>>>>>> psip ett to reset all subctl if any ------>>>>>>>");
-	            int idx = 0;
-	            for(idx = 0; idx < mon->psip_ettctl[i].subs; idx++)
-	            {
-	                mon->psip_ettctl[i].subctl[idx].ver = 0xFF;
-	                //AM_DEBUG(1, "the %d pid:0x%x, fid:0x%x", i, mon->psip_eitctl[i].subctl, mon->psip_eitctl[i].fid);
-	            }
-	        }
+		if (mon->psip_ettctl[i].subs && mon->psip_ettctl[i].subs > 0 && mon->mode == 0)
+		{
+			//AM_DEBUG(1, "--------->>>>>>> psip ett to reset all subctl if any ------>>>>>>>");
+			int idx = 0;
+			for (idx = 0; idx < mon->psip_ettctl[i].subs; idx++)
+			{
+				mon->psip_ettctl[i].subctl[idx].ver = 0xFF;
+				//AM_DEBUG(1, "the %d pid:0x%x, fid:0x%x", i, mon->psip_eitctl[i].subctl, mon->psip_eitctl[i].fid);
+			}
+		}
 		if (mon->psip_ettctl[i].fid != -1)
 			SET_MODE(psip_ett, psip_ettctl[i], AM_EPG_SCAN_PSIP_ETT, reset);
+		else
+			mon->psip_ett_request = 1;
+	}
+
+	if (HAS_MODE(mon->mode, AM_EPG_SCAN_PSIP_EIT) && mon->psip_eit_request) {
+		if (curr_time.tdt_utc_time)//assue stt done
+			SET_MODE_FORCE(mgt, mgtctl, AM_EPG_SCAN_MGT, AM_TRUE);
+		else//request stt first for the gps offset, then eit
+			SET_MODE_FORCE(stt, sttctl, AM_EPG_SCAN_STT, AM_TRUE);
 	}
 }
 
