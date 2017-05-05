@@ -784,12 +784,12 @@ static void *aml_userdata_thread(void *arg)
 							{
 
 								if (ud_format == H264_CC_TYPE)
-									min_bytes_valid = 11 + (buf[8] & 0x1F)*3;
+									min_bytes_valid = 11 + (p[8] & 0x1F)*3;
 								else if(ud_format == DIRECTV_CC_TYPE)
-									min_bytes_valid = 8 + (buf[5] & 0x1F)*3;
+									min_bytes_valid = 8 + (p[5] & 0x1F)*3;
 								else
 								{
-									min_bytes_valid = 8 + (buf[5] & 0x1F)*3; //wait avs cc spec
+									min_bytes_valid = 8 + (p[5] & 0x1F)*3; //wait avs cc spec
 								}
 								if (cnt >= min_bytes_valid)
 								{
