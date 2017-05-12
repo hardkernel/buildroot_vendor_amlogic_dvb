@@ -30,6 +30,7 @@
 
 #define CC_POLL_TIMEOUT 100
 #define CC_FLASH_PERIOD 1000
+#define CC_CLEAR_TIME 	3000
 
 #define AMSTREAM_USERDATA_PATH "/dev/amstream_userdata"
 #define VBI_DEV_FILE "/dev/vbi"
@@ -59,7 +60,7 @@ extern void vbi_decode_caption(vbi_decoder *vbi, int line, uint8_t *buf);
  * Static data
  ***************************************************************************/
 static int vout_fd = -1;
- static const vbi_opacity opacity_map[AM_CC_OPACITY_MAX] =
+static const vbi_opacity opacity_map[AM_CC_OPACITY_MAX] =
 {
 	VBI_OPAQUE,             /*not used, just take a position*/
 	VBI_TRANSPARENT_SPACE,  /*AM_CC_OPACITY_TRANSPARENT*/
@@ -327,13 +328,15 @@ static void am_cc_vbi_event_handler(vbi_event *ev, void *user_data)
 
 		pthread_mutex_lock(&cc->lock);
 
-		AM_DEBUG(2, "VBI Caption event: pgno %d, cur_pgno %d",
+		AM_DEBUG(0, "VBI Caption event: pgno %d, cur_pgno %d",
 				ev->ev.caption.pgno, cc->vbi_pgno);
 
 		if (cc->vbi_pgno == ev->ev.caption.pgno &&
-			(cc->vbi_pgno <= 8 || cc->flash_stat == FLASH_NONE))
+			cc->flash_stat == FLASH_NONE)
 		{
-			cc->render_flag= AM_TRUE;
+			cc->render_flag = AM_TRUE;
+			cc->need_clear = AM_FALSE;
+			cc->timeout = CC_CLEAR_TIME;
 			pthread_cond_signal(&cc->cond);
 		}
 
@@ -379,8 +382,28 @@ static void am_cc_check_flash(AM_CC_Decoder_t *cc)
 	else if (cc->flash_stat != FLASH_NONE)
 	{
 		cc->flash_stat = FLASH_NONE;
-		cc->timeout = 0;
+		cc->timeout = CC_CLEAR_TIME;
 	}
+}
+static void am_cc_clear(AM_CC_Decoder_t *cc)
+{
+	AM_CC_DrawPara_t draw_para;
+	struct vbi_page sub_page;
+
+	AM_DEBUG(0, "force clear cc page");
+	memset(&sub_page, 0, sizeof(vbi_page));
+	if (cc->cpara.draw_begin)
+		cc->cpara.draw_begin(cc, &draw_para);
+
+	vbi_draw_cc_page_region(
+		&sub_page, VBI_PIXFMT_RGBA32_LE,
+		am_cc_get_page_canvas(cc, &sub_page),
+		cc->cpara.pitch, 0, 0,
+		sub_page.columns, sub_page.rows);
+
+	if (cc->cpara.draw_end)
+		cc->cpara.draw_end(cc, &draw_para);
+
 }
 
 static void am_cc_render(AM_CC_Decoder_t *cc)
@@ -427,6 +450,7 @@ static void am_cc_render(AM_CC_Decoder_t *cc)
 
 	if (cc->cpara.draw_end)
 		cc->cpara.draw_end(cc, &draw_para);
+
 }
 
 static void am_cc_handle_event(AM_CC_Decoder_t *cc, int evt)
@@ -638,6 +662,11 @@ static void *am_cc_render_thread(void *arg)
 		{
 			pthread_cond_wait(&cc->cond, &cc->lock);
 		}
+		if(cc->need_clear && cc->flash_stat == FLASH_NONE)
+		{
+			am_cc_clear(cc);
+			cc->need_clear = AM_FALSE;
+		}
 
 		if (cc->evt >= 0)
 		{
@@ -648,6 +677,8 @@ static void *am_cc_render_thread(void *arg)
 		if (cc->render_flag)
 		{
 			am_cc_render(cc);
+			cc->render_flag = AM_FALSE;
+			cc->need_clear = AM_TRUE;
 		}
 	}
 
@@ -728,7 +759,6 @@ AM_ErrorCode_t AM_CC_Destroy(AM_CC_Handle_t handle)
 	AM_CC_Stop(handle);
 
 	tvcc_destroy(&cc->decoder);
-
 	pthread_mutex_destroy(&cc->lock);
 	pthread_cond_destroy(&cc->cond);
 
@@ -889,7 +919,7 @@ AM_ErrorCode_t AM_CC_SetUserOptions(AM_CC_Handle_t handle, AM_CC_UserOptions_t *
 	cc->evt = AM_CC_EVT_SET_USER_OPTIONS;
 
 	pthread_mutex_unlock(&cc->lock);
-	pthread_cond_signal(&cc->cond);
+	//pthread_cond_signal(&cc->cond);
 
 	return AM_SUCCESS;
 }
