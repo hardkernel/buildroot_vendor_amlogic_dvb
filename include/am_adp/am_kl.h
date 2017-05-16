@@ -6,7 +6,7 @@
 #define MESON_KL_LEVEL 3
 #define MESON_KL_IOC_MAGIC 'k'
 #define MESON_KL_RUN              _IOW(MESON_KL_IOC_MAGIC, 13, \
-	struct meson_kl_run_args)
+	int)
 #define MESON_KL_CR               _IOWR(MESON_KL_IOC_MAGIC, 14, \
 	struct meson_kl_cr_args)
 
@@ -46,5 +46,37 @@ struct meson_kl_cr_args {
 	/* ekn-1 (e.g. ek2 for 3-key ladder) */
 	__u8 ekn1[16];
 };
-
+/* keyladder_init
+ * open keyladder device
+ *  ret:
+ *  	Success:	AM_SUCCESS
+ *           Failure:	AM_FAILURE
+ */
+int AM_KL_KeyladderInit();
+/* keyladder_release
+ * release keyladder device
+ */
+void AM_KL_KeyladderRelease();
+/*  set_keyladder:
+ *  Currently support 3 levels keyladder, use this function
+ *  	to set kl regs, the cw will set to descrambler automatically.
+ *  key2:  for 3 levels kl, it means ekn1
+ *  key1:  ekn2
+ *  ecw:    ecw
+ *  ret:
+ *  	Success:	AM_SUCCESS
+ *           Failure:	AM_FAILURE
+ */
+int AM_KL_SetKeyladder(struct meson_kl_config *kl_config);
+/*  set_keyladder:
+ *  Currently support 3 levels keyladder, use this function
+ *  	to set kl regs, the cw will set to descrambler automatically.
+ *  key2:  for 3 levels kl, it means ekn1
+ *  nounce: it is used for challenge
+ *  dnounce: response of cr
+ *  ret:
+ *  	Success:	AM_SUCCESS
+ *           Failure:	AM_FAILURE
+ */
+int AM_KL_SetKeyladderCr(unsigned char key2[16], unsigned nounce[16], unsigned dnounce[16]);
 #endif  //end define MESON_AM_KL
