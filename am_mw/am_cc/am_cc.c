@@ -30,7 +30,7 @@
 
 #define CC_POLL_TIMEOUT 100
 #define CC_FLASH_PERIOD 1000
-#define CC_CLEAR_TIME 	3000
+#define CC_CLEAR_TIME 	15000
 
 #define AMSTREAM_USERDATA_PATH "/dev/amstream_userdata"
 #define VBI_DEV_FILE "/dev/vbi"
