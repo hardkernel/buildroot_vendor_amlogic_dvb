@@ -15,7 +15,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
-
+#include <unistd.h>
 #include <string.h>
 #include <assert.h>
 #include <am_fend.h>

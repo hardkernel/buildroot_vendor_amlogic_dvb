@@ -5,7 +5,7 @@
  *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
  */
 /**\file
- * \brief 解复用设备测试程序
+ * \brief
  *
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2010-06-07: create the document
@@ -163,7 +163,7 @@ static void dump_bytes(int dev_no, int fid, const uint8_t *data, int len, void *
 			}
 			if (get_upara(u-1)&UPARA_PES2ES) {
 				if (!h_pes[u-1]) {
-					AM_PES_Para_t para = {.packet = pes_cb, .user_data = (void*)u, .payload_only = AM_TRUE,};
+					AM_PES_Para_t para = {.packet = pes_cb, .user_data = (void*)(long)u, .payload_only = AM_TRUE,};
 					AM_PES_Create(&h_pes[u-1], &para);
 				}
 				AM_PES_Decode(h_pes[u-1], data, len);
