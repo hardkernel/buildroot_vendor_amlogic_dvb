@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
-
+#include <string.h>
+#include <errno.h>
 #define AM_DEBUG_LEVEL 5
 
 #include <am_debug.h>
@@ -205,7 +206,7 @@ AM_TSUPD_DlHandle_t dl_part_start(int pid, int tid, int ext, int slot)
 	memset(&dlpara, 0, sizeof(dlpara));
 
 	dlpara.callback = dl_part_callback;
-	dlpara.callback_args = (void*)slot;
+	dlpara.callback_args = (void*)(long)slot;
 	dlpara.pid = pid;
 	dlpara.tableid = tid;
 	dlpara.ext = ext;

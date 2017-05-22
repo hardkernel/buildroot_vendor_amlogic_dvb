@@ -260,7 +260,7 @@ static int start_scan_test()
 			{
 				if (hscan)
 				{
-					AM_EVT_Unsubscribe(hscan, AM_SCAN_EVT_PROGRESS, progress_evt_callback, NULL);
+					AM_EVT_Unsubscribe((long)hscan, AM_SCAN_EVT_PROGRESS, progress_evt_callback, NULL);
 					AM_SCAN_Destroy(hscan, AM_TRUE);
 					hscan == 0;
 				}
@@ -271,7 +271,7 @@ static int start_scan_test()
 				go = AM_FALSE;
 				if (hscan)
 				{
-					AM_EVT_Unsubscribe(hscan, AM_SCAN_EVT_PROGRESS, progress_evt_callback, NULL);
+					AM_EVT_Unsubscribe((long)hscan, AM_SCAN_EVT_PROGRESS, progress_evt_callback, NULL);
 					AM_SCAN_Destroy(hscan, AM_FALSE);
 				}
 				continue;
@@ -287,7 +287,7 @@ static int start_scan_test()
 			
 			if (hscan)
 			{
-				AM_EVT_Unsubscribe(hscan, AM_SCAN_EVT_PROGRESS, progress_evt_callback, NULL);
+				AM_EVT_Unsubscribe((long)hscan, AM_SCAN_EVT_PROGRESS, progress_evt_callback, NULL);
 				AM_SCAN_Destroy(hscan, AM_FALSE);
 				hscan = 0;
 			}
@@ -318,7 +318,7 @@ static int start_scan_test()
 			
 			AM_SCAN_Create(&para, &hscan);
 			/*注册搜索进度通知事件*/
-			AM_EVT_Subscribe(hscan, AM_SCAN_EVT_PROGRESS, progress_evt_callback, NULL);
+			AM_EVT_Subscribe((long)hscan, AM_SCAN_EVT_PROGRESS, progress_evt_callback, NULL);
 
 			AM_SCAN_Start(hscan);
 
