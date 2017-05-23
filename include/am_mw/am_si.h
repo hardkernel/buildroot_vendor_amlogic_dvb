@@ -384,7 +384,14 @@ extern AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_
  * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_ExtractATSCCaptionFromES(dvbpsi_pmt_es_t *es, AM_SI_CaptionInfo_t *cap_info);
-
+/**\brief get Rating String from Content Advisory descriptor
+ * \param [in] decoded content advisory descriptor
+ * \param [out] json string
+ * \param [in] buffer size
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
+extern AM_ErrorCode_t AM_SI_GetRatingString(atsc_content_advisory_dr_t *pcad, char *buf, int buf_size);
 #ifdef __cplusplus
 }
 #endif

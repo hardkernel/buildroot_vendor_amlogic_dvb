@@ -1934,3 +1934,55 @@ AM_ErrorCode_t AM_SI_ExtractATSCCaptionFromES(dvbpsi_pmt_es_t *es, AM_SI_Caption
 	return AM_SUCCESS;
 }
 
+AM_ErrorCode_t AM_SI_GetRatingString(atsc_content_advisory_dr_t *pcad, char *buf, int buf_size)
+{
+	int i, j;
+	/*
+	[
+	    //g=region, rx=ratings, d=dimension, r=rating value, rs:rating string
+	    {g:0,rx:[{d:0,r:3},{d:2,r:1},{d:4,r:1}],rs:[{lng:"eng",txt:"TV-PG-L-V"}]},
+		{g:1,rx:[{d:7,r:3},rs:[{lng:"eng",txt:"MPAA-PG"}]}
+		...
+	]
+	*/
+	sprintf(buf, "[");
+	for (i=0; i<pcad->i_region_count; i++)
+	{
+		if (i != 0)
+			snprintf(buf, buf_size, "%s,", buf);
+
+		snprintf(buf, buf_size, "%s{g:%d,rx:[", buf, pcad->region[i].i_rating_region);
+		for (j=0; j<pcad->region[i].i_dimension_count; j++)
+		{
+			if (j != 0)
+				snprintf(buf, buf_size, "%s,", buf);
+
+			snprintf(buf, buf_size, "%s{d:%d,r:%d}", buf,
+				pcad->region[i].dimension[j].i_dimension_j,
+				pcad->region[i].dimension[j].i_rating_value);
+		}
+		snprintf(buf, buf_size, "%s]", buf);
+
+		{
+			int k;
+			snprintf(buf, buf_size, "%s,rs:[", buf);
+			for (k=0; k<pcad->region[i].rating_description.i_string_count; k++)
+			{
+				if (k != 0)
+					snprintf(buf, buf_size, "%s,", buf);
+
+				snprintf(buf, buf_size, "%s{lng:\"%c%c%c\",txt:\"%s\"}", buf,
+					pcad->region[i].rating_description.string[k].iso_639_code[0],
+					pcad->region[i].rating_description.string[k].iso_639_code[1],
+					pcad->region[i].rating_description.string[k].iso_639_code[2],
+					pcad->region[i].rating_description.string[k].string);
+			}
+			snprintf(buf, buf_size, "%s]", buf);
+		}
+		snprintf(buf, buf_size, "%s}", buf);
+	}
+	snprintf(buf, buf_size, "%s]", buf);
+
+	return AM_SUCCESS;
+}
+
