@@ -28,7 +28,7 @@
  * Macro definitions
  ***************************************************************************/
 
-#define CC_POLL_TIMEOUT 100
+#define CC_POLL_TIMEOUT 1000
 #define CC_FLASH_PERIOD 1000
 #define CC_CLEAR_TIME 	15000
 
@@ -514,29 +514,40 @@ static void solve_vbi_data (AM_CC_Decoder_t *cc, struct vbi_data_s *vbi)
 {
 	int line = vbi->line_num;
 
-	if (line != 21)
+	if (cc == NULL || vbi == NULL)
+		return;
+
+	/*if (line != 21)
 		return;
 
 	if (vbi->field_id == VBI_FIELD_2)
-		line = 284;
+		line = 284;*/
 
+	//AM_DEBUG(0, "solve_vbi_data line == %d", line);
 	vbi_decode_caption(cc->decoder.vbi, line, vbi->b);
 }
 
 /**\brief VBI data thread.*/
 static void *am_vbi_data_thread(void *arg)
 {
-	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)arg;
-	int fd;
 
+	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)arg;
+	struct vbi_data_s  vbi[50];
+	int fd;
+	int type = 0x1;
+
+	AM_DEBUG(0, "am_vbi_data_thread start");
 	fd = open(VBI_DEV_FILE, O_RDWR);
 	if (fd == -1) {
 		AM_DEBUG(1, "cannot open \"%s\"", VBI_DEV_FILE);
 		return NULL;
 	}
 
-	ioctl(fd, VBI_IOC_SET_TYPE, VBI_TYPE_USCC);
-	ioctl(fd, VBI_IOC_START);
+	if (ioctl(fd, VBI_IOC_SET_TYPE, &type )== -1)
+		AM_DEBUG(0, "VBI_IOC_SET_TYPE error:%s", strerror(errno));
+
+	if (ioctl(fd, VBI_IOC_START) == -1)
+		AM_DEBUG(0, "VBI_IOC_START error:%s", strerror(errno));
 
 	while (cc->running) {
 		struct pollfd pfd;
@@ -546,13 +557,13 @@ static void *am_vbi_data_thread(void *arg)
 		pfd.events = POLLIN;
 
 		ret = poll(&pfd, 1, CC_POLL_TIMEOUT);
+
 		if (cc->running && (ret > 0) && (pfd.events & POLLIN)) {
-			struct vbi_data_s  vbi[256];
 			struct vbi_data_s *pd;
 
 			ret = read(fd, vbi, sizeof(vbi));
 			pd  = vbi;
-
+			//AM_DEBUG(0, "am_vbi_data_thread running read data == %d",ret);
 			while (ret >= (int)sizeof(struct vbi_data_s)) {
 				solve_vbi_data(cc, pd);
 
@@ -561,7 +572,7 @@ static void *am_vbi_data_thread(void *arg)
 			}
 		}
 	}
-
+	AM_DEBUG(0, "am_vbi_data_thread exit");
 	ioctl(fd, VBI_IOC_STOP);
 	close(fd);
 	return NULL;
@@ -828,6 +839,8 @@ AM_ErrorCode_t AM_CC_Start(AM_CC_Handle_t handle, AM_CC_StartPara_t *para)
 	if (para->caption <= AM_CC_CAPTION_DEFAULT ||
 		para->caption >= AM_CC_CAPTION_MAX)
 		para->caption = AM_CC_CAPTION_CC1;
+
+	AM_DEBUG(0, "AM_CC_Start para->caption == %d", para->caption );
 
 	cc->evt = -1;
 	cc->spara = *para;
