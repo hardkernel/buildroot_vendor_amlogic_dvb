@@ -55,6 +55,8 @@ typedef void (*AM_CC_DrawEnd_t)(AM_CC_Handle_t handle, AM_CC_DrawPara_t *draw_pa
 typedef void (*AM_CC_VBIProgInfoCb_t)(AM_CC_Handle_t handle, vbi_program_info *pi);
 /**VBI network callback.*/
 typedef void (*AM_CC_VBINetworkCb_t)(AM_CC_Handle_t handle, vbi_network *n);
+typedef void (*AM_CC_VBIRatingCb_t)(AM_CC_Handle_t handle, vbi_rating *rating);
+
 
 typedef enum {
     CC_STATE_RUNNING      = 0x1001,
@@ -207,6 +209,7 @@ typedef struct
 	AM_CC_Input_t       input;         /**< Input type.*/
 	AM_CC_VBIProgInfoCb_t pinfo_cb;    /**< VBI program information callback.*/
 	AM_CC_VBINetworkCb_t  network_cb;  /**< VBI network callback.*/
+	AM_CC_VBIRatingCb_t	rating_cb;		/**< VBI rating callback.*/
 }AM_CC_CreatePara_t;
 
 /**\brief Close caption parser start parameter*/
