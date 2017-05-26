@@ -1943,7 +1943,7 @@ AM_ErrorCode_t AM_SI_GetRatingString(atsc_content_advisory_dr_t *pcad, char *buf
 	[
 	    //g=region, rx=ratings, d=dimension, r=rating value, rs:rating string
 	    {g:0,rx:[{d:0,r:3},{d:2,r:1},{d:4,r:1}],rs:[{lng:"eng",txt:"TV-PG-L-V"}]},
-		{g:1,rx:[{d:7,r:3},rs:[{lng:"eng",txt:"MPAA-PG"}]}
+		{g:1,rx:[{d:7,r:3}],rs:[{lng:"eng",txt:"MPAA-PG"}]}
 		...
 	]
 	*/
