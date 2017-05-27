@@ -998,7 +998,9 @@ AM_ErrorCode_t AM_SI_Create(AM_SI_Handle_t *handle)
 		AM_DEBUG(1, "Cannot create SI Decoder, no enough memory");
 		return AM_SI_ERR_NO_MEM;
 	}
-
+	/*add set decode des callback*/
+	AM_DEBUG(1, "dvbpsi_Set_DecodeDescriptor_Callback at si creat");
+	dvbpsi_Set_DecodeDescriptor_Callback(si_decode_descriptor);
 	dec->prv_data = (void*)si_prv_data;
 	dec->allocated = AM_TRUE;
 
@@ -1052,7 +1054,7 @@ AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, uint8_t 
 
 	assert(buf && sec);
 	AM_TRY(si_check_handle(handle));
-	
+
 	table_id = buf[0];
 	
 	if (table_id <= AM_SI_TID_TOT)
