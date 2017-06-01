@@ -1552,6 +1552,10 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 									AM_DEBUG(1, "found  format identifier for [DTSH]");
 									afmt_tmp = AFORMAT_DTS;
 									break;
+								case 0x44524131:
+									AM_DEBUG(1, "found  format identifier for [DRA]");
+									afmt_tmp = AFORMAT_DRA;;
+									break;
 								default:
 									break;
 							}
