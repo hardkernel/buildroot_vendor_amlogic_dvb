@@ -21,6 +21,7 @@ typedef struct AM_TT2_CachedPage_s
 {
 	int			count;
 	vbi_page	page;
+	uint8_t   drcs_clut[2 + 2 * 4 + 2 * 16];
 	int      	pts;
 	struct AM_TT2_CachedPage_s *next;
 }AM_TT2_CachedPage_t;
@@ -98,6 +99,12 @@ static void tt2_add_cached_page(AM_TT2_Parser_t *parser, vbi_page *vp)
 		parser->cached_tail = tmp;
 	}
 	tmp->page = *vp;
+
+	if (vp->drcs_clut) {
+		memcpy(tmp->drcs_clut, vp->drcs_clut, sizeof(tmp->drcs_clut));
+		tmp->page.drcs_clut = &tmp->drcs_clut;
+	}
+
 	tmp->pts = tt2_get_pts("/sys/class/stb/video_pts", 10);
 	AM_DEBUG(1, "Cache page, pts 0x%x, total cache %d pages", tmp->pts,
 		parser->cached_tail->count - parser->cached_pages->count);
