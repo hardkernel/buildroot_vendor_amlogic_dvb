@@ -343,10 +343,13 @@ static void am_cc_vbi_event_handler(vbi_event *ev, void *user_data)
 		pthread_mutex_unlock(&cc->lock);
 	} else if ((ev->type == VBI_EVENT_ASPECT) || (ev->type == VBI_EVENT_PROG_INFO)) {
 		if (cc->cpara.pinfo_cb)
-			cc->cpara.pinfo_cb(cc, user_data);
+			cc->cpara.pinfo_cb(cc, ev->ev.prog_info);
 	} else if (ev->type == VBI_EVENT_NETWORK) {
 		if (cc->cpara.network_cb)
-			cc->cpara.network_cb(cc, user_data);
+			cc->cpara.network_cb(cc, &ev->ev.network);
+	}else if (ev->type == VBI_EVENT_RATING) {
+		if (cc->cpara.rating_cb)
+			cc->cpara.rating_cb(cc, &ev->ev.prog_info->rating);
 	}
 }
 
@@ -737,7 +740,8 @@ AM_ErrorCode_t AM_CC_Create(AM_CC_CreatePara_t *para, AM_CC_Handle_t *handle)
 
 	vbi_event_handler_register(cc->decoder.vbi,
 			VBI_EVENT_CAPTION|VBI_EVENT_ASPECT
-			|VBI_EVENT_PROG_INFO|VBI_EVENT_NETWORK,
+			|VBI_EVENT_PROG_INFO|VBI_EVENT_NETWORK
+			|VBI_EVENT_RATING,
 			am_cc_vbi_event_handler,
 			cc);
 

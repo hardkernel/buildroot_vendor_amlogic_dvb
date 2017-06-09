@@ -1224,13 +1224,10 @@ static void am_epg_psip_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_sect
 
 	events_cnt = 0;
 	AM_SI_LIST_BEGIN(eit->eit_event_info, event)
-		char *values = NULL;
-		int values_size = 0;
+		char values[256];
+		int values_size = 256;
 
 		pevt = &evts[events_cnt++];
-
-		values = pevt->rrt_ratings;
-		values_size = sizeof(pevt->rrt_ratings);
 
 		start = event->start_time - curr_gps_time_offset;
 		end = start + event->length_in_seconds;
@@ -1248,15 +1245,28 @@ static void am_epg_psip_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_sect
 		am_epg_gen_event_text(&event->title, pevt->name, sizeof(pevt->name));
 
 		values[0] = 0;
+		pevt->rrt_ratings[0] = 0;
 
+		sprintf(pevt->rrt_ratings, "{");
 		AM_SI_LIST_BEGIN(event->desc, descr)
 			if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_CONTENT_ADVISORY)
 			{
-				int i=0, j=0;
 				atsc_content_advisory_dr_t *pcad = (atsc_content_advisory_dr_t*)descr->p_decoded;
 				AM_SI_GetRatingString(pcad, values, values_size);
+				if (pevt->rrt_ratings[strlen(pevt->rrt_ratings)-1] != '{')
+					snprintf(pevt->rrt_ratings, sizeof(pevt->rrt_ratings), "%s,", pevt->rrt_ratings);
+				snprintf(pevt->rrt_ratings, sizeof(pevt->rrt_ratings), "%sDratings:%s", pevt->rrt_ratings, values);
 			}
+			/*else if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_CAPTION_SERVICE)
+			{
+				dvbpsi_caption_service_86_dr_t *pcsd = (dvbpsi_caption_service_86_dr_t*)descr->p_decoded;
+				AM_SI_GetATSCCaptionString(pcsd, values, values_size);
+				if (pevt->rrt_ratings[strlen(pevt->rrt_ratings)-1] != '{')
+					snprintf(pevt->rrt_ratings, sizeof(pevt->rrt_ratings), "%s,", pevt->rrt_ratings);
+				snprintf(pevt->rrt_ratings, sizeof(pevt->rrt_ratings), "%scaptions:%s", pevt->rrt_ratings, values);
+			}*/
 		AM_SI_LIST_END()
+		snprintf(pevt->rrt_ratings, sizeof(pevt->rrt_ratings), "%s}", pevt->rrt_ratings);
 
 		pevt->src = mon->src;
 		pevt->srv_id = eit->source_id;
@@ -1270,7 +1280,6 @@ static void am_epg_psip_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_sect
 		pevt->parental_rating = 0;
 		pevt->sub_flag = 0;
 		pevt->sub_status = 0;
-		strncpy(pevt->rrt_ratings, values, sizeof(pevt->rrt_ratings)-1);
 		AM_DEBUG(1, "evt: sid[%d] evt[%d] start[%d] end[%d] r(%s)", eit->source_id, pevt->evt_id, pevt->start, pevt->end, pevt->rrt_ratings);
 	AM_SI_LIST_END()
 
