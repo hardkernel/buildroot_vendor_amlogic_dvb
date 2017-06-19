@@ -1,6 +1,6 @@
 
-#ifndef _ATSC_MGT_H
-#define _ATSC_MGT_H
+#ifndef _ATSC_MGT_O_H
+#define _ATSC_MGT_O_H
 
 #include "atsc_types.h"
 

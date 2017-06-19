@@ -29,6 +29,7 @@
  *
  *****************************************************************************/
 
+#define TABLE_AREA
 
 #include "config.h"
 
@@ -48,6 +49,8 @@
 #include "../descriptor.h"
 #include "cat.h"
 #include "cat_private.h"
+
+DEF_SET_DECODE_DESCRIPTOR_CALLBACK(cat)
 
 
 /*****************************************************************************

@@ -27,6 +27,7 @@
  *
  *****************************************************************************/
 
+#define TABLE_AREA
 
 #include "config.h"
 
@@ -47,6 +48,8 @@
 #include "pmt.h"
 #include "pmt_private.h"
 
+
+DEF_SET_DECODE_DESCRIPTOR_CALLBACK(pmt)
 
 /*****************************************************************************
  * dvbpsi_AttachPMT

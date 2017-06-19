@@ -263,8 +263,8 @@ typedef struct AM_SCAN_TS_s
 			dvbpsi_cat_t *cats;		/**< the CAT table of scaned*/
 			dvbpsi_pmt_t *pmts;		/**< the PMT table of scaned*/
 			dvbpsi_sdt_t *sdts;		/**< the SDT table of scaned*/
-			mgt_section_info_t *mgts;		/**< the MGT table of scaned*/
-			vct_section_info_t *vcts;		/**< the VCT table of scaned*/
+			dvbpsi_atsc_mgt_t *mgts;		/**< the MGT table of scaned*/
+			dvbpsi_atsc_vct_t *vcts;		/**< the VCT table of scaned*/
 			int use_vct_tsid;
 			int				dvbt2_data_plp_num;	/**< DVB-T2 DATA PLP count*/
 			struct

@@ -22,9 +22,9 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_sub2/am_sub.c am_sub2/dvb_sub.c \
 		   am_tt2/am_tt.c \
 		   am_si/am_si.c\
+		   am_si/atsc/atsc_rrt.c\
 		   am_si/atsc/atsc_vct.c\
 		   am_si/atsc/atsc_mgt.c\
-		   am_si/atsc/atsc_rrt.c\
 		   am_si/atsc/atsc_stt.c\
 		   am_si/atsc/atsc_eit.c\
 		   am_si/atsc/atsc_ett.c\
@@ -54,7 +54,6 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_adp/libdvbsi\
 		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/descriptors\
 		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/tables\
-		    $(LOCAL_PATH)/../include/am_mw/atsc\
 		    $(LOCAL_PATH)/am_closecaption/am_vbi\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    external/libzvbi/src\
@@ -120,7 +119,6 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_adp/libdvbsi\
 		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/descriptors\
 		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/tables\
-		    $(LOCAL_PATH)/../include/am_mw/atsc\
 		    $(LOCAL_PATH)/am_scan/libsigdetect\
 		    $(LOCAL_PATH)/../android/ndk/include\
 		    external/libzvbi/src\

@@ -12,6 +12,7 @@
 #define _AM_SI_H
 
 #include "am_types.h"
+
 #include "libdvbsi/descriptor.h"
 #include "libdvbsi/dvbpsi.h"
 #include "libdvbsi/psi.h"
@@ -25,13 +26,20 @@
 #include "libdvbsi/tables/tot.h"
 #include "libdvbsi/tables/bat.h"
 #include "libdvbsi/descriptors/dr.h"
+#include "libdvbsi/tables/atsc_mgt.h"
+#include "libdvbsi/tables/atsc_vct.h"
+#include "libdvbsi/tables/atsc_stt.h"
+#include "libdvbsi/tables/atsc_eit.h"
+#include "libdvbsi/tables/atsc_ett.h"
+
 #include "atsc/atsc_descriptor.h"
+#include "atsc/atsc_rrt.h"
 #include "atsc/atsc_mgt.h"
 #include "atsc/atsc_vct.h"
-#include "atsc/atsc_rrt.h"
 #include "atsc/atsc_stt.h"
 #include "atsc/atsc_eit.h"
 #include "atsc/atsc_ett.h"
+
 
 
 #ifdef __cplusplus
@@ -176,6 +184,8 @@ extern "C"
 #define AM_SI_MAX_TTX_CNT 32
 /**\brief Maximum number of single Program supported caption*/
 #define AM_SI_MAX_CAP_CNT 32
+
+#define SECS_BETWEEN_1JAN1970_6JAN1980 (315964800)
 
 /****************************************************************************
  * Type definitions
@@ -363,6 +373,7 @@ extern AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *
  * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_ExtractAVFromATSCVC(vct_channel_info_t *vcinfo, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info);
+extern AM_ErrorCode_t AM_SI_ExtractAVFromVC(dvbpsi_atsc_vct_channel_t *vcinfo, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info);
 /**\brief get subtitle info from ES stream
  * \param [in] es ES stream
  * \param [out] sub_info subtitle info
@@ -391,7 +402,15 @@ extern AM_ErrorCode_t AM_SI_ExtractATSCCaptionFromES(dvbpsi_pmt_es_t *es, AM_SI_
  * \retval AM_SUCCESS On success
  * \return Error code
  */
-extern AM_ErrorCode_t AM_SI_GetRatingString(atsc_content_advisory_dr_t *pcad, char *buf, int buf_size);
+extern AM_ErrorCode_t AM_SI_GetRatingString(dvbpsi_atsc_content_advisory_dr_t *pcad, char *buf, int buf_size);
+
+
+extern AM_ErrorCode_t AM_SI_GetDVBTextCodingAndData(char *in, int in_len, char *coding, int coding_len, int *offset);
+
+extern AM_ErrorCode_t AM_SI_ConvertToUTF8(char *in, int in_len, char *out, int out_len, char *coding);
+
+extern AM_ErrorCode_t AM_SI_ConvertDVBTextCodeEx(char *in, int in_len, char *out, int out_len, char *coding);
+
 #ifdef __cplusplus
 }
 #endif

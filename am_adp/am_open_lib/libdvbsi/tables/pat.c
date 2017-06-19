@@ -27,6 +27,7 @@
  *
  *****************************************************************************/
 
+//#define TABLE_AREA
 
 #include "config.h"
 
@@ -45,6 +46,7 @@
 #include "pat.h"
 #include "pat_private.h"
 
+//DEF_SET_DECODE_DESCRIPTOR_CALLBACK(pat)
 
 /*****************************************************************************
  * dvbpsi_AttachPAT

@@ -29,6 +29,7 @@
  *
  *****************************************************************************/
 
+#define TABLE_AREA
 
 #include "config.h"
 
@@ -49,6 +50,8 @@
 #include "../demux.h"
 #include "tot.h"
 #include "tot_private.h"
+
+DEF_SET_DECODE_DESCRIPTOR_CALLBACK(tot)
 
 
 /*****************************************************************************
@@ -462,3 +465,4 @@ dvbpsi_psi_section_t* dvbpsi_GenTOTSections(dvbpsi_tot_t* p_tot)
 
   return p_result;
 }
+

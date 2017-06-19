@@ -128,7 +128,7 @@ struct AM_EPG_Monitor_s
 	AM_Bool_t			eit_has_data;		/**< 是否有需要通知更新的EIT数据*/
 	int					psip_ett_count; /**<ATSC ETT 最大个数*/
 	int					psip_ett_done_flag; /**< ATSC ETT 接收完成标志*/
-	
+
 	dvbpsi_pat_t		*pats;
 	dvbpsi_pmt_t		*pmts;
 	dvbpsi_cat_t		*cats;
@@ -136,12 +136,12 @@ struct AM_EPG_Monitor_s
 	dvbpsi_nit_t		*nits;
 	dvbpsi_eit_t		*eits;
 	dvbpsi_tot_t		*tots;
-	stt_section_info_t	*stts;
-	mgt_section_info_t	*mgts;
+	dvbpsi_atsc_stt_t	*atsc_stts;
+	dvbpsi_atsc_mgt_t	*atsc_mgts;
+	dvbpsi_atsc_vct_t	*atsc_vcts;
+	dvbpsi_atsc_eit_t	*atsc_eits;
+	dvbpsi_atsc_ett_t	*atsc_etts;
 	rrt_section_info_t	*rrts;
-	vct_section_info_t	*vcts;
-	eit_section_info_t	*psip_eits;
-	ett_section_info_t  *psip_etts;
 
 	struct dvb_frontend_event 		fe_evt;			/**< 前端事件*/
 

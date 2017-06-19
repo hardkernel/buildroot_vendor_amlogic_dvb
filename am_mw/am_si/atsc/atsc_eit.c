@@ -2,9 +2,9 @@
 #undef _FORTIFY_SOURCE
 #endif
 
-#include "atsc_types.h"
-#include "atsc_descriptor.h"
-#include "atsc_eit.h"
+#include "atsc/atsc_types.h"
+#include "atsc/atsc_descriptor.h"
+#include "atsc/atsc_eit.h"
 
 #define MAKE_SHORT_HL(exp)		            ((INT16U)((exp##_hi<<8)|exp##_lo))
 #define MAKE_WORD_HML(exp)			((INT32U)(((exp##_hi)<<24)|((exp##_mh)<<16)|((exp##_ml)<<8)|exp##_lo))

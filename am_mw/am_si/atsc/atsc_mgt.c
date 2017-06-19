@@ -1,9 +1,9 @@
 #ifdef _FORTIFY_SOURCE
 #undef _FORTIFY_SOURCE
 #endif
-#include "atsc_types.h"
-#include "atsc_descriptor.h"
-#include "atsc_mgt.h"
+#include "atsc/atsc_types.h"
+#include "atsc/atsc_descriptor.h"
+#include "atsc/atsc_mgt.h"
 
 #define MAKE_SHORT_HL(exp)		            ((INT16U)((exp##_hi<<8)|exp##_lo))
 

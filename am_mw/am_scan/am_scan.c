@@ -901,7 +901,7 @@ static void am_scan_update_ts_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *resul
 		if (pats != NULL && !ts->digital.use_vct_tsid)
 			ts_id = pats->i_ts_id;
 		else if (ts->digital.vcts != NULL)
-			ts_id = ts->digital.vcts->transport_stream_id;
+			ts_id = ts->digital.vcts->i_extension;
 
 		if (ts->digital.fend_para.m_type == FE_QAM)
 		{
@@ -1249,25 +1249,29 @@ static void am_scan_extract_srv_info_from_sdt(AM_SCAN_Result_t *result, dvbpsi_s
 }
 
 /**\brief 从visual channel中获取相关service信息*/
-static void am_scan_extract_srv_info_from_vc(vct_channel_info_t *vcinfo, AM_SCAN_ServiceInfo_t *srv_info)
+static void am_scan_extract_srv_info_from_vc(dvbpsi_atsc_vct_channel_t *vcinfo, AM_SCAN_ServiceInfo_t *srv_info)
 {
-	srv_info->major_chan_num = vcinfo->major_channel_number;
-	srv_info->minor_chan_num = vcinfo->minor_channel_number;
+	char name[14] = {0};
 
-	srv_info->chan_num = (vcinfo->major_channel_number<<16) | (vcinfo->minor_channel_number&0xffff);
-	srv_info->hidden = vcinfo->hidden;
-	srv_info->hide_guide = vcinfo->hide_guide;
-	srv_info->source_id = vcinfo->source_id;
-    memcpy(srv_info->name, "xxx", 3);
-	memcpy(srv_info->name+3, vcinfo->short_name, sizeof(vcinfo->short_name));
-	srv_info->name[sizeof(vcinfo->short_name)+3] = 0;
+	srv_info->major_chan_num = vcinfo->i_major_number;
+	srv_info->minor_chan_num = vcinfo->i_minor_number;
+
+	srv_info->chan_num = (vcinfo->i_major_number<<16) | (vcinfo->i_minor_number&0xffff);
+	srv_info->hidden = vcinfo->b_hidden;
+	srv_info->hide_guide = vcinfo->b_hide_guide;
+	srv_info->source_id = vcinfo->i_source_id;
+	memcpy(srv_info->name, "xxx", 3);
+	if (AM_SI_ConvertToUTF8(vcinfo->i_short_name, 14, name, 14, "utf-16") != AM_SUCCESS)
+		strcpy(name, "No Name");
+	memcpy(srv_info->name+3, name, sizeof(name));
+	srv_info->name[sizeof(name)+3] = 0;
 	/*业务类型*/
-	srv_info->srv_type = vcinfo->service_type;
-	
+	srv_info->srv_type = vcinfo->i_service_type;
+
 	AM_DEBUG(1 ,"Program(%d)('%s':%d-%d) in current TSID(%d) found!", 
 		srv_info->srv_id, srv_info->name, 
 		srv_info->major_chan_num, srv_info->minor_chan_num, 
-		vcinfo->channel_TSID);
+		vcinfo->i_channel_tsid);
 }
 
 static void add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang[3])
@@ -1489,8 +1493,8 @@ static void store_analog_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_S
 static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN_TS_t *ts)
 {
 	sqlite3 *hdb;
-	vct_section_info_t *vct;
-	vct_channel_info_t *vcinfo;
+	dvbpsi_atsc_vct_t *vct;
+	dvbpsi_atsc_vct_channel_t *vcinfo;
 	dvbpsi_pmt_t *pmt;
 	dvbpsi_pmt_es_t *es;
 	dvbpsi_descriptor_t *descr;
@@ -1503,7 +1507,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	AM_Bool_t store = (stmts != NULL);
 
 	if(ts->digital.vcts
-		&& (ts->digital.vcts->transport_stream_id != ts->digital.pats->i_ts_id)
+		&& (ts->digital.vcts->i_extension != ts->digital.pats->i_ts_id)
 		&& (ts->digital.pats->i_ts_id == 0))
 		ts->digital.use_vct_tsid = 1;
 
@@ -1571,19 +1575,19 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 		
 		program_found_in_vct = AM_FALSE;
 		AM_SI_LIST_BEGIN(ts->digital.vcts, vct)
-		AM_SI_LIST_BEGIN(vct->vct_chan_info, vcinfo)
+		AM_SI_LIST_BEGIN(vct->p_first_channel, vcinfo)
 			/*Skip inactive program*/
-			if (vcinfo->program_number == 0  || vcinfo->program_number == 0xffff)
+			if (vcinfo->i_program_number == 0  || vcinfo->i_program_number == 0xffff)
 				continue;
 			
 			/*从VCT表中查找该service并获取信息*/
-			if ((ts->digital.use_vct_tsid || (vct->transport_stream_id == ts->digital.pats->i_ts_id))
-				&& vcinfo->channel_TSID == vct->transport_stream_id)
+			if ((ts->digital.use_vct_tsid || (vct->i_extension == ts->digital.pats->i_ts_id))
+				&& vcinfo->i_channel_tsid == vct->i_extension)
 			{	
-				if (vcinfo->program_number == pmt->i_program_number)
+				if (vcinfo->i_program_number == pmt->i_program_number)
 				{
 					/*从VCT中尝试添加音视频流*/
-					AM_SI_ExtractAVFromATSCVC(vcinfo, &srv_info.vid, &srv_info.vfmt, &srv_info.aud_info);
+					AM_SI_ExtractAVFromVC(vcinfo, &srv_info.vid, &srv_info.vfmt, &srv_info.aud_info);
 		
 					am_scan_extract_srv_info_from_vc(vcinfo, &srv_info);
 					
@@ -1594,8 +1598,8 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 			else
 			{
 				AM_DEBUG(1, "Program(%d ts:%d) in VCT(ts:%d) found, current (ts:%d)",
-						vcinfo->program_number, vcinfo->channel_TSID,
-						vct->transport_stream_id, ts->digital.pats->i_ts_id);
+						vcinfo->i_program_number, vcinfo->i_channel_tsid,
+						vct->i_extension, ts->digital.pats->i_ts_id);
 				continue;
 			}
 		AM_SI_LIST_END()
@@ -1607,21 +1611,21 @@ VCT_END:
 
 	/* All programs in PMTs added, now trying the programs in VCT but NOT in PMT */
 	AM_SI_LIST_BEGIN(ts->digital.vcts, vct)
-	AM_SI_LIST_BEGIN(vct->vct_chan_info, vcinfo)
+	AM_SI_LIST_BEGIN(vct->p_first_channel, vcinfo)
 		AM_Bool_t found_in_pmt = AM_FALSE;
 
 		am_scan_init_service_info(&srv_info);
 		srv_info.satpara_dbid = satpara_dbid;
-		srv_info.srv_id = vcinfo->program_number;
+		srv_info.srv_id = vcinfo->i_program_number;
 		srv_info.src = src;
 
 		/*Skip inactive program*/
-		if (vcinfo->program_number == 0  || vcinfo->program_number == 0xffff)
+		if (vcinfo->i_program_number == 0  || vcinfo->i_program_number == 0xffff)
 			continue;
 
 		/* Is already added in PMT? */
 		AM_SI_LIST_BEGIN(ts->digital.pmts, pmt)
-			if (vcinfo->program_number == pmt->i_program_number)
+			if (vcinfo->i_program_number == pmt->i_program_number)
 			{
 				found_in_pmt = AM_TRUE;
 				break;
@@ -1640,9 +1644,9 @@ VCT_END:
 				continue;
 			}
 		}
-		if (vcinfo->channel_TSID == vct->transport_stream_id)
+		if (vcinfo->i_channel_tsid == vct->i_extension)
 		{
-			AM_SI_ExtractAVFromATSCVC(vcinfo, &srv_info.vid, &srv_info.vfmt, &srv_info.aud_info);
+			AM_SI_ExtractAVFromVC(vcinfo, &srv_info.vid, &srv_info.vfmt, &srv_info.aud_info);
 			am_scan_extract_srv_info_from_vc(vcinfo, &srv_info);
 			
 			/*Store this service*/
@@ -1651,8 +1655,8 @@ VCT_END:
 		else
 		{
 			AM_DEBUG(1, "Program(%d ts:%d) in VCT(ts:%d) found",
-			vcinfo->program_number, vcinfo->channel_TSID,
-			vct->transport_stream_id);
+			vcinfo->i_program_number, vcinfo->i_channel_tsid,
+			vct->i_extension);
 			continue;
 		}
 	AM_SI_LIST_END()
@@ -3272,7 +3276,19 @@ static void am_scan_mgt_done(AM_SCAN_Scanner_t *scanner)
 	/*开始搜索VCT表*/
 	if (scanner->curr_ts->digital.mgts)
 	{
-		if (! scanner->curr_ts->digital.mgts->is_cable)
+		AM_Bool_t is_cable_vct = AM_FALSE;
+		dvbpsi_atsc_mgt_table_t *p_table = scanner->curr_ts->digital.mgts->p_first_table;
+
+		do {
+			if (p_table) {
+				if (p_table->i_table_type == 0 || p_table->i_table_type == 1)
+					is_cable_vct = AM_FALSE;
+				else if (p_table->i_table_type == 2 || p_table->i_table_type == 3)
+					is_cable_vct = AM_TRUE;
+			}
+		} while (p_table = p_table->p_next);
+
+		if (!is_cable_vct)
 			scanner->dtvctl.vctctl.tid = AM_SI_TID_PSIP_TVCT;
 		else
 			scanner->dtvctl.vctctl.tid = AM_SI_TID_PSIP_CVCT;
@@ -3491,13 +3507,13 @@ static void am_scan_section_handler(int dev_no, int fid, const uint8_t *data, in
 				break;
 			case AM_SI_TID_PSIP_MGT:
 				if (scanner->curr_ts)
-					COLLECT_SECTION(mgt_section_info_t, scanner->curr_ts->digital.mgts);
+					COLLECT_SECTION(dvbpsi_atsc_mgt_t, scanner->curr_ts->digital.mgts);
 				break;
 			case AM_SI_TID_PSIP_TVCT:
 			case AM_SI_TID_PSIP_CVCT:
 				if (scanner->curr_ts)
 				{
-					COLLECT_SECTION(vct_section_info_t, scanner->curr_ts->digital.vcts);
+					COLLECT_SECTION(dvbpsi_atsc_vct_t, scanner->curr_ts->digital.vcts);
 					//if (scanner->curr_ts->digital.tvcts != NULL)
 					//	am_scan_add_vc_from_vct(scanner, scanner->curr_ts->digital.vcts);
 				}
@@ -4543,8 +4559,8 @@ static AM_ErrorCode_t am_scan_stop_dtv(AM_SCAN_Scanner_t *scanner)
 			RELEASE_TABLE_FROM_LIST(dvbpsi_pmt_t, ts->digital.pmts);
 			RELEASE_TABLE_FROM_LIST(dvbpsi_cat_t, ts->digital.cats);
 			RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.sdts);
-			RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.vcts);
-			RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.mgts);
+			RELEASE_TABLE_FROM_LIST(dvbpsi_atsc_vct_t, ts->digital.vcts);
+			RELEASE_TABLE_FROM_LIST(dvbpsi_atsc_mgt_t, ts->digital.mgts);
 
 			free(ts);
 
@@ -4648,8 +4664,8 @@ static AM_ErrorCode_t am_scan_stop_atv(AM_SCAN_Scanner_t *scanner)
 				RELEASE_TABLE_FROM_LIST(dvbpsi_pmt_t, ts->digital.pmts);
 				RELEASE_TABLE_FROM_LIST(dvbpsi_cat_t, ts->digital.cats);
 				RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.sdts);
-				RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.vcts);
-				RELEASE_TABLE_FROM_LIST(dvbpsi_sdt_t, ts->digital.mgts);
+				RELEASE_TABLE_FROM_LIST(dvbpsi_atsc_vct_t, ts->digital.vcts);
+				RELEASE_TABLE_FROM_LIST(dvbpsi_atsc_mgt_t, ts->digital.mgts);
 			}
 
 			free(ts);

@@ -1,6 +1,6 @@
-#include "atsc_types.h"
-#include "atsc_descriptor.h"
-#include "atsc_ett.h"
+#include "atsc/atsc_types.h"
+#include "atsc/atsc_descriptor.h"
+#include "atsc/atsc_ett.h"
 
 #define AM_DEBUG_LEVEL 5
 
