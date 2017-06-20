@@ -28,6 +28,18 @@
 #include <poll.h>
 #include <linux/dvb/dmx.h>
 
+#define open(a...)\
+	({\
+	 int ret, times=3;\
+	 do{\
+	 	ret = open(a);\
+	 	if(ret==-1)\
+	 	{\
+	 		usleep(100*1000);\
+	 	}\
+	 }while(ret==-1 && times--);\
+	 ret;\
+	 })
 
 /****************************************************************************
  * Type definitions
