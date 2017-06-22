@@ -36,6 +36,8 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
+
 #define DVBPSI_BCD2VALUE(b) ((((b)&0xf0)>>4)*10 + ((b)&0x0f))
 
 
@@ -81,9 +83,16 @@ typedef struct dvbpsi_descriptor_s
  * \param p_data descriptor's data
  * \return a pointer to the descriptor.
  */
+
+#ifdef TABLE_AREA
+dvbpsi_descriptor_t* dvbpsi_NewDescriptorEx(uint8_t i_tag, uint8_t i_length,
+                                          uint8_t* p_data, void *user);
+#define dvbpsi_NewDescriptor(_t_, _l_, _p_)\
+dvbpsi_NewDescriptorEx((_t_), (_l_), (_p_), psi_decode_descriptor_userdata)
+#else
 dvbpsi_descriptor_t* dvbpsi_NewDescriptor(uint8_t i_tag, uint8_t i_length,
                                           uint8_t* p_data);
-
+#endif
 
 /*****************************************************************************
  * dvbpsi_DeleteDescriptors
@@ -96,7 +105,57 @@ dvbpsi_descriptor_t* dvbpsi_NewDescriptor(uint8_t i_tag, uint8_t i_length,
  */
 void dvbpsi_DeleteDescriptors(dvbpsi_descriptor_t* p_descriptor);
 
-typedef void (*DVBpsi_Decode_Descriptor) (dvbpsi_descriptor_t *des);
+/*****************************************************************************
+ * dvbpsi_AddDescriptor
+ *****************************************************************************/
+/*!
+ * \fn  dvbpsi_descriptor_t *dvbpsi_AddDescriptor(dvbpsi_descriptor_t *p_list,
+                                          dvbpsi_descriptor_t *p_descriptor);
+ * \brief Add a descriptor to the end of descriptor list.
+ * \param p_list the first descriptor in the descriptor list.
+ * \param p_descriptor the descriptor to add to the list
+ * \return a pointer to the first element in the descriptor list.
+ */
+dvbpsi_descriptor_t *dvbpsi_AddDescriptor(dvbpsi_descriptor_t *p_list,
+                                          dvbpsi_descriptor_t *p_descriptor);
+
+/*****************************************************************************
+ * dvbpsi_CanDecodeAsDescriptor
+ *****************************************************************************/
+/*!
+ * \fn bool dvbpsi_CanDecodeAsDescriptor(dvbpsi_descriptor_t *p_descriptor, const uint8_t i_tag);
+ * \brief Checks if descriptor tag matches.
+ * \param p_descriptor pointer to descriptor allocated with @see dvbpsi_NewDescriptor
+ * \param i_tag descriptor tag to evaluate against
+ * \return true if descriptor can be decoded, false if not.
+ */
+bool dvbpsi_CanDecodeAsDescriptor(dvbpsi_descriptor_t *p_descriptor, const uint8_t i_tag);
+
+/*****************************************************************************
+ * dvbpsi_IsDescriptorDecoded
+ *****************************************************************************/
+/*!
+ * \fn bool dvbpsi_IsDescriptorDecoded(dvbpsi_descriptor_t *p_descriptor);
+ * \brief Checks if descriptor was already decoded.
+ * \param p_descriptor pointer to descriptor allocated with @see dvbpsi_NewDescriptor
+ * \return true if descriptor can be decoded, false if already decoded.
+ */
+bool dvbpsi_IsDescriptorDecoded(dvbpsi_descriptor_t *p_descriptor);
+
+
+/*****************************************************************************
+ * dvbpsi_DuplicateDecodedDescriptor
+ *****************************************************************************/
+/*!
+ * \fn void *dvbpsi_DuplicateDecodedDescriptor(void *p_decoded, ssize_t i_size);
+ * \brief Duplicate a decoded descriptor. The caller is responsible for releasing the associated memory.
+ * \param p_decoded pointer to decoded descriptor obtained with dvbpsi_Decode* function
+ * \param i_size the sizeof decoded descriptor
+ * \return pointer to duplicated descriptor, NULL on error.
+ */
+void *dvbpsi_DuplicateDecodedDescriptor(void *p_decoded, ssize_t i_size);
+
+typedef void (*DVBpsi_Decode_Descriptor) (dvbpsi_descriptor_t *descr, void *user);
 
 /*****************************************************************************
  * dvbpsi_Set_DecodeDescriptor_Callback
@@ -109,6 +168,18 @@ typedef void (*DVBpsi_Decode_Descriptor) (dvbpsi_descriptor_t *des);
  */
 int dvbpsi_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb);
 
+#define DEF_SET_DECODE_DESCRIPTOR_CALLBACK(_table_)\
+static void *psi_decode_descriptor_userdata = NULL;\
+int dvbpsi_##_table_##_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb, void *user)\
+{\
+    dvbpsi_Set_DecodeDescriptor_Callback(cb);\
+	psi_decode_descriptor_userdata = user;\
+	/*AM_DEBUG(1,"set ##_table_## decode descriptor cb/user\n");*/\
+	return 0;\
+}
+
+#define SET_DECODE_DESCRIPTOR_CALLBACK(_table_, _cb_, _user_)\
+dvbpsi_##_table_##_Set_DecodeDescriptor_Callback(_cb_, (void*)(long)(_user_));
 
 #ifdef __cplusplus
 };

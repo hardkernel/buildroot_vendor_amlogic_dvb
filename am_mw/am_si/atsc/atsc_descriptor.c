@@ -1,9 +1,9 @@
 #ifdef _FORTIFY_SOURCE
 #undef _FORTIFY_SOURCE
 #endif
-#include "atsc_types.h"
-#include "atsc_descriptor.h"
-#include "huffman_decode.h"
+#include "atsc/atsc_types.h"
+#include "atsc/atsc_descriptor.h"
+#include "atsc/huffman_decode.h"
 #include <errno.h>
 #include <am_iconv.h>
 

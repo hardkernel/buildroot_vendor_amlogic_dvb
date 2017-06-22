@@ -33,9 +33,8 @@
 /*增加一个描述符及其对应的解析函数*/
 #define SI_ADD_DESCR_DECODE_FUNC(_tag, _func)\
 		case _tag:\
-			_func(des);\
+			_func(descr);\
 			break;
-			
 /**\brief 解析ATSC表*/
 #define si_decode_psip_table(p_table, tab, _type, _buf, _len)\
 	AM_MACRO_BEGIN\
@@ -68,18 +67,36 @@ extern void dvbpsi_DecodeEITSections(dvbpsi_eit_t *p_eit,dvbpsi_psi_section_t* p
 extern void dvbpsi_DecodeTOTSections(dvbpsi_tot_t *p_tot,dvbpsi_psi_section_t* p_section);
 extern void dvbpsi_DecodeBATSections(dvbpsi_bat_t *p_tot,dvbpsi_psi_section_t* p_section);
 
+extern void dvbpsi_atsc_DecodeMGTSections(dvbpsi_atsc_mgt_t *p_mgt,dvbpsi_psi_section_t* p_section);
+extern void dvbpsi_atsc_DecodeVCTSections(dvbpsi_atsc_vct_t *p_vct,dvbpsi_psi_section_t* p_section);
+extern void dvbpsi_atsc_DecodeSTTSections(dvbpsi_atsc_stt_t *p_stt,dvbpsi_psi_section_t* p_section);
+extern void dvbpsi_atsc_DecodeEITSections(dvbpsi_atsc_eit_t *p_eit,dvbpsi_psi_section_t* p_section);
+extern void dvbpsi_atsc_DecodeETTSections(dvbpsi_atsc_ett_t *p_ett,dvbpsi_psi_section_t* p_section);
+
+extern int dvbpsi_bat_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb, void *user);
+extern int dvbpsi_eit_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb, void *user);
+extern int dvbpsi_cat_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb, void *user);
+extern int dvbpsi_nit_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb, void *user);
+extern int dvbpsi_pmt_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb, void *user);
+extern int dvbpsi_sdt_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb, void *user);
+extern int dvbpsi_tot_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb, void *user);
+extern int dvbpsi_atsc_eit_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb, void *user);
+extern int dvbpsi_atsc_ett_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb, void *user);
+extern int dvbpsi_atsc_mgt_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb, void *user);
+extern int dvbpsi_atsc_vct_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb, void *user);
+extern int dvbpsi_atsc_stt_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb, void *user);
+
 /*DVB字符默认编码,在进行DVB字符转码时会强制使用该编码为输入编码*/
 static char forced_dvb_text_coding[32] = {0};
 
 static const char * const si_prv_data = "AM SI Decoder";
 
 
-
 /**\brief 从dvbpsi_psi_section_t结构创建PAT表*/
 static AM_ErrorCode_t si_decode_pat(void **p_table, dvbpsi_psi_section_t *p_section)
 {
 	dvbpsi_pat_t *p_pat;
-	
+
 	assert(p_table && p_section);
 
 	/*Allocate a new table*/
@@ -89,26 +106,26 @@ static AM_ErrorCode_t si_decode_pat(void **p_table, dvbpsi_psi_section_t *p_sect
 		*p_table = NULL;
 		return AM_SI_ERR_NO_MEM;
 	}
-	
+
 	/*Init the p_pat*/
 	dvbpsi_InitPAT(p_pat,
-                   p_section->i_extension,
-                   p_section->i_version,
-                   p_section->b_current_next);
+			p_section->i_extension,
+			p_section->i_version,
+			p_section->b_current_next);
 	/*Decode*/
 	dvbpsi_DecodePATSections(p_pat, p_section);
-	
-	p_pat->i_table_id = p_section->i_table_id;
-    *p_table = (void*)p_pat;
 
-    return AM_SUCCESS;
+	p_pat->i_table_id = p_section->i_table_id;
+	*p_table = (void*)p_pat;
+
+	return AM_SUCCESS;
 }
 
 /**\brief 从dvbpsi_psi_section_t结构创建PMT表*/
 static AM_ErrorCode_t si_decode_pmt(void **p_table, dvbpsi_psi_section_t *p_section)
 {
 	dvbpsi_pmt_t *p_pmt;
-	
+
 	assert(p_table && p_section);
 
 	/*Allocate a new table*/
@@ -118,28 +135,28 @@ static AM_ErrorCode_t si_decode_pmt(void **p_table, dvbpsi_psi_section_t *p_sect
 		*p_table = NULL;
 		return AM_SI_ERR_NO_MEM;
 	}
-	
+
 	/*Init the p_pmt*/
 	dvbpsi_InitPMT(p_pmt,
-                   p_section->i_extension,
-                   p_section->i_version,
-                   p_section->b_current_next,
-                   ((uint16_t)(p_section->p_payload_start[0] & 0x1f) << 8)\
-                   | (uint16_t)p_section->p_payload_start[1]);
+			p_section->i_extension,
+			p_section->i_version,
+			p_section->b_current_next,
+			((uint16_t)(p_section->p_payload_start[0] & 0x1f) << 8)\
+			| (uint16_t)p_section->p_payload_start[1]);
 	/*Decode*/
 	dvbpsi_DecodePMTSections(p_pmt, p_section);
 
 	p_pmt->i_table_id = p_section->i_table_id;
-    *p_table = (void*)p_pmt;
-    
-    return AM_SUCCESS;
+	*p_table = (void*)p_pmt;
+
+	return AM_SUCCESS;
 }
 
 /**\brief 从dvbpsi_psi_section_t结构创建CAT表*/
 static AM_ErrorCode_t si_decode_cat(void **p_table, dvbpsi_psi_section_t *p_section)
 {
 	dvbpsi_cat_t *p_cat;
-	
+
 	assert(p_table && p_section);
 
 	/*Allocate a new table*/
@@ -149,25 +166,25 @@ static AM_ErrorCode_t si_decode_cat(void **p_table, dvbpsi_psi_section_t *p_sect
 		*p_table = NULL;
 		return AM_SI_ERR_NO_MEM;
 	}
-	
+
 	/*Init the p_cat*/
 	dvbpsi_InitCAT(p_cat,
-                   p_section->i_version,
-                   p_section->b_current_next);
+			p_section->i_version,
+			p_section->b_current_next);
 	/*Decode*/
 	dvbpsi_DecodeCATSections(p_cat, p_section);
 
 	p_cat->i_table_id = p_section->i_table_id;
 	*p_table = (void*)p_cat;
-	
-    return AM_SUCCESS;
+
+	return AM_SUCCESS;
 }
 
 /**\brief 从dvbpsi_psi_section_t结构创建NIT表*/
 static AM_ErrorCode_t si_decode_nit(void **p_table, dvbpsi_psi_section_t *p_section)
 {
 	dvbpsi_nit_t *p_nit;
-	
+
 	assert(p_table && p_section);
 
 	/*Allocate a new table*/
@@ -177,26 +194,26 @@ static AM_ErrorCode_t si_decode_nit(void **p_table, dvbpsi_psi_section_t *p_sect
 		*p_table = NULL;
 		return AM_SI_ERR_NO_MEM;
 	}
-	
+
 	/*Init the p_nit*/
 	dvbpsi_InitNIT(p_nit,
-                   p_section->i_extension,
-                   p_section->i_version,
-                   p_section->b_current_next);
+			p_section->i_extension,
+			p_section->i_version,
+			p_section->b_current_next);
 	/*Decode*/
 	dvbpsi_DecodeNITSections(p_nit, p_section);
 
 	p_nit->i_table_id = p_section->i_table_id;
 	*p_table = (void*)p_nit;
-	
-    return AM_SUCCESS;
+
+	return AM_SUCCESS;
 }
 
 /**\brief 从dvbpsi_psi_section_t结构创建BAT表*/
 static AM_ErrorCode_t si_decode_bat(void **p_table, dvbpsi_psi_section_t *p_section)
 {
 	dvbpsi_bat_t *p_bat;
-	
+
 	assert(p_table && p_section);
 
 	/*Allocate a new table*/
@@ -206,19 +223,19 @@ static AM_ErrorCode_t si_decode_bat(void **p_table, dvbpsi_psi_section_t *p_sect
 		*p_table = NULL;
 		return AM_SI_ERR_NO_MEM;
 	}
-	
+
 	/*Init the p_bat*/
 	dvbpsi_InitBAT(p_bat,
-                   p_section->i_extension,
-                   p_section->i_version,
-                   p_section->b_current_next);
+			p_section->i_extension,
+			p_section->i_version,
+			p_section->b_current_next);
 	/*Decode*/
 	dvbpsi_DecodeBATSections(p_bat, p_section);
 
 	p_bat->i_table_id = p_section->i_table_id;
 	*p_table = (void*)p_bat;
-	
-    return AM_SUCCESS;
+
+	return AM_SUCCESS;
 }
 
 
@@ -226,7 +243,7 @@ static AM_ErrorCode_t si_decode_bat(void **p_table, dvbpsi_psi_section_t *p_sect
 static AM_ErrorCode_t si_decode_sdt(void **p_table, dvbpsi_psi_section_t *p_section)
 {
 	dvbpsi_sdt_t *p_sdt;
-	
+
 	assert(p_table && p_section);
 
 	/*Allocate a new table*/
@@ -236,28 +253,28 @@ static AM_ErrorCode_t si_decode_sdt(void **p_table, dvbpsi_psi_section_t *p_sect
 		*p_table = NULL;
 		return AM_SI_ERR_NO_MEM;
 	}
-	
+
 	/*Init the p_sdt*/
 	dvbpsi_InitSDT(p_sdt,
-                   p_section->i_extension,
-                   p_section->i_version,
-                   p_section->b_current_next,
-                   ((uint16_t)(p_section->p_payload_start[0]) << 8)\
-                   | (uint16_t)p_section->p_payload_start[1]);
+			p_section->i_extension,
+			p_section->i_version,
+			p_section->b_current_next,
+			((uint16_t)(p_section->p_payload_start[0]) << 8)\
+			| (uint16_t)p_section->p_payload_start[1]);
 	/*Decode*/
 	dvbpsi_DecodeSDTSections(p_sdt, p_section);
 
 	p_sdt->i_table_id = p_section->i_table_id;
 	*p_table = (void*)p_sdt;
-	
-    return AM_SUCCESS;
+
+	return AM_SUCCESS;
 }
 
 /**\brief 从dvbpsi_psi_section_t结构创建EIT表*/
 static AM_ErrorCode_t si_decode_eit(void **p_table, dvbpsi_psi_section_t *p_section)
 {
 	dvbpsi_eit_t *p_eit;
-	
+
 	assert(p_table && p_section);
 
 	/*Allocate a new table*/
@@ -267,32 +284,32 @@ static AM_ErrorCode_t si_decode_eit(void **p_table, dvbpsi_psi_section_t *p_sect
 		*p_table = NULL;
 		return AM_SI_ERR_NO_MEM;
 	}
-	
+
 	/*Init the p_eit*/
 	dvbpsi_InitEIT(p_eit,
-                   p_section->i_extension,
-                   p_section->i_version,
-                   p_section->b_current_next,
-                   ((uint16_t)(p_section->p_payload_start[0]) << 8)\
-                   | (uint16_t)p_section->p_payload_start[1],
-                   ((uint16_t)(p_section->p_payload_start[2]) << 8)\
-                   | (uint16_t)p_section->p_payload_start[3],
-                   p_section->p_payload_start[4],
-                   p_section->p_payload_start[5]);
+			p_section->i_extension,
+			p_section->i_version,
+			p_section->b_current_next,
+			((uint16_t)(p_section->p_payload_start[0]) << 8)\
+			| (uint16_t)p_section->p_payload_start[1],
+			((uint16_t)(p_section->p_payload_start[2]) << 8)\
+			| (uint16_t)p_section->p_payload_start[3],
+			p_section->p_payload_start[4],
+			p_section->p_payload_start[5]);
 	/*Decode*/
 	dvbpsi_DecodeEITSections(p_eit, p_section);
 
 	p_eit->i_table_id = p_section->i_table_id;
 	*p_table = (void*)p_eit;
-	
-    return AM_SUCCESS;
+
+	return AM_SUCCESS;
 }
 
 /**\brief 从dvbpsi_psi_section_t结构创建TOT表*/
 static AM_ErrorCode_t si_decode_tot(void **p_table, dvbpsi_psi_section_t *p_section)
 {
 	dvbpsi_tot_t *p_tot;
-	
+
 	assert(p_table && p_section);
 
 	/*Allocate a new table*/
@@ -302,22 +319,185 @@ static AM_ErrorCode_t si_decode_tot(void **p_table, dvbpsi_psi_section_t *p_sect
 		*p_table = NULL;
 		return AM_SI_ERR_NO_MEM;
 	}
-	
+
 	/*Init the p_tot*/
-	dvbpsi_InitTOT(p_tot,   
-				   ((uint64_t)p_section->p_payload_start[0] << 32)\
-                   | ((uint64_t)p_section->p_payload_start[1] << 24)\
-                   | ((uint64_t)p_section->p_payload_start[2] << 16)\
-                   | ((uint64_t)p_section->p_payload_start[3] <<  8)\
-                   |  (uint64_t)p_section->p_payload_start[4]);
+	dvbpsi_InitTOT(p_tot,
+			((uint64_t)p_section->p_payload_start[0] << 32)\
+			| ((uint64_t)p_section->p_payload_start[1] << 24)\
+			| ((uint64_t)p_section->p_payload_start[2] << 16)\
+			| ((uint64_t)p_section->p_payload_start[3] <<  8)\
+			|  (uint64_t)p_section->p_payload_start[4]);
 	/*Decode*/
 	dvbpsi_DecodeTOTSections(p_tot, p_section);
 
 	p_tot->i_table_id = p_section->i_table_id;
 	*p_table = (void*)p_tot;
-	
-    return AM_SUCCESS;
+
+	return AM_SUCCESS;
 }
+
+static AM_ErrorCode_t si_decode_atsc_mgt(void **p_table, dvbpsi_psi_section_t *p_section)
+{
+	dvbpsi_atsc_mgt_t *p_mgt;
+
+	assert(p_table && p_section);
+
+	/*Allocate a new table*/
+	p_mgt = (dvbpsi_atsc_mgt_t*)malloc(sizeof(dvbpsi_atsc_mgt_t));
+	if (p_mgt == NULL)
+	{
+		*p_table = NULL;
+		return AM_SI_ERR_NO_MEM;
+	}
+
+	/*Init the p_mgt*/
+	dvbpsi_atsc_InitMGT(p_mgt,
+			p_section->i_table_id,
+			p_section->i_extension,
+			p_section->i_version,
+			p_section->p_payload_start[0],
+			p_section->b_current_next);
+
+	/*Decode*/
+	dvbpsi_atsc_DecodeMGTSections(p_mgt, p_section);
+
+	p_mgt->i_table_id = p_section->i_table_id;
+	*p_table = (void*)p_mgt;
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t si_decode_atsc_vct(void **p_table, dvbpsi_psi_section_t *p_section)
+{
+	dvbpsi_atsc_vct_t *p_vct;
+
+	assert(p_table && p_section);
+
+	/*Allocate a new table*/
+	p_vct = (dvbpsi_atsc_vct_t*)malloc(sizeof(dvbpsi_atsc_vct_t));
+	if (p_vct == NULL)
+	{
+		*p_table = NULL;
+		return AM_SI_ERR_NO_MEM;
+	}
+
+	/*Init the p_vct*/
+	dvbpsi_atsc_InitVCT(p_vct,
+			p_section->i_table_id,
+			p_section->i_extension,
+			p_section->p_payload_start[0],
+			p_section->i_table_id == 0xC9,
+			p_section->i_version,
+			p_section->b_current_next);
+
+	/*Decode*/
+	dvbpsi_atsc_DecodeVCTSections(p_vct, p_section);
+
+	p_vct->i_table_id = p_section->i_table_id;
+	*p_table = (void*)p_vct;
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t si_decode_atsc_stt(void **p_table, dvbpsi_psi_section_t *p_section)
+{
+	dvbpsi_atsc_stt_t *p_stt;
+
+	assert(p_table && p_section);
+
+	/*Allocate a new table*/
+	p_stt = (dvbpsi_atsc_stt_t*)malloc(sizeof(dvbpsi_atsc_stt_t));
+	if (p_stt == NULL)
+	{
+		*p_table = NULL;
+		return AM_SI_ERR_NO_MEM;
+	}
+
+	/*Init the p_stt*/
+	dvbpsi_atsc_InitSTT(p_stt,
+			p_section->i_table_id,
+			p_section->i_extension,
+			p_section->i_version,
+			p_section->b_current_next);
+
+	/*Decode*/
+	dvbpsi_atsc_DecodeSTTSections(p_stt, p_section);
+
+	p_stt->i_table_id = p_section->i_table_id;
+	*p_table = (void*)p_stt;
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t si_decode_atsc_eit(void **p_table, dvbpsi_psi_section_t *p_section)
+{
+	dvbpsi_atsc_eit_t *p_eit;
+
+	assert(p_table && p_section);
+
+	/*Allocate a new table*/
+	p_eit = (dvbpsi_atsc_eit_t*)malloc(sizeof(dvbpsi_atsc_eit_t));
+	if (p_eit == NULL)
+	{
+		*p_table = NULL;
+		return AM_SI_ERR_NO_MEM;
+	}
+
+	/*Init the p_eit*/
+	dvbpsi_atsc_InitEIT(p_eit,
+			p_section->i_table_id,
+			p_section->i_extension,
+			p_section->i_version,
+			p_section->p_payload_start[0],
+			p_section->i_extension,
+			p_section->b_current_next);
+
+	/*Decode*/
+	dvbpsi_atsc_DecodeEITSections(p_eit, p_section);
+
+	p_eit->i_table_id = p_section->i_table_id;
+	*p_table = (void*)p_eit;
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t si_decode_atsc_ett(void **p_table, dvbpsi_psi_section_t *p_section)
+{
+	dvbpsi_atsc_ett_t *p_ett;
+
+	assert(p_table && p_section);
+
+	/*Allocate a new table*/
+	p_ett = (dvbpsi_atsc_ett_t*)malloc(sizeof(dvbpsi_atsc_ett_t));
+	if (p_ett == NULL)
+	{
+		*p_table = NULL;
+		return AM_SI_ERR_NO_MEM;
+	}
+
+	/*Init the p_ett*/
+	uint32_t i_etm_id = ((uint32_t)p_section->p_payload_start[1] << 24) |
+		((uint32_t)p_section->p_payload_start[2] << 16) |
+		((uint32_t)p_section->p_payload_start[3] << 8)  |
+		((uint32_t)p_section->p_payload_start[4] << 0);
+
+	dvbpsi_atsc_InitETT(p_ett,
+			p_section->i_table_id,
+			p_section->i_extension,
+			p_section->i_version,
+			p_section->p_payload_start[0],
+			i_etm_id,
+			p_section->b_current_next);
+
+	/*Decode*/
+	dvbpsi_atsc_DecodeETTSections(p_ett, p_section);
+
+	p_ett->i_table_id = p_section->i_table_id;
+	*p_table = (void*)p_ett;
+
+	return AM_SUCCESS;
+}
+
 
 /**\brief 检查句柄是否有效*/
 static AM_INLINE AM_ErrorCode_t si_check_handle(AM_SI_Handle_t handle)
@@ -366,11 +546,11 @@ static AM_ErrorCode_t si_gen_dvbpsi_section(uint8_t *buf, uint16_t len, dvbpsi_p
 	
 	/* Allocate the dvbpsi_psi_section_t structure */
 	p_section  = (dvbpsi_psi_section_t*)malloc(sizeof(dvbpsi_psi_section_t));
- 	if(p_section == NULL)
- 	{
- 		AM_DEBUG(1, "Cannot alloc new psi section, no enough memory");
- 		return AM_SI_ERR_NO_MEM;
- 	}
+	if (p_section == NULL)
+	{
+		AM_DEBUG(1, "Cannot alloc new psi section, no enough memory");
+		return AM_SI_ERR_NO_MEM;
+	}
 
 	/*Fill the p_section*/
 	p_section->i_table_id = header.table_id;
@@ -393,20 +573,18 @@ static AM_ErrorCode_t si_gen_dvbpsi_section(uint8_t *buf, uint16_t len, dvbpsi_p
 		p_section->p_payload_start = buf + 8;
 		p_section->p_payload_end = buf + len - 4;
 	}
- 	p_section->p_next = NULL;
+	p_section->p_next = NULL;
 
  	*psi_sec = p_section;
 
  	return AM_SUCCESS;
 }
 
-/**\brief 解析一个描述符,自行查找解析函数,为libdvbsi调用*/
-void si_decode_descriptor(dvbpsi_descriptor_t *des)
+void si_decode_descriptor_ex(dvbpsi_descriptor_t *descr, SI_Descriptor_Flag_t flag)
 {
-	assert(des);
-
+	assert(descr);
 	/*Decode*/
-	switch (des->i_tag)
+	switch (descr->i_tag)
 	{
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_VIDEO_STREAM,	dvbpsi_DecodeVStreamDr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_AUDIO_STREAM,	dvbpsi_DecodeAStreamDr)
@@ -457,15 +635,37 @@ void si_decode_descriptor(dvbpsi_descriptor_t *des)
 		/*SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_DATA_BROADCAST_ID, 	NULL)*/
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_PDC, 			dvbpsi_DecodePDCDr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_LCN_83, 			dvbpsi_DecodeLogicalChannelNumber83Dr)
-		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_LCN_87, 			dvbpsi_DecodeLogicalChannelNumber87Dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_LCN_88, 			dvbpsi_DecodeLogicalChannelNumber88Dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_AC3, 			dvbpsi_DecodeAC3Dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_ENHANCED_AC3, 	dvbpsi_DecodeENAC3Dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_EXTENSION, 	dvbpsi_DecodeEXTENTIONDr)
-		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_CAPTION_SERVICE,	dvbpsi_DecodeCaptionService86Dr)
+		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_CAPTION_SERVICE,  dvbpsi_decode_atsc_caption_service_dr)
+		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_SERVICE_LOCATION, dvbpsi_decode_atsc_service_location_dr)
 		default:
 			break;
 	}
+
+	switch (descr->i_tag) {
+	case 0x87: {
+		if ((flag & SI_DESCR_87_LCN) == SI_DESCR_87_LCN)
+			dvbpsi_DecodeLogicalChannelNumber87Dr(descr);
+		else if ((flag & SI_DESCR_87_CA) == SI_DESCR_87_CA)
+			dvbpsi_decode_atsc_content_advisory_dr(descr);
+		else
+			dvbpsi_decode_atsc_content_advisory_dr(descr);
+		} break;
+	default:
+		break;
+	}
+}
+
+/**\brief 解析一个描述符,自行查找解析函数,为libdvbsi调用*/
+void si_decode_descriptor(dvbpsi_descriptor_t *descr, void *user)
+{
+	assert(des);
+	SI_Descriptor_Flag_t flag = (SI_Descriptor_Flag_t)(long)user;
+
+	si_decode_descriptor_ex(descr, flag);
 }
 
 
@@ -488,7 +688,7 @@ static AM_ErrorCode_t si_convert_iso6937_to_utf8(const char *src, int src_len, c
 	
 	if (!src || !dest || !dest_len || src_len <= 0)
 		return -1;
-		
+
 	/* first covert to UCS-2, then iconv to utf8 */
 	ucs2 = (char *)malloc(src_len*2);
 	if (!ucs2)
@@ -503,7 +703,7 @@ static AM_ErrorCode_t si_convert_iso6937_to_utf8(const char *src, int src_len, c
 		 for example 0x05 means encoding table 8859-9 */
 		return -1;
 	}
-	
+
 	while (b != 0)
 	{
 		ch = 0x00;
@@ -1001,6 +1201,20 @@ AM_ErrorCode_t AM_SI_Create(AM_SI_Handle_t *handle)
 	/*add set decode des callback*/
 	AM_DEBUG(1, "dvbpsi_Set_DecodeDescriptor_Callback at si creat");
 	dvbpsi_Set_DecodeDescriptor_Callback(si_decode_descriptor);
+	//SET_DECODE_DESCRIPTOR_CALLBACK(pat, si_decode_descriptor, 0);
+	SET_DECODE_DESCRIPTOR_CALLBACK(pmt, si_decode_descriptor, 0);
+	SET_DECODE_DESCRIPTOR_CALLBACK(sdt, si_decode_descriptor, 0);
+	SET_DECODE_DESCRIPTOR_CALLBACK(cat, si_decode_descriptor, 0);
+	SET_DECODE_DESCRIPTOR_CALLBACK(nit, si_decode_descriptor, SI_DESCR_87_LCN);
+	SET_DECODE_DESCRIPTOR_CALLBACK(eit, si_decode_descriptor, 0);
+	SET_DECODE_DESCRIPTOR_CALLBACK(tot, si_decode_descriptor, 0);
+	SET_DECODE_DESCRIPTOR_CALLBACK(bat, si_decode_descriptor, 0);
+	SET_DECODE_DESCRIPTOR_CALLBACK(atsc_mgt, si_decode_descriptor, 0);
+	SET_DECODE_DESCRIPTOR_CALLBACK(atsc_vct, si_decode_descriptor, 0);
+	SET_DECODE_DESCRIPTOR_CALLBACK(atsc_stt, si_decode_descriptor, 0);
+	SET_DECODE_DESCRIPTOR_CALLBACK(atsc_eit, si_decode_descriptor, 0);
+	SET_DECODE_DESCRIPTOR_CALLBACK(atsc_ett, si_decode_descriptor, 0);
+
 	dec->prv_data = (void*)si_prv_data;
 	dec->allocated = AM_TRUE;
 
@@ -1057,7 +1271,7 @@ AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, uint8_t 
 
 	table_id = buf[0];
 	
-	if (table_id <= AM_SI_TID_TOT)
+	if (table_id <= AM_SI_TID_PSIP_DCCSCT)
 	{
 		/*生成dvbpsi section*/
 		AM_TRY(si_gen_dvbpsi_section(buf, len, &psi_sec));
@@ -1124,14 +1338,14 @@ AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, uint8_t 
 			if (pid != AM_SI_ATSC_BASE_PID)
 				ret = AM_SI_ERR_NOT_SUPPORTED;
 			else
-				si_decode_psip_table(*sec, mgt, mgt_section_info_t, buf, len);
+				ret = si_decode_atsc_mgt(sec, psi_sec);
 			break;
 		case AM_SI_TID_PSIP_TVCT:
 		case AM_SI_TID_PSIP_CVCT:
 			if (pid != AM_SI_ATSC_BASE_PID)
 				ret = AM_SI_ERR_NOT_SUPPORTED;
 			else
-				si_decode_psip_table(*sec, vct, vct_section_info_t, buf, len);
+				ret = si_decode_atsc_vct(sec, psi_sec);
 			break;
 		case AM_SI_TID_PSIP_RRT:
 			if (pid != AM_SI_ATSC_BASE_PID)
@@ -1143,13 +1357,13 @@ AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, uint8_t 
 			if (pid != AM_SI_ATSC_BASE_PID)
 				ret = AM_SI_ERR_NOT_SUPPORTED;
 			else
-				si_decode_psip_table(*sec, stt, stt_section_info_t, buf, len);
+				ret = si_decode_atsc_stt(sec, psi_sec);
 			break;
 		case AM_SI_TID_PSIP_EIT:
-			si_decode_psip_table(*sec, eit, eit_section_info_t, buf, len);
+			ret = si_decode_atsc_eit(sec, psi_sec);
 			break;
 		case AM_SI_TID_PSIP_ETT:
-			si_decode_psip_table(*sec, ett, ett_section_info_t, buf, len);
+			ret = si_decode_atsc_ett(sec, psi_sec);
 			break;
 		default:
 			ret = AM_SI_ERR_NOT_SUPPORTED;
@@ -1157,7 +1371,8 @@ AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, uint8_t 
 	}
 
 	/*release the psi_sec*/
-	free(psi_sec);
+	if (psi_sec)
+		free(psi_sec);
 
 	return ret;
 }
@@ -1212,23 +1427,23 @@ AM_ErrorCode_t AM_SI_ReleaseSection(AM_SI_Handle_t handle, uint8_t table_id, voi
 			dvbpsi_DeleteTOT((dvbpsi_tot_t*)sec);
 			break;
 		case AM_SI_TID_PSIP_MGT:
-			atsc_psip_free_mgt_info((mgt_section_info_t*)sec);
+			dvbpsi_atsc_DeleteMGT((dvbpsi_atsc_mgt_t*)sec);
 			break;
 		case AM_SI_TID_PSIP_TVCT:
 		case AM_SI_TID_PSIP_CVCT:
-			atsc_psip_free_vct_info((vct_section_info_t*)sec);
+			dvbpsi_atsc_DeleteVCT((dvbpsi_atsc_vct_t*)sec);
 			break;
 		case AM_SI_TID_PSIP_RRT:
 			atsc_psip_free_rrt_info((rrt_section_info_t*)sec);
 			break;
 		case AM_SI_TID_PSIP_STT:
-			atsc_psip_free_stt_info((stt_section_info_t*)sec);
+			dvbpsi_atsc_DeleteSTT((dvbpsi_atsc_stt_t*)sec);
 			break;
 		case AM_SI_TID_PSIP_EIT:
-			atsc_psip_free_eit_info((eit_section_info_t*)sec);
+			dvbpsi_atsc_DeleteEIT((dvbpsi_atsc_eit_t*)sec);
 			break;
 		case AM_SI_TID_PSIP_ETT:
-			atsc_psip_free_ett_info((ett_section_info_t*)sec);
+			dvbpsi_atsc_DeleteETT((dvbpsi_atsc_ett_t*)sec);
 			break;
 		default:
 			ret = AM_SI_ERR_INVALID_SECTION_DATA;
@@ -1270,6 +1485,139 @@ void AM_SI_SetDefaultDVBTextCoding(const char *coding)
 	snprintf(forced_dvb_text_coding, sizeof(forced_dvb_text_coding), "%s", coding);
 }
 
+AM_ErrorCode_t AM_SI_GetDVBTextCodingAndData(char *in, int in_len, char *coding, int coding_len, int *offset)
+{
+	char fbyte;
+
+	if (!in || in_len <= 0
+			|| !coding || !coding_len || !offset) {
+		AM_DEBUG(1,"%s : bad param\n", __FUNCTION__);
+		return AM_FAILURE;
+	}
+
+	/*查找输入编码方式*/
+	AM_DEBUG(1,"%s : in_len=%d\n", __FUNCTION__, in_len);
+
+	#define SET_CODING(_c_) strncpy(coding, (_c_), coding_len)
+	#define SET_PRINT_CODING(_fmt_, _args_...) snprintf(coding, coding_len, _fmt_, _args_)
+
+	*offset = 0;
+
+	if (in_len <= 1) {
+		SET_CODING("ISO-8859-1");
+	} else {
+		fbyte = in[0];
+		AM_DEBUG(1, "%s fbyte == 0x%x \n", __FUNCTION__, fbyte);
+		if (fbyte >= 0x01 && fbyte <= 0x0B) {
+			SET_PRINT_CODING("ISO-8859-%d", fbyte + 4);
+		} else if (fbyte >= 0x0C && fbyte <= 0x0F) {
+			/*Reserved for future use, we set to ISO8859-1*/
+			SET_CODING("ISO-8859-1");
+		} else if (fbyte == 0x10 && in_len >= 3) {
+			uint16_t val = (uint16_t)(((uint16_t)in[1]<<8) | (uint16_t)in[2]);
+			if (val >= 0x0001 && val <= 0x000F) 	{
+				SET_PRINT_CODING("ISO-8859-%d", val);
+			} else {
+				/*Reserved for future use, we set to ISO8859-1*/
+				SET_CODING("ISO-8859-1");
+			}
+			*offset = 2;
+		} else if (fbyte == 0x11) {
+			SET_CODING("UTF-16");
+		} else if (fbyte == 0x13) {
+			SET_CODING("GB2312");
+		} else if (fbyte == 0x14) {
+			SET_CODING("big5hk");
+		} else if (fbyte == 0x15) {
+			SET_CODING("utf-8");
+		} else if (fbyte >= 0x20) {
+			AM_DEBUG(1, "%s fbyte >= 0x20 \n", __FUNCTION__);
+			if (strcmp(forced_dvb_text_coding, "")) {
+				/*强制将输入按默认编码处理*/
+				AM_DEBUG(1,"-fbyte >= 0x20-forced_dvb_text_coding-[%s]-\n",forced_dvb_text_coding);
+				SET_CODING(forced_dvb_text_coding);
+			} else {
+				AM_DEBUG(1,"-fbyte >= 0x20---ISO6937--\n");
+				SET_CODING("ISO6937");
+			}
+		} else if (fbyte == 0x1f) {
+			SET_CODING("FreesatHuffuman");
+		} else
+			return AM_FAILURE;
+
+		/*调整输入*/
+		if (fbyte < 0x1f)
+			*offset = 1;
+
+		AM_DEBUG(1,"%s in[0]=0x%x-\n",__FUNCTION__, in[0]);
+	}
+	return AM_SUCCESS;
+}
+
+//Covert @in to UTF8 @out
+AM_ErrorCode_t AM_SI_ConvertToUTF8(char *in, int in_len, char *out, int out_len, char *coding)
+{
+	if (!in || !out || in_len <= 0 || out_len <= 0 || !coding) {
+		AM_DEBUG(1,"%s : bad param\n", __FUNCTION__);
+		return AM_FAILURE;
+	}
+
+	memset(out,0,out_len);
+
+	if (! strcmp(coding, "ISO6937"))
+		return si_convert_iso6937_to_utf8(in, in_len, out, &out_len);
+	else if(! strcmp(coding, "utf-8"))
+		return AM_Check_UTF8(in, in_len, out, &out_len);
+	else if(! strcmp(coding, "FreesatHuffuman")){
+		char *temp = freesat_huffman_decode((unsigned char*)in, in_len);
+		if (temp ) {
+			int len = strlen(temp);
+			len = len < out_len ? len : out_len;
+			strncpy(out, temp, len);
+			free(temp);
+			temp = NULL;
+		}
+		AM_DEBUG(1,"--pp-out_code=%s--\n",out);
+		return 0;
+	} else {
+		char **pin = &in;
+		char **pout = &out;
+		char *o_out = out;
+		size_t inLength = in_len;
+		size_t outLength = out_len;
+		iconv_t handle;
+
+		handle = iconv_open("utf-8", coding);
+		if (handle == (iconv_t)-1) {
+			AM_DEBUG(1, "Covert DVB text code failed, iconv_open err: %d", errno);
+			return AM_FAILURE;
+		}
+		if ((int)iconv(handle, pin, &inLength, pout, &outLength) == -1) {
+		    AM_DEBUG(1, "Covert DVB text code failed, iconv err: %d, in_len %d, out_len %d",
+				errno, in_len, out_len);
+		    iconv_close(handle);
+		    return AM_FAILURE;
+		}
+		AM_Check_UTF8(o_out, out_len, o_out, &out_len);
+		return iconv_close(handle);
+	}
+	return AM_SUCCESS;
+}
+
+AM_ErrorCode_t AM_SI_ConvertDVBTextCodeEx(char *in, int in_len, char *out, int out_len, char *coding)
+{
+	char cod[64] = {0};
+	int offset = 0;
+
+	if (!coding) {
+		AM_TRY(AM_SI_GetDVBTextCodingAndData(in, in_len, cod, 64, &offset));
+	} else {
+		strncpy(cod, coding, 64);
+	}
+
+	return AM_SI_ConvertToUTF8(in+offset, in_len-offset, out, out_len, cod);
+}
+
 /**\brief 按DVB标准将输入字符转成UTF-8编码
  * \param [in] in_code 需要转换的字符数据
  * \param in_len 需要转换的字符数据长度
@@ -1281,147 +1629,16 @@ void AM_SI_SetDefaultDVBTextCoding(const char *coding)
  */
 AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,int out_len)
 {
-    iconv_t handle;
-    char **pin=&in_code;
-    char **pout=&out_code;
-    char fbyte;
-    char cod[32];
-    char *o_out_code = out_code;
+	char cod[64] = {0};
+	int offset = 0;
 
 	AM_DEBUG(0, "DVB convert text code");
 
-    
-	if (!in_code || !out_code || in_len <= 0 || out_len <= 0){
-		AM_DEBUG(1,"%s : bad param\n", __FUNCTION__);
-		return AM_FAILURE;
-	}
+	AM_TRY(AM_SI_GetDVBTextCodingAndData(in_code, in_len, cod, 64, &offset));
 
-	memset(out_code,0,out_len);
-	 
-	/*查找输入编码方式*/
-	AM_DEBUG(1, "AM_SI_ConvertDVBTextCode in_len == %d \n",in_len);
-	
-	if (in_len <= 1)
-	{
-		pin = &in_code;
-		strcpy(cod, "ISO-8859-1");
-	}
-	else
-	{
-		fbyte = in_code[0];
-		AM_DEBUG(1, "AM_SI_ConvertDVBTextCode fbyte == 0x%x \n",fbyte);
-		//log_print("AM_SI_ConvertDVBTextCode fbyte == 0x%x \n",fbyte);
-		if (fbyte >= 0x01 && fbyte <= 0x0B)
-			snprintf(cod, sizeof(cod), "ISO-8859-%d", fbyte + 4);
-		else if (fbyte >= 0x0C && fbyte <= 0x0F)
-		{
-			/*Reserved for future use, we set to ISO8859-1*/
-			strcpy(cod, "ISO-8859-1");
-		}
-		else if (fbyte == 0x10 && in_len >= 3)
-		{
-			uint16_t val = (uint16_t)(((uint16_t)in_code[1]<<8) | (uint16_t)in_code[2]);
-			if (val >= 0x0001 && val <= 0x000F)
-			{
-				snprintf(cod, sizeof(cod), "ISO-8859-%d", val);
-			}
-			else
-			{
-				/*Reserved for future use, we set to ISO8859-1*/
-				strcpy(cod, "ISO-8859-1");
-			}
-			in_code += 2;
-			in_len -= 2;
-		}
-		else if (fbyte == 0x11)
-			strcpy(cod, "UTF-16");
-		else if (fbyte == 0x13)
-			strcpy(cod, "GB2312");
-		else if (fbyte == 0x14)
-			strcpy(cod, "big5hk");
-		else if (fbyte == 0x15)
-			strcpy(cod, "utf-8");
-		else if (fbyte >= 0x20)
-		{
-			AM_DEBUG(1, "AM_SI_ConvertDVBTextCode fbyte >= 0x20 \n");
-			if (strcmp(forced_dvb_text_coding, ""))
-			{
-				/*强制将输入按默认编码处理*/
-				AM_DEBUG(1,"-fbyte >= 0x20-forced_dvb_text_coding-[%s]-\n",forced_dvb_text_coding);
-				strcpy(cod, forced_dvb_text_coding);
-			}
-			else
-			{
-				AM_DEBUG(1,"-fbyte >= 0x20---ISO6937--\n");
-				strcpy(cod, "ISO6937");
-			}
-		}else if(fbyte == 0x1f){
-		
-			strcpy(cod,"FreesatHuffuman");
-			
-		}
-		else
-			return AM_FAILURE;
+	AM_DEBUG(0, "coding:%s, offset:%d", cod, offset);
 
-		/*调整输入*/
-		if (fbyte < 0x1f)
-		{
-			in_code++;
-			in_len--;
-		}
-		AM_DEBUG(1,"AM_SI_ConvertDVBTextCode in_code[0]=0x%x-\n",in_code[0]);
-		pin = &in_code;
-		
-	}
-
-	if (! strcmp(cod, "ISO6937"))
-	{
-		return si_convert_iso6937_to_utf8(in_code,in_len,out_code,&out_len);
-	}	
-	else if(! strcmp(cod, "utf-8"))
-	{
-		return AM_Check_UTF8(in_code,in_len,out_code,&out_len);
-		
-	}
-	else if(! strcmp(cod, "FreesatHuffuman")){
-
-		char *temp = freesat_huffman_decode((unsigned char*)in_code,in_len);
-		if (temp ) {
-           int len = strlen(temp);
-           len = len < out_len ? len : out_len;
-           strncpy(out_code, temp, len);
-           free(temp);
-		   temp = NULL;
-        }
-		AM_DEBUG(1,"--pp-out_code=%s--\n",out_code);
-		return 0;
-
-	}
-	else
-	{
-		size_t inLength = in_len;
-		size_t outLength = out_len;
-
-		handle=iconv_open("utf-8",cod);
-
-		if (handle == (iconv_t)-1)
-		{
-			AM_DEBUG(1, "Covert DVB text code failed, iconv_open err: %d", errno);
-			return AM_FAILURE;
-		}
-
-		if ((int)iconv(handle, pin, &inLength, pout, &outLength) == -1)
-		{
-		    AM_DEBUG(1, "Covert DVB text code failed, iconv err: %d, in_len %d, out_len %d",
-				errno, in_len, out_len);
-		    iconv_close(handle);
-		    return AM_FAILURE;
-		}
-
-		AM_Check_UTF8(o_out_code, out_len, o_out_code, &out_len);
-
-		return iconv_close(handle);
-	}
+	return AM_SI_ConvertToUTF8(in_code+offset, in_len-offset, out_code, out_len, cod);
 }
 
 /**\brief 根据ac3 des 获取audio 的 exten
@@ -1719,6 +1936,57 @@ AM_ErrorCode_t AM_SI_ExtractAVFromATSCVC(vct_channel_info_t *vcinfo, int *vid, i
 	return AM_SUCCESS;
 }
 
+AM_ErrorCode_t AM_SI_ExtractAVFromVC(dvbpsi_atsc_vct_channel_t *vcinfo, int *vid, int *vfmt, AM_SI_AudioInfo_t *aud_info)
+{
+	char lang_tmp[3];
+	int audio_type=0;
+	int audio_exten = 0;
+	int afmt_tmp, vfmt_tmp, i;
+	dvbpsi_descriptor_t *descr;
+
+	afmt_tmp = -1;
+	vfmt_tmp = -1;
+	memset(lang_tmp, 0, sizeof(lang_tmp));
+
+	AM_SI_LIST_BEGIN(vcinfo->p_first_descriptor, descr)
+		if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SERVICE_LOCATION)
+		{
+			dvbpsi_atsc_service_location_dr_t *asld = (dvbpsi_atsc_service_location_dr_t*)descr->p_decoded;
+			for (i=0; i<asld->i_number_elements; i++)
+			{
+				afmt_tmp = -1;
+				vfmt_tmp = -1;
+				memset(lang_tmp, 0, sizeof(lang_tmp));
+				switch (asld->elements[i].i_stream_type)
+				{
+					/*video pid and video format*/
+					case 0x02:
+						vfmt_tmp = VFORMAT_MPEG12;
+						break;
+					/*audio pid and audio format*/
+					case 0x81:
+						afmt_tmp = AFORMAT_AC3;
+						break;
+					default:
+						break;
+				}
+				if (vfmt_tmp != -1)
+				{
+					*vid = (asld->elements[i].i_elementary_pid >= 0x1fff) ? 0x1fff : asld->elements[i].i_elementary_pid;
+					*vfmt = vfmt_tmp;
+				}
+				if (afmt_tmp != -1)
+				{
+					memcpy(lang_tmp, asld->elements[i].i_iso_639_code, sizeof(lang_tmp));
+					si_add_audio(aud_info, asld->elements[i].i_elementary_pid, afmt_tmp, lang_tmp,audio_type,audio_exten);
+				}
+			}
+		}
+	AM_SI_LIST_END()
+
+	return AM_SUCCESS;
+}
+
 AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_SubtitleInfo_t *sub_info)
 {
 	dvbpsi_descriptor_t *descr;
@@ -1891,12 +2159,12 @@ AM_ErrorCode_t AM_SI_ExtractATSCCaptionFromES(dvbpsi_pmt_es_t *es, AM_SI_Caption
 		if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_CAPTION_SERVICE)
 		{
 			int icap, i;
-			dvbpsi_caption_service_86_t *tmp_cap;
-			dvbpsi_caption_service_86_dr_t *psd = (dvbpsi_caption_service_86_dr_t*)descr->p_decoded;
+			dvbpsi_caption_service_t *tmp_cap;
+			dvbpsi_atsc_caption_service_dr_t *psd = (dvbpsi_atsc_caption_service_dr_t*)descr->p_decoded;
 
-			for (icap=0; icap<psd->i_caption_services_number; icap++)
+			for (icap=0; icap<psd->i_number_of_services; icap++)
 			{
-				tmp_cap = &psd->p_caption_service[icap];
+				tmp_cap = &psd->services[icap];
 
 				if (cap_info->caption_count >= AM_SI_MAX_CAP_CNT)
 				{
@@ -1907,14 +2175,14 @@ AM_ErrorCode_t AM_SI_ExtractATSCCaptionFromES(dvbpsi_pmt_es_t *es, AM_SI_Caption
 				if (cap_info->caption_count < 0)
 					cap_info->caption_count = 0;
 
-				if (!tmp_cap->b_digtal_cc)
-					continue;//ignore the analog cc declaration
+				//if (!tmp_cap->b_digtal_cc)
+				//	continue;//ignore the analog cc declaration
 
 				cap_info->captions[cap_info->caption_count].service_number = tmp_cap->i_caption_service_number;
-				cap_info->captions[cap_info->caption_count].type         = tmp_cap->b_digtal_cc;
-				cap_info->captions[cap_info->caption_count].pid_or_line21 = tmp_cap->b_digtal_cc ? es->i_pid : tmp_cap->b_line21_field;
+				cap_info->captions[cap_info->caption_count].type = tmp_cap->b_digital_cc;
+				cap_info->captions[cap_info->caption_count].pid_or_line21 = tmp_cap->b_digital_cc ? es->i_pid : tmp_cap->b_line21_field;
 				cap_info->captions[cap_info->caption_count].flags = (tmp_cap->b_easy_reader ? 0x80 : 0) | (tmp_cap->b_wide_aspect_ratio ? 0x40 : 0);
-				if (tmp_cap->iso_639_lang_code[0] == 0)
+				if (tmp_cap->i_iso_639_code[0] == 0)
 				{
 					snprintf(cap_info->captions[cap_info->caption_count].lang,
 						sizeof(cap_info->captions[cap_info->caption_count].lang),
@@ -1922,7 +2190,7 @@ AM_ErrorCode_t AM_SI_ExtractATSCCaptionFromES(dvbpsi_pmt_es_t *es, AM_SI_Caption
 				}
 				else
 				{
-					memcpy(cap_info->captions[cap_info->caption_count].lang, tmp_cap->iso_639_lang_code, 3);
+					memcpy(cap_info->captions[cap_info->caption_count].lang, tmp_cap->i_iso_639_code, 3);
 					cap_info->captions[cap_info->caption_count].lang[3] = 0;
 				}
 
@@ -1940,7 +2208,7 @@ AM_ErrorCode_t AM_SI_ExtractATSCCaptionFromES(dvbpsi_pmt_es_t *es, AM_SI_Caption
 	return AM_SUCCESS;
 }
 
-AM_ErrorCode_t AM_SI_GetRatingString(atsc_content_advisory_dr_t *pcad, char *buf, int buf_size)
+AM_ErrorCode_t AM_SI_GetRatingString(dvbpsi_atsc_content_advisory_dr_t *pcad, char *buf, int buf_size)
 {
 	int i, j;
 	/*
@@ -1952,36 +2220,41 @@ AM_ErrorCode_t AM_SI_GetRatingString(atsc_content_advisory_dr_t *pcad, char *buf
 	]
 	*/
 	sprintf(buf, "[");
-	for (i=0; i<pcad->i_region_count; i++)
+	for (i=0; i<pcad->i_rating_region_count; i++)
 	{
 		if (i != 0)
 			snprintf(buf, buf_size, "%s,", buf);
 
-		snprintf(buf, buf_size, "%s{g:%d,rx:[", buf, pcad->region[i].i_rating_region);
-		for (j=0; j<pcad->region[i].i_dimension_count; j++)
+		snprintf(buf, buf_size, "%s{g:%d,rx:[", buf, pcad->rating_regions[i].i_rating_region);
+		for (j=0; j<pcad->rating_regions[i].i_rated_dimensions; j++)
 		{
 			if (j != 0)
 				snprintf(buf, buf_size, "%s,", buf);
 
 			snprintf(buf, buf_size, "%s{d:%d,r:%d}", buf,
-				pcad->region[i].dimension[j].i_dimension_j,
-				pcad->region[i].dimension[j].i_rating_value);
+				pcad->rating_regions[i].dimensions[j].i_rating_dimension_j,
+				pcad->rating_regions[i].dimensions[j].i_rating_value);
 		}
 		snprintf(buf, buf_size, "%s]", buf);
 
 		{
 			int k;
+			atsc_multiple_string_t ms;
+
 			snprintf(buf, buf_size, "%s,rs:[", buf);
-			for (k=0; k<pcad->region[i].rating_description.i_string_count; k++)
+
+			memset(&ms, 0, sizeof(ms));
+			atsc_decode_multiple_string_structure(pcad->rating_regions[i].i_rating_description, &ms);
+			for (k=0; k<ms.i_string_count; k++)
 			{
 				if (k != 0)
 					snprintf(buf, buf_size, "%s,", buf);
 
 				snprintf(buf, buf_size, "%s{lng:\"%c%c%c\",txt:\"%s\"}", buf,
-					pcad->region[i].rating_description.string[k].iso_639_code[0],
-					pcad->region[i].rating_description.string[k].iso_639_code[1],
-					pcad->region[i].rating_description.string[k].iso_639_code[2],
-					pcad->region[i].rating_description.string[k].string);
+					ms.string[k].iso_639_code[0],
+					ms.string[k].iso_639_code[1],
+					ms.string[k].iso_639_code[2],
+					ms.string[k].string);
 			}
 			snprintf(buf, buf_size, "%s]", buf);
 		}

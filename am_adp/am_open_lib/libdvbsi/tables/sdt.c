@@ -27,6 +27,7 @@
  *
  *****************************************************************************/
 
+#define TABLE_AREA
 
 #include "config.h"
 
@@ -48,6 +49,8 @@
 #include "sdt.h"
 #include "sdt_private.h"
 
+
+DEF_SET_DECODE_DESCRIPTOR_CALLBACK(sdt)
 
 /*****************************************************************************
  * dvbpsi_AttachSDT

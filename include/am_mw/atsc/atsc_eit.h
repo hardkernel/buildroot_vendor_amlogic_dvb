@@ -1,6 +1,6 @@
 
-#ifndef _ATSC_EIT_H
-#define _ATSC_EIT_H
+#ifndef _ATSC_EIT_O_H
+#define _ATSC_EIT_O_H
 
 #include "atsc_types.h"
 

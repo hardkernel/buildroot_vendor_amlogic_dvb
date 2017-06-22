@@ -1,7 +1,7 @@
 #ifdef _FORTIFY_SOURCE
 #undef _FORTIFY_SOURCE
 #endif
-#include "atsc_types.h"
+#include "atsc/atsc_types.h"
 
 typedef unsigned char bool;
 

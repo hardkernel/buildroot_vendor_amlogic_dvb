@@ -29,6 +29,7 @@
  *
  *****************************************************************************/
 
+#define TABLE_AREA
 
 #include "config.h"
 
@@ -49,6 +50,8 @@
 #include "../demux.h"
 #include "nit.h"
 #include "nit_private.h"
+
+DEF_SET_DECODE_DESCRIPTOR_CALLBACK(nit)
 
 
 /*****************************************************************************
@@ -743,3 +746,4 @@ dvbpsi_psi_section_t* dvbpsi_GenNITSections(dvbpsi_nit_t* p_nit,
 
   return p_result;
 }
+

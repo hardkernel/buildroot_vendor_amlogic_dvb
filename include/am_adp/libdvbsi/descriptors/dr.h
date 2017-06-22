@@ -68,11 +68,13 @@
 #include "dr_83.h"
 #include "dr_86.h"
 #include "dr_87.h"
+#include "dr_87_ca.h"
 #include "dr_88.h"
 #include "dr_5d.h"
 #include "dr_6a.h"
 #include "dr_7a.h"
 #include "dr_7f.h"
+#include "dr_a1.h"
 #else
 #error "Multiple inclusions of dr.h"
 #endif

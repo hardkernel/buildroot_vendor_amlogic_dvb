@@ -1,5 +1,5 @@
-#ifndef _ATSC_ETT_H
-#define _ATSC_ETT_H
+#ifndef _ATSC_ETT_O_H
+#define _ATSC_ETT_O_H
 
 #include "atsc_types.h"
 

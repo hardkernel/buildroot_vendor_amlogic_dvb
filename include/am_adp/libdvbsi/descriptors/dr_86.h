@@ -1,128 +1,104 @@
-/*****************************************************************************
- * dr_88.h
- * (c)2001-2008 VideoLAN
- * $Id: dr_58.h 172 2008-04-26 12:10:54Z jpsaman $
- *
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
- *
- *****************************************************************************/
+/*
+Copyright (C) 2013-2014  Michael Ira Krufky
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
+dr_86.h
+
+Decode Caption Service Descriptor.
+
+*/
 
 /*!
- * \file <dr_86.h>
- * \brief Application interface for the caption service
- * descriptor decoder and generator.
- *
- * Application interface for the "caption service" descriptor
- * decoder and generator.
+ * \file dr_86.h
+ * \author Michael Ira Krufky
+ * \brief Decode Caption Service Descriptor.
  */
 
-#ifndef _DVBPSI_DR_86_H_
-#define _DVBPSI_DR_86_H_
+#ifndef _DR_86_H
+#define _DR_86_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef uint8_t language_cod_t[3];
-
 /*****************************************************************************
- * dvbpsi_caption_service_86_t
+ * dvbpsi_caption_service_t
  *****************************************************************************/
 /*!
- * \struct dvbpsi_caption_service_86_s
- * \brief one caption service structure.
+ * \struct dvbpsi_caption_service_s
+ * \brief Caption Service
  *
+ * This structure is used to store a decoded Caption Service.
  */
 /*!
- * \typedef struct dvbpsi_caption_service_86_s dvbpsi_caption_service_86_t
- * \brief dvbpsi_caption_service_86_t type definition.
+ * \typedef struct dvbpsi_caption_service_s dvbpsi_caption_service_t
+ * \brief dvbpsi_caption_service_t type definition.
  */
-typedef struct dvbpsi_caption_service_86_s
+typedef struct dvbpsi_caption_service_s
 {
-  int                b_digtal_cc;                          /*!< digtal cc flag*/
-
-  /* used if b_digtal_cc is true */
-  language_cod_t   iso_639_lang_code;    /*!< language_code */
-  uint8_t        i_caption_service_number;  /*!< caption service number */
-  int               b_easy_reader;                     /*!< easy reader */
-  int               b_wide_aspect_ratio;           /*!< wide aspect ratio */
-
-  /* used if b_digtal_cc is false */
-  int               b_line21_field;                      /*!< line21_field */
-} dvbpsi_caption_service_86_t;
-
+    char     i_iso_639_code[3]; /*!< ISO 639 language code */
+    int      b_digital_cc;      /*!< Digital CC  flag */
+    int      b_line21_field;    /*!< Line 21 */
+    uint16_t i_caption_service_number; /*!< Caption Service Number */
+    int      b_easy_reader;     /*!< Easy reader flag */
+    int      b_wide_aspect_ratio; /*!< Wide aspect ratio flag */
+} dvbpsi_caption_service_t;
 
 /*****************************************************************************
- * dvbpsi_caption_service_86_dr_t
+ * dvbpsi_atsc_caption_service_dr_s
  *****************************************************************************/
 /*!
- * \struct dvbpsi_caption_service_86_dr_s
- * \brief "caption service" descriptor structure.
+ * \struct dvbpsi_atsc_caption_service_dr_s
+ * \brief Caption Service Descriptor
  *
- * This structure is used to store a decoded "caption service"
- * descriptor.
+ * This structure is used to store a decoded Caption Service descriptor.
  */
 /*!
- * \typedef struct dvbpsi_caption_service_86_dr_s dvbpsi_caption_service_86_dr_t
- * \brief dvbpsi_caption_service_86_dr_t type definition.
+ * \typedef struct dvbpsi_atsc_caption_service_dr_s dvbpsi_atsc_caption_service_dr_t
+ * \brief dvbpsi_atsc_caption_service_dr_t type definition.
  */
-typedef struct dvbpsi_caption_service_86_dr_s
+typedef struct dvbpsi_atsc_caption_service_dr_s
 {
-  uint8_t      i_caption_services_number;
-  dvbpsi_caption_service_86_t p_caption_service[63];
-} dvbpsi_caption_service_86_dr_t;
-
-
-/*****************************************************************************
- * dvbpsi_DecodeCaptionSerivceDr
- *****************************************************************************/
-/*!
- * \fn dvbpsi_caption_service_86_dr_t * dvbpsi_DecodeCaptionService86Dr(
-                                        dvbpsi_descriptor_t * p_descriptor)
- * \brief "caption service" descriptor decoder.
- * \param p_descriptor pointer to the descriptor structure
- * \return a pointer to a new "caption service" descriptor structure
- * which contains the decoded data.
- */
-dvbpsi_caption_service_86_dr_t* dvbpsi_DecodeCaptionService86Dr(
-                                        dvbpsi_descriptor_t * p_descriptor);
-
+    uint8_t i_number_of_services; /*!< Number of Captions services */
+    dvbpsi_caption_service_t services[0x1f]; /*!< Caption services array */
+} dvbpsi_atsc_caption_service_dr_t;
 
 /*****************************************************************************
- * dvbpsi_GenCaptionService86Dr
+ * dvbpsi_decode_atsc_caption_service_dr
  *****************************************************************************/
 /*!
- * \fn dvbpsi_descriptor_t * dvbpsi_GenCaptionService86Dr(
-                        dvbpsi_caption_service_86_dr_t * p_decoded, int b_duplicate)
- * \brief "caption service" descriptor generator.
- * \param p_decoded pointer to a decoded "caption service" descriptor
- * structure
- * \param b_duplicate if non zero then duplicate the p_decoded structure into
- * the descriptor
- * \return a pointer to a new descriptor structure which contains encoded data.
+ * \fn dvbpsi_atsc_caption_service_dr_t dvbpsi_decode_atsc_caption_service_dr(dvbpsi_descriptor_t *p_descriptor)
+ * \brief Decode a Caption Service descriptor (tag 0x86)
+ * \param p_descriptor Raw descriptor to decode.
+ * \return NULL if the descriptor could not be decoded or a pointer to a
+ *         dvbpsi_atsc_caption_service_dr_t structure.
  */
-dvbpsi_descriptor_t * dvbpsi_GenCaptionService86Dr(
-                                        dvbpsi_caption_service_86_dr_t * p_decoded,
-                                        int b_duplicate);
+dvbpsi_atsc_caption_service_dr_t *dvbpsi_decode_atsc_caption_service_dr(dvbpsi_descriptor_t *p_descriptor);
 
+#ifdef DVBPSI_USE_DEPRECATED_DR_API
+typedef dvbpsi_atsc_caption_service_dr_t dvbpsi_caption_service_dr_t ;
+
+__attribute__((deprecated,unused)) static dvbpsi_caption_service_dr_t* dvbpsi_DecodeCaptionServiceDr (dvbpsi_descriptor_t *dr) {
+    return dvbpsi_decode_atsc_caption_service_dr (dr);
+}
+#endif
 
 #ifdef __cplusplus
-};
+}
 #endif
 
-#else
-#error "Multiple inclusions of dr_86.h"
 #endif
+

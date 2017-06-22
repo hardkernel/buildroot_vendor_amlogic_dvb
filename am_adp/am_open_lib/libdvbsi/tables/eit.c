@@ -27,6 +27,7 @@
  *----------------------------------------------------------------------------
  *
  *****************************************************************************/
+#define TABLE_AREA
 
 
 #include "config.h"
@@ -49,6 +50,8 @@
 #include "eit.h"
 #include "eit_private.h"
 
+
+DEF_SET_DECODE_DESCRIPTOR_CALLBACK(eit)
 
 /*****************************************************************************
  * dvbpsi_AttachEIT
@@ -544,3 +547,4 @@ void dvbpsi_DecodeEITSections(dvbpsi_eit_t* p_eit,
     p_section = p_section->p_next;
   }
 }
+

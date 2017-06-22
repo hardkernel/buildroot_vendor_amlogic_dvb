@@ -29,6 +29,7 @@
  *
  *****************************************************************************/
 
+#define TABLE_AREA
 
 #include "config.h"
 
@@ -49,6 +50,8 @@
 #include "../demux.h"
 #include "bat.h"
 #include "bat_private.h"
+
+DEF_SET_DECODE_DESCRIPTOR_CALLBACK(bat)
 
 
 /*****************************************************************************
@@ -743,3 +746,4 @@ dvbpsi_psi_section_t* dvbpsi_GenBATSections(dvbpsi_bat_t* p_bat,
 
   return p_result;
 }
+
