@@ -2265,3 +2265,75 @@ AM_ErrorCode_t AM_SI_GetRatingString(dvbpsi_atsc_content_advisory_dr_t *pcad, ch
 	return AM_SUCCESS;
 }
 
+AM_ErrorCode_t AM_SI_GetATSCCaptionString(dvbpsi_atsc_caption_service_dr_t *psd, char *buf, int buf_size)
+{
+		/*
+		[
+			//bdig=b_digtal_cc, sn=caption_service_number, lng=language,
+			//beasy=b_easy_reader, bwar=b_wide_aspect_ratio
+			{bdig:1,sn:0x2,lng:"eng",beasy:0,bwar:1},
+			{bdig:0,l21:1},
+			...
+		]
+		*/
+		int i;
+		sprintf(buf, "[");
+		for (i=0; i<psd->i_number_of_services; i++) {
+				dvbpsi_caption_service_t *tmp_cap = &psd->services[i];
+				if (i != 0)
+						snprintf(buf, buf_size, "%s,", buf);
+				if (tmp_cap->b_digital_cc) {
+						snprintf(buf, buf_size, "%s{bdig:1,sn:%#x", buf, tmp_cap->i_caption_service_number);
+						char lang[8] = {0};
+						if (tmp_cap->i_iso_639_code[0] == 0)
+								snprintf(lang, sizeof(lang), "cap");
+						else
+								memcpy(lang, tmp_cap->i_iso_639_code, 3);
+						lang[3] = 0;
+						snprintf(buf, buf_size, "%s,lng:\"%s\",beasy:%d,bwar:%d}",
+								buf, lang, tmp_cap->b_easy_reader, tmp_cap->b_wide_aspect_ratio);
+				} else {
+						snprintf(buf, buf_size, "%s{bdig:0,l21:%d}", buf, tmp_cap->b_line21_field);
+				}
+		}
+		snprintf(buf, buf_size, "%s]", buf);
+		return AM_SUCCESS;
+}
+
+AM_ErrorCode_t AM_SI_GetRatingStringFromDescriptors(dvbpsi_descriptor_t *p_descriptor, char *buf, int buf_size)
+{
+	dvbpsi_descriptor_t *descr;
+
+	if (!buf || !buf_size)
+		return AM_SUCCESS;
+
+	AM_SI_LIST_BEGIN(p_descriptor, descr)
+		if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_CONTENT_ADVISORY)
+		{
+			dvbpsi_atsc_content_advisory_dr_t *pcad = (dvbpsi_atsc_content_advisory_dr_t*)descr->p_decoded;
+			AM_SI_GetRatingString(pcad, buf, buf_size);
+			return AM_SUCCESS;
+		}
+	AM_SI_LIST_END()
+
+	return AM_SUCCESS;
+}
+
+AM_ErrorCode_t AM_SI_GetATSCCaptionStringFromDescriptors(dvbpsi_descriptor_t *p_descriptor, char *buf, int buf_size)
+{
+	dvbpsi_descriptor_t *descr;
+
+	if (!buf || !buf_size)
+		return AM_SUCCESS;
+	AM_SI_LIST_BEGIN(p_descriptor, descr)
+		if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_CAPTION_SERVICE)
+		{
+			dvbpsi_atsc_caption_service_dr_t *pcsd = (dvbpsi_atsc_caption_service_dr_t*)descr->p_decoded;
+			AM_SI_GetATSCCaptionString(pcsd, buf, buf_size);
+			return AM_SUCCESS;
+		}
+	AM_SI_LIST_END()
+
+	return AM_SUCCESS;
+}
+
