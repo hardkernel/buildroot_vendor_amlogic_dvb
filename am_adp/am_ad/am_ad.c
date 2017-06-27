@@ -1,7 +1,15 @@
 #ifdef _FORTIFY_SOURCE
 #undef _FORTIFY_SOURCE
 #endif
-
+/***************************************************************************
+ *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
+ */
+/**\file
+ * \brief Audio description模块
+ *
+ * \author Gong Ke <ke.gong@amlogic.com>
+ * \date 2017-06-23: create the document
+ ***************************************************************************/
 #define AM_DEBUG_LEVEL 5
 #include <am_debug.h>
 
