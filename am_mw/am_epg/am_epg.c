@@ -1245,28 +1245,24 @@ static void am_epg_psip_eit_get_event_list(AM_EPG_Monitor_t *mon, void *eit_sect
 			//AM_DEBUG(1,"evt: name:%s", pevt->name);
 		}
 
-		values[0] = 0;
 		pevt->rrt_ratings[0] = 0;
-
 		sprintf(pevt->rrt_ratings, "{");
-		AM_SI_LIST_BEGIN(event->p_first_descriptor, descr)
-			if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_CONTENT_ADVISORY)
-			{
-				dvbpsi_atsc_content_advisory_dr_t *pcad = (dvbpsi_atsc_content_advisory_dr_t*)descr->p_decoded;
-				AM_SI_GetRatingString(pcad, values, values_size);
-				if (pevt->rrt_ratings[strlen(pevt->rrt_ratings)-1] != '{')
-					snprintf(pevt->rrt_ratings, sizeof(pevt->rrt_ratings), "%s,", pevt->rrt_ratings);
-				snprintf(pevt->rrt_ratings, sizeof(pevt->rrt_ratings), "%sDratings:%s", pevt->rrt_ratings, values);
-			}
-			/*else if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_CAPTION_SERVICE)
-			{
-				dvbpsi_caption_service_86_dr_t *pcsd = (dvbpsi_caption_service_86_dr_t*)descr->p_decoded;
-				AM_SI_GetATSCCaptionString(pcsd, values, values_size);
-				if (pevt->rrt_ratings[strlen(pevt->rrt_ratings)-1] != '{')
-					snprintf(pevt->rrt_ratings, sizeof(pevt->rrt_ratings), "%s,", pevt->rrt_ratings);
-				snprintf(pevt->rrt_ratings, sizeof(pevt->rrt_ratings), "%scaptions:%s", pevt->rrt_ratings, values);
-			}*/
-		AM_SI_LIST_END()
+
+		//get ratings
+		values[0] = 0;
+		AM_SI_GetRatingStringFromDescriptors(event->p_first_descriptor, values, values_size);
+		if (strlen(values))
+			snprintf(pevt->rrt_ratings, sizeof(pevt->rrt_ratings), "%sDratings:%s", pevt->rrt_ratings, values);
+
+		//get captions
+		values[0] = 0;
+		AM_SI_GetATSCCaptionStringFromDescriptors(event->p_first_descriptor, values, values_size);
+		if (strlen(values)) {
+			if (pevt->rrt_ratings[strlen(pevt->rrt_ratings)-1] != '{')
+				snprintf(pevt->rrt_ratings, sizeof(pevt->rrt_ratings), "%s,", pevt->rrt_ratings);
+			snprintf(pevt->rrt_ratings, sizeof(pevt->rrt_ratings), "%scaptions:%s", pevt->rrt_ratings, values);
+		}
+
 		snprintf(pevt->rrt_ratings, sizeof(pevt->rrt_ratings), "%s}", pevt->rrt_ratings);
 
 		pevt->src = mon->src;

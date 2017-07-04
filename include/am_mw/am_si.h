@@ -345,14 +345,16 @@ extern AM_ErrorCode_t AM_SI_GetSectionHeader(AM_SI_Handle_t handle, uint8_t *buf
 extern void AM_SI_SetDefaultDVBTextCoding(const char *coding);
 
 /**\brief convert text to UTF-8 code text
- * \param [in] in_code Character data that needs to be converted
- * \param in_len the lenght of in_code
- * \param [out] out_code Converted character data
- * \param out_len out_code buf length
+ * \param [in] in_code/in Character data that needs to be converted
+ * \param [in] in_len the lenght of in_code/in
+ * \param [out] out_code/out Converted character data
+ * \param [in] out_len out_code/out buf length
+ * \param [in] coding coding of the @in
  * \retval AM_SUCCESS On success
  * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,int out_len);
+extern AM_ErrorCode_t AM_SI_ConvertDVBTextCodeEx(char *in, int in_len, char *out, int out_len, char *coding);
 
 /**\brief get audio and video info from ES stream
  * \param [in] es ES stream
@@ -388,28 +390,44 @@ extern AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_
  * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_TeletextInfo_t *ttx_info);
-/**\brief get Caption info from ES stream
- * \param [in] es ES stream
+/**\brief get Caption info from ES-stream
+ * \param [in] es ES-stream
  * \param [out] cap_info Caption info
  * \retval AM_SUCCESS On success
  * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_ExtractATSCCaptionFromES(dvbpsi_pmt_es_t *es, AM_SI_CaptionInfo_t *cap_info);
-/**\brief get Rating String from Content Advisory descriptor
- * \param [in] decoded content advisory descriptor
+/**\brief get Rating/Rating/Caption String from ContentAdvisoryDescriptor/descriptor/descriptor
+ * \param [in] decoded content advisory descriptor/decoded descriptors/decoded descriptors
  * \param [out] json string
  * \param [in] buffer size
  * \retval AM_SUCCESS On success
  * \return Error code
  */
 extern AM_ErrorCode_t AM_SI_GetRatingString(dvbpsi_atsc_content_advisory_dr_t *pcad, char *buf, int buf_size);
-
-
+extern AM_ErrorCode_t AM_SI_GetRatingStringFromDescriptors(dvbpsi_descriptor_t *p_descriptor, char *buf, int buf_size);
+extern AM_ErrorCode_t AM_SI_GetATSCCaptionStringFromDescriptors(dvbpsi_descriptor_t *p_descriptor, char *buf, int buf_size);
+/**\brief get the coding and data of the given DVB-Text
+ * \param [in] in DVB-Text data
+ * \param [in] in_len length of the data
+ * \param [out] coding buf to store the coding-string
+ * \param [in] coding_len length of the buf @out
+ * \param [out] offset the raw data offset in the DVB-Text
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
 extern AM_ErrorCode_t AM_SI_GetDVBTextCodingAndData(char *in, int in_len, char *coding, int coding_len, int *offset);
-
+/**\brief convert the data to utf-8 coding format
+ * \param [in] in the data
+ * \param [in] in_len the data length
+ * \param [out] out the output data
+ * \param [in] out_len the size of the buf @out
+ * \param [in] the original coding of the data
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
 extern AM_ErrorCode_t AM_SI_ConvertToUTF8(char *in, int in_len, char *out, int out_len, char *coding);
 
-extern AM_ErrorCode_t AM_SI_ConvertDVBTextCodeEx(char *in, int in_len, char *out, int out_len, char *coding);
 
 #ifdef __cplusplus
 }
