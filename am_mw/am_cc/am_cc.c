@@ -123,6 +123,9 @@ static AM_ErrorCode_t am_cc_calc_caption_size(int *w, int *h)
 
 static uint8_t *am_cc_get_page_canvas(AM_CC_Decoder_t *cc, struct vbi_page *pg)
 {
+	int safe_width, safe_height;
+
+	am_cc_calc_caption_size(&safe_width, &safe_height);
 	if (pg->pgno <= 8)
 	{
 		return cc->cpara.bmp_buffer;
@@ -135,12 +138,12 @@ static uint8_t *am_cc_get_page_canvas(AM_CC_Decoder_t *cc, struct vbi_page *pg)
 
 		if (dw->anchor_relative)
 		{
-			x = dw->anchor_horizontal * SAFE_TITLE_AREA_WIDTH / 100;
+			x = dw->anchor_horizontal * safe_width / 100;
 			y = dw->anchor_vertical * SAFE_TITLE_AREA_HEIGHT/ 100;
 		}
 		else
 		{
-			x = dw->anchor_horizontal * SAFE_TITLE_AREA_WIDTH / 210;
+			x = dw->anchor_horizontal * safe_width / 210;
 			y = dw->anchor_vertical * SAFE_TITLE_AREA_HEIGHT/ 75;
 		}
 
@@ -188,8 +191,8 @@ static uint8_t *am_cc_get_page_canvas(AM_CC_Decoder_t *cc, struct vbi_page *pg)
 			x = 0;
 		if (y < 0)
 			y = 0;
-		if (r > SAFE_TITLE_AREA_WIDTH)
-			r = SAFE_TITLE_AREA_WIDTH;
+		if (r > safe_width)
+			r = safe_width;
 		if (b > SAFE_TITLE_AREA_HEIGHT)
 			b = SAFE_TITLE_AREA_HEIGHT;
 
@@ -434,6 +437,10 @@ static void am_cc_render(AM_CC_Decoder_t *cc)
 	if (cc->vbi_pgno > 8)
 		am_cc_clear_safe_title(cc);
 
+	/*608 CC will always used 34 columns*/
+	if (cc->vbi_pgno <= 8)
+		draw_para.caption_width = 34*ROW_W;
+
 	/*fetch cc pages from libzvbi*/
 	sub_pg_cnt = AM_ARRAY_SIZE(sub_pages);
 	tvcc_fetch_page(&cc->decoder, cc->vbi_pgno, &sub_pg_cnt, sub_pages);
@@ -443,7 +450,6 @@ static void am_cc_render(AM_CC_Decoder_t *cc)
 	{
 		/*Override by user options*/
 		am_cc_override_by_user_options(cc, &sub_pages[i]);
-
 		vbi_draw_cc_page_region(
 			&sub_pages[i], VBI_PIXFMT_RGBA32_LE,
 			am_cc_get_page_canvas(cc, &sub_pages[i]),
