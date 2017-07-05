@@ -2,7 +2,12 @@
 #undef _FORTIFY_SOURCE
 #endif
 /***************************************************************************
- *  Copyright C 2009 by Amlogic, Inc. All Rights Reserved.
+ * Copyright (c) 2014 Amlogic, Inc. All rights reserved.
+ *
+ * This source code is subject to the terms and conditions defined in the
+ * file 'LICENSE' which is part of this source code package.
+ *
+ * Description:
  */
 /**\file am_rec.c
  * \brief 录像管理模块

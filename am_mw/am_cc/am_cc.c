@@ -2,7 +2,12 @@
 #undef _FORTIFY_SOURCE
 #endif
 /***************************************************************************
- *  Copyright C 2013 by Amlogic, Inc. All Rights Reserved.
+ * Copyright (c) 2014 Amlogic, Inc. All rights reserved.
+ *
+ * This source code is subject to the terms and conditions defined in the
+ * file 'LICENSE' which is part of this source code package.
+ *
+ * Description:
  */
 /**\file am_cc.c
  * \brief 数据库模块
