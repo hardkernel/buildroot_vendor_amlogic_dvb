@@ -2,7 +2,7 @@ BASE=.
 
 include $(BASE)/rule/def.mk
 
-SUBDIRS=doc script include am_adp am_mw am_app test
+SUBDIRS=doc script include am_adp am_mw am_app am_ver test
 
 
 include $(BASE)/rule/rule.mk
@@ -12,11 +12,20 @@ doxygen:
 	doxygen
 	#cd doc/doxygen/latex; sed -f $(ROOTDIR)/rule/latex_conv.sed refman.tex > new_refman.tex; mv new_refman.tex refman.tex; make
 
+PHONY+=install
+install:
+	$(Q)$(INFO) install all lib...
+	$(Q)rm -rf $(ROOTDIR)/lib
+	$(Q)mkdir $(ROOTDIR)/lib
+	$(Q)cp -rf $(ROOTDIR)/build/$(TARGET)/am_adp/libam_adp.so $(ROOTDIR)/lib
+	$(Q)cp -rf $(ROOTDIR)/build/$(TARGET)/am_mw/libam_mw.so $(ROOTDIR)/lib
+	$(Q)cp -rf $(ROOTDIR)/build/$(TARGET)/am_ver/libam_ver.so $(ROOTDIR)/lib
+
 DATE:=$(shell date +%Y.%m.%d-%k.%M|sed s/\ //)
 
 PHONY+=dist
 DIST_NAME:=AmlogicSetTopBox-$(VERSION)-$(DATE)
-DIST_DIRS:=android config doc Doxyfile include rule script am_adp am_mw am_app test Makefile
+DIST_DIRS:=android config doc Doxyfile include rule script am_adp am_mw am_app am_ver test Makefile
 dist: distclean info
 	mkdir -p disttmp/$(DIST_NAME)
 	mv build/INFO disttmp/$(DIST_NAME)/

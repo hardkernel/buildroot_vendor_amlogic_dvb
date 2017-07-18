@@ -33,6 +33,7 @@
 #endif
 
 #define MAX_DMX_COUNT 3
+#define VIDEO_PTS_FILE	"/sys/class/tsync/pts_video"
 
 typedef struct pes_buffer
 {
@@ -1042,7 +1043,7 @@ static unsigned long get_curretn_pts()
 	char buffer[16];
 	int ret=AM_SUCCESS;
 	unsigned long pts=0xffffffff;
-	ret=AM_FileRead("/sys/class/tsync/pts_video",buffer,11);
+	ret=AM_FileRead(VIDEO_PTS_FILE,buffer,11);
 	if(!ret)
 		pts=strtoul(buffer,0,16);
 	return pts;

@@ -44,7 +44,9 @@
 #include <errno.h>
 #include <signal.h>
 #include <amports/amstream.h>
+#ifdef ANDROID
 #include <cutils/properties.h>
+#endif
 #include "am_ad.h"
 
 #ifdef ANDROID
@@ -90,7 +92,9 @@ void *adec_handle = NULL;
 #define ENABLE_DROP_BFRAME
 #endif
 //#define ENABLE_BYPASS_DI
+#ifdef ANDROID
 #define ENABLE_PCR
+#endif
 
 #define ADEC_START_AUDIO_LEVEL       1024
 #define ADEC_START_VIDEO_LEVEL       2048
@@ -113,6 +117,27 @@ void *adec_handle = NULL;
 #endif
 #endif
 
+#if !defined (AMLOGIC_LIBPLAYER)
+#define  AUDIO_CTRL_DEVICE    "/dev/amaudio_ctl"
+#define AMAUDIO_IOC_MAGIC  'A'
+#define AMAUDIO_IOC_SET_LEFT_MONO               _IOW(AMAUDIO_IOC_MAGIC, 0x0e, int)
+#define AMAUDIO_IOC_SET_RIGHT_MONO              _IOW(AMAUDIO_IOC_MAGIC, 0x0f, int)
+#define AMAUDIO_IOC_SET_STEREO                  _IOW(AMAUDIO_IOC_MAGIC, 0x10, int)
+#define AMAUDIO_IOC_SET_CHANNEL_SWAP            _IOW(AMAUDIO_IOC_MAGIC, 0x11, int)
+#endif
+
+
+#ifdef ANDROID
+/*for add new path*/
+#define DVB_STB_SOURCE_FILE "/sys/class/stb/source"
+#define TSYNCPCR_RESETFLAG_FILE "/sys/class/tsync_pcr/tsync_pcr_reset_flag"
+#define DI_BYPASS_ALL_FILE "/sys/module/di/parameters/bypass_all"
+#define DVB_STB_DEMUXSOURCE_FILE "/sys/class/stb/demux%d_source"
+#define DVB_STB_ASYNCFIFO_FLUSHSIZE_FILE "/sys/class/stb/asyncfifo0_flush_size"
+#define TSYNC_ENABLE_FILE "/sys/class/tsync/enable"
+#define VIDEO_SHOW_FIRSTFRM_NOSYNC_FILE "/sys/class/video/show_first_frame_nosync"
+
+
 #define STREAM_VBUF_FILE    "/dev/amstream_vbuf"
 #define STREAM_ABUF_FILE    "/dev/amstream_abuf"
 #define STREAM_TS_FILE      "/dev/amstream_mpts"
@@ -134,14 +159,6 @@ void *adec_handle = NULL;
 #define VID_ASPECT_RATIO_FILE "/sys/class/video/aspect_ratio"
 #define VID_ASPECT_MATCH_FILE "/sys/class/video/matchmethod"
 
-#if !defined (AMLOGIC_LIBPLAYER)
-#define  AUDIO_CTRL_DEVICE    "/dev/amaudio_ctl"
-#define AMAUDIO_IOC_MAGIC  'A'
-#define AMAUDIO_IOC_SET_LEFT_MONO               _IOW(AMAUDIO_IOC_MAGIC, 0x0e, int)
-#define AMAUDIO_IOC_SET_RIGHT_MONO              _IOW(AMAUDIO_IOC_MAGIC, 0x0f, int)
-#define AMAUDIO_IOC_SET_STEREO                  _IOW(AMAUDIO_IOC_MAGIC, 0x10, int)
-#define AMAUDIO_IOC_SET_CHANNEL_SWAP            _IOW(AMAUDIO_IOC_MAGIC, 0x11, int)
-#endif
 
 #define VDEC_H264_ERROR_RECOVERY_MODE_FILE "/sys/module/amvdec_h264/parameters/error_recovery_mode"
 #define VDEC_H264_FATAL_ERROR_RESET_FILE "/sys/module/amvdec_h264/parameters/fatal_error_reset"
@@ -149,7 +166,6 @@ void *adec_handle = NULL;
 #define ASTREAM_FORMAT_FILE "/sys/class/astream/format"
 #define VIDEO_DROP_BFRAME_FILE  "/sys/module/amvdec_h264/parameters/enable_toggle_drop_B_frame"
 #define DI_BYPASS_FILE    "/sys/module/di/parameters/bypass_post"
-#define TSYNC_MODE_FILE   "/sys/class/tsync/mode"
 #define ENABLE_RESAMPLE_FILE    "/sys/class/amaudio/enable_resample"
 #define RESAMPLE_TYPE_FILE      "/sys/class/amaudio/resample_type"
 #define AUDIO_DMX_PTS_FILE	"/sys/class/stb/audio_pts"
@@ -163,16 +179,81 @@ void *adec_handle = NULL;
 #define DEC_CONTROL_H264 "/sys/module/amvdec_h264/parameters/dec_control"
 #define DEC_CONTROL_MPEG12 "/sys/module/amvdec_mpeg12/parameters/dec_control"
 #define VIDEO_NEW_FRAME_COUNT_FILE "/sys/module/amvideo/parameters/new_frame_count"
-
 #define AUDIO_DSP_DIGITAL_RAW_FILE "/sys/class/audiodsp/digital_raw"
 
+#else
+
+/*for add new path*/
+#define DVB_STB_SOURCE_FILE "/sys/class/stb/source"
+#define TSYNCPCR_RESETFLAG_FILE "/sys/class/tsync_pcr/tsync_pcr_reset_flag"
+#define DI_BYPASS_ALL_FILE "/sys/module/di/parameters/bypass_all"
+#define DVB_STB_DEMUXSOURCE_FILE "/sys/class/stb/demux%d_source"
+#define DVB_STB_ASYNCFIFO_FLUSHSIZE_FILE "/sys/class/stb/asyncfifo0_flush_size"
+#define TSYNC_ENABLE_FILE "/sys/class/tsync/enable"
+#define VIDEO_SHOW_FIRSTFRM_NOSYNC_FILE "/sys/class/video/show_first_frame_nosync"
+
+
+#define STREAM_VBUF_FILE    "/dev/amstream_vbuf"
+#define STREAM_ABUF_FILE    "/dev/amstream_abuf"
+#define STREAM_TS_FILE      "/dev/amstream_mpts"
+#define STREAM_PS_FILE      "/dev/amstream_mpps"
+#define STREAM_RM_FILE      "/dev/amstream_rm"
+#define JPEG_DEC_FILE       "/dev/amjpegdec"
+#define AMVIDEO_FILE        "/dev/amvideo"
+
+#define PPMGR_FILE			"/dev/ppmgr"
+
+#define VID_AXIS_FILE       "/sys/class/video/axis"
+#define VID_CONTRAST_FILE   "/sys/class/video/contrast"
+
+/*not find,but android is exist*/
+#define VID_SATURATION_FILE "/sys/class/video/saturation"
+
+#define VID_BRIGHTNESS_FILE "/sys/class/video/brightness"
+#define VID_DISABLE_FILE    "/sys/class/video/disable_video"
+#define VID_BLACKOUT_FILE   "/sys/class/video/blackout_policy"
+#define VID_SCREEN_MODE_FILE  "/sys/class/video/screen_mode"
+#define VID_FRAME_FMT_FILE   "/sys/class/video/frame_format"
+
+#define VDEC_H264_ERROR_RECOVERY_MODE_FILE "/sys/module/vh264/parameters/error_recovery_mode"
+#define VDEC_H264_FATAL_ERROR_RESET_FILE "/sys/module/vh264/parameters/fatal_error_reset"
+#define DISP_MODE_FILE      "/sys/class/display/mode"
+#define ASTREAM_FORMAT_FILE "/sys/class/astream/format"
+
+/*not find,android is not find*/
+#define VIDEO_DROP_BFRAME_FILE  "/sys/module/amvdec_h264/parameters/enable_toggle_drop_B_frame"
+
+
+#define DI_BYPASS_FILE    "/sys/module/di/parameters/bypass_post"
+
+/*not find,android is not find*/
+#define ENABLE_RESAMPLE_FILE    "/sys/class/amaudio/enable_resample"
+#define RESAMPLE_TYPE_FILE      "/sys/class/amaudio/resample_type"
+
+#define AUDIO_DMX_PTS_FILE	"/sys/class/stb/audio_pts"
+#define VIDEO_DMX_PTS_FILE	"/sys/class/stb/video_pts"
+#define AUDIO_PTS_FILE	"/sys/class/tsync/pts_audio"
+#define VIDEO_PTS_FILE	"/sys/class/tsync/pts_video"
+#define TSYNC_MODE_FILE "/sys/class/tsync/mode"
+#define AV_THRESHOLD_MIN_FILE "/sys/class/tsync/av_threshold_min"
+#define AV_THRESHOLD_MAX_FILE "/sys/class/tsync/av_threshold_max"
+
+/*not find,android is not find*/
+#define AVS_PLUS_DECT_FILE "/sys/module/amvdec_avs/parameters/profile"
+
+#define DEC_CONTROL_H264 "/sys/module/vh264/parameters/dec_control"
+#define DEC_CONTROL_MPEG12 "/sys/module/vmpeg12/parameters/dec_control"
+#define VIDEO_NEW_FRAME_COUNT_FILE "/sys/module/frame_sink/parameters/new_frame_count"
+#define AUDIO_DSP_DIGITAL_RAW_FILE "/sys/class/audiodsp/digital_raw"
+#endif
+
+#ifdef ANDROID
 #define DEC_CONTROL_PROP "media.dec_control"
 #define AC3_AMASTER_PROP "media.ac3_amaster"
+#endif
 
 #define CANVAS_ALIGN(x)    (((x)+7)&~7)
 #define JPEG_WRTIE_UNIT    (32*1024)
-#define AUDIO_START_LEN (0*1024)
-#define AUDIO_LOW_LEN (1*1024)
 #define AV_SYNC_THRESHOLD	60
 #define AV_SMOOTH_SYNC_VAL "100"
 
@@ -489,7 +570,7 @@ static AM_Bool_t show_first_frame_nosync(void)
 {
 	char buf[32];
 
-	if (AM_FileRead("/sys/class/video/show_first_frame_nosync", buf, sizeof(buf)) >= 0) {
+	if (AM_FileRead(VIDEO_SHOW_FIRSTFRM_NOSYNC_FILE, buf, sizeof(buf)) >= 0) {
 		int v = atoi(buf);
 
 		return (v == 1) ? AM_TRUE : AM_FALSE;
@@ -525,11 +606,11 @@ static int get_amstream(AM_AV_Device_t *dev)
 		AV_DataSource_t *src = (AV_DataSource_t *)dev->aud_player.drv_data;
 		return src->fd;
 	}
-	else if (dev->mode & (AV_GET_JPEG_INFO | AV_DECODE_JPEG))
-	{
-		AV_JPEGData_t *jpeg = (AV_JPEGData_t *)dev->vid_player.drv_data;
-		return jpeg->vbuf_fd;
-	}
+	// else if (dev->mode & (AV_GET_JPEG_INFO | AV_DECODE_JPEG))
+	// {
+	// 	AV_JPEGData_t *jpeg = (AV_JPEGData_t *)dev->vid_player.drv_data;
+	// 	return jpeg->vbuf_fd;
+	// }
 
 	return -1;
 }
@@ -542,7 +623,9 @@ static int get_amstream(AM_AV_Device_t *dev)
 static int _get_prop_int(char *prop, int def) {
 	char v[32];
 	int val = 0;
+#ifdef ANDROID
 	property_get(prop, v, "0");
+#endif
 	if (sscanf(v, "%d", &val) != 1)
 		val = def;
 	return val;
@@ -1127,12 +1210,11 @@ static int aml_update_player_info_callback(int pid,player_info_t * info)
 int aml_set_tsync_enable(int enable)
 {
 	int fd;
-	char *path = "/sys/class/tsync/enable";
 	char  bcmd[16];
 
 	snprintf(bcmd,sizeof(bcmd),"%d",enable);
 	
-	return AM_FileEcho(path, bcmd);
+	return AM_FileEcho(TSYNC_ENABLE_FILE, bcmd);
 
 	// fd=open(path, O_CREAT|O_RDWR | O_TRUNC, 0644);
 	// if(fd>=0)
@@ -1149,85 +1231,85 @@ int aml_set_tsync_enable(int enable)
 /**\brief 初始化JPEG解码器*/
 static AM_ErrorCode_t aml_init_jpeg(AV_JPEGData_t *jpeg)
 {
-	if (jpeg->dec_fd != -1)
-	{
-		close(jpeg->dec_fd);
-		jpeg->dec_fd = -1;
-	}
+// 	if (jpeg->dec_fd != -1)
+// 	{
+// 		close(jpeg->dec_fd);
+// 		jpeg->dec_fd = -1;
+// 	}
 
-	if (jpeg->vbuf_fd != -1)
-	{
-		close(jpeg->vbuf_fd);
-		jpeg->vbuf_fd = -1;
-	}
+// 	if (jpeg->vbuf_fd != -1)
+// 	{
+// 		close(jpeg->vbuf_fd);
+// 		jpeg->vbuf_fd = -1;
+// 	}
 
-	jpeg->vbuf_fd = open(STREAM_VBUF_FILE, O_RDWR|O_NONBLOCK);
-	if (jpeg->vbuf_fd == -1)
-	{
-		AM_DEBUG(1, "cannot open amstream_vbuf");
-		goto error;
-	}
+// 	jpeg->vbuf_fd = open(STREAM_VBUF_FILE, O_RDWR|O_NONBLOCK);
+// 	if (jpeg->vbuf_fd == -1)
+// 	{
+// 		AM_DEBUG(1, "cannot open amstream_vbuf");
+// 		goto error;
+// 	}
 
-	if (ioctl(jpeg->vbuf_fd, AMSTREAM_IOC_VFORMAT, VFORMAT_JPEG) == -1)
-	{
-		AM_DEBUG(1, "set jpeg video format failed (\"%s\")", strerror(errno));
-		goto error;
-	}
+// 	if (ioctl(jpeg->vbuf_fd, AMSTREAM_IOC_VFORMAT, VFORMAT_JPEG) == -1)
+// 	{
+// 		AM_DEBUG(1, "set jpeg video format failed (\"%s\")", strerror(errno));
+// 		goto error;
+// 	}
 
-	if (ioctl(jpeg->vbuf_fd, AMSTREAM_IOC_PORT_INIT) == -1)
-	{
-		AM_DEBUG(1, "amstream init failed (\"%s\")", strerror(errno));
-		goto error;
-	}
+// 	if (ioctl(jpeg->vbuf_fd, AMSTREAM_IOC_PORT_INIT) == -1)
+// 	{
+// 		AM_DEBUG(1, "amstream init failed (\"%s\")", strerror(errno));
+// 		goto error;
+// 	}
 
-	return AM_SUCCESS;
-error:
-	if (jpeg->dec_fd != -1)
-	{
-		close(jpeg->dec_fd);
-		jpeg->dec_fd = -1;
-	}
-	if (jpeg->vbuf_fd != -1)
-	{
-		close(jpeg->vbuf_fd);
-		jpeg->vbuf_fd = -1;
-	}
+// 	return AM_SUCCESS;
+// error:
+// 	if (jpeg->dec_fd != -1)
+// 	{
+// 		close(jpeg->dec_fd);
+// 		jpeg->dec_fd = -1;
+// 	}
+// 	if (jpeg->vbuf_fd != -1)
+// 	{
+// 		close(jpeg->vbuf_fd);
+// 		jpeg->vbuf_fd = -1;
+// 	}
 	return AM_AV_ERR_SYS;
 }
 
 /**\brief 创建JPEG解码相关数据*/
 static AV_JPEGData_t* aml_create_jpeg_data(void)
 {
-	AV_JPEGData_t *jpeg;
+	// AV_JPEGData_t *jpeg;
 
-	jpeg = malloc(sizeof(AV_JPEGData_t));
-	if (!jpeg)
-	{
-		AM_DEBUG(1, "not enough memory");
-		return NULL;
-	}
+	// jpeg = malloc(sizeof(AV_JPEGData_t));
+	// if (!jpeg)
+	// {
+	// 	AM_DEBUG(1, "not enough memory");
+	// 	return NULL;
+	// }
 
-	jpeg->vbuf_fd = -1;
-	jpeg->dec_fd  = -1;
+	// jpeg->vbuf_fd = -1;
+	// jpeg->dec_fd  = -1;
 
-	if (aml_init_jpeg(jpeg) != AM_SUCCESS)
-	{
-		free(jpeg);
-		return NULL;
-	}
+	// if (aml_init_jpeg(jpeg) != AM_SUCCESS)
+	// {
+	// 	free(jpeg);
+	// 	return NULL;
+	// }
 
-	return jpeg;
+	return NULL;
 }
 
 /**\brief 释放JPEG解码相关数据*/
 static void aml_destroy_jpeg_data(AV_JPEGData_t *jpeg)
 {
-	if (jpeg->dec_fd != -1)
-		close(jpeg->dec_fd);
-	if (jpeg->vbuf_fd != -1)
-		close(jpeg->vbuf_fd);
+	// if (jpeg->dec_fd != -1)
+	// 	close(jpeg->dec_fd);
+	// if (jpeg->vbuf_fd != -1)
+	// 	close(jpeg->vbuf_fd);
 
-	free(jpeg);
+	// free(jpeg);
 }
 
 /**\brief 创建数据注入相关数据*/
@@ -2130,16 +2212,16 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AV_TimeShi
 		return AM_AV_ERR_CANNOT_OPEN_DEV;
 	}
 
-	AM_FileRead("/sys/class/stb/source", tshift->last_stb_src, 16);
+	AM_FileRead(DVB_STB_SOURCE_FILE, tshift->last_stb_src, 16);
 	snprintf(buf, sizeof(buf), "dmx%d", para->dmx_id);
-	AM_FileEcho("/sys/class/stb/source", buf);
+	AM_FileEcho(DVB_STB_SOURCE_FILE, buf);
 
-	snprintf(buf, sizeof(buf), "/sys/class/stb/demux%d_source", para->dmx_id);
+	snprintf(buf, sizeof(buf), DVB_STB_DEMUXSOURCE_FILE, para->dmx_id);
 	AM_FileRead(buf, tshift->last_dmx_src, 16);
 	AM_FileEcho(buf, "hiu");
 
 	snprintf(buf, sizeof(buf), "%d", 32*1024);
-	AM_FileEcho("/sys/class/stb/asyncfifo0_flush_size", buf);
+	AM_FileEcho(DVB_STB_ASYNCFIFO_FLUSHSIZE_FILE, buf);
 
 	AM_DEBUG(1, "Openning mpts");
 	tshift->av_fd = open(STREAM_TS_FILE, O_RDWR);
@@ -2293,13 +2375,13 @@ static void aml_destroy_timeshift_data(AV_TimeshiftData_t *tshift, AM_Bool_t des
 	if (tshift->cntl_fd != -1)
 		close(tshift->cntl_fd);
 
-	AM_FileEcho("/sys/class/stb/source", tshift->last_stb_src);
-	snprintf(buf, sizeof(buf), "/sys/class/stb/demux%d_source", tshift->para.para.dmx_id);
+	AM_FileEcho(DVB_STB_SOURCE_FILE, tshift->last_stb_src);
+	snprintf(buf, sizeof(buf), DVB_STB_DEMUXSOURCE_FILE, tshift->para.para.dmx_id);
 	AM_FileEcho(buf, tshift->last_dmx_src);
 
-	if (AM_FileRead("/sys/module/di/parameters/bypass_all", buf, sizeof(buf)) == AM_SUCCESS) {
+	if (AM_FileRead(DI_BYPASS_ALL_FILE, buf, sizeof(buf)) == AM_SUCCESS) {
 		if (!strncmp(buf, "1", 1)) {
-			AM_FileEcho("/sys/module/di/parameters/bypass_all","0");
+			AM_FileEcho(DI_BYPASS_ALL_FILE,"0");
 		}
 	}
 
@@ -2442,7 +2524,7 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 				{
 					//usleep(200*1000);
 					AM_DEBUG(1, "set di bypass_all to 0");
-					AM_FileEcho("/sys/module/di/parameters/bypass_all","0");
+					AM_FileEcho(DI_BYPASS_ALL_FILE,"0");
 				}
 			}
 			break;
@@ -2479,7 +2561,7 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 				if (tshift->last_cmd == AV_PLAY_START)
 				{
 					AM_DEBUG(1, "set di bypass_all to 1");
-					AM_FileEcho("/sys/module/di/parameters/bypass_all","1");
+					AM_FileEcho(DI_BYPASS_ALL_FILE,"1");
 					usleep(200*1000);
 				}
 
@@ -3011,226 +3093,226 @@ extern unsigned long CMEM_getPhys(unsigned long virts);
 static AM_ErrorCode_t aml_decode_jpeg(AV_JPEGData_t *jpeg, const uint8_t *data, int len, int mode, void *para)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
-#if !defined(ANDROID)
-	AV_JPEGDecodePara_t *dec_para = (AV_JPEGDecodePara_t *)para;
-	AV_JPEGDecState_t s;
-	AM_Bool_t decLoop = AM_TRUE;
-	int decState = 0;
-	int try_count = 0;
-	int decode_wait = 0;
-	const uint8_t *src = data;
-	int left = len;
-	AM_OSD_Surface_t *surf = NULL;
-	jpegdec_info_t info;
+// #if !defined(ANDROID)
+// 	AV_JPEGDecodePara_t *dec_para = (AV_JPEGDecodePara_t *)para;
+// 	AV_JPEGDecState_t s;
+// 	AM_Bool_t decLoop = AM_TRUE;
+// 	int decState = 0;
+// 	int try_count = 0;
+// 	int decode_wait = 0;
+// 	const uint8_t *src = data;
+// 	int left = len;
+// 	AM_OSD_Surface_t *surf = NULL;
+// 	jpegdec_info_t info;
 
-	char tmp_buf[64];
+// 	char tmp_buf[64];
 
-	s = AV_JPEG_DEC_STAT_INFOCONFIG;
-	while (decLoop)
-	{
-		if (jpeg->dec_fd == -1)
-		{
-			jpeg->dec_fd = open(JPEG_DEC_FILE, O_RDWR);
-			if (jpeg->dec_fd != -1)
-			{
-				s = AV_JPEG_DEC_STAT_INFOCONFIG;
-			}
-			else
-			{
-				try_count++;
-				if (try_count > 40)
-				{
-					AM_DEBUG(1, "jpegdec init timeout");
-					try_count=0;
-					ret = aml_init_jpeg(jpeg);
-					if (ret != AM_SUCCESS)
-						break;
-				}
-				usleep(10000);
-				continue;
-			}
-		}
-		else
-		{
-			decState = ioctl(jpeg->dec_fd, JPEGDEC_IOC_STAT);
+// 	s = AV_JPEG_DEC_STAT_INFOCONFIG;
+// 	while (decLoop)
+// 	{
+// 		if (jpeg->dec_fd == -1)
+// 		{
+// 			jpeg->dec_fd = open(JPEG_DEC_FILE, O_RDWR);
+// 			if (jpeg->dec_fd != -1)
+// 			{
+// 				s = AV_JPEG_DEC_STAT_INFOCONFIG;
+// 			}
+// 			else
+// 			{
+// 				try_count++;
+// 				if (try_count > 40)
+// 				{
+// 					AM_DEBUG(1, "jpegdec init timeout");
+// 					try_count=0;
+// 					ret = aml_init_jpeg(jpeg);
+// 					if (ret != AM_SUCCESS)
+// 						break;
+// 				}
+// 				usleep(10000);
+// 				continue;
+// 			}
+// 		}
+// 		else
+// 		{
+// 			decState = ioctl(jpeg->dec_fd, JPEGDEC_IOC_STAT);
 
-			if (decState & JPEGDEC_STAT_ERROR)
-			{
-				AM_DEBUG(1, "jpegdec JPEGDEC_STAT_ERROR");
-				ret = AM_AV_ERR_DECODE;
-				break;
-			}
+// 			if (decState & JPEGDEC_STAT_ERROR)
+// 			{
+// 				AM_DEBUG(1, "jpegdec JPEGDEC_STAT_ERROR");
+// 				ret = AM_AV_ERR_DECODE;
+// 				break;
+// 			}
 
-			if (decState & JPEGDEC_STAT_UNSUPPORT)
-			{
-				AM_DEBUG(1, "jpegdec JPEGDEC_STAT_UNSUPPORT");
-				ret = AM_AV_ERR_DECODE;
-				break;
-			}
+// 			if (decState & JPEGDEC_STAT_UNSUPPORT)
+// 			{
+// 				AM_DEBUG(1, "jpegdec JPEGDEC_STAT_UNSUPPORT");
+// 				ret = AM_AV_ERR_DECODE;
+// 				break;
+// 			}
 
-			if (decState & JPEGDEC_STAT_DONE)
-				break;
+// 			if (decState & JPEGDEC_STAT_DONE)
+// 				break;
 
-			if (decState & JPEGDEC_STAT_WAIT_DATA)
-			{
-				if (left > 0)
-				{
-					int send = AM_MIN(left, JPEG_WRTIE_UNIT);
-					int rc;
-					rc = write(jpeg->vbuf_fd, src, send);
-					if (rc == -1)
-					{
-						AM_DEBUG(1, "write data to the jpeg decoder failed");
-						ret = AM_AV_ERR_DECODE;
-						break;
-					}
-					left -= rc;
-					src  += rc;
-				}
-				else if (decode_wait == 0)
-				{
-					int i, times = JPEG_WRTIE_UNIT/sizeof(tmp_buf);
+// 			if (decState & JPEGDEC_STAT_WAIT_DATA)
+// 			{
+// 				if (left > 0)
+// 				{
+// 					int send = AM_MIN(left, JPEG_WRTIE_UNIT);
+// 					int rc;
+// 					rc = write(jpeg->vbuf_fd, src, send);
+// 					if (rc == -1)
+// 					{
+// 						AM_DEBUG(1, "write data to the jpeg decoder failed");
+// 						ret = AM_AV_ERR_DECODE;
+// 						break;
+// 					}
+// 					left -= rc;
+// 					src  += rc;
+// 				}
+// 				else if (decode_wait == 0)
+// 				{
+// 					int i, times = JPEG_WRTIE_UNIT/sizeof(tmp_buf);
 
-					memset(tmp_buf, 0, sizeof(tmp_buf));
+// 					memset(tmp_buf, 0, sizeof(tmp_buf));
 
-					for (i=0; i<times; i++)
-						write(jpeg->vbuf_fd, tmp_buf, sizeof(tmp_buf));
-					decode_wait++;
-				}
-				else
-				{
-					if (decode_wait > 300)
-					{
-						AM_DEBUG(1, "jpegdec wait data error");
-						ret = AM_AV_ERR_DECODE;
-						break;
-					}
-					decode_wait++;
-					usleep(10);
-				}
-			}
+// 					for (i=0; i<times; i++)
+// 						write(jpeg->vbuf_fd, tmp_buf, sizeof(tmp_buf));
+// 					decode_wait++;
+// 				}
+// 				else
+// 				{
+// 					if (decode_wait > 300)
+// 					{
+// 						AM_DEBUG(1, "jpegdec wait data error");
+// 						ret = AM_AV_ERR_DECODE;
+// 						break;
+// 					}
+// 					decode_wait++;
+// 					usleep(10);
+// 				}
+// 			}
 
-			switch (s)
-			{
-				case AV_JPEG_DEC_STAT_INFOCONFIG:
-					if (decState & JPEGDEC_STAT_WAIT_INFOCONFIG)
-					{
-						if (ioctl(jpeg->dec_fd, JPEGDEC_IOC_INFOCONFIG, 0) == -1)
-						{
-							AM_DEBUG(1, "jpegdec JPEGDEC_IOC_INFOCONFIG error");
-							ret = AM_AV_ERR_DECODE;
-							decLoop = AM_FALSE;
-						}
-						s = AV_JPEG_DEC_STAT_INFO;
-					}
-					break;
-				case AV_JPEG_DEC_STAT_INFO:
-					if (decState & JPEGDEC_STAT_INFO_READY)
-					{
-						if (ioctl(jpeg->dec_fd, JPEGDEC_IOC_INFO, &info) == -1)
-						{
-							AM_DEBUG(1, "jpegdec JPEGDEC_IOC_INFO error");
-							ret = AM_AV_ERR_DECODE;
-							decLoop = AM_FALSE;
-						}
-						if (mode & AV_GET_JPEG_INFO)
-						{
-							AM_AV_JPEGInfo_t *jinfo = (AM_AV_JPEGInfo_t *)para;
-							jinfo->width    = info.width;
-							jinfo->height   = info.height;
-							jinfo->comp_num = info.comp_num;
-							decLoop = AM_FALSE;
-						}
-						AM_DEBUG(2, "jpegdec width:%d height:%d", info.width, info.height);
-						s = AV_JPEG_DEC_STAT_DECCONFIG;
-					}
-					break;
-				case AV_JPEG_DEC_STAT_DECCONFIG:
-					if (decState & JPEGDEC_STAT_WAIT_DECCONFIG)
-					{
-						jpegdec_config_t config;
-						int dst_w, dst_h;
+// 			switch (s)
+// 			{
+// 				case AV_JPEG_DEC_STAT_INFOCONFIG:
+// 					if (decState & JPEGDEC_STAT_WAIT_INFOCONFIG)
+// 					{
+// 						if (ioctl(jpeg->dec_fd, JPEGDEC_IOC_INFOCONFIG, 0) == -1)
+// 						{
+// 							AM_DEBUG(1, "jpegdec JPEGDEC_IOC_INFOCONFIG error");
+// 							ret = AM_AV_ERR_DECODE;
+// 							decLoop = AM_FALSE;
+// 						}
+// 						s = AV_JPEG_DEC_STAT_INFO;
+// 					}
+// 					break;
+// 				case AV_JPEG_DEC_STAT_INFO:
+// 					if (decState & JPEGDEC_STAT_INFO_READY)
+// 					{
+// 						if (ioctl(jpeg->dec_fd, JPEGDEC_IOC_INFO, &info) == -1)
+// 						{
+// 							AM_DEBUG(1, "jpegdec JPEGDEC_IOC_INFO error");
+// 							ret = AM_AV_ERR_DECODE;
+// 							decLoop = AM_FALSE;
+// 						}
+// 						if (mode & AV_GET_JPEG_INFO)
+// 						{
+// 							AM_AV_JPEGInfo_t *jinfo = (AM_AV_JPEGInfo_t *)para;
+// 							jinfo->width    = info.width;
+// 							jinfo->height   = info.height;
+// 							jinfo->comp_num = info.comp_num;
+// 							decLoop = AM_FALSE;
+// 						}
+// 						AM_DEBUG(2, "jpegdec width:%d height:%d", info.width, info.height);
+// 						s = AV_JPEG_DEC_STAT_DECCONFIG;
+// 					}
+// 					break;
+// 				case AV_JPEG_DEC_STAT_DECCONFIG:
+// 					if (decState & JPEGDEC_STAT_WAIT_DECCONFIG)
+// 					{
+// 						jpegdec_config_t config;
+// 						int dst_w, dst_h;
 
-						switch (dec_para->para.angle)
-						{
-							case AM_AV_JPEG_CLKWISE_0:
-							default:
-								dst_w = info.width;
-								dst_h = info.height;
-							break;
-							case AM_AV_JPEG_CLKWISE_90:
-								dst_w = info.height;
-								dst_h = info.width;
-							break;
-							case AM_AV_JPEG_CLKWISE_180:
-								dst_w = info.width;
-								dst_h = info.height;
-							break;
-							case AM_AV_JPEG_CLKWISE_270:
-								dst_w = info.height;
-								dst_h = info.width;
-							break;
-						}
+// 						switch (dec_para->para.angle)
+// 						{
+// 							case AM_AV_JPEG_CLKWISE_0:
+// 							default:
+// 								dst_w = info.width;
+// 								dst_h = info.height;
+// 							break;
+// 							case AM_AV_JPEG_CLKWISE_90:
+// 								dst_w = info.height;
+// 								dst_h = info.width;
+// 							break;
+// 							case AM_AV_JPEG_CLKWISE_180:
+// 								dst_w = info.width;
+// 								dst_h = info.height;
+// 							break;
+// 							case AM_AV_JPEG_CLKWISE_270:
+// 								dst_w = info.height;
+// 								dst_h = info.width;
+// 							break;
+// 						}
 
-						if (dec_para->para.width > 0)
-							dst_w = AM_MIN(dst_w, dec_para->para.width);
-						if (dec_para->para.height > 0)
-							dst_h = AM_MIN(dst_h, dec_para->para.height);
+// 						if (dec_para->para.width > 0)
+// 							dst_w = AM_MIN(dst_w, dec_para->para.width);
+// 						if (dec_para->para.height > 0)
+// 							dst_h = AM_MIN(dst_h, dec_para->para.height);
 
-						ret = AM_OSD_CreateSurface(AM_OSD_FMT_YUV_420, dst_w, dst_h, AM_OSD_SURFACE_FL_HW, &surf);
-						if (ret != AM_SUCCESS)
-						{
-							AM_DEBUG(1, "cannot create the YUV420 surface");
-							decLoop = AM_FALSE;
-						}
-						else
-						{
-							config.addr_y = CMEM_getPhys((unsigned long)surf->buffer);
-							config.addr_u = config.addr_y+CANVAS_ALIGN(surf->width)*surf->height;
-							config.addr_v = config.addr_u+CANVAS_ALIGN(surf->width/2)*(surf->height/2);
-							config.opt    = dec_para->para.option;
-							config.dec_x  = 0;
-							config.dec_y  = 0;
-							config.dec_w  = surf->width;
-							config.dec_h  = surf->height;
-							config.angle  = dec_para->para.angle;
-							config.canvas_width = CANVAS_ALIGN(surf->width);
+// 						ret = AM_OSD_CreateSurface(AM_OSD_FMT_YUV_420, dst_w, dst_h, AM_OSD_SURFACE_FL_HW, &surf);
+// 						if (ret != AM_SUCCESS)
+// 						{
+// 							AM_DEBUG(1, "cannot create the YUV420 surface");
+// 							decLoop = AM_FALSE;
+// 						}
+// 						else
+// 						{
+// 							config.addr_y = CMEM_getPhys((unsigned long)surf->buffer);
+// 							config.addr_u = config.addr_y+CANVAS_ALIGN(surf->width)*surf->height;
+// 							config.addr_v = config.addr_u+CANVAS_ALIGN(surf->width/2)*(surf->height/2);
+// 							config.opt    = dec_para->para.option;
+// 							config.dec_x  = 0;
+// 							config.dec_y  = 0;
+// 							config.dec_w  = surf->width;
+// 							config.dec_h  = surf->height;
+// 							config.angle  = dec_para->para.angle;
+// 							config.canvas_width = CANVAS_ALIGN(surf->width);
 
-							if (ioctl(jpeg->dec_fd, JPEGDEC_IOC_DECCONFIG, &config) == -1)
-							{
-								AM_DEBUG(1, "jpegdec JPEGDEC_IOC_DECCONFIG error");
-								ret = AM_AV_ERR_DECODE;
-								decLoop = AM_FALSE;
-							}
-							s = AV_JPEG_DEC_STAT_RUN;
-						}
-					}
-				break;
+// 							if (ioctl(jpeg->dec_fd, JPEGDEC_IOC_DECCONFIG, &config) == -1)
+// 							{
+// 								AM_DEBUG(1, "jpegdec JPEGDEC_IOC_DECCONFIG error");
+// 								ret = AM_AV_ERR_DECODE;
+// 								decLoop = AM_FALSE;
+// 							}
+// 							s = AV_JPEG_DEC_STAT_RUN;
+// 						}
+// 					}
+// 				break;
 
-				default:
-					break;
-			}
-		}
-	}
+// 				default:
+// 					break;
+// 			}
+// 		}
+// 	}
 
-	if (surf)
-	{
-		if (ret == AM_SUCCESS)
-		{
-			dec_para->surface = surf;
-		}
-		else
-		{
-			AM_OSD_DestroySurface(surf);
-		}
-	}
-#else
-	UNUSED(jpeg);
-	UNUSED(data);
-	UNUSED(len);
-	UNUSED(mode);
-	UNUSED(para);
-#endif
+// 	if (surf)
+// 	{
+// 		if (ret == AM_SUCCESS)
+// 		{
+// 			dec_para->surface = surf;
+// 		}
+// 		else
+// 		{
+// 			AM_OSD_DestroySurface(surf);
+// 		}
+// 	}
+// #else
+// 	UNUSED(jpeg);
+// 	UNUSED(data);
+// 	UNUSED(len);
+// 	UNUSED(mode);
+// 	UNUSED(para);
+// #endif
 
 	return ret;
 }
@@ -3337,65 +3419,7 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 			dev->vout_h = 1080;
 		}
 	}
-#ifdef CHIP_8226H
-	if (AM_FileRead(VID_ASPECT_RATIO_FILE, buf, sizeof(buf)) == AM_SUCCESS)
-	{
-		if (!strncmp(buf, "auto", 4))
-		{
-			dev->video_ratio = AM_AV_VIDEO_ASPECT_AUTO;
-		}
-		else if (!strncmp(buf, "16x9", 4))
-		{
-			dev->video_ratio = AM_AV_VIDEO_ASPECT_16_9;
-		}
-		else if (!strncmp(buf, "4x3", 3))
-		{
-			dev->video_ratio = AM_AV_VIDEO_ASPECT_4_3;
-		}
-	}
-	if (AM_FileRead(VID_ASPECT_MATCH_FILE, buf, sizeof(buf)) == AM_SUCCESS)
-	{
-		if (!strncmp(buf, "ignore", 4))
-		{
-			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_IGNORE;
-		}
-		else if (!strncmp(buf, "letter box", 10))
-		{
-			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX;
-		}
-		else if (!strncmp(buf, "pan scan", 8))
-		{
-			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN;
-		}
-		else if (!strncmp(buf, "combined", 8))
-		{
-			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_COMBINED;
-		}
-	}
-#else
-	if (AM_FileRead(VID_ASPECT_MATCH_FILE, buf, sizeof(buf)) == AM_SUCCESS)
-	{
-		if (sscanf(buf, "%d", &v) == 1)
-		{
-			switch (v)
-			{
-				case 0:
-				case 1:
-					dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_IGNORE;
-					break;
-				case 2:
-					dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN;
-					break;
-				case 3:
-					dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX;
-					break;
-				case 4:
-					dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_COMBINED;
-					break;
-			}
-		}
-	}
-#endif
+
 //#endif
 
 #if !defined(ADEC_API_NEW)
@@ -3461,7 +3485,9 @@ static AM_ErrorCode_t set_dec_control(AM_Bool_t enable)
 	int cnt = sizeof(dec_control)/sizeof(dec_control[0]);
 	int i;
 	if (enable) {//format: "0xaa|0xbb"
+#ifdef ANDROID
 		property_get(DEC_CONTROL_PROP, v, "");
+#endif
 		for (i=0; i<cnt; i++) {
 			dc = 0;
 			if (!pch || !pch[0])
@@ -3541,6 +3567,8 @@ static int aml_set_sync_mode(int has_audio, int has_video, int afmt)
 		afmt == AFORMAT_EAC3) {
 		is_dts_dolby = 1;
 	}
+	AM_DEBUG(1, "aml_set_sync_mode:-----------1\n");
+#ifdef ANDROID
 	if (aml_get_audio_digital_raw() == 0) {
 		AM_FileEcho(TSYNC_MODE_FILE, "2");
 	} else if (has_audio && is_dts_dolby) {
@@ -3550,7 +3578,14 @@ static int aml_set_sync_mode(int has_audio, int has_video, int afmt)
 	} else {
 		AM_FileEcho(TSYNC_MODE_FILE, "2");
 	}
-	/*AM_FileEcho(TSYNC_MODE_FILE, "2");*/
+#else
+	if (has_audio && is_dts_dolby) {
+		AM_FileEcho(TSYNC_MODE_FILE, "1");
+	} else {
+		AM_FileEcho(TSYNC_MODE_FILE, "0");
+	}
+#endif
+	
 	return 0;
 }
 
@@ -3572,8 +3607,9 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	if ((tp->afmt == AFORMAT_AC3) || (tp->afmt == AFORMAT_EAC3))
 	{
 		char buf[32];
+#ifdef ANDROID
 		property_get(AC3_AMASTER_PROP, buf, "0");
-
+#endif
 		if (!strcmp(buf, "1"))
 		{
 			ac3_amaster = AM_TRUE;
@@ -3593,8 +3629,13 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 
 #ifndef ENABLE_PCR
 	if (ts->vid_fd != -1){
+		AM_DEBUG(1, "%s, enable video pause", __FUNCTION__);
 		ioctl(ts->vid_fd, AMSTREAM_IOC_VPAUSE, 1);
+	}else{
+		AM_DEBUG(1, "%s, disenable video pause", __FUNCTION__);
 	}
+#else
+	AM_DEBUG(1, "%s, enable pcr -------", __FUNCTION__);
 #endif
 
 #ifdef MPTSONLYAUDIOVIDEO
@@ -3630,6 +3671,18 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 
 
 #if defined(ANDROID) || defined(CHIP_8626X)
+	/*Set tsync enable/disable*/
+	if (has_video && has_audio)
+	{
+		AM_DEBUG(1, "Set tsync enable to 1");
+		aml_set_tsync_enable(1);
+	}
+	else
+	{
+		AM_DEBUG(1, "Set tsync enable to 0");
+		aml_set_tsync_enable(0);
+	}
+#else
 	/*Set tsync enable/disable*/
 	if (has_video && has_audio)
 	{
@@ -3727,11 +3780,15 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 		}
 		aml_set_sync_mode(has_audio, has_video, tp->afmt);
 		/*AM_FileEcho(TSYNC_MODE_FILE, "2");*/
+	} else {
+		aml_set_sync_mode(has_audio, has_video, tp->afmt);
 	}
 
 	if (has_audio && !ac3_amaster) {
 		if (!show_first_frame_nosync()) {
+#ifdef ANDROID
 			property_set("sys.amplayer.drop_pcm", "1");
+#endif
 		}
 		AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
 
@@ -3801,7 +3858,9 @@ static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 	dev->ts_player.drv_data = NULL;
 
 //#ifdef ENABLE_PCR
+#ifdef ANDROID
 	property_set("sys.amplayer.drop_pcm", "0");
+#endif
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "0");
 	if (gAVPcrEnable == AM_TRUE)
 	{
@@ -3879,7 +3938,9 @@ static void* aml_av_monitor_thread(void *arg)
 
 #ifndef ENABLE_PCR
 	if (!show_first_frame_nosync()) {
+#ifdef ANDROID
 		property_set("sys.amplayer.drop_pcm", "1");
+#endif
 	}
 #else
 	av_paused  = AM_FALSE;
@@ -3982,12 +4043,13 @@ static void* aml_av_monitor_thread(void *arg)
 			frame_width = 0;
 			frame_height= 0;
 		}
-		if (AM_FileRead(AVS_PLUS_DECT_FILE, buf, sizeof(buf)) >= 0) {
-			sscanf(buf, "%d", &avs_fmt);
-		} else {
-			//AM_DEBUG(1, "cannot read \"%s\"", AVS_PLUS_DECT_FILE);
-			avs_fmt = 0;
-		}
+		// if (AM_FileRead(AVS_PLUS_DECT_FILE, buf, sizeof(buf)) >= 0) {
+		// 	sscanf(buf, "%d", &avs_fmt);
+		// } else {
+		// 	//AM_DEBUG(1, "cannot read \"%s\"", AVS_PLUS_DECT_FILE);
+		// 	avs_fmt = 0;
+		// }
+		avs_fmt = 0;
 		//AM_DEBUG(1, "avs_fmt: \"%x\"", avs_fmt);
 		if (avs_fmt == 0x148) //bit8
 			is_avs_plus = AM_TRUE;
@@ -4420,7 +4482,7 @@ static void* aml_av_monitor_thread(void *arg)
 			need_replay = AM_TRUE;
 		}
 
-		if (AM_FileRead("/sys/class/tsync_pcr/tsync_pcr_reset_flag", buf, sizeof(buf)) >= 0) {
+		if (AM_FileRead(TSYNCPCR_RESETFLAG_FILE, buf, sizeof(buf)) >= 0) {
 			int val = 0;
 			sscanf(buf, "%d", &val);
 			if (val == 1) {
@@ -4491,7 +4553,7 @@ static AM_ErrorCode_t aml_open_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 #ifdef PLAYER_API_NEW
 	AV_FilePlayerData_t *data;
 #endif
-	AV_JPEGData_t *jpeg;
+	//AV_JPEGData_t *jpeg;
 	AV_InjectData_t *inj;
 	AV_TimeshiftData_t *tshift;
 	AV_TSData_t *ts;
@@ -4542,16 +4604,16 @@ static AM_ErrorCode_t aml_open_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 			dev->file_player.drv_data = data;
 #endif
 		break;
-		case AV_GET_JPEG_INFO:
-		case AV_DECODE_JPEG:
-			jpeg = aml_create_jpeg_data();
-			if (!jpeg)
-			{
-				AM_DEBUG(1, "not enough memory");
-				return AM_AV_ERR_NO_MEM;
-			}
-			dev->vid_player.drv_data = jpeg;
-		break;
+		// case AV_GET_JPEG_INFO:
+		// case AV_DECODE_JPEG:
+		// 	jpeg = aml_create_jpeg_data();
+		// 	if (!jpeg)
+		// 	{
+		// 		AM_DEBUG(1, "not enough memory");
+		// 		return AM_AV_ERR_NO_MEM;
+		// 	}
+		// 	dev->vid_player.drv_data = jpeg;
+		// break;
 		case AV_INJECT:
 			inj = aml_create_inject_data();
 			if (!inj)
@@ -4587,13 +4649,13 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 	AV_FilePlayerData_t *data;
 	AV_FilePlayPara_t *pp;
 #endif
-	AV_JPEGData_t *jpeg;
+	// AV_JPEGData_t *jpeg;
 	AV_InjectPlayPara_t *inj_p;
 	AV_InjectData_t *inj;
 	AV_TimeShiftPlayPara_t *tshift_p;
 	AV_TimeshiftData_t *tshift;
 
-	int ctrl_fd = open("/dev/amvideo", O_RDWR);
+	int ctrl_fd = open(AMVIDEO_FILE, O_RDWR);
 	if (ctrl_fd >= 0) {
 		ioctl(ctrl_fd, AMSTREAM_IOC_SET_VSYNC_UPINT, 0);
 		close(ctrl_fd);
@@ -4673,11 +4735,11 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 			}
 #endif
 		break;
-		case AV_GET_JPEG_INFO:
-		case AV_DECODE_JPEG:
-			jpeg = dev->vid_player.drv_data;
-			return aml_decode_jpeg(jpeg, dev->vid_player.para.data, dev->vid_player.para.len, mode, para);
-		break;
+		// case AV_GET_JPEG_INFO:
+		// case AV_DECODE_JPEG:
+		// 	jpeg = dev->vid_player.drv_data;
+		// 	return aml_decode_jpeg(jpeg, dev->vid_player.para.data, dev->vid_player.para.len, mode, para);
+		// break;
 		case AV_INJECT:
 			inj_p = (AV_InjectPlayPara_t *)para;
 			inj = dev->inject_player.drv_data;
@@ -4710,7 +4772,7 @@ static AM_ErrorCode_t aml_close_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 #ifdef PLAYER_API_NEW
 	AV_FilePlayerData_t *data;
 #endif
-	AV_JPEGData_t *jpeg;
+	// AV_JPEGData_t *jpeg;
 	AV_InjectData_t *inj;
 	AV_TimeshiftData_t *tshift;
 	int fd, ret;
@@ -4743,11 +4805,11 @@ static AM_ErrorCode_t aml_close_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 			adec_cmd("stop");
 #endif
 		break;
-		case AV_GET_JPEG_INFO:
-		case AV_DECODE_JPEG:
-			jpeg = dev->vid_player.drv_data;
-			aml_destroy_jpeg_data(jpeg);
-		break;
+		// case AV_GET_JPEG_INFO:
+		// case AV_DECODE_JPEG:
+		// 	jpeg = dev->vid_player.drv_data;
+		// 	aml_destroy_jpeg_data(jpeg);
+		// break;
 		case AV_INJECT:
 			inj = dev->inject_player.drv_data;
 			aml_destroy_inject_data(inj);
@@ -4804,7 +4866,7 @@ static AM_ErrorCode_t aml_ts_source(AM_AV_Device_t *dev, AM_AV_TSSource_t src)
 		break;
 	}
 
-	return AM_FileEcho("/sys/class/stb/source", cmd);
+	return AM_FileEcho(DVB_STB_SOURCE_FILE, cmd);
 }
 
 static AM_ErrorCode_t aml_file_cmd(AM_AV_Device_t *dev, AV_PlayCmd_t cmd, void *para)
@@ -5007,73 +5069,6 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 				}
 			}
 #endif
-#endif
-		break;
-		case AV_VIDEO_PARA_RATIO:
-#ifndef 	CHIP_8226H
-			name = VID_SCREEN_MODE_FILE;
-			switch ((long)val)
-			{
-				case AM_AV_VIDEO_ASPECT_AUTO:
-					cmd = "0";
-				break;
-				case AM_AV_VIDEO_ASPECT_16_9:
-					cmd = "3";
-				break;
-				case AM_AV_VIDEO_ASPECT_4_3:
-					cmd = "2";
-				break;
-			}
-#else
-			name = VID_ASPECT_RATIO_FILE;
-			switch ((long)val)
-			{
-				case AM_AV_VIDEO_ASPECT_AUTO:
-					cmd = "auto";
-				break;
-				case AM_AV_VIDEO_ASPECT_16_9:
-					cmd = "16x9";
-				break;
-				case AM_AV_VIDEO_ASPECT_4_3:
-					cmd = "4x3";
-				break;
-			}
- #endif
-		break;
-		case AV_VIDEO_PARA_RATIO_MATCH:
-			name = VID_ASPECT_MATCH_FILE;
-#ifndef 	CHIP_8226H
-			switch ((long)val)
-			{
-				case AM_AV_VIDEO_ASPECT_MATCH_IGNORE:
-					cmd = "1";
-				break;
-				case AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX:
-					cmd = "3";
-				break;
-				case AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN:
-					cmd = "2";
-				break;
-				case AM_AV_VIDEO_ASPECT_MATCH_COMBINED:
-					cmd = "4";
-				break;
-			}
-#else
-			switch ((long)val)
-			{
-				case AM_AV_VIDEO_ASPECT_MATCH_IGNORE:
-					cmd = "ignore";
-				break;
-				case AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX:
-					cmd = "letter box";
-				break;
-				case AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN:
-					cmd = "pan scan";
-				break;
-				case AM_AV_VIDEO_ASPECT_MATCH_COMBINED:
-					cmd = "combined";
-				break;
-			}
 #endif
 		break;
 		case AV_VIDEO_PARA_MODE:
@@ -5415,7 +5410,7 @@ static AM_ErrorCode_t aml_get_vstatus(AM_AV_Device_t *dev, AM_AV_VideoStatus_t *
 	para->interlaced  = 1;
 
 #if 1
-	if (AM_FileRead("/sys/class/video/frame_format", buf, sizeof(buf)) >= 0) {
+	if (AM_FileRead(VID_FRAME_FMT_FILE, buf, sizeof(buf)) >= 0) {
 		char *ptr = strstr(buf, "interlace");
 		if (ptr) {
 			para->interlaced = 1;
@@ -5573,7 +5568,9 @@ get_osd_prop(const char *mode, const char *p, const char *defv)
 	int r;
 
 	snprintf(n, sizeof(n), "ubootenv.var.%soutput%s", mode, p);
+#ifdef ANDROID
 	property_get(n,v,defv);
+#endif
 	sscanf(v, "%d", &r);
 
 	return r;
@@ -5816,7 +5813,7 @@ aml_set_vpath(AM_AV_Device_t *dev)
 			//AM_FileEcho("/sys/class/ppmgr/ppscaler_rect","0 0 0 0 1");
 			//AM_FileEcho("/sys/class/video/axis", "0 0 0 0");
 			AM_FileEcho("/sys/module/amvideo/parameters/smooth_sync_enable", AV_SMOOTH_SYNC_VAL);
-			AM_FileEcho("/sys/module/di/parameters/bypass_all","0");
+			AM_FileEcho(DI_BYPASS_ALL_FILE,"0");
 			usleep(2000*1000);
 		}
 #endif
@@ -5913,7 +5910,9 @@ static AM_ErrorCode_t aml_switch_ts_audio_legacy(AM_AV_Device_t *dev, uint16_t a
 
 #ifdef ENABLE_PCR
 	if (!show_first_frame_nosync()) {
+#ifdef ANDROID
 		property_set("sys.amplayer.drop_pcm", "1");
+#endif
 	}
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
 	aml_set_sync_mode(audio_valid, has_video, afmt);
@@ -5989,7 +5988,9 @@ static AM_ErrorCode_t aml_switch_ts_audio_fmt(AM_AV_Device_t *dev)
 
 #ifdef ENABLE_PCR
 	if (!show_first_frame_nosync()) {
+#ifdef ANDROID
 		property_set("sys.amplayer.drop_pcm", "1");
+#endif
 	}
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
 	aml_set_sync_mode(audio_valid, has_video, afmt);

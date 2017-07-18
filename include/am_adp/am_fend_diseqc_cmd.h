@@ -25,6 +25,8 @@
 
 #include "am_types.h"
 #include "am_evt.h"
+/*add for config define for linux dvb *.h*/
+#include <am_config.h>
 #include <linux/dvb/frontend.h>
 
 #ifdef __cplusplus

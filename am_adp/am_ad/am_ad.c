@@ -28,7 +28,7 @@
  ***************************************************************************/
 #define AM_DEBUG_LEVEL 5
 #include <am_debug.h>
-
+#include <signal.h> 
 #include "string.h"
 #include "stdio.h"
 #include "stdlib.h"

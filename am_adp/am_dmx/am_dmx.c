@@ -878,7 +878,7 @@ AM_ErrorCode_t AM_DMX_GetScrambleStatus(int dev_no, AM_Bool_t dev_status[2])
 			sscanf(buf,"%d %d", &vflag, &aflag);
 			dev_status[0] = vflag ? AM_TRUE : AM_FALSE;
 			dev_status[1] = aflag ? AM_TRUE : AM_FALSE;
-			AM_DEBUG(1, "AM_DMX_GetScrambleStatus video scamble %d, audio scamble %d\n", vflag, aflag);
+			//AM_DEBUG(1, "AM_DMX_GetScrambleStatus video scamble %d, audio scamble %d\n", vflag, aflag);
 			if (memcmp(dev_status, last_dev_status, sizeof(last_dev_status))) 
 			{
 				memcpy(last_dev_status, dev_status, sizeof(last_dev_status));
@@ -887,7 +887,7 @@ AM_ErrorCode_t AM_DMX_GetScrambleStatus(int dev_no, AM_Bool_t dev_status[2])
 			else
 			{
 				repeat_count++;
-				AM_DEBUG(1, "video scramble & audio scramble keep for %d times", repeat_count);
+				//AM_DEBUG(1, "video scramble & audio scramble keep for %d times", repeat_count);
 				if (repeat_count >= 3) 
 					return AM_SUCCESS;
 			}

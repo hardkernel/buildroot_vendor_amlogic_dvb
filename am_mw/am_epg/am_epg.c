@@ -4067,7 +4067,6 @@ AM_ErrorCode_t AM_EPG_SubscribeEvent(AM_EPG_Handle_t handle, int db_evt_id)
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
-	assert(mon && mon->hdb);
 
 	sqlite3 *hdb;
 	pthread_mutex_lock(&mon->lock);
@@ -4096,8 +4095,6 @@ AM_ErrorCode_t AM_EPG_UnsubscribeEvent(AM_EPG_Handle_t handle, int db_evt_id)
 {
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-
-	assert(mon && mon->hdb);
 
 	sqlite3 *hdb;
 	pthread_mutex_lock(&mon->lock);

@@ -36,7 +36,7 @@ endif
 MAKE=make --no-print-directory
 MKDIR=mkdir -p
 
-CFLAGS+=-Wall -I$(ROOTDIR)/include/am_adp -I$(ROOTDIR)/include/am_mw -I$(ROOTDIR)/include/am_app
+CFLAGS+=-Wall -I$(ROOTDIR)/include/am_adp -I$(ROOTDIR)/include/am_mw -I$(ROOTDIR)/include/am_app -I$(ROOTDIR)/include/am_ver
 
 include $(ROOTDIR)/rule/def_$(ARCH).mk
 -include $(ROOTDIR)/rule/def_$(TARGET).mk

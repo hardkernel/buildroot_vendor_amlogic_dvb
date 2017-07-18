@@ -16,13 +16,14 @@ else
 		LGL:=
 		LUI:=
 	endif
-	LDFLAGS+=-liconv -lsqlite -licui18n -lamplayer
+	LDFLAGS+= -lsqlite -licui18n -lamplayer
+#-liconv
 endif
 
 
 ifneq ($(LIBICONV),n)
 ifneq ($(TARGET),android)
-	LDFLAGS+=-liconv
+	#LDFLAGS+=-liconv
 endif
 endif
 

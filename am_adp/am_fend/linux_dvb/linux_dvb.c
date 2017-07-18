@@ -36,6 +36,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+/*add for config define for linux dvb *.h*/
+#include <am_config.h>
 #include <linux/dvb/frontend.h>
 #include <sys/ioctl.h>
 #include <poll.h>
@@ -148,11 +150,70 @@ static AM_ErrorCode_t dvb_set_mode (AM_FEND_Device_t *dev, int mode)
 {
 	int fd = (long)dev->drv_data;
 	int ret;
-
+	int fe_mode = SYS_UNDEFINED;
 	if(mode < 0)
 		return AM_SUCCESS;
 
-	ret = ioctl(fd, FE_SET_MODE, mode);
+/*
+	SYS_UNDEFINED,
+	SYS_DVBC_ANNEX_A,
+	SYS_DVBC_ANNEX_B,
+	SYS_DVBT,
+	SYS_DSS,
+	SYS_DVBS,
+	SYS_DVBS2,
+	SYS_DVBH,
+	SYS_ISDBT,
+	SYS_ISDBS,
+	SYS_ISDBC,
+	SYS_ATSC,
+	SYS_ATSCMH,
+	SYS_DTMB,
+	SYS_CMMB,
+	SYS_DAB,
+	SYS_DVBT2,
+	SYS_TURBO,
+	SYS_DVBC_ANNEX_C,
+	SYS_ANALOG
+ */
+
+	switch(mode)
+	{
+		case FE_QPSK:
+			{
+				/* process sec */
+				fe_mode = SYS_DVBS;
+				break;
+			}
+		case FE_QAM:
+			fe_mode = SYS_DVBC_ANNEX_A;
+			break;
+		case FE_OFDM:
+			fe_mode = SYS_DVBT;
+			break;
+		case FE_ATSC:
+			fe_mode = SYS_ATSC;
+			break;
+		case FE_ANALOG:
+			fe_mode = SYS_ANALOG;
+			break;	
+		case FE_DTMB:
+			fe_mode = SYS_DTMB;
+			break;
+		case FE_ISDBT:
+			fe_mode = SYS_ISDBT;
+			break;
+		default:
+			break;
+	}
+
+	struct dtv_property p = {.cmd = DTV_DELIVERY_SYSTEM, .u.data = fe_mode};
+	struct dtv_properties props = {.num = 1, .props = &p};
+
+	printf("dvb_set_mode:%d\n", props.props[0].u.data);
+
+	ret = dvb_set_prop(dev, &props);
+
 	if(ret != 0){
 		AM_DEBUG(1, "set mode %d failed (%d)\n", mode, errno);
 		return AM_FEND_ERR_NOT_SUPPORTED;
@@ -179,12 +240,18 @@ static AM_ErrorCode_t dvb_get_ts (AM_FEND_Device_t *dev, AM_DMX_Source_t *src)
 	int fd = (long)dev->drv_data;
 	int ret;
 
-	ret = ioctl(fd, FE_READ_TS, src);
+	struct dtv_property p = {.cmd = DTV_TS_INPUT, .u.data = 0};
+	struct dtv_properties props = {.num = 1, .props = &p};
+
+	printf("dvb_get_ts:%d\n", props.props[0].u.data);
+
+	ret = dvb_get_prop(dev, &props);
+
 	if(ret != 0){
 		AM_DEBUG(1, "get ts failed (%d)\n", errno);
 		return AM_FEND_ERR_NOT_SUPPORTED;
 	}
-
+	*src = (AM_DMX_Source_t)p.u.data;
 	return AM_SUCCESS;
 }
 
@@ -438,6 +505,8 @@ static AM_ErrorCode_t dvb_close (AM_FEND_Device_t *dev)
 
 static AM_ErrorCode_t dvbsx_blindscan_scan(AM_FEND_Device_t *dev, struct dvbsx_blindscanpara *pbspara)
 {
+	int ret =AM_SUCCESS;
+	#if 0
 	int fd = (long)dev->drv_data;
 	
 	if(ioctl(fd, FE_SET_BLINDSCAN, pbspara)==-1)
@@ -445,12 +514,61 @@ static AM_ErrorCode_t dvbsx_blindscan_scan(AM_FEND_Device_t *dev, struct dvbsx_b
 		AM_DEBUG(1, "ioctl dvbsx_blindscan_scan failed, error:%s", strerror(errno));
 		return AM_FAILURE;
 	}
+	#else
+	/*set propty*/
+	struct dtv_properties prop;
+	struct dtv_property *property = NULL;
+	int num = 8;
 
-	return AM_SUCCESS;	
+	property = malloc(num * sizeof(struct dtv_property));
+
+	prop.num = num;
+	prop.props = property;
+	/*set min fre*/
+	(property+0)->cmd = DTV_BLIND_SCAN_MIN_FRE;
+	(property+0)->u.data = pbspara->minfrequency;
+	/*set max fre*/
+	(property+1)->cmd = DTV_BLIND_SCAN_MAX_FRE;
+	(property+1)->u.data = pbspara->maxfrequency;
+
+	/*set min rate*/
+	(property+2)->cmd = DTV_BLIND_SCAN_MIN_SRATE;
+	(property+2)->u.data = pbspara->minSymbolRate;
+
+	/*set max rate*/
+	(property+3)->cmd = DTV_BLIND_SCAN_MAX_SRATE;
+	(property+3)->u.data = pbspara->maxSymbolRate;
+	/*set fre range*/
+	(property+4)->cmd = DTV_BLIND_SCAN_FRE_RANGE;
+	(property+4)->u.data = pbspara->frequencyRange;
+	/*set fre step*/
+	(property+5)->cmd = DTV_BLIND_SCAN_FRE_STEP;
+	(property+5)->u.data = pbspara->frequencyStep;
+	/*set time out*/
+	(property+6)->cmd = DTV_BLIND_SCAN_TIMEOUT;
+	(property+6)->u.data = pbspara->timeout;
+	/*set start blind scan*/
+	(property+7)->cmd = DTV_START_BLIND_SCAN;
+	(property+7)->u.data = 0;
+	for (num = 0; num < 8; num++) {
+		AM_DEBUG(1, "set start blind num[%d] cmd[%d]data[%d]\r\n", num, (property+num)->cmd, (property+num)->u.data);
+	}
+	ret = dvb_set_prop(dev, &prop);
+	if (ret != AM_SUCCESS) {
+		AM_DEBUG(1, "set start blind cmd error\n");
+	}
+	if (property != NULL) {
+		free(property);
+		property = NULL;	
+	}
+	#endif
+	return ret;	
 }
 
 static AM_ErrorCode_t dvbsx_blindscan_getscanevent(AM_FEND_Device_t *dev, struct dvbsx_blindscanevent *pbsevent)
 {
+	int ret = AM_SUCCESS;
+	#if 0
 	int fd = (long)dev->drv_data;	
 	
 	if(ioctl(fd, FE_GET_BLINDSCANEVENT, pbsevent)!=0)
@@ -458,12 +576,29 @@ static AM_ErrorCode_t dvbsx_blindscan_getscanevent(AM_FEND_Device_t *dev, struct
 		AM_DEBUG(1, "ioctl FE_GET_BLINDSCANEVENT failed, error:%s", strerror(errno));
 		return AM_FAILURE;
 	}
+	#else
 
-	return AM_SUCCESS;	
+	struct dvb_frontend_event event;
+	ret = dvb_wait_event(dev, &event, 200);
+	if (event.status&BLINDSCAN_UPDATESTARTFREQ) {
+		pbsevent->status = BLINDSCAN_UPDATESTARTFREQ;
+		pbsevent->u.m_uistartfreq_khz = event.parameters.frequency;
+	} else if (event.status&BLINDSCAN_UPDATEPROCESS) {
+		pbsevent->status = BLINDSCAN_UPDATEPROCESS;
+		pbsevent->u.m_uiprogress = event.parameters.frequency;	
+	} else if (BLINDSCAN_UPDATERESULTFREQ) {
+		pbsevent->status = BLINDSCAN_UPDATERESULTFREQ;
+	    memcpy(&(pbsevent->u.parameters),
+				&(event.parameters), sizeof(struct dvb_frontend_parameters));	
+	}
+	#endif
+	return ret;	
 }
 
 static AM_ErrorCode_t dvbsx_blindscan_cancel(AM_FEND_Device_t *dev)
 {
+	int ret = AM_SUCCESS;
+	#if 0
 	int fd = (long)dev->drv_data;
 	
 	if(ioctl(fd, FE_SET_BLINDSCANCANCEl)==-1)
@@ -471,8 +606,24 @@ static AM_ErrorCode_t dvbsx_blindscan_cancel(AM_FEND_Device_t *dev)
 		AM_DEBUG(1, "ioctl FE_SET_BLINDSCANCANCEl failed, error:%s", strerror(errno));
 		return AM_FAILURE;
 	}
+	#else
 
-	return AM_SUCCESS;	
+	struct dtv_properties prop;
+	struct dtv_property property;
+
+	prop.num = 1;
+	prop.props = &property;
+	/*set min fre*/
+	memset(&property, 0, sizeof(property));
+	property.cmd = DTV_CANCEL_BLIND_SCAN;
+	property.u.data = 0;
+
+	ret = dvb_set_prop(dev, &prop);
+	if (ret != AM_SUCCESS) {
+		AM_DEBUG(1, "set cancel blind scan error\n");
+	}
+	#endif
+	return ret;	
 }
 
 static AM_ErrorCode_t dvb_fine_tune(AM_FEND_Device_t *dev, unsigned int freq)

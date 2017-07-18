@@ -29,6 +29,7 @@
 
 #define MAX_DISEQC_LENGTH  16
 
+static int ofdm_mode = 0;
 static unsigned int blindscan_process = 0;
 
 #define scanf(a...) \
@@ -621,11 +622,13 @@ static int lock_fend(int id, int mode)
 
 		if(mode==1) {
 			printf("T2?[0/1]: ");
-			scanf("%d", &p.u.ofdm.ofdm_mode);
-		} else if(mode == 5)
+			scanf("%d", &ofdm_mode);
+			
+		} else if(mode == 5) {
 			printf("set to T2\n");
-			p.u.ofdm.ofdm_mode = OFDM_DVBT2;
-		
+			ofdm_mode = OFDM_DVBT2;
+		}
+			
 		p.frequency = freq;
 		switch(bw)
 		{
@@ -728,6 +731,19 @@ static int lock_fend(int id, int mode)
 	} else
 #else
 	{
+		/*add set sub sys*/
+		if (mode == 1 || mode == 5) {
+			struct dtv_properties prop;
+			struct dtv_property property;
+
+			prop.num = 1;
+			prop.props = &property;
+			memset(&property, 0, sizeof(property));
+			property.cmd = DTV_DELIVERY_SUB_SYSTEM;
+			property.u.data = ofdm_mode;
+			AM_FEND_SetProp(id, &prop);
+			
+		}
 		AM_TRY(AM_FEND_Lock(id, &p, &status));
 		printf("lock status: 0x%x\n", status);
 	}

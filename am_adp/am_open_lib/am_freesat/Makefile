@@ -1,4 +1,4 @@
-BASE=../..
+BASE=../../..
 
 include $(BASE)/rule/def.mk
 

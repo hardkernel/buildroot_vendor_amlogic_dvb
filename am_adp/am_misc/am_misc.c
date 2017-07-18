@@ -66,6 +66,7 @@ static int AM_SYSTEMCONTROL_INIT=0;
  */
 static AM_ErrorCode_t am_init_syscontrol_api()
 {
+#ifdef ANDROID
 	if(AM_SYSTEMCONTROL_INIT==0)
 	{
 		void* handle = NULL;
@@ -96,6 +97,7 @@ static AM_ErrorCode_t am_init_syscontrol_api()
 			AM_DEBUG(1, "cannot get read sysfs api\r\n");
 		}
 	}
+#endif
 	return AM_SUCCESS;
 }
 

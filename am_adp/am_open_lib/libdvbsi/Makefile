@@ -2,7 +2,7 @@ BASE=../../..
 
 include $(BASE)/rule/def.mk
 
-CFLAGS+=-I$(ROOTDIR)/include/am_mw/libdvbsi
+CFLAGS+=-I$(ROOTDIR)/include/am_adp/libdvbsi
 
 SUBDIRS=descriptors tables
 

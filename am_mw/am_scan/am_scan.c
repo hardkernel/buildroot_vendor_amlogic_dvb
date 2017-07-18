@@ -165,7 +165,7 @@
 #define dvb_fend_para(_p)	((struct dvb_frontend_parameters*)(&_p))
 
 #define IS_DVBT2_TS(_para) (_para.m_type==FE_OFDM && \
-	_para.terrestrial.para.u.ofdm.ofdm_mode == OFDM_DVBT2)
+	_para.terrestrial.ofdm_mode == OFDM_DVBT2)
 #define IS_ISDBT_TS(_para) (_para.m_type==FE_ISDBT)
 #define IS_DVBT2() IS_DVBT2_TS(scanner->start_freqs[scanner->curr_freq].fe_para)
 #define IS_ISDBT() IS_ISDBT_TS(scanner->start_freqs[scanner->curr_freq].fe_para)
@@ -936,7 +936,7 @@ static void am_scan_update_ts_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *resul
 	if (ts->type!=AM_SCAN_TS_ANALOG)
 	{
 		if (IS_DVBT2_TS(ts->digital.fend_para))
-			dvbt_flag = (int)dvb_fend_para(ts->digital.fend_para)->u.ofdm.ofdm_mode;
+			dvbt_flag = (int)ts->digital.fend_para.terrestrial.ofdm_mode;
 		else if (IS_ISDBT_TS(ts->digital.fend_para))
 			dvbt_flag = (result->start_para->dtv_para.mode&AM_SCAN_DTVMODE_ISDBT_ONESEG) ? Layer_A : Layer_A_B_C;
 	}
@@ -4270,7 +4270,7 @@ static AM_ErrorCode_t am_scan_dvbt2_start_next_data_plp(AM_SCAN_Scanner_t *scann
 			{
 				scanner->start_freqs[scanner->curr_freq].
 					fe_para.terrestrial.
-					para.u.ofdm.ofdm_mode = OFDM_DVBT;
+					ofdm_mode = OFDM_DVBT;
 
 				AM_DEBUG(1, "No DVBT2 plp data found, try DVBT...");
 				return am_scan_start_current_ts(scanner);
@@ -5097,7 +5097,7 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 			AM_DEBUG(1, "Can not lock DVBT2, try DVBT...");
 			scanner->start_freqs[scanner->curr_freq].
 				fe_para.terrestrial.
-				para.u.ofdm.ofdm_mode = OFDM_DVBT;
+				ofdm_mode = OFDM_DVBT;
 			am_scan_start_current_ts(scanner);
 			return;
 		}

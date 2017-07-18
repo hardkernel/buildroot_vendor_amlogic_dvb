@@ -28,19 +28,21 @@
 #include "am_types.h"
 #include "am_evt.h"
 #include "am_dmx.h"
+/*add for config define for linux dvb *.h*/
+#include <am_config.h>
 #include <linux/dvb/frontend.h>
 
-#ifdef FE_SET_FRONTEND
-#undef FE_SET_FRONTEND
-#define FE_SET_FRONTEND FE_SET_FRONTEND_EX
-#endif
+// #ifdef FE_SET_FRONTEND
+// #undef FE_SET_FRONTEND
+// #define FE_SET_FRONTEND FE_SET_FRONTEND_EX
+// #endif
 
-#ifdef FE_GET_FRONTEND
-#undef FE_GET_FRONTEND
-#define FE_GET_FRONTEND FE_GET_FRONTEND_EX
-#endif
+// #ifdef FE_GET_FRONTEND
+// #undef FE_GET_FRONTEND
+// #define FE_GET_FRONTEND FE_GET_FRONTEND_EX
+// #endif
 
-#define dvb_frontend_parameters dvb_frontend_parameters_ex
+//#define dvb_frontend_parameters dvb_frontend_parameters_ex
 
 #ifdef __cplusplus
 extern "C"
@@ -433,6 +435,26 @@ AM_ErrorCode_t AM_FEND_GetAtvStatus(int dev_no,  atv_status_t *atv_status);
  *   - or error code
  */
 AM_ErrorCode_t AM_FEND_SetAfc(int dev_no, unsigned int afc);
+
+
+/**\brief try to set sub sys
+ *\param dev_no frontend device number
+ *\param sub_sys fend type,T or T2,C-A C-B OR C-A
+ * \return
+ *   - AM_SUCCESS On success
+ *   - or error code
+ */
+AM_ErrorCode_t AM_FEND_SetSubSystem(int dev_no, unsigned int sub_sys);
+
+
+/**\brief try to get sub sys
+ *\param dev_no frontend device number
+ *\param sub_sys fend type,use to indentify T or T2,C-A C-B OR C-C
+ * \return
+ *   - AM_SUCCESS On success
+ *   - or error code
+ */
+AM_ErrorCode_t AM_FEND_GetSubSystem(int dev_no, unsigned int *sub_sys);
 
 #ifdef __cplusplus
 }

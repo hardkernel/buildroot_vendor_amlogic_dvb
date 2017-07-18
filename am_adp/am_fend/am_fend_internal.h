@@ -25,7 +25,9 @@
 
 #include <am_fend.h>
 #include <am_thread.h>
-
+/*add for config define for linux dvb *.h*/
+#include <am_config.h>
+#include <linux/dvb/frontend.h>
 #ifdef __cplusplus
 extern "C"
 {

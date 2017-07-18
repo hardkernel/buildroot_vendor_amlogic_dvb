@@ -37,6 +37,8 @@
 #include <string.h>
 #include <errno.h>
 #include <poll.h>
+/*add for config define for linux dvb *.h*/
+#include <am_config.h>
 #include <linux/dvb/dmx.h>
 #include <am_misc.h>
 

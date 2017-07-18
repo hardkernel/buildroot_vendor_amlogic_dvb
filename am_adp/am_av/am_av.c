@@ -1164,8 +1164,6 @@ AM_ErrorCode_t AM_AV_SetDRMMode(int dev_no, int enable)
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_AV_ERR_SYS;
 
-	assert(para);
-
 	AM_TRY(av_get_openned_dev(dev_no, &dev));
 
 	pthread_mutex_lock(&dev->lock);

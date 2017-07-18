@@ -160,7 +160,12 @@ static void* fend_thread(void *arg)
 	
 	while(dev->enable_thread)
 	{
-		
+		/*when blind scan is start, we need stop fend thread read event*/
+		if (dev->enable_blindscan_thread) {
+			usleep(100 * 1000);
+			continue;
+		}
+
 		if(dev->drv->wait_event)
 		{
 			ret = dev->drv->wait_event(dev, &evt, FEND_WAIT_TIMEOUT);
@@ -1695,6 +1700,25 @@ AM_ErrorCode_t AM_FEND_SetAfc(int dev_no, unsigned int afc)
 
 	pthread_mutex_unlock(&dev->lock);
 
+	return ret;
+}
+
+AM_ErrorCode_t AM_FEND_SetSubSystem(int dev_no, unsigned int sub_sys)
+{
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	struct dtv_property p = {.cmd = DTV_DELIVERY_SUB_SYSTEM, .u.data = sub_sys};
+	struct dtv_properties props = {.num = 1, .props = &p};
+	ret = AM_FEND_SetProp(dev_no, &props);
+	return ret;
+}
+
+AM_ErrorCode_t AM_FEND_GetSubSystem(int dev_no, unsigned int *sub_sys)
+{
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	struct dtv_property p = {.cmd = DTV_DELIVERY_SUB_SYSTEM, .u.data = sub_sys};
+	struct dtv_properties props = {.num = 1, .props = &p};
+	ret = AM_FEND_GetProp(dev_no, &props);
+	sub_sys = p.u.data;
 	return ret;
 }
 

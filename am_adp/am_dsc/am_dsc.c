@@ -23,6 +23,7 @@
  * \date 2010-08-06: create the document
  ***************************************************************************/
 
+#define AM_DEBUG_LEVEL 5
 #include <stdio.h>
 #include <string.h>
 #include <am_debug.h>
@@ -176,7 +177,7 @@ static AM_ErrorCode_t dsc_init_dev_db( int *dev_num )
 		return AM_SUCCESS;
 	}
 
-	if (AM_FileRead("/sys/module/aml/parameters/dsc_max", buf, sizeof(buf)) >= 0)
+	if(AM_FileRead("/sys/module/aml_dmx/parameters/dsc_max", buf, sizeof(buf)) >= 0)
 		sscanf(buf, "%d", &num);
 	else
 		num = 1;

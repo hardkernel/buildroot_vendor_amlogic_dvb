@@ -38,20 +38,10 @@
 #include <string.h>
 #include <errno.h>
 #include <poll.h>
+/*add for config define for linux dvb *.h*/
+#include <am_config.h>
 #include <linux/dvb/dmx.h>
 
-#define open(a...)\
-	({\
-	 int ret, times=3;\
-	 do{\
-	 	ret = open(a);\
-	 	if(ret==-1)\
-	 	{\
-	 		usleep(100*1000);\
-	 	}\
-	 }while(ret==-1 && times--);\
-	 ret;\
-	 })
 
 /****************************************************************************
  * Type definitions

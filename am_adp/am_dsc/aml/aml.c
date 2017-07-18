@@ -36,13 +36,16 @@
 #include <amdsc.h>
 #include <string.h>
 #include <errno.h>
+/*add for config define for linux dvb *.h*/
+#include <am_config.h>
+#include <linux/dvb/ca.h>
 #include "am_misc.h"
 
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
 
-#define DEV_NAME "/dev/dvb0.dsc"
+#define DEV_NAME "/dev/dvb0.ca"
 
 /****************************************************************************
  * Static data
@@ -73,50 +76,63 @@ AM_DSC_Driver_t aml_dsc_drv =
 
 static AM_ErrorCode_t aml_open (AM_DSC_Device_t *dev, const AM_DSC_OpenPara_t *para)
 {
-	UNUSED(dev);
-	UNUSED(para);
-	return AM_SUCCESS;
-}
-
-static AM_ErrorCode_t aml_alloc_chan (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan)
-{
 	int fd;
 	char buf[32];
 
 	snprintf(buf, sizeof(buf), DEV_NAME"%d", dev->dev_no);
 	fd = open(buf, O_RDWR);
+
 	if(fd==-1)
 	{
 		AM_DEBUG(1, "cannot open \"%s\" (%d:%s)", DEV_NAME, errno, strerror(errno));
 		return AM_DSC_ERR_CANNOT_OPEN_DEV;
 	}
-	else
-	{
-		AM_DEBUG(2, "open DSC %d", chan->id);
-	}
-	
-	chan->drv_data = (void*)(long)fd;
+	dev->drv_data = (void*)(long)fd;
 	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t aml_alloc_chan (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan)
+{
+	// int fd;
+	// int ret = 0;
+	// ca_pid_t pi;
+
+	// fd = (long)dev->drv_data;
+	// pi.index = chan->id;
+	// pi.pid = chan->pid;
+
+	// ret = ioctl(fd, CA_SET_PID, &pi);
+	// if(ret == 0)
+		return AM_SUCCESS;
 }
 
 static AM_ErrorCode_t aml_free_chan (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan)
 {
-	int fd = (long)chan->drv_data;
+	int fd;
+	int ret = 0;
+	ca_pid_t pi;
 
-	UNUSED(dev);
-
-	AM_DEBUG(2, "close DSC %d", chan->id);
-	close(fd);
-	return AM_SUCCESS;
+	fd = (long)dev->drv_data;
+	// pi.index = chan->id;
+	// pi.pid = 0x1fff;
+	/*index == -1 pid is chan set pid ,will free chan*/
+	pi.index = -1;
+	pi.pid = chan->pid;
+	ret = ioctl(fd, CA_SET_PID, &pi);
+	if(ret == 0)
+		return AM_SUCCESS;
+	else
+		return AM_FAILURE;
 }
 
 static AM_ErrorCode_t aml_set_pid (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan, uint16_t pid)
 {
-	int fd = (long)chan->drv_data;
+	ca_pid_t pi;
+	int fd = (long)dev->drv_data;
 
-	UNUSED(dev);	
-
-	if(ioctl(fd, AMDSC_IOC_SET_PID, pid)==-1)
+	pi.pid = pid;
+	pi.index = chan->id;
+	if(ioctl(fd, CA_SET_PID, &pi)==-1)
 	{
 		AM_DEBUG(1, "set pid failed \"%s\"", strerror(errno));
 		return AM_DSC_ERR_SYS;
@@ -125,31 +141,57 @@ static AM_ErrorCode_t aml_set_pid (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan,
 	{
 		AM_DEBUG(2, "SET DSC %d PID %d", chan->id, pid);
 	}
-	
+
 	return AM_SUCCESS;
 }
 
-static AM_ErrorCode_t aml_set_key (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan, AM_DSC_KeyType_t type, const uint8_t *key)
+static AM_ErrorCode_t aml_set_key (
+	AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan, AM_DSC_KeyType_t type, const uint8_t *key)
 {
+	int key_len, fd;
+	unsigned int alg_type, kl_flag;
+	/* For dvbcsa use */
 	struct am_dsc_key dkey;
-	int fd = (long)chan->drv_data;
+	struct ca_descr_ex aes_param;
+	/* For aes use */
+	ca_descr_t dvbcsa_param;
 
-	UNUSED(dev);
+	fd = (long)dev->drv_data;
+	alg_type = type &(~AM_DSC_KEY_FROM_KL);
+	kl_flag = type & AM_DSC_KEY_FROM_KL;
 
-	dkey.type = type;
-	memcpy(dkey.key, key, sizeof(dkey.key));
-	
-	if(ioctl(fd, AMDSC_IOC_SET_KEY, &dkey)==-1)
+	/* DVBCSA */
+	if(alg_type == AM_DSC_KEY_TYPE_ODD || alg_type == AM_DSC_KEY_TYPE_EVEN)
 	{
-		AM_DEBUG(1, "set key failed \"%s\"", strerror(errno));
-		return AM_DSC_ERR_SYS;
+		dvbcsa_param.parity = (type == AM_DSC_KEY_TYPE_ODD) ? 1 : 0;
+		dvbcsa_param.index = chan->id;
+		memcpy(dvbcsa_param.cw, key, 8);
+		if(ioctl(fd, CA_SET_DESCR, &dvbcsa_param)==-1)
+			goto ERR;
+		else
+			goto SUCCESS;
+	}
+	else if(alg_type < AM_DSC_KEY_FROM_KL)/* AES */
+	{
+		aes_param.index = chan->id;
+		aes_param.flags = (kl_flag) ? CA_CW_FROM_KL : 0;
+		/* Need to ensure type in am_dsc.h equal to the one in ca.h */
+		aes_param.type = alg_type; 
+		memcpy(aes_param.cw, key, 16);
+		if(ioctl(fd, CA_SET_DESCR_EX, &dvbcsa_param)==-1)
+			goto ERR;
+		else
+			goto SUCCESS;
 	}
 	else
-	{
-		AM_DEBUG(2, "SET DSC %d KEY %d, %02x %02x %02x %02x %02x %02x %02x %02x", chan->id, type, key[0], key[1], key[2], key[3],
-				key[4], key[5], key[6], key[7]);
-	}
-	
+		goto ERR;
+
+ERR:
+	AM_DEBUG(1, "set key failed \"%s\"", strerror(errno));
+	return AM_DSC_ERR_SYS;
+SUCCESS:
+	AM_DEBUG(2, "SET DSC %d KEY %d, %02x %02x %02x %02x %02x %02x %02x %02x", 
+		chan->id, type, key[0], key[1], key[2], key[3], key[4], key[5], key[6], key[7]);
 	return AM_SUCCESS;
 }
 
@@ -177,7 +219,7 @@ static AM_ErrorCode_t aml_set_source (AM_DSC_Device_t *dev, AM_DSC_Source_t src)
 			return AM_DSC_ERR_NOT_SUPPORTED;
 		break;
 	}
-	
+
 	snprintf(buf, sizeof(buf), "/sys/class/stb/dsc%d_source", dev->dev_no);
 	return AM_FileEcho(buf, cmd);
 }

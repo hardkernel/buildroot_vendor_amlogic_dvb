@@ -324,8 +324,8 @@ static int normal_cmd(const char *cmd)
 
 		if(vpid>0 || apid>0) {
 			int ret;
-			unsigned char key[8] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
-
+			//unsigned char key[8] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
+			unsigned char key[8] = {0x12, 0x34, 0x56, 0x78, 0x90, 0xab, 0xcd, 0xef};
 			ret = AM_DSC_Open(dev, &dsc_para);
 			ret = AM_DSC_SetSource(dev, AM_DSC_SRC_DMX1);
 			printf("keys(Default/key[format-HH HH HH HH HH HH HH HH]):");

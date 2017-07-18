@@ -51,6 +51,8 @@
 /**\brief 定时录像即将开始时，提前通知用户的间隔*/
 #define REC_NOTIFY_RECORD_TIME	(60 * 1000)
 
+#define DVB_STB_ASYNCFIFO_FLUSHSIZE_FILE "/sys/class/stb/asyncfifo0_flush_size"
+
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
@@ -575,7 +577,8 @@ static int am_rec_start_record(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start_p
 
 		char buf[64];
 		snprintf(buf, sizeof(buf), "%d", 32*1024);
-		AM_FileEcho("/sys/class/stb/asyncfifo0_flush_size", buf);
+
+		AM_FileEcho(DVB_STB_ASYNCFIFO_FLUSHSIZE_FILE, buf);
 
 		am_rec_insert_file_header(rec);
 		am_rec_insert_pat(rec);

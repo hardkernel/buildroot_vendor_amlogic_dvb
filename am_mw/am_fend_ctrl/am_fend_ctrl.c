@@ -77,7 +77,11 @@ AM_ErrorCode_t AM_FENDCTRL_SetPara(int dev_no, const AM_FENDCTRL_DVBFrontendPara
 			ret = AM_FEND_SetPara(dev_no, &(para->cable.para));
 			break;
 		case FE_OFDM:
-			ret = AM_FEND_SetPara(dev_no, &(para->terrestrial.para));
+			{
+				/*add set ofdm_mode api*/
+				ret = AM_FEND_SetSubSystem(dev_no, para->terrestrial.ofdm_mode);
+				ret = AM_FEND_SetPara(dev_no, &(para->terrestrial.para));
+			}
 			break;
 		case FE_ATSC:
 			ret = AM_FEND_SetPara(dev_no, &(para->atsc.para));
@@ -130,7 +134,11 @@ AM_ErrorCode_t AM_FENDCTRL_Lock(int dev_no, const AM_FENDCTRL_DVBFrontendParamet
 			AM_FEND_Lock(dev_no, &(para->cable.para), status);
 			break;
 		case FE_OFDM:
-			AM_FEND_Lock(dev_no, &(para->terrestrial.para), status);
+			{
+				/*add set ofdm_mode api*/
+				AM_FEND_SetSubSystem(dev_no, para->terrestrial.ofdm_mode);
+				AM_FEND_Lock(dev_no, &(para->terrestrial.para), status);
+			}
 			break;
 		case FE_ATSC:
 			AM_FEND_Lock(dev_no, &(para->atsc.para), status);

@@ -1,6 +1,6 @@
 #ifndef MESON_AM_KL
 #define MESON_AM_KL
-
+#include <linux/types.h>
 #define MESON_KL_DEV "/dev/keyladder"
 #define MESON_KL_NUM 0
 #define MESON_KL_LEVEL 3
