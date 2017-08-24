@@ -1,0 +1,1 @@
+export OUTPUT=`pwd`/../../../output/mesongxl_p230_kernel49
