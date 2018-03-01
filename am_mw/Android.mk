@@ -35,13 +35,15 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_caman/am_caman.c \
 		   am_caman/ca_dummy.c \
 		   am_cc/am_cc.c \
+		   am_cc/cc_json.c \
 		   am_upd/am_upd.c \
                    am_closecaption/am_cc.c \
                    am_closecaption/am_cc_decoder.c \
                    am_closecaption/am_xds.c \
                    am_closecaption/am_cc_slice.c \
                    am_closecaption/am_vbi/linux_vbi/linux_vbi.c \
-                   am_closecaption/am_vbi/am_vbi_api.c
+                   am_closecaption/am_vbi/am_vbi_api.c \
+                   am_check_scramb/am_check_scramb.c
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1 #
 ifeq ($(AMLOGIC_LIBPLAYER), y)
@@ -105,7 +107,8 @@ LOCAL_SRC_FILES := am_db/am_db.c\
                    am_closecaption/am_xds.c \
                    am_closecaption/am_cc_slice.c \
                    am_closecaption/am_vbi/linux_vbi/linux_vbi.c \
-                   am_closecaption/am_vbi/am_vbi_api.c
+                   am_closecaption/am_vbi/am_vbi_api.c \
+                   am_check_scramb/am_check_scramb.c
 
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1 #

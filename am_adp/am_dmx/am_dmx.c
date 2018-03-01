@@ -232,13 +232,13 @@ static void* dmx_data_thread(void *arg)
 				if(cb)
 				{
 					if(id && sec)
-					AM_DEBUG(2, "filter %d data callback len fd:%ld len:%d, %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
+					AM_DEBUG(5, "filter %d data callback len fd:%ld len:%d, %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
 						id, (long)filter->drv_data, sec_len,
 						sec[0], sec[1], sec[2], sec[3], sec[4],
 						sec[5], sec[6], sec[7], sec[8], sec[9]);
 					cb(dev->dev_no, id, sec, sec_len, data);
 					if(id && sec)
-					AM_DEBUG(2, "filter %d data callback ok", id);
+					AM_DEBUG(5, "filter %d data callback ok", id);
 				}
 			}
 #if defined(DMX_WAIT_CB) || defined(DMX_SYNC)
@@ -481,8 +481,6 @@ AM_ErrorCode_t AM_DMX_AllocateFilter(int dev_no, int *fhandle)
 	{
 		dev->filters[fid].used = AM_TRUE;
 		*fhandle = fid;
-		
-		AM_DEBUG(2, "allocate filter %d", fid);
 	}
 	
 	pthread_mutex_unlock(&dev->lock);
@@ -527,7 +525,7 @@ AM_ErrorCode_t AM_DMX_SetSecFilter(int dev_no, int fhandle, const struct dmx_sct
 	if(ret==AM_SUCCESS)
 	{
 		ret = dev->drv->set_sec_filter(dev, filter, params);
-		AM_DEBUG(2, "set sec filter %d PID: %d filter: %02x:%02x %02x:%02x %02x:%02x %02x:%02x %02x:%02x %02x:%02x %02x:%02x %02x:%02x",
+		AM_DEBUG(5, "set sec filter %d PID: %d filter: %02x:%02x %02x:%02x %02x:%02x %02x:%02x %02x:%02x %02x:%02x %02x:%02x %02x:%02x",
 				fhandle, params->pid,
 				params->filter.filter[0], params->filter.mask[0],
 				params->filter.filter[1], params->filter.mask[1],
@@ -612,7 +610,6 @@ AM_ErrorCode_t AM_DMX_FreeFilter(int dev_no, int fhandle)
 	{
 		dmx_wait_cb(dev);
 		ret = dmx_free_filter(dev, filter);
-		AM_DEBUG(2, "free filter %d", fhandle);
 	}
 	
 	pthread_mutex_unlock(&dev->lock);

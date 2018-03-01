@@ -13,6 +13,7 @@
 #include "am_si.h"
 #include "am_debug.h"
 #include "am_upd.h"
+#include "am_cond.h"
 
 
 /*list util -----------------------------------------------------------*/

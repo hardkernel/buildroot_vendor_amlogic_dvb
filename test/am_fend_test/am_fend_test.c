@@ -64,7 +64,11 @@ static void fend_cb(int dev_no, struct dvb_frontend_event *evt, void *user_data)
 		struct dvb_frontend_parameters para;
 		AM_FEND_GetPara(dev_no, &para);
 		printf("cb parameters: std:%#X\n", para.u.analog.std);
-	} else {
+	} else if(info.type == FE_ATSC) {
+		printf("cb parameters: freq:%d modulation:%d\n",
+			evt->parameters.frequency,
+			evt->parameters.u.vsb.modulation);
+	}else {
 		printf("cb parameters: * can not get fe type! *\n");
 	}
 	printf("cb status: 0x%x\n", evt->status);
@@ -502,8 +506,8 @@ static int open_fend(int *id, int *mode)
 	if(*id<0)
 		return -2;
 
-	printf("Input fontend mode: (0-DVBC, 1-DVBT, 2-DVBS, 3-ISDBT, 4-DTMB, 5-DVBT2, 6-ANALOG)\n");
-	printf("mode(0/1/2/3/4/5/6): ");
+	printf("Input fontend mode: (0-DVBC, 1-DVBT, 2-DVBS, 3-ISDBT, 4-DTMB, 5-DVBT2, 6-ANALOG,7-ATSC)\n");
+	printf("mode(0/1/2/3/4/5/6/7): ");
 	scanf("%d", mode);
 	para.mode = (*mode==0)?FE_QAM : 
 			(*mode==1)? FE_OFDM : 
@@ -512,6 +516,7 @@ static int open_fend(int *id, int *mode)
 			(*mode==4)? FE_DTMB :
 			(*mode==5)? FE_OFDM :
 			(*mode==6)? FE_ANALOG :
+			(*mode==7)? FE_ATSC :
 				FE_OFDM;
 
 	AM_TRY(AM_FEND_Open(*id, &para));
@@ -534,7 +539,7 @@ static int lock_fend(int id, int mode)
 	static int bw;
 	static int std, afc, afc_range;
 
-	/*(0-DVBC, 1-DVBT, 2-DVBS, 3-ISDBT, 4-DTMB, 5-DVBT2, 6-ANALOG)*/
+	/*(0-DVBC, 1-DVBT, 2-DVBS, 3-ISDBT, 4-DTMB, 5-DVBT2, 6-ANALOG, 7-ATSC)*/
 
 	if(mode==-1)
 		return -1;
@@ -717,6 +722,29 @@ static int lock_fend(int id, int mode)
 
 	        printf("freq=%dHz, std=%#X, flag=%x, afc_range=%d\n", freq, std, afc, afc_range);
 
+	} else if (mode==7){
+		printf("MODULATION(8:VSB8/16:VSB16/64:QAM64/128:QAM128/256:QAM256): ");
+		scanf("%d", &qam);
+		switch (qam)
+		{
+			case 8:
+			default:
+				p.u.vsb.modulation = VSB_8;
+			break;
+			case 16:
+				p.u.vsb.modulation = VSB_16;
+			break;
+			case 64:
+				p.u.vsb.modulation = QAM_64;
+			break;
+			case 128:
+				p.u.vsb.modulation = QAM_128;
+			break;
+			case 256:
+				p.u.vsb.modulation = QAM_256;
+			break;
+		}
+		p.frequency = freq;
 	} else {
 		printf("dvb sx test\n");
 
@@ -927,7 +955,7 @@ int main(int argc, char **argv)
 			info_fend(fe_id);
 		} else if (!strncmp(cmd, "quit", 4)) {
 			if(fe_id>=0){
-				AM_FEND_Close(fe_id);
+				AM_FEND_CloseEx(fe_id, strncmp(cmd, "quit reset", 10)? AM_FALSE : AM_TRUE);
 				fe_id = -1;
 				mode = -1;
 				break;

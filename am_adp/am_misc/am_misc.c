@@ -38,6 +38,7 @@
 #include <sys/un.h>
 #include <assert.h>
 #include <dlfcn.h>
+#include "am_misc.h"
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
@@ -552,4 +553,14 @@ AM_ErrorCode_t AM_Check_UTF8(const char *src, int src_len, char *dest, int *dest
 	return AM_SUCCESS;	
 }
 
+static int am_debug_loglevel = AM_DEBUG_LOGLEVEL_DEFAULT;
 
+void AM_DebugSetLogLevel(int level)
+{
+	am_debug_loglevel = level;
+}
+
+int AM_DebugGetLogLevel()
+{
+	return am_debug_loglevel;
+}

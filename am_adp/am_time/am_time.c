@@ -57,7 +57,7 @@ AM_ErrorCode_t AM_TIME_GetClock(int *clock)
 	
 	assert(clock);
 	
-	clock_gettime(CLOCK_REALTIME, &ts);
+	clock_gettime(CLOCK_MONOTONIC, &ts);
 	ms = ts.tv_sec*1000+ts.tv_nsec/1000000;
 	*clock = ms;
 	
@@ -74,7 +74,7 @@ AM_ErrorCode_t AM_TIME_GetTimeSpec(struct timespec *ts)
 {
 	assert(ts);
 	
-	clock_gettime(CLOCK_REALTIME, ts);
+	clock_gettime(CLOCK_MONOTONIC, ts);
 	
 	return AM_SUCCESS;
 }
@@ -94,7 +94,7 @@ AM_ErrorCode_t AM_TIME_GetTimeSpecTimeout(int timeout, struct timespec *ts)
 	
 	assert(ts);
 	
-	clock_gettime(CLOCK_REALTIME, &ots);
+	clock_gettime(CLOCK_MONOTONIC, &ots);
 	
 	ts->tv_sec  = ots.tv_sec + timeout/1000;
 	ts->tv_nsec = ots.tv_nsec;

@@ -31,6 +31,12 @@ extern "C"
 /*Max service name languages*/
 #define AM_SCAN_MAX_SRV_NAME_LANG 4
 
+static const   v4l2_std_id  V4L2_COLOR_STD_PAL  =   ((v4l2_std_id)0x04000000);
+static const   v4l2_std_id  V4L2_COLOR_STD_NTSC = ((v4l2_std_id)0x08000000);
+static const   v4l2_std_id  V4L2_COLOR_STD_SECAM =  ((v4l2_std_id)0x10000000);
+//virtual
+static const   v4l2_std_id  V4L2_COLOR_STD_AUTO  =    ((v4l2_std_id)0x02000000);
+
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
@@ -215,6 +221,7 @@ typedef struct
 typedef struct
 {
 	int flag; /**< 搜索标志*/
+	int skip; /**< 搜索终止标识  6表示跳过该频点*/
 	AM_FENDCTRL_DVBFrontendParameters_t	fe_para; /**< 数字参数*/
 }AM_SCAN_FrontEndPara_t;
 
@@ -258,6 +265,7 @@ typedef struct
 	AM_SI_SubtitleInfo_t sub_info;
 	AM_SI_TeletextInfo_t ttx_info;
 	int sdt_version;
+	int analog_std;
 }AM_SCAN_ServiceInfo_t;
 
 /**\brief 搜索中间数据*/

@@ -33,6 +33,7 @@
 #include <signal.h>
 #include <assert.h>
 #include <math.h>
+#include <errno.h>
 #include "../am_adp_internal.h"
 
 /****************************************************************************
@@ -157,7 +158,7 @@ static void* fend_thread(void *arg)
 	AM_FEND_Device_t *dev = (AM_FEND_Device_t*)arg;
 	struct dvb_frontend_event evt;
 	AM_ErrorCode_t ret = AM_FAILURE;
-	
+
 	while(dev->enable_thread)
 	{
 		/*when blind scan is start, we need stop fend thread read event*/
@@ -534,6 +535,8 @@ static void* fend_blindscan_thread(void *arg)
 	return NULL;
 }
 
+static void sighand(int signo) {}
+
 /****************************************************************************
  * API functions
  ***************************************************************************/
@@ -594,6 +597,17 @@ AM_ErrorCode_t AM_FEND_Open(int dev_no, const AM_FEND_OpenPara_t *para)
 		ret = AM_FEND_ERR_CANNOT_CREATE_THREAD;
 		goto final;
 	}
+
+	{
+		struct sigaction actions;
+		memset(&actions, 0, sizeof(actions));
+		sigemptyset(&actions.sa_mask);
+		actions.sa_flags = 0;
+		actions.sa_handler = sighand;
+		rc = sigaction(SIGALRM, &actions, NULL);
+		if (rc != 0)
+			AM_DEBUG(1, "sigaction: err=%d", errno);
+	}
 final:	
 	pthread_mutex_unlock(&am_gAdpLock);
 
@@ -606,7 +620,7 @@ final:
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend.h)
  */
-AM_ErrorCode_t AM_FEND_Close(int dev_no)
+AM_ErrorCode_t AM_FEND_CloseEx(int dev_no, AM_Bool_t reset)
 {
 	AM_FEND_Device_t *dev;
 	
@@ -616,15 +630,21 @@ AM_ErrorCode_t AM_FEND_Close(int dev_no)
 	
 	if (dev->open_count == 1)
 	{
+		int err = 0;
+
 		dev->enable_cb = AM_FALSE;
-	
 		/*Stop the thread*/
 		dev->enable_thread = AM_FALSE;
+		err = pthread_kill(dev->thread, SIGALRM);
+		if (err != 0)
+			AM_DEBUG(1, "kill fail, err:%d", err);
 		pthread_join(dev->thread, NULL);
-	
 		/*Release the device*/
 		if(dev->drv->close)
 		{
+			if (reset && dev->drv->set_mode)
+				dev->drv->set_mode(dev, FE_UNKNOWN);
+
 			dev->drv->close(dev);
 		}
 	
@@ -636,6 +656,10 @@ AM_ErrorCode_t AM_FEND_Close(int dev_no)
 	pthread_mutex_unlock(&am_gAdpLock);
 	
 	return AM_SUCCESS;
+}
+AM_ErrorCode_t AM_FEND_Close(int dev_no)
+{
+	return AM_FEND_CloseEx(dev_no, AM_TRUE);
 }
 
 /**\brief 设定前端解调模式
@@ -651,7 +675,7 @@ AM_ErrorCode_t AM_FEND_SetMode(int dev_no, int mode)
 	AM_ErrorCode_t ret = AM_SUCCESS;
 	
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
-	
+	AM_DEBUG(1, "AM_FEND_SetMode %d", mode);
 	if(!dev->drv->set_mode)
 	{
 		AM_DEBUG(1, "fronend %d no not support set_mode", dev_no);
@@ -1146,6 +1170,7 @@ AM_ErrorCode_t AM_FEND_Lock(int dev_no, const struct dvb_frontend_parameters *pa
 	{
 		pthread_cond_wait(&dev->cond, &dev->lock);
 	}
+	AM_DEBUG(1, "AM_FEND_Lock line:%d\n",__LINE__);
 	
 	lockp.old_cb   = dev->cb;
 	lockp.old_data = dev->user_data;
@@ -1155,9 +1180,12 @@ AM_ErrorCode_t AM_FEND_Lock(int dev_no, const struct dvb_frontend_parameters *pa
 	dev->cb = fend_lock_cb;
 	dev->user_data = &lockp;
 	dev->flags |= FEND_FL_LOCK;
+
 	
+	AM_DEBUG(1, "AM_FEND_Lock line:%d\n",__LINE__);
 	ret = dev->drv->set_para(dev, para);
 	
+	AM_DEBUG(1, "AM_FEND_Lock line:%d,ret:%d\n",__LINE__,ret);
 	if(ret==AM_SUCCESS)
 	{
 		/*等待回调函数执行完*/
@@ -1166,6 +1194,7 @@ AM_ErrorCode_t AM_FEND_Lock(int dev_no, const struct dvb_frontend_parameters *pa
 			pthread_cond_wait(&dev->cond, &dev->lock);
 		}
 	}
+	AM_DEBUG(1, "AM_FEND_Lock line:%d\n",__LINE__);
 	
 	dev->cb = lockp.old_cb;
 	dev->user_data = lockp.old_data;
@@ -1715,10 +1744,10 @@ AM_ErrorCode_t AM_FEND_SetSubSystem(int dev_no, unsigned int sub_sys)
 AM_ErrorCode_t AM_FEND_GetSubSystem(int dev_no, unsigned int *sub_sys)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	struct dtv_property p = {.cmd = DTV_DELIVERY_SUB_SYSTEM, .u.data = sub_sys};
+	struct dtv_property p = {.cmd = DTV_DELIVERY_SUB_SYSTEM, .u.data = 0/*sub_sys*/};
 	struct dtv_properties props = {.num = 1, .props = &p};
 	ret = AM_FEND_GetProp(dev_no, &props);
-	sub_sys = p.u.data;
+	*sub_sys = p.u.data;
 	return ret;
 }
 

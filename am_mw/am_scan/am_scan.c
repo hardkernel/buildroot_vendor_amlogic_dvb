@@ -30,16 +30,20 @@
 #include <am_time.h>
 #include <am_aout.h>
 #include <am_av.h>
+#include <am_cond.h>
 #include <linux/ioctl.h>
 #include <linux/types.h>
-
+#include "am_check_scramb.h"
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
 
 #define SCAN_FEND_DEV_NO 0
 #define SCAN_DMX_DEV_NO 0
-
+#define SCAN_DVR_DEV_ID 2
+#define SCAN_DVR_SRC 0
+#define SCAN_DMX_DEV_ID 2
+#define SCAN_DMX_SRC 2
 /*位操作*/
 #define BIT_MASK(b) (1 << ((b) % 8))
 #define BIT_SLOT(b) ((b) / 8)
@@ -48,7 +52,7 @@
 #define BIT_TEST(a, b) ((a)[BIT_SLOT(b)] & BIT_MASK(b))
 
 /*超时ms定义*/
-#define PAT_TIMEOUT 10000
+#define PAT_TIMEOUT 3000
 #define PMT_TIMEOUT 3000
 #define SDT_TIMEOUT 6000
 #define NIT_TIMEOUT 10000
@@ -167,10 +171,17 @@
 #define IS_DVBT2_TS(_para) (_para.m_type==FE_OFDM && \
 	_para.terrestrial.ofdm_mode == OFDM_DVBT2)
 #define IS_ISDBT_TS(_para) (_para.m_type==FE_ISDBT)
+#define IS_ATSC_QAM256_TS(_para) (_para.m_type==FE_ATSC && \
+	_para.atsc.para.u.vsb.modulation==QAM_256)
+#define IS_ATSC_TS(_para) (_para.m_type==FE_ATSC)
+#define IS_ATSC_QAM_TS(_para) (IS_ATSC_TS(_para) && \
+	(_para.atsc.para.u.vsb.modulation==QAM_256 || \
+	_para.atsc.para.u.vsb.modulation==QAM_64))
 #define IS_DVBT2() IS_DVBT2_TS(scanner->start_freqs[scanner->curr_freq].fe_para)
 #define IS_ISDBT() IS_ISDBT_TS(scanner->start_freqs[scanner->curr_freq].fe_para)
+#define IS_ATSC_QAM256() IS_ATSC_QAM256_TS(scanner->start_freqs[scanner->curr_freq].fe_para)
 
-#define cur_fe_para			scanner->start_freqs[scanner->curr_freq].fe_para
+#define cur_fe_para		scanner->start_freqs[scanner->curr_freq].fe_para
 #define dtv_start_para		scanner->start_para.dtv_para
 #define atv_start_para		scanner->start_para.atv_para
 
@@ -1029,11 +1040,17 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 		{
 			srv_info->srv_type = AM_SCAN_SRV_UNKNOWN;
 		}
-    			
+
 		/* Skip program for FTA mode */
 		if (srv_info->scrambled_flag && (mode & AM_SCAN_DTVMODE_FTA))
 		{
-			AM_DEBUG(1, "Skip program '%s' for FTA mode", srv_info->name);
+			AM_DEBUG(1, "Skip program '%s' vid[%d]for FTA mode", srv_info->name, srv_info->vid);
+			return;
+		}
+		/* Skip program for vct hide is set 1, we need hide this channel */
+		if (srv_info->hidden == 1 && (mode & AM_SCAN_DTVMODE_NOVCTHIDE))
+		{
+			AM_DEBUG(1, "Skip program '%s' vid[%d]for vct hide mode", srv_info->name, srv_info->vid);
 			return;
 		}
 
@@ -1057,7 +1074,20 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 			strcpy(srv_info->name, "xxxNo Name");
 		}
 	}
-
+	if (srv_info->src == FE_ANALOG) {
+		int mode = result->start_para->store_mode;
+		//not store pal type program
+		if (((srv_info->analog_std & V4L2_COLOR_STD_PAL) == V4L2_COLOR_STD_PAL) &&
+			(mode & AM_SCAN_ATV_STOREMODE_NOPAL) == AM_SCAN_ATV_STOREMODE_NOPAL) {
+			AM_DEBUG(1, "Skip program '%s' for atv pal mode", srv_info->name);
+			return;
+		}
+		if (((srv_info->analog_std & V4L2_COLOR_STD_SECAM) == V4L2_COLOR_STD_SECAM) &&
+			(mode & AM_SCAN_DTV_STOREMODE_NOSECAM) == AM_SCAN_DTV_STOREMODE_NOSECAM) {
+			AM_DEBUG(1, "Skip program '%s' for atv secam mode", srv_info->name);
+			return;
+		}
+	}
 	if (stmts == NULL)
 	{
 		AM_SCAN_ProgramProgress_t pp;
@@ -1067,11 +1097,12 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 		pp.scrambled = !!srv_info->scrambled_flag;
 		pp.service_id = srv_info->srv_id;
 		pp.service_type = srv_info->srv_type;
+		AM_DEBUG(1, "send type  [%d] Program '%s'  mode %d vid: %d", srv_info->srv_type, srv_info->name, srv_info->scrambled_flag, srv_info->vid);
 		snprintf(pp.name, sizeof(pp.name), "%s", srv_info->name);
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_NEW_PROGRAM, &pp);
 		return;
 	}
-	
+
 	/* Update to database */	
 	AM_DEBUG(1, "Updating Program: '%s', db_srv_id(%d), srv_type(%d)",
 		srv_info->name, srv_info->srv_dbid, srv_info->srv_type);
@@ -1132,18 +1163,67 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 }
 
 /**\brief 提取CA加扰标识*/
-static void am_scan_extract_ca_scrambled_flag(dvbpsi_descriptor_t *p_first_descriptor, int *flag)
+static void am_scan_extract_ca_scrambled_flag(dvbpsi_descriptor_t *p_first_descriptor, AM_SCAN_ServiceInfo_t *psrv_info, int mode, int *pmt_scramble_flag)
 {
 	dvbpsi_descriptor_t *descr;
-	
-	AM_SI_LIST_BEGIN(p_first_descriptor, descr)
-		if (descr->i_tag == AM_SI_DESCR_CA && ! *flag)
-		{
-			AM_DEBUG(1, "Found CA descr, set scrambled flag to 1");
-			*flag = 1;
-			break;
+	int scrambled_pids[AM_DVB_PID_MAXCOUNT + 1];
+	if (*pmt_scramble_flag == 1) {
+		//AM_DEBUG(1, "pmt_scramble_flag is 1, vid( pid %d)", psrv_info->vid);
+		psrv_info->scrambled_flag = 1;
+		return;
+	}
+
+	if ((mode & AM_SCAN_DTVMODE_SCRAMB_TSHEAD)) {
+		int i = 0;
+		int j = 0;
+		int video_scramb = 0;
+		int audio_scramb = 0;
+		memset(scrambled_pids, 0, sizeof(scrambled_pids));
+		AM_Check_Scramb_GetPid(scrambled_pids);
+		for (i = 0; i < AM_DVB_PID_MAXCOUNT; i++) {
+			if (scrambled_pids[i] == psrv_info->vid) {
+				video_scramb = 1;
+				//AM_DEBUG(1, "Program to check scramble video is scrambled check end( pid %d)", psrv_info->vid);
+				break;
+			}
+			if (scrambled_pids[i] == 0) {
+				break;
+			}
 		}
-	AM_SI_LIST_END()
+
+		for (i = 0; i < AM_DVB_PID_MAXCOUNT; i++) {
+			if (scrambled_pids[i] == 0) {
+				break;
+			}
+			for (j = 0; j < psrv_info->aud_info.audio_count; j++) {
+				if (psrv_info->aud_info.audios[j].pid == scrambled_pids[i]) {
+					audio_scramb = 1;
+					//AM_DEBUG(1, "Program to check scramble audios is scrambled check end( pid %d)", psrv_info->aud_info.audios[j].pid);
+					goto check_end;
+				}
+			}
+		}
+check_end:
+		if (audio_scramb != 0 || video_scramb != 0) {
+				psrv_info->scrambled_flag = 1;
+				*pmt_scramble_flag = 1;
+				//AM_DEBUG(1, "Program set pmt_scramble_flag 1");
+			} else {
+				psrv_info->scrambled_flag = 0;
+				*pmt_scramble_flag = 0;
+				//AM_DEBUG(1, "Program set pmt_scramble_flag 0");
+			}
+		} else {
+		/*for ca des mode*/
+		AM_SI_LIST_BEGIN(p_first_descriptor, descr)
+			if (descr->i_tag == AM_SI_DESCR_CA && ! psrv_info->scrambled_flag)
+			{
+				//AM_DEBUG(1, "Found CA descr, set scrambled flag to 1");
+				psrv_info->scrambled_flag = 1;
+				break;
+			}
+		AM_SI_LIST_END()
+	}
 }
 
 /**\brief 从SDT表获取相关service信息*/
@@ -1256,7 +1336,7 @@ static void am_scan_extract_srv_info_from_sdt(AM_SCAN_Result_t *result, dvbpsi_s
 /**\brief 从visual channel中获取相关service信息*/
 static void am_scan_extract_srv_info_from_vc(dvbpsi_atsc_vct_channel_t *vcinfo, AM_SCAN_ServiceInfo_t *srv_info)
 {
-	char name[14] = {0};
+	char name[32] = {0};
 
 	srv_info->major_chan_num = vcinfo->i_major_number;
 	srv_info->minor_chan_num = vcinfo->i_minor_number;
@@ -1266,7 +1346,7 @@ static void am_scan_extract_srv_info_from_vc(dvbpsi_atsc_vct_channel_t *vcinfo, 
 	srv_info->hide_guide = vcinfo->b_hide_guide;
 	srv_info->source_id = vcinfo->i_source_id;
 	memcpy(srv_info->name, "xxx", 3);
-	if (AM_SI_ConvertToUTF8(vcinfo->i_short_name, 14, name, 14, "utf-16") != AM_SUCCESS)
+	if (AM_SI_ConvertToUTF8(vcinfo->i_short_name, 14, name, 32, "utf-16") != AM_SUCCESS)
 		strcpy(name, "No Name");
 	memcpy(srv_info->name+3, name, sizeof(name));
 	srv_info->name[sizeof(name)+3] = 0;
@@ -1379,6 +1459,7 @@ static void update_analog_ts_bynum(sqlite3_stmt **stmts, AM_SCAN_Result_t *resul
 
 			srv_info.chan_num = atv_update_num;
 			srv_info.srv_dbid = dbid;
+			srv_info.analog_std = ts->analog.std;
 			am_scan_update_service_info(stmts, result, &srv_info);
 		}
 
@@ -1480,6 +1561,7 @@ static void store_analog_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_S
 	srv_info.chan_num = 0;
 	srv_info.srv_type = AM_SCAN_SRV_ATV; 
 	strcpy(srv_info.name, "xxxATV Program");
+	srv_info.analog_std = ts->analog.std;
 	if (result->start_para->atv_para.mode == AM_SCAN_ATVMODE_MANUAL)
 	{
 		srv_info.chan_num = 1;
@@ -1545,6 +1627,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	
 	/*遍历PMT表*/
 	AM_SI_LIST_BEGIN(ts->digital.pmts, pmt)
+		memset(&srv_info, 0, sizeof(AM_SCAN_ServiceInfo_t));
 		am_scan_init_service_info(&srv_info);
 		srv_info.satpara_dbid = satpara_dbid;
 		srv_info.srv_id = pmt->i_program_number;
@@ -1562,22 +1645,22 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 				continue;
 			}
 		}
-		
+
+
 		/* looking for CA descr */
 		if (! srv_info.scrambled_flag)
 		{
-			am_scan_extract_ca_scrambled_flag(pmt->p_first_descriptor, &srv_info.scrambled_flag);
+			am_scan_extract_ca_scrambled_flag(pmt->p_first_descriptor, &srv_info, mode, &pmt->i_scramble_flag);
 		}
-
 		/*取ES流信息*/
 		AM_SI_LIST_BEGIN(pmt->p_first_es, es)
 			/* 提取音视频流 */
 			AM_SI_ExtractAVFromES(es, &srv_info.vid, &srv_info.vfmt, &srv_info.aud_info);
 			/* 查找CA加扰标识 */
 			if (! srv_info.scrambled_flag)
-				am_scan_extract_ca_scrambled_flag(es->p_first_descriptor, &srv_info.scrambled_flag);
+				am_scan_extract_ca_scrambled_flag(es->p_first_descriptor, &srv_info, mode, &pmt->i_scramble_flag);
 		AM_SI_LIST_END()
-		
+
 		program_found_in_vct = AM_FALSE;
 		AM_SI_LIST_BEGIN(ts->digital.vcts, vct)
 		AM_SI_LIST_BEGIN(vct->p_first_channel, vcinfo)
@@ -1609,11 +1692,15 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 			}
 		AM_SI_LIST_END()
 		AM_SI_LIST_END()
-VCT_END:		
+VCT_END:
 		/*Store this service*/
 		am_scan_update_service_info(stmts, result, &srv_info);
 	AM_SI_LIST_END()
 
+	if ((mode & AM_SCAN_DTVMODE_NOVCT)) {
+		AM_DEBUG(1, "Skip programs  in vct but not in pmt mode");
+		return;
+	}
 	/* All programs in PMTs added, now trying the programs in VCT but NOT in PMT */
 	AM_SI_LIST_BEGIN(ts->digital.vcts, vct)
 	AM_SI_LIST_BEGIN(vct->p_first_channel, vcinfo)
@@ -1653,7 +1740,7 @@ VCT_END:
 		{
 			AM_SI_ExtractAVFromVC(vcinfo, &srv_info.vid, &srv_info.vfmt, &srv_info.aud_info);
 			am_scan_extract_srv_info_from_vc(vcinfo, &srv_info);
-			
+
 			/*Store this service*/
 			am_scan_update_service_info(stmts, result, &srv_info);
 		}
@@ -1771,7 +1858,7 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 				/* looking for CA descr */
 				if (! srv_info.scrambled_flag)
 				{
-					am_scan_extract_ca_scrambled_flag(pmt->p_first_descriptor, &srv_info.scrambled_flag);
+					am_scan_extract_ca_scrambled_flag(pmt->p_first_descriptor, &srv_info, mode, &pmt->i_scramble_flag);
 				}
 
 				/*取ES流信息*/
@@ -1788,9 +1875,8 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 					
 					/* 查找CA加扰标识 */
 					if (! srv_info.scrambled_flag)
-						am_scan_extract_ca_scrambled_flag(es->p_first_descriptor, &srv_info.scrambled_flag);
+						am_scan_extract_ca_scrambled_flag(es->p_first_descriptor, &srv_info, mode, &pmt->i_scramble_flag);
 				AM_SI_LIST_END()
-				
 				/*获取节目名称，类型等信息*/
 				am_scan_extract_srv_info_from_sdt(result, sdt_list, &srv_info);
 				
@@ -1836,7 +1922,6 @@ static void store_dvb_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCAN
 				}
 
 				am_scan_extract_srv_info_from_sdt(result, sdt_list, &srv_info);
-
 				am_scan_update_service_info(stmts, result, &srv_info);
 
 				/*as no pmt for this srv, set type to data for invisible*/
@@ -3142,7 +3227,7 @@ static void am_scan_nit_done(AM_SCAN_Scanner_t *scanner)
 				scanner->start_freqs[scanner->start_freqs_cnt].fe_para.m_type = FE_QPSK;
 				scanner->start_freqs[scanner->start_freqs_cnt].fe_para.sat.polarisation = pcd->i_polarization>1 ? AM_FEND_POLARISATION_NOSET : pcd->i_polarization;
 				param = &scanner->start_freqs[scanner->start_freqs_cnt].fe_para.sat.para;
-				param->frequency = pcd->i_frequency * 10; /* GHz->KHz */
+				param->frequency = pcd->i_frequency; /* GHz->KHz */
 				param->u.qpsk.symbol_rate = pcd->i_symbol_rate;
 				scanner->start_freqs_cnt++;
 				AM_DEBUG(1, "Add frequency %u(%u), symbol_rate %u, onid %d, ts_id %d", param->frequency,pcd->i_frequency,
@@ -3282,21 +3367,27 @@ static void am_scan_mgt_done(AM_SCAN_Scanner_t *scanner)
 	if (scanner->curr_ts->digital.mgts)
 	{
 		AM_Bool_t is_cable_vct = AM_FALSE;
+		AM_Bool_t is_tvct = AM_FALSE;
+
 		dvbpsi_atsc_mgt_table_t *p_table = scanner->curr_ts->digital.mgts->p_first_table;
 
 		do {
 			if (p_table) {
-				if (p_table->i_table_type == 0 || p_table->i_table_type == 1)
-					is_cable_vct = AM_FALSE;
-				else if (p_table->i_table_type == 2 || p_table->i_table_type == 3)
+				if (p_table->i_table_type == 0 || p_table->i_table_type == 1) {
+					is_tvct = AM_TRUE;
+				}
+				else if (p_table->i_table_type == 2 || p_table->i_table_type == 3) {
 					is_cable_vct = AM_TRUE;
+				}
 			}
 		} while (p_table = p_table->p_next);
 
-		if (!is_cable_vct)
+		AM_DEBUG(1, "mgt has vct cvct:[%d] tvct:[%d]", is_cable_vct, is_tvct);
+		if (!is_cable_vct && is_tvct) {
 			scanner->dtvctl.vctctl.tid = AM_SI_TID_PSIP_TVCT;
-		else
+		} else {
 			scanner->dtvctl.vctctl.tid = AM_SI_TID_PSIP_CVCT;
+		}
 		am_scan_request_section(scanner, &scanner->dtvctl.vctctl);
 	}
 #if 0
@@ -3569,7 +3660,11 @@ static AM_ErrorCode_t am_scan_request_section(AM_SCAN_Scanner_t *scanner, AM_SCA
 	param.pid = scl->pid;
 	param.filter.filter[0] = scl->tid;
 	param.filter.mask[0] = 0xff;
-	
+
+	// if (scl->tid == AM_SI_TID_PSIP_TVCT || scl->tid == AM_SI_TID_PSIP_CVCT) {
+	// 	param.filter.mask[0] = 0xfe;
+	// }
+
 	/*For PMT, we must filter its extension*/
 	if (scl->tid == AM_SI_TID_PMT && scl->ext != 0xffff/* a special mark for isdbt one-seg program */)
 	{
@@ -3893,11 +3988,81 @@ static AM_ErrorCode_t am_scan_atv_step_tune(AM_SCAN_Scanner_t *scanner)
 	return ret;
 }
 
+
+static void get_freg_from_para(AM_SCAN_FrontEndPara_t *start_freq, int *freg)
+{
+	switch (start_freq->fe_para.m_type)
+	{
+		case FE_QPSK:
+			*freg = start_freq->fe_para.sat.para.frequency;
+			break;
+		case FE_QAM:
+			*freg = start_freq->fe_para.sat.para.frequency;
+			break;
+		case FE_OFDM:
+			*freg = start_freq->fe_para.terrestrial.para.frequency;
+			break;
+		case FE_ATSC:
+			*freg = start_freq->fe_para.atsc.para.frequency;
+			break;
+		case FE_ANALOG:
+			*freg = start_freq->fe_para.analog.para.frequency;
+			break;
+		case FE_DTMB:
+			*freg = start_freq->fe_para.dtmb.para.frequency;
+			break;
+		case FE_ISDBT:
+			*freg = start_freq->fe_para.isdbt.para.frequency;
+			break;
+		default:
+			break;
+	}
+
+}
+
+static void set_freq_skip(AM_SCAN_Scanner_t *scanner)
+{
+	int i = 0;
+	int cur_freq = -1;
+	int near_freq = -1;
+
+	if (scanner == NULL || scanner->start_freqs == NULL || scanner->curr_freq >= scanner->start_freqs_cnt)
+		return;
+	get_freg_from_para(&(scanner->start_freqs[scanner->curr_freq]),&cur_freq);
+	for (i=scanner->curr_freq; i<scanner->start_freqs_cnt; i++)
+	{
+		if (scanner->start_freqs[i].skip == 6) {
+			continue;
+		}
+		near_freq = -1;
+		get_freg_from_para(&(scanner->start_freqs[i]),&near_freq);
+		if (near_freq != -1 && (abs(near_freq - cur_freq) <= 3000000)) {
+			scanner->start_freqs[i].skip = 6;
+			AM_DEBUG(2, " ##### find it ##### near_freq[%d]=[%d]type[%d] ~~ cur_freq[%d]=[%d]type[%d]",
+					i, near_freq, scanner->start_freqs[i].fe_para.m_type, scanner->curr_freq, cur_freq, cur_fe_para.m_type);
+		}
+	}
+
+}
+
+
+static bool check_freq_skip(AM_SCAN_Scanner_t *scanner)
+{
+
+	if (scanner->start_freqs[scanner->curr_freq].skip == 6) {
+		AM_DEBUG(2, "This freg should be skip,start_freqs[%d].skip=%d type=%d",
+				scanner->curr_freq, scanner->start_freqs[scanner->curr_freq].skip, cur_fe_para.m_type);
+		return true;
+	}
+	return false;
+}
+
 static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 {
 	AM_ErrorCode_t ret = AM_FAILURE;
 	AM_SCAN_TSProgress_t tp;
 	int frequency;
+	bool skip_flag = false;
 
 	if (scanner->stage != AM_SCAN_STAGE_TS)
 		scanner->stage = AM_SCAN_STAGE_TS;
@@ -3926,13 +4091,19 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 
 			/*store when found*/
 			if (scanner->proc_mode & AM_SCAN_PROCMODE_STORE_CB_COMPLICATED) {
-				if ((scanner->start_para.atv_para.mode == AM_SCAN_ATVMODE_AUTO)
+				if ((scanner->start_para.atv_para.mode == AM_SCAN_ATVMODE_AUTO
+					|| scanner->start_para.atv_para.mode == AM_SCAN_ATVMODE_FREQ)
 					|| (scanner->start_para.dtv_para.mode != AM_SCAN_DTVMODE_MANUAL)) {
-					if (scanner->store_cb)
+					if (scanner->store_cb) {
+						if (scanner->start_para.dtv_para.mode & AM_SCAN_DTVMODE_SCRAMB_TSHEAD) {
+							AM_DEBUG(1, "AM_Check_Scramb_Stop --2");
+							AM_Check_Scramb_Stop();
+						}
 						scanner->store_cb(&scanner->result);
+					}
 				}
 			}
-
+			AM_DEBUG(1, "AM_SCAN_PROGRESS_NEW_PROGRAM_MORE --1");
 			npd.result = &scanner->result;
 			npd.newts = scanner->curr_ts;
 			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_NEW_PROGRAM_MORE, (void*)&npd);
@@ -3942,9 +4113,10 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 	}
 	
 	scanner->curr_ts = NULL;
+
 	do
 	{
-		if (scanner->curr_freq >= 0 && scanner->start_freqs[scanner->curr_freq].flag)
+		if (scanner->curr_freq >= 0 && scanner->start_freqs[scanner->curr_freq].flag && !skip_flag)
 		{
 			/* if DTV not found in this freq, try atv */
 			if (scanner->start_freqs[scanner->curr_freq].flag == AM_SCAN_FE_FL_ATV &&
@@ -3962,18 +4134,25 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 					atv_start_para.afc_range = ATV_2MHZ;
 				dvb_fend_para(cur_fe_para)->u.analog.afc_range = atv_start_para.afc_range;
 			}
+			skip_flag = false;
 		}
 		else
 		{
 			/* try next freq */
 			scanner->curr_freq += step;
+
 			if (scanner->curr_freq < 0 || scanner->curr_freq >= scanner->start_freqs_cnt)
 			{
 				AM_DEBUG(1, "All TSes Complete!");
 				return am_scan_all_done(scanner);
 			}
-			
-			if (scanner->curr_freq >= (scanner->atvctl.start_idx + atv_start_para.fe_cnt) && 
+
+			if (step == 1 && check_freq_skip(scanner)) {
+				skip_flag = true;
+				continue;
+			}
+
+			if (scanner->curr_freq >= (scanner->atvctl.start_idx + atv_start_para.fe_cnt) &&
 				! scanner->dtvctl.start)
 			{
 				return am_scan_start_dtv(scanner);
@@ -3990,8 +4169,9 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 		tp.fend_para = cur_fe_para;
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_TS_BEGIN, (void*)&tp);
 		
-		AM_DEBUG(1, "Start scanning %s frequency %u ...", 
-			(cur_fe_para.m_type==FE_ANALOG)?"atv":"dtv", 
+		AM_DEBUG(1, "Start scanning %s frequency[%d] %u ...",
+			(cur_fe_para.m_type==FE_ANALOG)?"atv":"dtv",
+			scanner->curr_freq,
 			dvb_fend_para(cur_fe_para)->frequency);
 
 		HELPER_CB(AM_SCAN_HELPER_ID_FE_TYPE_CHANGE, (void*)(long)(cur_fe_para.m_type));
@@ -4736,14 +4916,47 @@ static void am_scan_solve_blind_scan_done_evt(AM_SCAN_Scanner_t *scanner)
 
 	AM_DEBUG(1, "Blind scan stage done, start %d, total fe %d, dtv fe %d", 
 		scanner->dtvctl.start_idx, scanner->start_freqs_cnt, dtv_start_para.fe_cnt);
-	
+
 	/* 退出本次盲扫 */
 	AM_FEND_BlindExit(scanner->start_para.fend_dev_id);
-	
+
 	scanner->dtvctl.bs_ctl.stage++;
 	am_scan_start_blind_scan(scanner);
 }
 
+AM_ErrorCode_t AM_Scan_Update_Digital_FrontendPara(AM_FENDCTRL_DVBFrontendParameters_t *para, unsigned int frequency)
+{
+
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	switch (para->m_type)
+	{
+		case FE_QPSK:
+			para->sat.para.frequency = frequency;
+			break;
+		case FE_QAM:
+			para->cable.para.frequency = frequency;
+			break;
+		case FE_OFDM:
+			para->terrestrial.para.frequency = frequency;
+			break;
+		case FE_ATSC:
+			para->atsc.para.frequency = frequency;
+			break;
+		case FE_ANALOG:
+			para->analog.para.frequency = frequency;
+			break;
+		case FE_DTMB:
+			para->dtmb.para.frequency = frequency;
+			break;
+		case FE_ISDBT:
+			para->isdbt.para.frequency = frequency;
+			break;
+		default:
+			break;
+	}
+	return ret;
+}
 /**\brief 当前频点锁定后的处理*/
 static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 {
@@ -4815,7 +5028,10 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			AM_SCAN_DTVSignalInfo_t si;
 			int formatted_freq;
 			AM_SCAN_NewProgram_Data_t npd;
-			
+			struct dvb_frontend_parameters para;
+			int mode = scanner->start_para.store_mode;
+
+			AM_FEND_GetPara(scanner->start_para.fend_dev_id, &para);
 			AM_DEBUG(1, "cvbs lock !");
 			formatted_freq = am_scan_format_atv_freq(scanner->atvctl.afc_locked_freq);
 			memset(&si, 0, sizeof(si));
@@ -4831,6 +5047,22 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 				scanner->status |= AM_SCAN_STATUS_PAUSED;
 				pthread_mutex_unlock(&scanner->lock_pause);
 			}
+			if (((para.u.analog.std & V4L2_COLOR_STD_PAL) == V4L2_COLOR_STD_PAL) &&
+				(mode & AM_SCAN_ATV_STOREMODE_NOPAL) == AM_SCAN_ATV_STOREMODE_NOPAL)
+			{
+				AM_DEBUG(1, "Skip program for atv pal mode at lock proc");
+				goto next_ts;
+			} else {
+				AM_DEBUG(1, "not Skip program for atv pal mode at lock proc std[%x]pal[%x]mode[%d]", para.u.analog.std, V4L2_COLOR_STD_PAL, mode);
+			}
+			if (((para.u.analog.std & V4L2_COLOR_STD_SECAM) == V4L2_COLOR_STD_SECAM) &&
+				(mode & AM_SCAN_DTV_STOREMODE_NOSECAM) == AM_SCAN_DTV_STOREMODE_NOSECAM)
+			{
+				AM_DEBUG(1, "Skip program for atv secam mode at lock proc");
+				goto next_ts;
+			} else {
+				AM_DEBUG(1, "not Skip program for atv secam mode at lock proc std[%x]pal[%x]mode[%d]", para.u.analog.std, V4L2_COLOR_STD_PAL, mode);
+			}
 
 			SIGNAL_EVENT(AM_SCAN_EVT_SIGNAL, (void*)&si);
 
@@ -4840,11 +5072,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 
 			//scanner->curr_ts->analog.std = scanner->start_para.atv_para.default_std;
 			//scanner->curr_ts->analog.std = scanner->fe_evt.parameters.u.analog.std;
-			{
-				struct dvb_frontend_parameters para;
-				AM_FEND_GetPara(scanner->start_para.fend_dev_id, &para);
-				scanner->curr_ts->analog.std = para.u.analog.std;
-			}
+			scanner->curr_ts->analog.std = para.u.analog.std;
 			//scanner->curr_ts->analog.std = dvb_fend_para(cur_fe_para)->u.analog.std;
 
 			/*添加到搜索结果列表*/
@@ -4852,16 +5080,19 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 
 			/*store when found*/
 			if (scanner->proc_mode & AM_SCAN_PROCMODE_STORE_CB_COMPLICATED) {
-				if (scanner->start_para.atv_para.mode == AM_SCAN_ATVMODE_AUTO) {
-					if (scanner->store_cb)
+				if (scanner->start_para.atv_para.mode == AM_SCAN_ATVMODE_AUTO
+					|| scanner->start_para.atv_para.mode == AM_SCAN_ATVMODE_FREQ) {
+					if (scanner->store_cb) {
 						scanner->store_cb(&scanner->result);
+					}
 				}
 			}
 
 			npd.result = &scanner->result;
 			npd.newts = scanner->curr_ts;
+			AM_DEBUG(1, "AM_SCAN_PROGRESS_NEW_PROGRAM_MORE --analog");
 			SET_PROGRESS_EVT(AM_SCAN_PROGRESS_NEW_PROGRAM_MORE, (void*)&npd);
-
+next_ts:
 			//check if auto pause
 			am_scan_check_need_pause(scanner, AM_SCAN_STATUS_PAUSED);
 
@@ -4883,11 +5114,17 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			
 			/* Digital processing */
 			scanner->curr_ts->type = AM_SCAN_TS_DIGITAL;
-	
+
 			scanner->curr_ts->digital.snr = 0;
 			scanner->curr_ts->digital.ber = 0;
 			scanner->curr_ts->digital.strength = 0;
-		
+			if (scanner->start_para.dtv_para.mode & AM_SCAN_DTVMODE_SCRAMB_TSHEAD) {
+				int ret = AM_Check_Scramb_Start(SCAN_DVR_DEV_ID, SCAN_DVR_SRC, SCAN_DMX_DEV_ID, SCAN_DMX_SRC);
+				if (ret != AM_SUCCESS) {
+					AM_Check_Scramb_Stop();
+					AM_Check_Scramb_Start(SCAN_DVR_DEV_ID, SCAN_DVR_SRC, SCAN_DMX_DEV_ID, SCAN_DMX_SRC);
+				}
+		    }
 			if (dtv_start_para.standard == AM_SCAN_DTV_STD_ATSC)
 			{
 				am_scan_tablectl_clear(&scanner->dtvctl.patctl);
@@ -4897,7 +5134,8 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 				}
 				/*am_scan_tablectl_clear(&scanner->dtvctl.catctl);*/
 				am_scan_tablectl_clear(&scanner->dtvctl.mgtctl);
-			
+				am_scan_tablectl_clear(&scanner->dtvctl.vctctl);
+
 				/*请求数据*/
 				am_scan_request_section(scanner, &scanner->dtvctl.patctl);
 				/*am_scan_request_section(scanner, &scanner->dtvctl.catctl);*/
@@ -4950,9 +5188,13 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 					}
 				}
 			}
-		
 
 			scanner->curr_ts->digital.fend_para = cur_fe_para;
+			//update freq for locked real freq
+			if (scanner->fe_evt.parameters.frequency > 0) {
+				//AM_DEBUG(1, "real scanner->fe_evt.parameters.frequency %d", scanner->fe_evt.parameters.frequency);
+				AM_Scan_Update_Digital_FrontendPara(&scanner->curr_ts->digital.fend_para, scanner->fe_evt.parameters.frequency);
+			}
 			scanner->start_freqs[scanner->curr_freq].flag = 0;
 			/*添加到搜索结果列表*/
 			APPEND_TO_LIST(AM_SCAN_TS_t, scanner->curr_ts, scanner->result.tses);
@@ -4962,7 +5204,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 	{
 		am_scan_tablectl_clear(&scanner->dtvctl.nitctl);
 		am_scan_tablectl_clear(&scanner->dtvctl.batctl);
-		
+
 		/*请求NIT, BAT数据*/
 		am_scan_request_section(scanner, &scanner->dtvctl.nitctl);
 		if (dtv_start_para.mode & AM_SCAN_DTVMODE_SEARCHBAT)
@@ -5033,7 +5275,9 @@ static int am_scan_check_fend_evt(AM_SCAN_Scanner_t *scanner)
 	}
 	else
 	{
-		if (dvb_fend_para(cur_fe_para)->frequency != freq)
+		if (IS_ATSC_QAM_TS(cur_fe_para) ?
+			abs(dvb_fend_para(cur_fe_para)->frequency - freq) > 3000000 :
+			dvb_fend_para(cur_fe_para)->frequency != freq)
 		{
 			AM_DEBUG(1, "Unexpected fend_evt arrived, expected/got:(%u/%u)", 
 				dvb_fend_para(cur_fe_para)->frequency, freq);
@@ -5083,6 +5327,9 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 			/* Update the frequency */
 			scanner->atvctl.afc_locked_freq = scanner->fe_evt.parameters.frequency;
 		}
+
+	    set_freq_skip(scanner);
+
 		/* Get locked, process it */
 		if (am_scan_new_ts_locked_proc(scanner) < 0) {
 			goto try_next;
@@ -5098,6 +5345,12 @@ static void am_scan_solve_fend_evt(AM_SCAN_Scanner_t *scanner)
 			scanner->start_freqs[scanner->curr_freq].
 				fe_para.terrestrial.
 				ofdm_mode = OFDM_DVBT;
+			am_scan_start_current_ts(scanner);
+			return;
+		} else if (IS_ATSC_QAM256()) {
+			AM_DEBUG(1, "Can not lock QAM256, try QAM64...");
+			scanner->start_freqs[scanner->curr_freq].
+				fe_para.atsc.para.u.vsb.modulation = QAM_64;
 			am_scan_start_current_ts(scanner);
 			return;
 		}
@@ -5332,8 +5585,13 @@ handle_events:
 		//	AM_DEBUG(1, "scanner->result.nits==NULL");
 		
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_STORE_BEGIN, NULL);
-		if (scanner->store_cb)
+		if (scanner->store_cb) {
+			if (scanner->start_para.dtv_para.mode & AM_SCAN_DTVMODE_SCRAMB_TSHEAD) {
+				AM_DEBUG(1, "AM_Check_Scramb_Stop --1");
+				AM_Check_Scramb_Stop();
+			}
 			scanner->store_cb(&scanner->result);
+		}
 		//if(nit_version!=-1)
 		//	SET_PROGRESS_EVT(AM_SCAN_PROGRESS_STORE_END, nit_version);
 
@@ -5391,6 +5649,7 @@ static void am_scan_copy_dtv_feparas(AM_SCAN_DTVCreatePara_t *para, AM_Bool_t us
 				tpara.frequency = dvbc_std_freqs[i]*1000;
 				*dvb_fend_para(fe_start->fe_para) = tpara;
 				fe_start->flag = AM_SCAN_FE_FL_DTV;
+				fe_start->skip = 0;
 			}
 		} 
 		else if(para->source==FE_OFDM) 
@@ -5401,6 +5660,7 @@ static void am_scan_copy_dtv_feparas(AM_SCAN_DTVCreatePara_t *para, AM_Bool_t us
 				tpara.frequency = (DEFAULT_DVBT_FREQ_START+(8000*i))*1000;
 				*dvb_fend_para(fe_start->fe_para) = tpara;
 				fe_start->flag = AM_SCAN_FE_FL_DTV;
+				fe_start->skip = 0;
 			}
 		}
 	}
@@ -5410,6 +5670,7 @@ static void am_scan_copy_dtv_feparas(AM_SCAN_DTVCreatePara_t *para, AM_Bool_t us
 		{
 			fe_start->fe_para = para->fe_paras[i];
 			fe_start->flag = AM_SCAN_FE_FL_DTV;
+			fe_start->skip = 0;
 		}
 	}
 	
@@ -5420,8 +5681,8 @@ static void am_scan_copy_dtv_feparas(AM_SCAN_DTVCreatePara_t *para, AM_Bool_t us
 static void am_scan_copy_atv_feparas(AM_SCAN_ATVCreatePara_t *para, AM_SCAN_FrontEndPara_t *fe_start)
 {
 	int i;	
-    
-    for (i=0; i<para->fe_cnt; i++,fe_start++)
+
+	for (i=0; i<para->fe_cnt; i++,fe_start++)
 	{
 		fe_start->fe_para = para->fe_paras[i];
 		AM_DEBUG(1, "ATV fe_para mode %d, freq %u", fe_start->fe_para.m_type, dvb_fend_para(fe_start->fe_para)->frequency);
@@ -5430,19 +5691,19 @@ static void am_scan_copy_atv_feparas(AM_SCAN_ATVCreatePara_t *para, AM_SCAN_Fron
 			dvb_fend_para(fe_start->fe_para)->u.analog.std = para->default_std;
 		}
 
-        if (para->mode == AM_SCAN_ATVMODE_MANUAL)
-        {
-             dvb_fend_para(fe_start->fe_para)->u.analog.flag  |= ANALOG_FLAG_MANUL_SCAN;
-        }
-        else
-        {
-         
-             dvb_fend_para(fe_start->fe_para)->u.analog.flag |= ANALOG_FLAG_ENABLE_AFC;
-        }
-	    if (para->afc_range <= 0)
-			        para->afc_range = ATV_2MHZ;
+		if (para->mode == AM_SCAN_ATVMODE_MANUAL)
+		{
+			dvb_fend_para(fe_start->fe_para)->u.analog.flag  |= ANALOG_FLAG_MANUL_SCAN;
+		}
+		else
+		{
+			dvb_fend_para(fe_start->fe_para)->u.analog.flag |= ANALOG_FLAG_ENABLE_AFC;
+		}
+		if (para->afc_range <= 0)
+			para->afc_range = ATV_2MHZ;
 		dvb_fend_para(fe_start->fe_para)->u.analog.afc_range = para->afc_range;
 		fe_start->flag = AM_SCAN_FE_FL_ATV;
+		fe_start->skip = 0;
 	}
 	AM_DEBUG(1, "ATV fe_paras count %d", para->fe_cnt);
 }
@@ -5458,6 +5719,7 @@ static void am_scan_copy_adtv_feparas(int fe_cnt, AM_FENDCTRL_DVBFrontendParamet
 	{
 		fe_start->fe_para = fe_paras[i];
 		fe_start->flag = AM_SCAN_FE_FL_ATV | AM_SCAN_FE_FL_DTV;
+		fe_start->skip = 0;
 	}
 	
 	AM_DEBUG(1, "ADTV fe_paras count %d", fe_start - start);
@@ -5501,6 +5763,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, AM_SCAN_Handle_t *hand
 		if (para->atv_para.fe_cnt < 0 || !para->atv_para.fe_paras)
 			return AM_SCAN_ERR_INVALID_PARAM;
 		/* need to scan ATV */
+
 		if (para->atv_para.mode != AM_SCAN_ATVMODE_FREQ && para->atv_para.fe_cnt < 3)
 		{
 			AM_DEBUG(1, "Invalid ATV fe count, must >= 3 to specify the min,max and start freq");
@@ -5523,7 +5786,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, AM_SCAN_Handle_t *hand
 			return AM_SCAN_ERR_INVALID_PARAM;
 		if (GET_MODE(para->dtv_para.mode) == AM_SCAN_DTVMODE_MANUAL)
 		{
-			para->dtv_para.fe_cnt = 1;
+			//para->dtv_para.fe_cnt = 1;
 		}
 		else if (((GET_MODE(para->dtv_para.mode) ==  AM_SCAN_DTVMODE_ALLBAND) || 
 				(GET_MODE(para->dtv_para.mode) ==  AM_SCAN_DTVMODE_AUTO)) && 
@@ -5539,7 +5802,7 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, AM_SCAN_Handle_t *hand
 	{
 		para->dtv_para.fe_cnt = 0;
 	}
-	
+
 	/*Create a scanner*/
 	scanner = (AM_SCAN_Scanner_t*)malloc(sizeof(AM_SCAN_Scanner_t));
 	if (scanner == NULL)
@@ -5549,9 +5812,8 @@ AM_ErrorCode_t AM_SCAN_Create(AM_SCAN_CreatePara_t *para, AM_SCAN_Handle_t *hand
 	}
 	/*数据初始化*/
 	memset(scanner, 0, sizeof(AM_SCAN_Scanner_t));
-
 	scanner->status = AM_SCAN_STATUS_RUNNING;
-
+	AM_DEBUG(1, "am-scan get check_scramble_mode [%d]", para->dtv_para.mode & AM_SCAN_DTVMODE_SCRAMB_TSHEAD);
 	/*配置起始频点*/
 	if (para->mode == AM_SCAN_MODE_ADTV)
 	{

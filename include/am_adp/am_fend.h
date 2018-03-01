@@ -100,7 +100,8 @@ enum AM_FEND_EventType
 typedef struct
 {
 	int mode;
-	#define FE_AUTO (-1)
+	#define FE_AUTO (-1)    /**< Do not care the mode*/
+	#define FE_UNKNOWN (-2) /**< Set mode to unknown, something like reset*/
 } AM_FEND_OpenPara_t;
 
 /**\brief frontend callback function*/
@@ -149,6 +150,8 @@ extern AM_ErrorCode_t AM_FEND_Open(int dev_no, const AM_FEND_OpenPara_t *para);
  *   - or error code
  */
 extern AM_ErrorCode_t AM_FEND_Close(int dev_no);
+extern AM_ErrorCode_t AM_FEND_CloseEx(int dev_no, AM_Bool_t reset);
+
 
 /**\brief set frontend deivce mode
  * \param dev_no frontend device number

@@ -70,7 +70,7 @@ dvbpsi_ENAC3_dr_t * dvbpsi_DecodeENAC3Dr(dvbpsi_descriptor_t * p_descriptor)
     AM_DEBUG(1, "dr_7a decoder out of memory");
     return NULL;
   }
-
+  memset(p_decoded, 0, sizeof(dvbpsi_ENAC3_dr_t));
   /* Decode data and check the length */
   p_decoded->i_component_type_flag = (p_descriptor->p_data[0] & AM_ENAC3_CMP_FLAG) ? 1 : 0;
   p_decoded->i_bsid_flag = (p_descriptor->p_data[0] & AM_ENAC3_BSID_FLAG) ? 1 : 0;

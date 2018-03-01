@@ -43,6 +43,31 @@ enum AM_CC_ErrorCode
 	AM_CC_ERR_END
 };
 
+/**\brief caption mode*/
+typedef enum
+{
+	AM_CC_CAPTION_NONE = -1,
+	AM_CC_CAPTION_DEFAULT,
+	/*NTSC CC channels*/
+	AM_CC_CAPTION_CC1,
+	AM_CC_CAPTION_CC2,
+	AM_CC_CAPTION_CC3,
+	AM_CC_CAPTION_CC4,
+	AM_CC_CAPTION_TEXT1,
+	AM_CC_CAPTION_TEXT2,
+	AM_CC_CAPTION_TEXT3,
+	AM_CC_CAPTION_TEXT4,
+	/*DTVCC services*/
+	AM_CC_CAPTION_SERVICE1,
+	AM_CC_CAPTION_SERVICE2,
+	AM_CC_CAPTION_SERVICE3,
+	AM_CC_CAPTION_SERVICE4,
+	AM_CC_CAPTION_SERVICE5,
+	AM_CC_CAPTION_SERVICE6,
+	AM_CC_CAPTION_XDS,
+	AM_CC_CAPTION_DATA,
+	AM_CC_CAPTION_MAX
+}AM_CC_CaptionMode_t;
 
 /****************************************************************************
  * Type definitions
@@ -61,7 +86,10 @@ typedef void (*AM_CC_VBIProgInfoCb_t)(AM_CC_Handle_t handle, vbi_program_info *p
 /**VBI network callback.*/
 typedef void (*AM_CC_VBINetworkCb_t)(AM_CC_Handle_t handle, vbi_network *n);
 typedef void (*AM_CC_VBIRatingCb_t)(AM_CC_Handle_t handle, vbi_rating *rating);
+/**CC data callback.*/
+typedef void (*AM_CC_DataCb_t)(AM_CC_Handle_t handle, int mask);
 
+typedef void (*AM_CC_UpdataJson_t)(AM_CC_Handle_t handle);
 
 typedef enum {
     CC_STATE_RUNNING      = 0x1001,
@@ -98,35 +126,13 @@ typedef enum {
     /*set CC source type according ATV or DTV*/
     CMD_CC_SET_VBIDATA   = 0x7001,
     CMD_CC_SET_USERDATA ,
-	
+
 	CMD_CC_SET_CHAN_NUM = 0x8001,
 	CMD_VCHIP_RST_CHGSTAT = 0x9001,
 
     CMD_CC_MAX
 } AM_CLOSECAPTION_cmd_t;
 
-/**\brief caption mode*/
-typedef enum
-{
-	AM_CC_CAPTION_DEFAULT,
-	/*NTSC CC channels*/
-	AM_CC_CAPTION_CC1,
-	AM_CC_CAPTION_CC2,
-	AM_CC_CAPTION_CC3,
-	AM_CC_CAPTION_CC4,
-	AM_CC_CAPTION_TEXT1,
-	AM_CC_CAPTION_TEXT2,
-	AM_CC_CAPTION_TEXT3,
-	AM_CC_CAPTION_TEXT4,
-	/*DTVCC services*/
-	AM_CC_CAPTION_SERVICE1,
-	AM_CC_CAPTION_SERVICE2,
-	AM_CC_CAPTION_SERVICE3,
-	AM_CC_CAPTION_SERVICE4,
-	AM_CC_CAPTION_SERVICE5,
-	AM_CC_CAPTION_SERVICE6,
-	AM_CC_CAPTION_MAX
-}AM_CC_CaptionMode_t;
 
 /**\brief Font size, see details in CEA-708**/
 typedef enum
@@ -205,28 +211,35 @@ typedef enum {
 /**\brief Close caption parser's create parameters*/
 typedef struct
 {
-	AM_CC_DrawBegin_t   draw_begin;    /**< Drawing beginning callback*/
-	AM_CC_DrawEnd_t     draw_end;      /**< Drawing end callback*/
 	uint8_t            *bmp_buffer;    /**< Drawing buffer*/
 	int                 pitch;         /**< Line pitch of the drawing buffer*/
 	int                 bypass_cc_enable; /**< Bypass CC data flag*/
+	int                 data_timeout;  /**< Data timeout value in ms*/
+	int                 switch_timeout;/**< Caption 1/2 swith timeout in ms.*/
 	void               *user_data;     /**< User defined data*/
 	AM_CC_Input_t       input;         /**< Input type.*/
 	AM_CC_VBIProgInfoCb_t pinfo_cb;    /**< VBI program information callback.*/
 	AM_CC_VBINetworkCb_t  network_cb;  /**< VBI network callback.*/
-	AM_CC_VBIRatingCb_t	rating_cb;		/**< VBI rating callback.*/
+	AM_CC_VBIRatingCb_t   rating_cb;   /**< VBI rating callback.*/
+	AM_CC_DataCb_t      data_cb;       /**< Received data callback.*/
+	AM_CC_DrawBegin_t   draw_begin;    /**< Drawing beginning callback*/
+	AM_CC_DrawEnd_t     draw_end;      /**< Drawing end callback*/
+	AM_CC_UpdataJson_t json_update;
+	char *json_buffer;
 }AM_CC_CreatePara_t;
 
 /**\brief Close caption parser start parameter*/
 typedef struct
 {
-	AM_CC_CaptionMode_t    caption;      /**< Mode*/
+	int 				vfmt;
+	AM_CC_CaptionMode_t    caption1;     /**< Mode 1*/
+	AM_CC_CaptionMode_t    caption2;     /**< Mode 2.*/
 	AM_CC_UserOptions_t    user_options; /**< User options*/
 }AM_CC_StartPara_t;
 
 
 /****************************************************************************
- * Function prototypes  
+ * Function prototypes
  ***************************************************************************/
 
 /**\brief Create a new close caption parser

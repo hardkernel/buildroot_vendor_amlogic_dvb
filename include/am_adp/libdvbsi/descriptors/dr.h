@@ -65,6 +65,7 @@
 #include "dr_5a.h"
 #include "dr_69.h"
 #include "dr_54.h"
+#include "dr_81.h"
 #include "dr_83.h"
 #include "dr_86.h"
 #include "dr_87.h"
@@ -75,6 +76,7 @@
 #include "dr_7a.h"
 #include "dr_7f.h"
 #include "dr_a1.h"
+#include "dr_cc.h"
 #else
 #error "Multiple inclusions of dr.h"
 #endif

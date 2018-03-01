@@ -23,7 +23,7 @@
  * \date 2010-08-06: create the document
  ***************************************************************************/
 
-#define AM_DEBUG_LEVEL 1
+#define AM_DEBUG_LEVEL 5
 
 #include <am_debug.h>
 #include <am_mem.h>

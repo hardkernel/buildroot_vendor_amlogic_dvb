@@ -24,6 +24,7 @@
 
 #include "am_util.h"
 #include <stdio.h>
+#include "am_misc.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -38,6 +39,8 @@ extern "C"
 #define AM_DEBUG_LEVEL 500
 #endif
 
+#define AM_DEBUG_LOGLEVEL_DEFAULT 1
+
 #define AM_DEBUG_WITH_FILE_LINE
 #ifdef AM_DEBUG_WITH_FILE_LINE
 #define AM_DEBUG_FILE_LINE fprintf(stderr, "(\"%s\" %d)", __FILE__, __LINE__);
@@ -48,7 +51,7 @@ extern "C"
 /**\brief 输出调试信息
  *如果_level小于等于文件中定义的宏AM_DEBUG_LEVEL,则输出调试信息。
  */
- #ifndef ANDROID
+#ifndef ANDROID
 #define AM_DEBUG(_level,_fmt...) \
 	AM_MACRO_BEGIN\
 	if ((_level)<=(AM_DEBUG_LEVEL))\
@@ -64,10 +67,11 @@ extern "C"
 #ifndef TAG_EXT
 #define TAG_EXT
 #endif
+
 #define log_print(...) __android_log_print(ANDROID_LOG_INFO, "AM_DEBUG" TAG_EXT, __VA_ARGS__)
 #define AM_DEBUG(_level,_fmt...) \
 	AM_MACRO_BEGIN\
-	if ((_level)<=(AM_DEBUG_LEVEL))\
+	if ((_level)<=(AM_DebugGetLogLevel()))\
 	{\
 		log_print(_fmt);\
 	}\

@@ -92,7 +92,7 @@ typedef struct dvbpsi_pmt_s
   dvbpsi_descriptor_t *     p_first_descriptor; /*!< descriptor list */
 
   dvbpsi_pmt_es_t *         p_first_es;         /*!< ES list */
-
+  int                       i_scramble_flag;    /*!< is scramble **/
 } dvbpsi_pmt_t;
 
 

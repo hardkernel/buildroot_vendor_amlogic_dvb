@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <am_time.h>
+#include <am_cond.h>
 
 #define AM_TT2_MAX_SLICES (32)
 #define AM_TT2_MAX_CACHED_PAGES (200)

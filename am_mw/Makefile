@@ -7,7 +7,7 @@ include $(BASE)/rule/def.mk
 ifeq ($(TARGET),android)
 SUBDIRS=am_cfg am_si am_img am_db am_font am_scan am_epg am_rec am_sub am_tt
 else
-SUBDIRS=am_cfg am_si am_db am_scan am_epg am_rec am_sub2 am_fend_ctrl
+SUBDIRS=am_cfg am_si am_db am_scan am_epg am_rec am_sub2 am_fend_ctrl am_check_scramb
 endif
 
 LIB_TARGET=am_mw
@@ -15,7 +15,7 @@ LIB_TARGET=am_mw
 ifeq ($(TARGET),android)
 am_mw_OBJS=am_cfg/am_cfg am_si/am_si am_img/am_img  am_font/am_font am_scan/am_scan am_epg/am_epg  am_db/am_db am_rec/am_rec am_sub/am_sub am_tt/am_tt
 else
-am_mw_OBJS=am_cfg/am_cfg am_si/am_si am_scan/am_scan am_epg/am_epg am_db/am_db am_rec/am_rec am_sub2/am_sub am_fend_ctrl/am_fend_ctrl
+am_mw_OBJS=am_cfg/am_cfg am_si/am_si am_scan/am_scan am_epg/am_epg am_db/am_db am_rec/am_rec am_sub2/am_sub am_fend_ctrl/am_fend_ctrl am_check_scramb/am_check_scramb
 endif
 
 include $(BASE)/rule/rule.mk

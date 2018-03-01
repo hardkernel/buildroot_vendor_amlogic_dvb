@@ -231,6 +231,36 @@ static AM_ErrorCode_t dvb_get_info (AM_FEND_Device_t *dev, struct dvb_frontend_i
 	if(ret != 0){
 		return AM_FEND_ERR_NOT_SUPPORTED;
 	}
+	switch (info->type)
+	{
+		case SYS_DVBS:
+			{
+				/* process sec */
+				info->type = FE_QPSK;
+				break;
+			}
+		case SYS_DVBC_ANNEX_A :
+			info->type = FE_QAM;
+			break;
+		case SYS_DVBT :
+			info->type = FE_OFDM;
+			break;
+		case SYS_ATSC:
+		case SYS_DVBC_ANNEX_B:
+			info->type = FE_ATSC ;
+			break;
+		case SYS_ANALOG:
+			info->type = FE_ANALOG ;
+			break;
+		case SYS_DTMB:
+			info->type = FE_DTMB ;
+			break;
+		case SYS_ISDBT:
+			info->type = FE_ISDBT ;
+			break;
+		default:
+			break;
+	}
 
 	return AM_SUCCESS;
 }
@@ -258,12 +288,14 @@ static AM_ErrorCode_t dvb_get_ts (AM_FEND_Device_t *dev, AM_DMX_Source_t *src)
 static AM_ErrorCode_t dvb_set_para (AM_FEND_Device_t *dev, const struct dvb_frontend_parameters *para)
 {
 	int fd = (long)dev->drv_data;
-	
+
+	AM_DEBUG(1, "ioctl FE_SET_FRONTEND \n");
 	if(ioctl(fd, FE_SET_FRONTEND, para)==-1)
 	{
 		AM_DEBUG(1, "ioctl FE_SET_FRONTEND failed, error:%s", strerror(errno));
 		return AM_FAILURE;
 	}
+	AM_DEBUG(1, "ioctl FE_SET_FRONTEND success \n");
 
 	return AM_SUCCESS;
 }

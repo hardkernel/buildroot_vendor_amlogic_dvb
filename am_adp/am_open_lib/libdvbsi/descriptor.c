@@ -90,7 +90,7 @@ int dvbpsi_Set_DecodeDescriptor_Callback(DVBpsi_Decode_Descriptor cb)
     int ret = 0;
     if (cb) {
         psi_decode_descriptor = cb;
-        AM_DEBUG(1,"set decode descriptor cb success\n");
+        //AM_DEBUG(1,"set decode descriptor cb success\n");
     } else {
         AM_DEBUG(1,"set decode descriptor cb null error\n");
         ret = -1;

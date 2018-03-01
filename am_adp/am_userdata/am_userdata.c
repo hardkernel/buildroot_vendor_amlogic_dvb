@@ -43,6 +43,7 @@
 #include <am_fend.h>
 #include <am_time.h>
 #include <am_mem.h>
+#include <am_cond.h>
 
 #include "../am_adp_internal.h"
 
@@ -81,11 +82,11 @@ static AM_USERDATA_Device_t userdata_devices[USERDATA_DEV_COUNT] =
 /****************************************************************************
  * Static functions
  ***************************************************************************/
- 
+
 /**\brief 根据设备号取得设备结构指针*/
 static AM_INLINE AM_ErrorCode_t userdata_get_dev(int dev_no, AM_USERDATA_Device_t **dev)
 {
-	if((dev_no<0) || (dev_no>=USERDATA_DEV_COUNT))
+	if ((dev_no<0) || (dev_no >= USERDATA_DEV_COUNT))
 	{
 		AM_DEBUG(1, "invalid userdata device number %d, must in(%d~%d)", dev_no, 0, USERDATA_DEV_COUNT-1);
 		return AM_USERDATA_ERR_INVALID_DEV_NO;
@@ -100,7 +101,7 @@ static AM_INLINE AM_ErrorCode_t userdata_get_openned_dev(int dev_no, AM_USERDATA
 {
 	AM_TRY(userdata_get_dev(dev_no, dev));
 	
-	if(!(*dev)->open_cnt)
+	if (!(*dev)->open_cnt)
 	{
 		AM_DEBUG(1, "userdata device %d has not been openned", dev_no);
 		return AM_USERDATA_ERR_INVALID_DEV_NO;
@@ -121,7 +122,7 @@ static void dump_user_data(const uint8_t *buff, int size)
 		sprintf(buf+i*3, "%02x ", buff[i]);
 	}
 
-	AM_DEBUG(3, "%s", buf);
+	AM_DEBUG(5, "%s", buf);
 }
 
 int userdata_ring_buf_init(AM_USERDATA_RingBuffer_t *ringbuf, size_t len)
@@ -232,7 +233,7 @@ static void read_unused_data(AM_USERDATA_RingBuffer_t *ringbuf, size_t len)
 	
 	if (buf != NULL)
 	{
-		AM_DEBUG(1, "read %d bytes unused data", len);
+		//AM_DEBUG(1, "read %d bytes unused data", len);
 		userdata_ring_buf_read(ringbuf, buf, len);
 		free(buf);
 	}
@@ -258,7 +259,7 @@ static int userdata_package_write(AM_USERDATA_Device_t *dev, const uint8_t *buf,
 	}
 	pthread_mutex_unlock(&dev->lock);
 	
-	AM_DEBUG(3, "write %d bytes\n", ret);
+	//AM_DEBUG(3, "write %d bytes\n", ret);
 	dump_user_data(buf, size);
 	return ret;
 }
@@ -269,14 +270,14 @@ static int userdata_package_read(AM_USERDATA_Device_t *dev, uint8_t *buf, int si
 	
 	ud_cnt = 0;
 	cnt = userdata_ring_buf_avail(&dev->pkg_buf);
-	if (cnt > 4) 
+	if (cnt > 4)
 	{
 		userdata_ring_buf_read(&dev->pkg_buf, (uint8_t*)&ud_cnt, sizeof(ud_cnt));
 		cnt = userdata_ring_buf_avail(&dev->pkg_buf);
 		if (cnt < ud_cnt)
 		{
 			/* this case must not happen */
-			AM_DEBUG(0, "read userdata error: expect %d bytes, but only %d bytes avail", ud_cnt, cnt);
+			//AM_DEBUG(0, "read userdata error: expect %d bytes, but only %d bytes avail", ud_cnt, cnt);
 			cnt = 0;
 			read_unused_data(&dev->pkg_buf, cnt);
 		}
@@ -285,7 +286,7 @@ static int userdata_package_read(AM_USERDATA_Device_t *dev, uint8_t *buf, int si
 			cnt = 0;
 			if (ud_cnt > size)
 			{
-				AM_DEBUG(0, "read userdata error: source buffer not enough, bufsize %d , datasize %d", size, ud_cnt);
+				//AM_DEBUG(0, "read userdata error: source buffer not enough, bufsize %d , datasize %d", size, ud_cnt);
 				read_unused_data(&dev->pkg_buf, ud_cnt);
 			}
 			else if (ud_cnt > 0)
@@ -297,7 +298,7 @@ static int userdata_package_read(AM_USERDATA_Device_t *dev, uint8_t *buf, int si
 	}
 	else
 	{
-		AM_DEBUG(0, "read userdata error: count = %d < 4", cnt);
+		//AM_DEBUG(0, "read userdata error: count = %d < 4", cnt);
 		cnt = 0;
 		read_unused_data(&dev->pkg_buf, cnt);
 	}
@@ -336,7 +337,7 @@ static AM_ErrorCode_t userdata_package_poll(AM_USERDATA_Device_t *dev, int timeo
 /****************************************************************************
  * API functions
  ***************************************************************************/
- 
+
 /**\brief 打开USERDATA设备
  * \param dev_no USERDATA设备号
  * \param[in] para USERDATA设备开启参数
@@ -356,7 +357,7 @@ AM_ErrorCode_t AM_USERDATA_Open(int dev_no, const AM_USERDATA_OpenPara_t *para)
 	
 	pthread_mutex_lock(&am_gAdpLock);
 	
-	if(dev->open_cnt)
+	if (dev->open_cnt)
 	{
 		AM_DEBUG(1, "userdata device %d has already been openned", dev_no);
 		dev->open_cnt++;
@@ -369,12 +370,12 @@ AM_ErrorCode_t AM_USERDATA_Open(int dev_no, const AM_USERDATA_OpenPara_t *para)
 	userdata_ring_buf_init(&dev->pkg_buf, USERDATA_BUF_SIZE);
 	pthread_mutex_init(&dev->lock, NULL);
 	
-	if(dev->drv->open)
+	if (dev->drv->open)
 	{
 		ret = dev->drv->open(dev, para);
 	}
 	
-	if(ret==AM_SUCCESS)
+	if (ret == AM_SUCCESS)
 	{
 		dev->open_cnt++;
 	}
@@ -404,11 +405,11 @@ AM_ErrorCode_t AM_USERDATA_Close(int dev_no)
 	
 	pthread_mutex_lock(&am_gAdpLock);
 
-	if(dev->open_cnt > 0)
+	if (dev->open_cnt > 0)
 	{
 		if (dev->open_cnt == 1)
 		{				
-			if(dev->drv->close)
+			if (dev->drv->close)
 			{
 				dev->drv->close(dev);
 			}
@@ -429,7 +430,7 @@ AM_ErrorCode_t AM_USERDATA_Close(int dev_no)
  * \param dev_no USERDATA设备号
  * \param	[out] buf 缓冲区
  * \param size	需要读取的数据长度
- * \param timeout 读取超时时间 ms 
+ * \param timeout 读取超时时间 ms
  * \return
  *   - 实际读取的字节数
  */
@@ -443,7 +444,7 @@ int AM_USERDATA_Read(int dev_no, uint8_t *buf, int size, int timeout_ms)
 
 	pthread_mutex_lock(&dev->lock);
 	ret = userdata_package_poll(dev, timeout_ms);
-	if(ret==AM_SUCCESS)
+	if (ret == AM_SUCCESS)
 	{
 		cnt = userdata_package_read(dev, buf, size);
 	}

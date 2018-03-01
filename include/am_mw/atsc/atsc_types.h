@@ -55,7 +55,7 @@ typedef uint32_t	INT32U;
 #define ATSC_PSIP_STT_TID       0xcd
 #define ATSC_PSIP_DCCT_TID      0xd3
 #define ATSC_PSIP_DCCSCT_TID    0xd4
-
+#define ATSC_PSIP_CEA_TID       0xd8
 
 #ifdef __cplusplus
 }

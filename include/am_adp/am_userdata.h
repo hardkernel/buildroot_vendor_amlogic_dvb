@@ -59,11 +59,12 @@ enum AM_USERDATA_ErrorCode
 /**\brief MPEG user data device open parameters*/
 typedef struct
 {
-	int    foo;	
+	int    foo;
+	int vfmt;
 } AM_USERDATA_OpenPara_t;
 
 /****************************************************************************
- * Function prototypes  
+ * Function prototypes
  ***************************************************************************/
 
 /**\brief Open the MPEG user data device

@@ -46,12 +46,46 @@ enum
 	FLASH_HIDE
 };
 
+enum
+{
+	UNKNOWN = -1,
+	MPEG12,
+	MPEG4,
+	H264,
+	MJPEG,
+	REAL,
+	JPEG,
+	VC1,
+	AVS,
+	SW,
+	H264MVC,
+	H264_4K2K,
+	HEVC,
+	H264_ENC,
+	JPEG_ENC,
+	VP9,
+};
+
+
 typedef struct AM_CC_Decoder AM_CC_Decoder_t;
 
+typedef struct json_chain AM_CC_JsonChain_t;
+#define JSON_STRING_LENGTH 8192
+struct json_chain
+{
+	char* buffer;
+	uint32_t pts;
+	struct timespec decode_time;
+	struct timespec display_time;
+	struct json_chain* json_chain_next;
+	struct json_chain* json_chain_prior;
+	int count;
+};
 
 /**\brief ClosedCaption数据*/
 struct AM_CC_Decoder
 {
+	int vfmt;
 	int evt;
 	int vbi_pgno;
 	int flash_stat;
@@ -66,14 +100,25 @@ struct AM_CC_Decoder
 	pthread_cond_t cond;
 	struct tvcc_decoder decoder;
 
+	AM_CC_JsonChain_t* json_chain_head;
 	AM_CC_CreatePara_t cpara;
 	AM_CC_StartPara_t spara;
+
+	int curr_data_mask;
+	int curr_switch_mask;
+	int process_update_flag;
+
+	uint32_t decoder_cc_pts;
+	uint32_t video_pts;
 };
 
 
 /****************************************************************************
- * Function prototypes  
+ * Function prototypes
  ***************************************************************************/
+int tvcc_to_json (struct tvcc_decoder *td, int pgno, char *buf, size_t len);
+int tvcc_empty_json (int pgno, char *buf, size_t len);
+
 
 
 #ifdef __cplusplus

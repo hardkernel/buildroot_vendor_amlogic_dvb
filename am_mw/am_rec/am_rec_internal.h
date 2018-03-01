@@ -67,6 +67,8 @@ typedef struct
 	int				rec_file_index;
 	char			rec_file_name[AM_REC_PATH_MAX];
 	void			*user_data;
+    int       tfile_flag;
+    AM_TFile_t      tfile;
 }AM_REC_Recorder_t;
 
 /****************************************************************************

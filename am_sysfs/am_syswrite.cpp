@@ -10,7 +10,7 @@
 #include <utils/threads.h>
 #include <unistd.h>
 
-#include <am_debug.h>
+#include "am_debug.h"
 
 #include "am_sys_write.h"
 
@@ -158,7 +158,7 @@ AM_ErrorCode_t AM_SystemControl_Write_Sysfs(const char *path, char *value)
         String16 v(value);
         if (scs->writeSysfs(String16(path), v))
         {
-            AM_DEBUG(1,"writeSysfs ok");
+            //AM_DEBUG(1,"writeSysfs ok");
             return AM_SUCCESS;
         }
     }

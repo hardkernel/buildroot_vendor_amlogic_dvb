@@ -47,6 +47,11 @@ typedef struct AV_DataPlayer   AV_DataPlayer_t;
 typedef struct AV_InjectPlayer AV_InjectPlayer_t;
 typedef struct AV_TimeshiftPlayer AV_TimeshiftPlayer_t;
 
+typedef struct {
+	pthread_t av_mon_thread;
+	AM_Bool_t av_thread_running;
+} AV_Monitor_t;
+
 /**\brief TS播放参数*/
 typedef struct
 {
@@ -64,8 +69,7 @@ struct AV_TSPlayer
 {
 	void            *drv_data;       /**< 解码驱动相关数据*/
 	AM_AV_TSSource_t src;            /**< TS源*/
-	pthread_t	av_mon_thread;	/**< 监控Audio Video buffer数据变化线程*/
-	AM_Bool_t	av_thread_running;
+	AV_Monitor_t     mon;
 	int             av_start_time;
 	AV_TSPlayPara_t play_para;	/**< 播放参数*/
 };
@@ -119,6 +123,7 @@ typedef struct {
 struct AV_TimeshiftPlayer
 {
 	void            *drv_data;       /**< 解码驱动相关数据*/
+	AV_Monitor_t    mon;
 	AV_TimeShiftPlayPara_t para;
 };
 
@@ -225,6 +230,9 @@ struct AM_AV_Driver
 	AM_ErrorCode_t (*reset_audio_decoder)(AM_AV_Device_t *dev);
 	AM_ErrorCode_t (*set_drm_mode)(AM_AV_Device_t *dev, int enable);
 	AM_ErrorCode_t (*set_audio_ad)(AM_AV_Device_t *dev, int enable, uint16_t apid, AM_AV_AFormat_t afmt);
+	AM_ErrorCode_t (*set_inject_audio)(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt);
+	AM_ErrorCode_t (*set_inject_subtitle)(AM_AV_Device_t *dev, uint16_t spid, int stype);
+	AM_ErrorCode_t (*timeshift_get_tfile)(AM_AV_Device_t *dev, AM_TFile_t *tfile);
 };
 
 /**\brief 音视频播放参数*/

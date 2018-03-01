@@ -58,6 +58,7 @@ enum
 	AM_EPG_EVT_PSIP_EIT_DONE	= 0x200000, /**< ATSC 某个 EIT 接收完毕*/
 	AM_EPG_EVT_VCT_DONE		= 0x400000,	/**< VCT接收完毕*/
 	AM_EPG_EVT_PSIP_ETT_DONE	= 0x800000,/**< ATSC 某个 ETT 接收完毕*/
+	AM_EPG_EVT_PSIP_CEA_DONE	= 0x1000000,/**< ATSC 某个 CEA 接收完毕*/
 };
 
 typedef struct AM_EPG_Monitor_s AM_EPG_Monitor_t ;
@@ -91,6 +92,8 @@ typedef struct
 	
 	uint16_t subs;				/**< 子表个数*/
 	AM_EPG_SubCtl_t *subctl; 	/**< 子表控制数据*/
+
+	int				last_repeat_time;
 }AM_EPG_TableCtl_t;
 
 /**\brief 监控数据*/
@@ -112,6 +115,7 @@ struct AM_EPG_Monitor_s
 	AM_EPG_TableCtl_t	mgtctl;
 	AM_EPG_TableCtl_t	rrtctl;
 	AM_EPG_TableCtl_t	vctctl;
+	AM_EPG_TableCtl_t	ceactl;
 	AM_EPG_TableCtl_t	psip_eitctl[128]; /**< ATSC PSIP supports up to 128 EITs*/
 	AM_EPG_TableCtl_t   psip_ettctl[128]; /**< ATSC PSIP supports up to 128 ETTs*/
 
@@ -128,11 +132,12 @@ struct AM_EPG_Monitor_s
 	int					eitsche_check_time; /**< EIT Schedule自动检查更新间隔，ms*/
 	int					new_eit_check_time; /**< EIT数据更新检查时间*/
 	int					sub_check_time;	/**< 预约播放检查时间*/
-	int					psip_eit_count;	/**<ATSC EIT 最大个数*/
-	int					psip_eit_done_flag;	/**< ATSC EIT 接收完成标志*/
+	int					psip_eit_count;	/**<ATSC EIT 最大个数, max 128*/
+	uint8_t				psip_eit_done_flag[16];	/**< ATSC EIT 接收完成标志*/
+	AM_Bool_t			eit_looped;
 	AM_Bool_t			eit_has_data;		/**< 是否有需要通知更新的EIT数据*/
-	int					psip_ett_count; /**<ATSC ETT 最大个数*/
-	int					psip_ett_done_flag; /**< ATSC ETT 接收完成标志*/
+	int					psip_ett_count; /**<ATSC ETT 最大个数, max 128*/
+	uint8_t				psip_ett_done_flag[16]; /**< ATSC ETT 接收完成标志*/
 
 	dvbpsi_pat_t		*pats;
 	dvbpsi_pmt_t		*pmts;
@@ -146,6 +151,7 @@ struct AM_EPG_Monitor_s
 	dvbpsi_atsc_vct_t	*atsc_vcts;
 	dvbpsi_atsc_eit_t	*atsc_eits;
 	dvbpsi_atsc_ett_t	*atsc_etts;
+	dvbpsi_atsc_cea_t	*atsc_ceas;
 	rrt_section_info_t	*rrts;
 
 	struct dvb_frontend_event 		fe_evt;			/**< 前端事件*/
@@ -174,6 +180,8 @@ struct AM_EPG_Monitor_s
 	int                      disable_def_proc;
 	int                      psip_eit_request;
 	int                      psip_ett_request;
+
+	int                      current_fid;
 };
 
 

@@ -24,6 +24,7 @@
 #include <am_misc.h>
 #include <am_time.h>
 #include <am_debug.h>
+#include <am_cond.h>
 
 typedef struct
 {
@@ -40,8 +41,9 @@ static void sub2_check(AM_SUB2_Parser_t *parser)
 {
 	AM_SUB2_Picture_t *old = parser->pic;
 	AM_SUB2_Picture_t *npic;
-	uint64_t pts;
-	int64_t diff;
+	//uint64_t pts;
+	//int64_t diff;
+	int pts, diff;
 	AM_Bool_t loop;
 
 	do
@@ -60,9 +62,11 @@ static void sub2_check(AM_SUB2_Parser_t *parser)
 		if(npic)
 		{
 			pts = parser->para.get_pts(parser, npic->pts);
-			diff = npic->pts - pts;
+			diff = ((int)npic->pts) - pts;
 
-			if(diff < 0)
+			AM_DEBUG(1, "subtitle pts: %d %d, diff:%d", pts, npic->pts, diff);
+
+			if ((diff < 0) || (diff > 90000*60))
 			{
 				dvbsub_remove_display_picture(parser->handle, parser->pic);
 				parser->pic = npic;
@@ -76,8 +80,7 @@ static void sub2_check(AM_SUB2_Parser_t *parser)
 		if(parser->pic)
 		{
 			pts = parser->para.get_pts(parser, parser->pic->pts);
-			diff = llabs(pts - parser->pic->pts);
-			
+			diff = abs(pts - (int)parser->pic->pts);
 			if((diff > parser->pic->timeout * 90000ll) || pts == 0llu)
 			{
 				dvbsub_remove_display_picture(parser->handle, parser->pic);

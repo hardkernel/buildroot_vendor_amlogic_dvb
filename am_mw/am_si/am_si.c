@@ -135,6 +135,8 @@ static AM_ErrorCode_t si_decode_pmt(void **p_table, dvbpsi_psi_section_t *p_sect
 
 	/*Allocate a new table*/
 	p_pmt = (dvbpsi_pmt_t*)malloc(sizeof(dvbpsi_pmt_t));
+	/*need init p_pmt*/
+	memset(p_pmt, 0, sizeof(dvbpsi_pmt_t));
 	if (p_pmt == NULL)
 	{
 		*p_table = NULL;
@@ -466,6 +468,35 @@ static AM_ErrorCode_t si_decode_atsc_eit(void **p_table, dvbpsi_psi_section_t *p
 	return AM_SUCCESS;
 }
 
+static AM_ErrorCode_t si_decode_atsc_cea(void **p_table, dvbpsi_psi_section_t *p_section)
+{
+	dvbpsi_atsc_cea_t *p_cea;
+
+	assert(p_table && p_section);
+
+	/*Allocate a new table*/
+	p_cea = (dvbpsi_atsc_cea_t*)malloc(sizeof(dvbpsi_atsc_cea_t));
+	if (p_cea == NULL)
+	{
+		*p_table = NULL;
+		return AM_SI_ERR_NO_MEM;
+	}
+
+	/*Init the p_cea*/
+	dvbpsi_atsc_InitCEA(p_cea,
+			p_section->i_table_id,
+			p_section->i_extension,
+			p_section->i_version,
+			p_section->b_current_next);
+
+	/*Decode*/
+	dvbpsi_atsc_DecodeCEASections(p_cea, p_section);
+
+	p_cea->i_table_id = p_section->i_table_id;
+	*p_table = (void*)p_cea;
+	return AM_SUCCESS;
+}
+
 static AM_ErrorCode_t si_decode_atsc_ett(void **p_table, dvbpsi_psi_section_t *p_section)
 {
 	dvbpsi_atsc_ett_t *p_ett;
@@ -643,6 +674,8 @@ void si_decode_descriptor_ex(dvbpsi_descriptor_t *descr, SI_Descriptor_Flag_t fl
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_LCN_88, 			dvbpsi_DecodeLogicalChannelNumber88Dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_AC3, 			dvbpsi_DecodeAC3Dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_ENHANCED_AC3, 	dvbpsi_DecodeENAC3Dr)
+		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_PSIPENHANCED_AC3, 	dvbpsi_DecodePSIPENAC3Dr)
+		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_PSIP_AUDIOSTREAM_AC3, 	dvbpsi_decode_atsc_ac3_audio_dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_EXTENSION, 	dvbpsi_DecodeEXTENTIONDr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_CAPTION_SERVICE,  dvbpsi_decode_atsc_caption_service_dr)
 		SI_ADD_DESCR_DECODE_FUNC(AM_SI_DESCR_SERVICE_LOCATION, dvbpsi_decode_atsc_service_location_dr)
@@ -651,7 +684,8 @@ void si_decode_descriptor_ex(dvbpsi_descriptor_t *descr, SI_Descriptor_Flag_t fl
 	}
 
 	switch (descr->i_tag) {
-	case 0x87: {
+	case AM_SI_DESCR_CONTENT_ADVISORY: {
+		//AM_DEBUG(1, "PMT [%x][%x][%x]", flag, SI_DESCR_87_LCN, SI_DESCR_87_CA);
 		if ((flag & SI_DESCR_87_LCN) == SI_DESCR_87_LCN)
 			dvbpsi_DecodeLogicalChannelNumber87Dr(descr);
 		else if ((flag & SI_DESCR_87_CA) == SI_DESCR_87_CA)
@@ -1107,10 +1141,15 @@ static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char l
 	for (i=0; i<ai->audio_count; i++)
 	{
 		if (ai->audios[i].pid == aud_pid &&
-			ai->audios[i].fmt == aud_fmt &&
-			! memcmp(ai->audios[i].lang, lang, 3))
+			ai->audios[i].fmt == aud_fmt /*&&
+			! memcmp(ai->audios[i].lang, lang, 3)*/)
 		{
-			AM_DEBUG(0, "Skipping a exist audio: pid %d, fmt %d, lang %c%c%c",
+			if ((strncmp(ai->audios[i].lang, "Audio", 5) == 0) && lang[0] != 0) {
+				memset(ai->audios[i].lang, 0, sizeof(ai->audios[i].lang));
+				memcpy(ai->audios[i].lang, lang, 3);
+			}
+
+			AM_DEBUG(1, "Skipping a exist audio: pid %d, fmt %d, lang %c%c%c",
 				aud_pid, aud_fmt, lang[0], lang[1], lang[2]);
 			return;
 		}
@@ -1127,7 +1166,7 @@ static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char l
 	ai->audios[ai->audio_count].fmt = aud_fmt;
 	ai->audios[ai->audio_count].audio_type = audio_type;
 	/*set audio exten flag*/
-	if (aud_fmt == AFORMAT_AC3) {
+	if (aud_fmt == AFORMAT_AC3 || aud_fmt == AFORMAT_EAC3) {
 		ai->audios[ai->audio_count].audio_exten = audio_exten;
 	} else {
 		if (audio_type == 0) {
@@ -1138,7 +1177,7 @@ static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char l
 				/*max main audio sum is AM_SI_MAX_MAIN_AUD_CNT*/
 				ai->audio_mainid = AM_SI_MAX_MAIN_AUD_CNT-1;
 			}
-			AM_DEBUG(0, "add audio main exten 0x%x mainid index:%d", i_exten, ai->audio_mainid);
+			AM_DEBUG(1, "add audio main exten 0x%x mainid index:%d", i_exten, ai->audio_mainid);
 		}
 		ai->audios[ai->audio_count].audio_exten = i_exten;
 	}
@@ -1153,25 +1192,25 @@ static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char l
 		snprintf(ai->audios[ai->audio_count].lang, sizeof(ai->audios[ai->audio_count].lang), "Audio%d", ai->audio_count+1);
 	}
 
-	AM_DEBUG(0, "---Add a audio: pid %d, fmt %d, language: %s ,audio_type:%d, audio_exten:0x%x", aud_pid, aud_fmt, ai->audios[ai->audio_count].lang,audio_type,audio_exten);
+	AM_DEBUG(1, "---Add a audio: pid %d, fmt %d, language: %s ,audio_type:%d, audio_exten:0x%x", aud_pid, aud_fmt, ai->audios[ai->audio_count].lang,audio_type,audio_exten);
 	ai->audio_count++;
 	/*ad sub audio exten when fmt is not ac3*/
 	for (i=0; i<ai->audio_count; i++)
 	{
-		if (ai->audios[i].fmt != AFORMAT_AC3 && ai->audios[i].audio_type != 0) {
-			AM_DEBUG(0,"sub audio lang :%s ", ai->audios[i].lang);
+		if (ai->audios[i].fmt != AFORMAT_AC3 && ai->audios[i].fmt != AFORMAT_EAC3 && ai->audios[i].audio_type != 0) {
+			AM_DEBUG(1,"sub audio lang :%s ", ai->audios[i].lang);
 			for (j=0; j<ai->audio_count; j++)
 			{
 				if (ai->audios[j].fmt != AFORMAT_AC3 && ai->audios[j].audio_type == 0) {
-					AM_DEBUG(0,"main audio lang :%s ", ai->audios[j].lang);
+					AM_DEBUG(1,"main audio lang :%s ", ai->audios[j].lang);
 					/*get same audio lang*/
 					if (!memcmp(ai->audios[i].lang, ai->audios[j].lang, 3)) {
 						/*get main audio mainid and set sub audio exten*/
 						sub_id = (ai->audios[j].audio_exten&0x00ff0000)>>16;
-						AM_DEBUG(0,"sub audio id index :%d ", sub_id);
+						AM_DEBUG(1,"sub audio id index :%d ", sub_id);
 						sub_id = 1 << sub_id;
 						i_exten = AM_Audio_AC3ASVC<<24 | ((sub_id<<16)&0x00ff0000);
-						AM_DEBUG(0, "Add- a sub audio: audio_exten:0x%x main:0x%x",  i_exten, ai->audios[j].audio_exten);
+						AM_DEBUG(1, "Add a sub audio: audio_exten:0x%x main:0x%x",  i_exten, ai->audios[j].audio_exten);
 						break;
 					}
 				}
@@ -1276,7 +1315,7 @@ AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, uint8_t 
 
 	table_id = buf[0];
 	
-	if (table_id <= AM_SI_TID_PSIP_DCCSCT)
+	if (table_id <= AM_SI_TID_PSIP_CEA)
 	{
 		/*生成dvbpsi section*/
 		AM_TRY(si_gen_dvbpsi_section(buf, len, &psi_sec));
@@ -1370,6 +1409,10 @@ AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, uint8_t 
 		case AM_SI_TID_PSIP_ETT:
 			ret = si_decode_atsc_ett(sec, psi_sec);
 			break;
+		case AM_SI_TID_PSIP_CEA:
+		    AM_DEBUG(1, "CEA PSI DECODE");
+			ret = si_decode_atsc_cea(sec, psi_sec);
+			break;
 		default:
 			ret = AM_SI_ERR_NOT_SUPPORTED;
 			break;
@@ -1450,6 +1493,9 @@ AM_ErrorCode_t AM_SI_ReleaseSection(AM_SI_Handle_t handle, uint8_t table_id, voi
 		case AM_SI_TID_PSIP_ETT:
 			dvbpsi_atsc_DeleteETT((dvbpsi_atsc_ett_t*)sec);
 			break;
+		case AM_SI_TID_PSIP_CEA:
+			dvbpsi_atsc_DeleteCEA((dvbpsi_atsc_cea_t*)sec);
+			break;
 		default:
 			ret = AM_SI_ERR_INVALID_SECTION_DATA;
 	}
@@ -1501,7 +1547,7 @@ AM_ErrorCode_t AM_SI_GetDVBTextCodingAndData(char *in, int in_len, char *coding,
 	}
 
 	/*查找输入编码方式*/
-	AM_DEBUG(1,"%s : in_len=%d\n", __FUNCTION__, in_len);
+	AM_DEBUG(2,"%s : in_len=%d\n", __FUNCTION__, in_len);
 
 	#define SET_CODING(_c_) strncpy(coding, (_c_), coding_len)
 	#define SET_PRINT_CODING(_fmt_, _args_...) snprintf(coding, coding_len, _fmt_, _args_)
@@ -1512,7 +1558,7 @@ AM_ErrorCode_t AM_SI_GetDVBTextCodingAndData(char *in, int in_len, char *coding,
 		SET_CODING("ISO-8859-1");
 	} else {
 		fbyte = in[0];
-		AM_DEBUG(1, "%s fbyte == 0x%x \n", __FUNCTION__, fbyte);
+		AM_DEBUG(2, "%s fbyte == 0x%x \n", __FUNCTION__, fbyte);
 		if (fbyte >= 0x01 && fbyte <= 0x0B) {
 			SET_PRINT_CODING("ISO-8859-%d", fbyte + 4);
 		} else if (fbyte >= 0x0C && fbyte <= 0x0F) {
@@ -1536,13 +1582,13 @@ AM_ErrorCode_t AM_SI_GetDVBTextCodingAndData(char *in, int in_len, char *coding,
 		} else if (fbyte == 0x15) {
 			SET_CODING("utf-8");
 		} else if (fbyte >= 0x20) {
-			AM_DEBUG(1, "%s fbyte >= 0x20 \n", __FUNCTION__);
+			AM_DEBUG(2, "%s fbyte >= 0x20 \n", __FUNCTION__);
 			if (strcmp(forced_dvb_text_coding, "")) {
 				/*强制将输入按默认编码处理*/
-				AM_DEBUG(1,"-fbyte >= 0x20-forced_dvb_text_coding-[%s]-\n",forced_dvb_text_coding);
+				AM_DEBUG(2,"-fbyte >= 0x20-forced_dvb_text_coding-[%s]-\n",forced_dvb_text_coding);
 				SET_CODING(forced_dvb_text_coding);
 			} else {
-				AM_DEBUG(1,"-fbyte >= 0x20---ISO6937--\n");
+				AM_DEBUG(2,"-fbyte >= 0x20---ISO6937--\n");
 				SET_CODING("ISO6937");
 			}
 		} else if (fbyte == 0x1f) {
@@ -1554,7 +1600,7 @@ AM_ErrorCode_t AM_SI_GetDVBTextCodingAndData(char *in, int in_len, char *coding,
 		if (fbyte < 0x1f)
 			*offset = 1;
 
-		AM_DEBUG(1,"%s in[0]=0x%x-\n",__FUNCTION__, in[0]);
+		AM_DEBUG(2,"%s in[0]=0x%x-\n",__FUNCTION__, in[0]);
 	}
 	return AM_SUCCESS;
 }
@@ -1582,8 +1628,44 @@ AM_ErrorCode_t AM_SI_ConvertToUTF8(char *in, int in_len, char *out, int out_len,
 			free(temp);
 			temp = NULL;
 		}
-		AM_DEBUG(1,"--pp-out_code=%s--\n",out);
+		AM_DEBUG(2,"--pp-out_code=%s--\n",out);
 		return 0;
+	} else if (!strcmp(coding, "utf-16")) {
+		uint8_t *src, *dst;
+		uint16_t uc;
+		int sleft, dleft;
+
+		src = (uint8_t*)in;
+		dst = (uint8_t*)out;
+		sleft = in_len;
+		dleft = out_len;
+
+		while (sleft > 0) {
+			uc = (src[0] << 8) | src[1];
+
+			if (uc <= 0x7f) {
+				if (dleft < 1)
+					break;
+				dleft --;
+				*dst++ = uc;
+			} else if (uc <= 0x7ff) {
+				if (dleft < 2)
+					break;
+				dleft -= 2;
+				*dst++ = (uc >> 6) | 0xb0;
+				*dst++ = (uc & 0x3f) | 0x80;
+			} else {
+				if (dleft < 3)
+					break;
+				dleft -= 3;
+				*dst++ = (uc >> 12) | 0xe0;
+				*dst++ = ((uc >> 6) & 0x3f) | 0x80;
+				*dst++ = (uc & 0x3f) | 0x80;
+			}
+
+			src += 2;
+			sleft -= 2;
+		}
 	} else {
 		char **pin = &in;
 		char **pout = &out;
@@ -1637,11 +1719,9 @@ AM_ErrorCode_t AM_SI_ConvertDVBTextCode(char *in_code,int in_len,char *out_code,
 	char cod[64] = {0};
 	int offset = 0;
 
-	AM_DEBUG(0, "DVB convert text code");
-
 	AM_TRY(AM_SI_GetDVBTextCodingAndData(in_code, in_len, cod, 64, &offset));
 
-	AM_DEBUG(0, "coding:%s, offset:%d", cod, offset);
+	AM_DEBUG(2, "coding:%s, offset:%d", cod, offset);
 
 	return AM_SI_ConvertToUTF8(in_code+offset, in_len-offset, out_code, out_len, cod);
 }
@@ -1695,6 +1775,54 @@ AM_ErrorCode_t AM_SI_GetAudioExten_from_ENAC3des(dvbpsi_ENAC3_dr_t *p_decoded,in
 	AM_DEBUG(1, "audio->audio_exten : 0x%04x", i_exten);
 	return  AM_SUCCESS;
 }
+/**\brief 根据 PSIP enac3 des 获取audio 的 exten
+ * \param [in] p_decoded dvbpsi_ENAC3_dr_t
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_si.h)
+ */
+AM_ErrorCode_t AM_SI_GetAudioExten_from_PSIPENAC3des(dvbpsi_PSIPENAC3_dr_t *p_decoded,int *p_exten)
+{
+	int i_exten = 0;
+	/*i_exten is 32 bit,31:24 bit: exten type,*/
+	/*23:16:mainid or asvc id,8 bit*/
+	/*15:0 bit:no use*/
+	if (p_decoded->i_mainid_flag == 1)
+	{
+		i_exten = AM_Audio_AC3MAIN<<24 | p_decoded->i_mainid<<16;
+	}
+	if (p_decoded->i_asvc_flag == 1)
+	{
+		i_exten = AM_Audio_AC3ASVC<<24 | p_decoded->i_asvc<<16;
+	}
+	*p_exten = i_exten;
+	AM_DEBUG(1, "audio->audio_exten : 0x%04x", i_exten);
+	return  AM_SUCCESS;
+}
+/**\brief 根据 PSIP ac3 audio stream des 获取audio 的 exten
+ * \param [in] p_decoded dvbpsi_ENAC3_dr_t
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_si.h)
+ */
+AM_ErrorCode_t AM_SI_GetAudioExten_from_PSIPAC3AStreamdes(dvbpsi_atsc_ac3_audio_dr_t *p_decoded,int *p_exten)
+{
+	int i_exten = 0;
+	/*i_exten is 32 bit,31:24 bit: exten type,*/
+	/*23:16:mainid or asvc id,8 bit*/
+	/*15:0 bit:no use*/
+	if (p_decoded->i_bsmod < 1)
+	{
+		i_exten = AM_Audio_AC3MAIN<<24 | p_decoded->i_mainid<<16;
+	}
+	else
+	{
+		i_exten = AM_Audio_AC3ASVC<<24 | p_decoded->i_asvcflags<<16;
+	}
+	*p_exten = i_exten;
+	AM_DEBUG(1, "audio->audio_exten : 0x%04x", i_exten);
+	return  AM_SUCCESS;
+}
 /**\brief 从一个ES流中提取音视频
  * \param [in] es ES流
  * \param [out] vid 提取出的视频PID
@@ -1737,6 +1865,22 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 						if (descr->p_decoded != NULL)
 						{
 							AM_SI_GetAudioExten_from_ENAC3des((dvbpsi_ENAC3_dr_t*)descr->p_decoded,&audio_exten);
+						}
+						break;
+					case AM_SI_DESCR_PSIPENHANCED_AC3:
+						AM_DEBUG(1, "!!Found PSIP Enhanced AC3 Descriptor!!!");
+						afmt_tmp = AFORMAT_EAC3;
+						if (descr->p_decoded != NULL)
+						{
+							AM_SI_GetAudioExten_from_PSIPENAC3des((dvbpsi_PSIPENAC3_dr_t*)descr->p_decoded,&audio_exten);
+						}
+						break;
+					case AM_SI_DESCR_PSIP_AUDIOSTREAM_AC3:
+						AM_DEBUG(1, "!!Found PSIP AC3 audio stream Descriptor!!!");
+						afmt_tmp = AFORMAT_AC3;
+						if (descr->p_decoded != NULL)
+						{
+							AM_SI_GetAudioExten_from_PSIPAC3AStreamdes((dvbpsi_atsc_ac3_audio_dr_t*)descr->p_decoded,&audio_exten);
 						}
 						break;
 					case AM_SI_DESCR_AAC:
@@ -1792,6 +1936,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 		case 0x1:
 		case 0x2:
 		//case 0x80:/*do not support*/
+		case 0x80:
 			vfmt_tmp = VFORMAT_MPEG12;
 			break;
 		case 0x10:
@@ -1822,6 +1967,46 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 			break;
 		case 0x81:
 			afmt_tmp = AFORMAT_AC3;
+			AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+			//AM_DEBUG(1, "ac3 descr->i_tag : 0x%02x", descr->i_tag);
+				switch (descr->i_tag)
+				{
+					case AM_SI_DESCR_AC3:
+						AM_DEBUG(1, "!!Found AC3 Descriptor!!!");
+						afmt_tmp = AFORMAT_AC3;
+						if (descr->p_decoded != NULL)
+						{
+							AM_SI_GetAudioExten_from_AC3des((dvbpsi_AC3_dr_t*)descr->p_decoded,&audio_exten);
+						}
+						break;
+					case AM_SI_DESCR_ENHANCED_AC3:
+						AM_DEBUG(1, "!!Found Enhanced AC3 Descriptor!!!");
+						afmt_tmp = AFORMAT_EAC3;
+						if (descr->p_decoded != NULL)
+						{
+							AM_SI_GetAudioExten_from_ENAC3des((dvbpsi_ENAC3_dr_t*)descr->p_decoded,&audio_exten);
+						}
+						break;
+					case AM_SI_DESCR_PSIPENHANCED_AC3:
+						AM_DEBUG(1, "!!Found PSIP Enhanced AC3 Descriptor!!!");
+						afmt_tmp = AFORMAT_EAC3;
+						if (descr->p_decoded != NULL)
+						{
+							AM_SI_GetAudioExten_from_PSIPENAC3des((dvbpsi_PSIPENAC3_dr_t*)descr->p_decoded,&audio_exten);
+						}
+						break;
+					case AM_SI_DESCR_PSIP_AUDIOSTREAM_AC3:
+						AM_DEBUG(1, "!!Found PSIP AC3 audio stream Descriptor!!!");
+						afmt_tmp = AFORMAT_AC3;
+						if (descr->p_decoded != NULL)
+						{
+							AM_SI_GetAudioExten_from_PSIPAC3AStreamdes((dvbpsi_atsc_ac3_audio_dr_t*)descr->p_decoded,&audio_exten);
+						}
+						break;
+					default:
+						break;
+				}
+			AM_SI_LIST_END()
 			break;
 		case 0x8A:
 		case 0x82:
@@ -1831,6 +2016,46 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 			break;
 		case 0x87:
 			afmt_tmp = AFORMAT_EAC3;
+			AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+			//AM_DEBUG(1, "eac3 descr->i_tag : 0x%02x", descr->i_tag);
+				switch (descr->i_tag)
+				{
+					case AM_SI_DESCR_AC3:
+						AM_DEBUG(1, "!!Found AC3 Descriptor!!!");
+						afmt_tmp = AFORMAT_AC3;
+						if (descr->p_decoded != NULL)
+						{
+							AM_SI_GetAudioExten_from_AC3des((dvbpsi_AC3_dr_t*)descr->p_decoded,&audio_exten);
+						}
+						break;
+					case AM_SI_DESCR_ENHANCED_AC3:
+						AM_DEBUG(1, "!!Found Enhanced AC3 Descriptor!!!");
+						afmt_tmp = AFORMAT_EAC3;
+						if (descr->p_decoded != NULL)
+						{
+							AM_SI_GetAudioExten_from_ENAC3des((dvbpsi_ENAC3_dr_t*)descr->p_decoded,&audio_exten);
+						}
+						break;
+					case AM_SI_DESCR_PSIPENHANCED_AC3:
+						AM_DEBUG(1, "!!Found PSIP Enhanced AC3 Descriptor!!!");
+						afmt_tmp = AFORMAT_EAC3;
+						if (descr->p_decoded != NULL)
+						{
+							AM_SI_GetAudioExten_from_PSIPENAC3des((dvbpsi_PSIPENAC3_dr_t*)descr->p_decoded,&audio_exten);
+						}
+						break;
+					case AM_SI_DESCR_PSIP_AUDIOSTREAM_AC3:
+						AM_DEBUG(1, "!!Found PSIP AC3 audio stream Descriptor!!!");
+						afmt_tmp = AFORMAT_AC3;
+						if (descr->p_decoded != NULL)
+						{
+							AM_SI_GetAudioExten_from_PSIPAC3AStreamdes((dvbpsi_atsc_ac3_audio_dr_t*)descr->p_decoded,&audio_exten);
+						}
+						break;
+					default:
+						break;
+				}
+			AM_SI_LIST_END()
 			break;
 		default:
 			break;
@@ -1840,7 +2065,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 	if (vfmt_tmp != -1)
 	{
 		*vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;	
-		AM_DEBUG(3, "Set video format to %d", vfmt_tmp);
+		AM_DEBUG(1, "Set video format to %d", vfmt_tmp);
 		*vfmt = vfmt_tmp;
 	}
 	if (afmt_tmp != -1)
@@ -1868,7 +2093,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 						memcpy(lang_tmp, pisod->exten_t.sup_audio.iso_639_lang_code, sizeof(lang_tmp));
 					}
 					audio_type = pisod->exten_t.sup_audio.editorial_classification;
-					AM_DEBUG(3, "audio type : %d lang:%s", audio_type, lang_tmp);
+					AM_DEBUG(1, "audio type : %d lang:%s", audio_type, lang_tmp);
 					break;
 				}
 			}
@@ -2029,7 +2254,7 @@ AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_Subtitl
 				
 				if (sub_info->subtitle_count >= AM_SI_MAX_SUB_CNT)
 				{
-					AM_DEBUG(1, "Too many subtitles, Max count %d", AM_SI_MAX_SUB_CNT);
+					AM_DEBUG(0, "Too many subtitles, Max count %d", AM_SI_MAX_SUB_CNT);
 					return AM_SUCCESS;
 				}
 				
@@ -2052,7 +2277,7 @@ AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_Subtitl
 					sub_info->subtitles[sub_info->subtitle_count].lang[3] = 0;
 				}
 				
-				AM_DEBUG(0, "Add a subtitle: pid %d, language: %s", es->i_pid, sub_info->subtitles[sub_info->subtitle_count].lang);
+				AM_DEBUG(1, "Add a subtitle: pid %d, language: %s", es->i_pid, sub_info->subtitles[sub_info->subtitle_count].lang);
 
 				sub_info->subtitle_count++;
 			}
@@ -2123,7 +2348,7 @@ AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_Teletex
 				
 				if (ttx_info->teletext_count >= AM_SI_MAX_TTX_CNT)
 				{
-					AM_DEBUG(1, "Too many teletexts, Max count %d", AM_SI_MAX_TTX_CNT);
+					AM_DEBUG(0, "Too many teletexts, Max count %d", AM_SI_MAX_TTX_CNT);
 					return AM_SUCCESS;
 				}
 				
@@ -2146,7 +2371,7 @@ AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_Teletex
 					ttx_info->teletexts[ttx_info->teletext_count].lang[3] = 0;
 				}
 				
-				AM_DEBUG(0, "Add a teletext: pid %d, language: %s", es->i_pid, ttx_info->teletexts[ttx_info->teletext_count].lang);
+				AM_DEBUG(1, "Add a teletext: pid %d, language: %s", es->i_pid, ttx_info->teletexts[ttx_info->teletext_count].lang);
 
 				ttx_info->teletext_count++;
 			}
@@ -2173,7 +2398,7 @@ AM_ErrorCode_t AM_SI_ExtractATSCCaptionFromES(dvbpsi_pmt_es_t *es, AM_SI_Caption
 
 				if (cap_info->caption_count >= AM_SI_MAX_CAP_CNT)
 				{
-					AM_DEBUG(1, "Too many captions, Max count %d", AM_SI_MAX_CAP_CNT);
+					AM_DEBUG(0, "Too many captions, Max count %d", AM_SI_MAX_CAP_CNT);
 					return AM_SUCCESS;
 				}
 
@@ -2199,7 +2424,7 @@ AM_ErrorCode_t AM_SI_ExtractATSCCaptionFromES(dvbpsi_pmt_es_t *es, AM_SI_Caption
 					cap_info->captions[cap_info->caption_count].lang[3] = 0;
 				}
 
-				AM_DEBUG(0, "Add a caption: pid %d, language: %s, digital:%d service:%d",
+				AM_DEBUG(1, "Add a caption: pid %d, language: %s, digital:%d service:%d",
 					es->i_pid,
 					cap_info->captions[cap_info->caption_count].lang,
 					cap_info->captions[cap_info->caption_count].type,

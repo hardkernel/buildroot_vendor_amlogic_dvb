@@ -14,7 +14,7 @@
  * Description:
  */
 /**\file
- * \brief 一些常用辅助函数
+ * \brief Misc tools
  *
  * \author Gong Ke <ke.gong@amlogic.com>
  * \date 2010-08-05: create the document
@@ -38,7 +38,6 @@ extern "C"
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
-
 
 /****************************************************************************
  * API function prototypes  
@@ -111,9 +110,21 @@ extern AM_ErrorCode_t AM_LocalGetResp(int fd, char *buf, int len);
  */
 extern AM_ErrorCode_t AM_Check_UTF8(const char *src, int src_len, char *dest, int *dest_len);
 
+/**\brief Set the log level of debug print
+ * \param[in] level
+ */
+extern void AM_DebugSetLogLevel(int level);
+
+/**\brief Get the log level of debug print
+ * \return
+ *   - current log level
+ */
+extern int AM_DebugGetLogLevel();
+
 #ifdef __cplusplus
 }
 #endif
 
 #endif
+
 

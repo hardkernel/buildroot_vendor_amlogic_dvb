@@ -110,6 +110,7 @@ typedef enum
 	AM_SCAN_DTV_STD_MAX,
 }AM_SCAN_DTVStandard_t;
 
+
 /**\brief TV scan mode*/
 enum AM_SCAN_Mode
 {
@@ -134,6 +135,9 @@ enum AM_SCAN_DTVMode
 	AM_SCAN_DTVMODE_NORADIO			= 0x80, /**< Donot store radio programs*/
 	AM_SCAN_DTVMODE_ISDBT_ONESEG	= 0x100, /**< Scan ISDBT oneseg in layer A*/
 	AM_SCAN_DTVMODE_ISDBT_FULLSEG	= 0x200, /**< Scan ISDBT fullseg*/
+	AM_SCAN_DTVMODE_SCRAMB_TSHEAD	= 0x400, /**< is check scramb by ts head*/
+	AM_SCAN_DTVMODE_NOVCT			= 0x800, /**< Donot store in vct but not in pmt programs*/
+	AM_SCAN_DTVMODE_NOVCTHIDE		= 0x1000, /**< Donot store in vct hide flag is set 1*/
 };
 
 /**\brief ATVscan mode*/
@@ -144,6 +148,20 @@ enum AM_SCAN_ATVMode
 	AM_SCAN_ATVMODE_FREQ	= 0x03,	/**< all band scan mode*/
 	AM_SCAN_ATVMODE_NONE	= 0x07,	/**< none*/
 };
+
+/**\brief scan store mode */
+typedef enum
+{
+	AM_SCAN_ATV_STOREMODE_DEFAULT   = 0x00, /**< atv store default mode, store all program*/
+	AM_SCAN_ATV_STOREMODE_NOPAL     = 0x01,	/**< atv store NO pal programs*/
+	AM_SCAN_ATV_STOREMODE_NONTSC	= 0x02,	/**< atv store NO ntsc programs*/
+	AM_SCAN_ATV_STOREMODE_ALL		= 0x04,	/**< atv store all*/
+	AM_SCAN_DTV_STOREMODE_NOSECAM	= 0x08,	/**< Dtv store NO SECCAM */
+	AM_SCAN_DTV_STOREMODE_NOMODE1	= 0x10,	/**< Dtv store NO MODE 1*/
+	AM_SCAN_DTV_STOREMODE_NOMODE2	= 0x20,	/**< Dtv store NO MODE 2*/
+	AM_SCAN_DTV_STOREMODE_NOMODE3	= 0x40,	/**< Dtv store NO MODE 3*/
+}AM_SCAN_StoreMode;
+
 
 /**\brief code of scan result*/
 enum AM_SCAN_ResultCode
@@ -368,6 +386,7 @@ struct AM_SCAN_CreatePara_s
 	AM_SCAN_ATVCreatePara_t atv_para;	/**< ATV scan parameters*/
 	AM_SCAN_DTVCreatePara_t dtv_para;	/**< DTV scan parameters*/
 	int proc_mode;	/**< see AM_SCAN_PROCMode*/
+	int store_mode; /**< see AM_SCAN_StoreMode*/
 };
 /**\brief scan new program parameters*/
 typedef struct AM_SCAN_NewProgram_Data_s {

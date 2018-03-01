@@ -108,11 +108,11 @@ INT32S atsc_psip_parse_rrt(INT8U* data, INT32U length, rrt_section_info_t *info)
 	rrt_section_info_t *sect_info = info;
 	rrt_section_header_t *sect_head = NULL;
 	rrt_dimensions_info_t *tmp_dimensions_info = NULL;
-	INT8U dimensions_defined = 0;
-	INT8S rating_region_name_len;
-	INT8S dimensions_name_len;
-	INT8S values_defined, text_len;
-	INT8U i;
+	INT32S dimensions_defined = 0;
+	INT32S rating_region_name_len;
+	INT32S dimensions_name_len;
+	INT32S values_defined, text_len;
+	INT32S i;
 	INT8U *ptr = NULL;
 
 	if(data && length && info)

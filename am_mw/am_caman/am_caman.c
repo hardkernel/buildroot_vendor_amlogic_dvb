@@ -15,6 +15,7 @@
 
 #include "am_caman.h"
 #include "ca_dummy.h"
+#include "am_cond.h"
 
 #define CAMAN_ONE_TS
 

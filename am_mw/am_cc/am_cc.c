@@ -15,7 +15,7 @@
  * \author Xia Lei Peng <leipeng.xia@amlogic.com>
  * \date 2013-03-10: create the document
  ***************************************************************************/
-#define AM_DEBUG_LEVEL 1
+#define AM_DEBUG_LEVEL 5
 
 #include <assert.h>
 #include <errno.h>
@@ -28,14 +28,17 @@
 #include "am_cc.h"
 #include "am_cc_internal.h"
 #include "tvin_vbi.h"
+#include "am_cond.h"
+#include "math.h"
 
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
 
-#define CC_POLL_TIMEOUT 1000
+#define CC_POLL_TIMEOUT 16
 #define CC_FLASH_PERIOD 1000
-#define CC_CLEAR_TIME 	15000
+#define CC_CLEAR_TIME 	5000
+#define LINE_284_TIMEOUT 4000
 
 #define AMSTREAM_USERDATA_PATH "/dev/amstream_userdata"
 #define VBI_DEV_FILE "/dev/vbi"
@@ -58,8 +61,12 @@ struct vout_CCparam_s {
 #define ROW_W (SAFE_TITLE_AREA_WIDTH/42)
 #define ROW_H (SAFE_TITLE_AREA_HEIGHT/15)
 
-extern void vbi_decode_caption(vbi_decoder *vbi, int line, uint8_t *buf);
 
+
+
+extern void vbi_decode_caption(vbi_decoder *vbi, int line, const uint8_t *buf);
+extern void vbi_refresh_cc(vbi_decoder *vbi);
+extern void vbi_caption_reset(vbi_decoder *vbi);
 
 /****************************************************************************
  * Static data
@@ -87,6 +94,8 @@ static const vbi_color color_map[AM_CC_COLOR_MAX] =
 	VBI_CYAN,
 };
 
+static int chn_send[AM_CC_CAPTION_MAX];
+
 static AM_ErrorCode_t am_cc_calc_caption_size(int *w, int *h)
 {
 	int rows, vw, vh;
@@ -103,7 +112,7 @@ static AM_ErrorCode_t am_cc_calc_caption_size(int *w, int *h)
 		sscanf(wbuf, "%d", &vw) != 1 ||
 		sscanf(hbuf, "%d", &vh) != 1)
 	{
-		AM_DEBUG(1, "Get video size failed, default set to 16:9");
+		AM_DEBUG(4, "Get video size failed, default set to 16:9");
 		vw = 1920;
 		vh = 1080;
 	}
@@ -117,7 +126,7 @@ static AM_ErrorCode_t am_cc_calc_caption_size(int *w, int *h)
 	else if (rows > 42)
 		rows = 42;
 
-	AM_DEBUG(2, "Video size: %d X %d, rows %d", vw, vh, rows);
+	AM_DEBUG(4, "Video size: %d X %d, rows %d", vw, vh, rows);
 
 	*w = rows * ROW_W;
 	*h = SAFE_TITLE_AREA_HEIGHT;
@@ -125,15 +134,23 @@ static AM_ErrorCode_t am_cc_calc_caption_size(int *w, int *h)
 	return AM_SUCCESS;
 }
 
+uint32_t am_cc_get_video_pts()
+{
+#define VIDEO_PTS_PATH "/sys/class/tsync/pts_video"
+	char buffer[16] = {0};
+	AM_FileRead(VIDEO_PTS_PATH,buffer,16);
+	return strtoul(buffer, NULL, 16);
+}
 
-static uint8_t *am_cc_get_page_canvas(AM_CC_Decoder_t *cc, struct vbi_page *pg)
+static void am_cc_get_page_canvas(AM_CC_Decoder_t *cc, struct vbi_page *pg, int* x_point, int* y_point)
 {
 	int safe_width, safe_height;
 
 	am_cc_calc_caption_size(&safe_width, &safe_height);
 	if (pg->pgno <= 8)
 	{
-		return cc->cpara.bmp_buffer;
+		*x_point = 0;
+		*y_point = 0;
 	}
 	else
 	{
@@ -202,28 +219,18 @@ static uint8_t *am_cc_get_page_canvas(AM_CC_Decoder_t *cc, struct vbi_page *pg)
 			b = SAFE_TITLE_AREA_HEIGHT;
 
 		/*calc the real displayed rows & cols*/
-		pg->columns = (r - x) / ROW_W;
-		pg->rows = (b - y) / ROW_H;
+		//pg->columns = (r - x) / ROW_W;
+		//pg->rows = (b - y) / ROW_H;
 
-		AM_DEBUG(2, "window prio(%d), row %d, cols %d ar %d, ah %d, av %d, "
+		/* AM_DEBUG(2, "window prio(%d), row %d, cols %d ar %d, ah %d, av %d, "
 			"ap %d, screen position(%d, %d), displayed rows/cols(%d, %d)",
 			dw->priority, dw->row_count, dw->column_count, dw->anchor_relative,
 			dw->anchor_horizontal, dw->anchor_vertical, dw->anchor_point,
 			x, y, pg->rows, pg->columns);
+		*/
 
-		return cc->cpara.bmp_buffer + y*cc->cpara.pitch + x*4;
-	}
-}
-
-static void am_cc_clear_safe_title(AM_CC_Decoder_t *cc)
-{
-	int i;
-	uint8_t *p = cc->cpara.bmp_buffer;
-
-	for (i=0; i<SAFE_TITLE_AREA_HEIGHT; i++)
-	{
-		memset(p, 0x00, SAFE_TITLE_AREA_WIDTH * 4);
-		p += cc->cpara.pitch;
+		*x_point = x;
+		*y_point = y;
 	}
 }
 
@@ -328,34 +335,85 @@ static void am_cc_override_by_user_options(AM_CC_Decoder_t *cc, struct vbi_page 
 static void am_cc_vbi_event_handler(vbi_event *ev, void *user_data)
 {
 	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)user_data;
-	int pgno, subno;
-
+	int pgno, subno, ret;
+	char* json_buffer;
+	AM_CC_JsonChain_t* node, *json_chain_head;
+	static int count = 0;
+	json_chain_head = cc->json_chain_head;
 	if (ev->type == VBI_EVENT_CAPTION) {
 		if (cc->hide)
 			return;
 
-		pthread_mutex_lock(&cc->lock);
+		AM_DEBUG(4, "VBI Caption event: pgno %d, cur_pgno %d",
+			ev->ev.caption.pgno, cc->vbi_pgno);
 
-		AM_DEBUG(0, "VBI Caption event: pgno %d, cur_pgno %d",
-				ev->ev.caption.pgno, cc->vbi_pgno);
+		pgno = ev->ev.caption.pgno;
+		if (pgno < AM_CC_CAPTION_MAX) {
+			if (cc->process_update_flag == 0)
+			{
+				cc->curr_data_mask   |= 1 << pgno;
+				cc->curr_switch_mask |= 1 << pgno;
+			}
+		}
+
+		pthread_mutex_lock(&cc->lock);
 
 		if (cc->vbi_pgno == ev->ev.caption.pgno &&
 			cc->flash_stat == FLASH_NONE)
 		{
+			json_buffer = (char*)malloc(JSON_STRING_LENGTH);
+			if (!json_buffer)
+			{
+				AM_DEBUG(1, "json buffer malloc failed");
+				pthread_mutex_unlock(&cc->lock);
+				return;
+			}
+			/* Convert to json attributes */
+			ret = tvcc_to_json (&cc->decoder, cc->vbi_pgno, json_buffer, JSON_STRING_LENGTH);
+			if (ret == -1)
+			{
+				AM_DEBUG(1, "tvcc_to_json failed");
+				pthread_mutex_unlock(&cc->lock);
+				return;
+			}
+			//AM_DEBUG(1, "---------json: %s %d", json_buffer, count);
+			//count ++;
+			/* Create one json node */
+			node = (AM_CC_JsonChain_t*)malloc(sizeof(AM_CC_JsonChain_t));
+			node->buffer = json_buffer;
+			node->pts = cc->decoder_cc_pts;
+
+			AM_DEBUG(4, "vbi_event node_pts %x decoder_pts %x", node->pts, cc->decoder_cc_pts);
+			/* TODO: Add node time */
+			AM_TIME_GetTimeSpec(&node->decode_time);
+
+			/* Add to json chain */
+			json_chain_head->json_chain_prior->json_chain_next = node;
+			json_chain_head->count++;
+			node->json_chain_next = json_chain_head;
+			node->json_chain_prior = json_chain_head->json_chain_prior;
+			json_chain_head->json_chain_prior = node;
+
 			cc->render_flag = AM_TRUE;
 			cc->need_clear = AM_FALSE;
 			cc->timeout = CC_CLEAR_TIME;
-			pthread_cond_signal(&cc->cond);
 		}
 
 		pthread_mutex_unlock(&cc->lock);
+		pthread_cond_signal(&cc->cond);
 	} else if ((ev->type == VBI_EVENT_ASPECT) || (ev->type == VBI_EVENT_PROG_INFO)) {
+		cc->curr_data_mask |= 1 << AM_CC_CAPTION_XDS;
+
 		if (cc->cpara.pinfo_cb)
 			cc->cpara.pinfo_cb(cc, ev->ev.prog_info);
 	} else if (ev->type == VBI_EVENT_NETWORK) {
+		cc->curr_data_mask |= 1 << AM_CC_CAPTION_XDS;
+
 		if (cc->cpara.network_cb)
 			cc->cpara.network_cb(cc, &ev->ev.network);
-	}else if (ev->type == VBI_EVENT_RATING) {
+	} else if (ev->type == VBI_EVENT_RATING) {
+		cc->curr_data_mask |= 1 << AM_CC_CAPTION_XDS;
+
 		if (cc->cpara.rating_cb)
 			cc->cpara.rating_cb(cc, &ev->ev.prog_info->rating);
 	}
@@ -373,7 +431,7 @@ static void dump_cc_data(uint8_t *buff, int size)
 		sprintf(buf+i*3, "%02x ", buff[i]);
 	}
 
-	AM_DEBUG(3, "%s", buf);
+	AM_DEBUG(4, "dump_cc_data len: %d data:%s", size, buf);
 }
 
 static void am_cc_check_flash(AM_CC_Decoder_t *cc)
@@ -396,75 +454,124 @@ static void am_cc_check_flash(AM_CC_Decoder_t *cc)
 		cc->timeout = CC_CLEAR_TIME;
 	}
 }
+
 static void am_cc_clear(AM_CC_Decoder_t *cc)
 {
 	AM_CC_DrawPara_t draw_para;
+	AM_CC_JsonChain_t *node, *node_to_clear, *json_chain_head;
 	struct vbi_page sub_page;
 
-	AM_DEBUG(0, "force clear cc page");
-	memset(&sub_page, 0, sizeof(vbi_page));
-	if (cc->cpara.draw_begin)
-		cc->cpara.draw_begin(cc, &draw_para);
+	/* Clear all node */
+	json_chain_head = cc->json_chain_head;
+	node = json_chain_head->json_chain_next;
+	while (node != json_chain_head)
+	{
+		node_to_clear = node;
+		node = node->json_chain_next;
+		free(node_to_clear->buffer);
+		free(node_to_clear);
+	}
+	json_chain_head->json_chain_next = json_chain_head;
+	json_chain_head->json_chain_prior = json_chain_head;
 
-	vbi_draw_cc_page_region(
-		&sub_page, VBI_PIXFMT_RGBA32_LE,
-		am_cc_get_page_canvas(cc, &sub_page),
-		cc->cpara.pitch, 0, 0,
-		sub_page.columns, sub_page.rows);
-
-	if (cc->cpara.draw_end)
-		cc->cpara.draw_end(cc, &draw_para);
-
+	if (cc->cpara.json_buffer)
+		tvcc_empty_json(cc->vbi_pgno, cc->cpara.json_buffer, 8096);
+	if (cc->cpara.json_update)
+		cc->cpara.json_update(cc);
+	AM_DEBUG(4, "am_cc_clear");
 }
 
-static void am_cc_render(AM_CC_Decoder_t *cc)
+/*
+ * If has cc data to render, return 1
+ * else return 0
+ */
+static int am_cc_render(AM_CC_Decoder_t *cc)
 {
 	AM_CC_DrawPara_t draw_para;
 	struct vbi_page sub_pages[8];
 	int sub_pg_cnt, i;
+	int status = 0;
+	static int count = 0;
+	AM_CC_JsonChain_t* node, *node_reset, *json_chain_head;
+	struct timespec now;
+	int has_data_to_render;
+	int32_t decode_time_gap = 0;
+	int ret;
 
 	if (cc->hide)
-		return;
-
-	AM_DEBUG(2, "CC Rendering...");
-
+		return 0;
+	has_data_to_render = 0;
 	/*Flashing?*/
-	am_cc_check_flash(cc);
+	//am_cc_check_flash(cc);
 
 	if (am_cc_calc_caption_size(&draw_para.caption_width,
 		&draw_para.caption_height) != AM_SUCCESS)
-		return;
+		return 0;
+	//if (cc->cpara.draw_begin)
+	//	cc->cpara.draw_begin(cc, &draw_para);
+	json_chain_head = cc->json_chain_head;
+	AM_TIME_GetTimeSpec(&now);
+	/* Fetch one json from chain */
+	node = json_chain_head->json_chain_next;
 
-	if (cc->cpara.draw_begin)
-		cc->cpara.draw_begin(cc, &draw_para);
-
-	/*clear safe title*/
-	if (cc->vbi_pgno > 8)
-		am_cc_clear_safe_title(cc);
-
-	/*608 CC will always used 34 columns*/
-	if (cc->vbi_pgno <= 8)
-		draw_para.caption_width = 34*ROW_W;
-
-	/*fetch cc pages from libzvbi*/
-	sub_pg_cnt = AM_ARRAY_SIZE(sub_pages);
-	tvcc_fetch_page(&cc->decoder, cc->vbi_pgno, &sub_pg_cnt, sub_pages);
-
-	/*draw each*/
-	for (i=0; i<sub_pg_cnt; i++)
+	while (node != json_chain_head)
 	{
-		/*Override by user options*/
-		am_cc_override_by_user_options(cc, &sub_pages[i]);
-		vbi_draw_cc_page_region(
-			&sub_pages[i], VBI_PIXFMT_RGBA32_LE,
-			am_cc_get_page_canvas(cc, &sub_pages[i]),
-			cc->cpara.pitch, 0, 0,
-			sub_pages[i].columns, sub_pages[i].rows);
+		//100 indicates analog which does not need to use pts
+		if (cc->vfmt != 100)
+		{
+			decode_time_gap = (int32_t)(node->pts - cc->video_pts);
+#if 0
+			if (decode_time_gap<-200000 || decode_time_gap > 400000)
+			{
+				AM_DEBUG(4, "render_thread pts gap too large, am_cc_clear, node 0x%x video 0x%x diff %d", node->pts,
+					cc->video_pts, decode_time_gap);
+				has_data_to_render = 0;
+				goto NEXT_NODE;
+			}
+			else
+#endif
+			if (decode_time_gap >= 0 && decode_time_gap < 20000)
+			{
+				AM_DEBUG(4, "render_thread pts gap large than 0, value %d", decode_time_gap);
+				has_data_to_render = 0;
+				break;
+			}
+			AM_DEBUG(4, "render_thread pts in range, node->pts %x videopts %x", node->pts, cc->video_pts);
+		}
+		/* If gap of node time and now time is too big, discard */
+		// decode_time_gap = (now.tv_sec - node->decode_time.tv_sec)*1000 +
+			// (now.tv_nsec - node->decode_time.tv_nsec)/1000;
+//		if (decode_time_gap < 300)
+		{
+            if (cc->cpara.json_buffer)
+				memcpy(cc->cpara.json_buffer, node->buffer, JSON_STRING_LENGTH);
+			AM_DEBUG(4, "json--> %s", node->buffer);
+			has_data_to_render = 1;
+		}
+		//AM_DEBUG(1, "Render json: %s, %d", node->buffer, count);
+		//count++;
+NEXT_NODE:
+		node_reset = node;
+		node->json_chain_prior->json_chain_next = node->json_chain_next;
+		node->json_chain_next->json_chain_prior = node->json_chain_prior;
+		node = node->json_chain_next;
+		json_chain_head->count--;
+		if (node_reset->buffer)
+			free(node_reset->buffer);
+		if (node_reset)
+			free(node_reset);
+		//if (has_data_to_render == 1)
+		//	break;
+		if (cc->cpara.json_update && has_data_to_render)
+			cc->cpara.json_update(cc);
 	}
 
-	if (cc->cpara.draw_end)
-		cc->cpara.draw_end(cc, &draw_para);
-
+	if (cc->cpara.json_update && has_data_to_render)
+		cc->cpara.json_update(cc);
+	//if (cc->cpara.draw_end)
+	//	cc->cpara.draw_end(cc, &draw_para);
+	AM_DEBUG(4, "render_thread render exit, has_data %d chain_left %d", has_data_to_render,json_chain_head->count);
+	return has_data_to_render;
 }
 
 static void am_cc_handle_event(AM_CC_Decoder_t *cc, int evt)
@@ -473,7 +580,6 @@ static void am_cc_handle_event(AM_CC_Decoder_t *cc, int evt)
 	{
 		case AM_CC_EVT_SET_USER_OPTIONS:
 			/*force redraw*/
-			am_cc_clear_safe_title(cc);
 			cc->render_flag = AM_TRUE;
 			break;
 		default:
@@ -488,7 +594,7 @@ static void am_cc_set_tv(const uint8_t *buf, unsigned int n_bytes)
 	int i;
 
 	cc_flag = buf[1] & 0x40;
-	if(!cc_flag)
+	if (!cc_flag)
 	{
 		AM_DEBUG(0, "cc_flag is invalid, %d", n_bytes);
 		return;
@@ -508,7 +614,7 @@ static void am_cc_set_tv(const uint8_t *buf, unsigned int n_bytes)
 		cc_data1 = buf[4 + i * 3];
 		cc_data2 = buf[5 + i * 3];
 
-		if(cc_type == 0 || cc_type == 1)//NTSC pair
+		if (cc_type == 0 || cc_type == 1)//NTSC pair
 		{
 			struct vout_CCparam_s cc_param;
             cc_param.type = cc_type;
@@ -518,7 +624,7 @@ static void am_cc_set_tv(const uint8_t *buf, unsigned int n_bytes)
 			if (ioctl(vout_fd, VOUT_IOC_CC_DATA, &cc_param)== -1)
 	            AM_DEBUG(1, "ioctl VOUT_IOC_CC_DATA failed, error:%s", strerror(errno));
 
-			if(!cc_valid || i >= 3)
+			if (!cc_valid || i >= 3)
 				break;
 		}
 	}
@@ -537,7 +643,7 @@ static void solve_vbi_data (AM_CC_Decoder_t *cc, struct vbi_data_s *vbi)
 	if (vbi->field_id == VBI_FIELD_2)
 		line = 284;*/
 
-	//AM_DEBUG(0, "solve_vbi_data line == %d", line);
+	AM_DEBUG(5, "VBI solve_vbi_data line %d: %02x %02x", line, vbi->b[0], vbi->b[1]);
 	vbi_decode_caption(cc->decoder.vbi, line, vbi->b);
 }
 
@@ -549,8 +655,10 @@ static void *am_vbi_data_thread(void *arg)
 	struct vbi_data_s  vbi[50];
 	int fd;
 	int type = 0x1;
+	int now, last;
+	int last_data_mask = 0;
+	int timeout = cc->cpara.data_timeout * 2;
 
-	AM_DEBUG(0, "am_vbi_data_thread start");
 	fd = open(VBI_DEV_FILE, O_RDWR);
 	if (fd == -1) {
 		AM_DEBUG(1, "cannot open \"%s\"", VBI_DEV_FILE);
@@ -558,10 +666,12 @@ static void *am_vbi_data_thread(void *arg)
 	}
 
 	if (ioctl(fd, VBI_IOC_SET_TYPE, &type )== -1)
-		AM_DEBUG(0, "VBI_IOC_SET_TYPE error:%s", strerror(errno));
+		AM_DEBUG(4, "VBI_IOC_SET_TYPE error:%s", strerror(errno));
 
 	if (ioctl(fd, VBI_IOC_START) == -1)
-		AM_DEBUG(0, "VBI_IOC_START error:%s", strerror(errno));
+		AM_DEBUG(4, "VBI_IOC_START error:%s", strerror(errno));
+
+	AM_TIME_GetClock(&last);
 
 	while (cc->running) {
 		struct pollfd pfd;
@@ -578,14 +688,57 @@ static void *am_vbi_data_thread(void *arg)
 			ret = read(fd, vbi, sizeof(vbi));
 			pd  = vbi;
 			//AM_DEBUG(0, "am_vbi_data_thread running read data == %d",ret);
-			while (ret >= (int)sizeof(struct vbi_data_s)) {
-				solve_vbi_data(cc, pd);
 
-				pd ++;
-				ret -= sizeof(struct vbi_data_s);
+			if (ret >= (int)sizeof(struct vbi_data_s)) {
+				while (ret >= (int)sizeof(struct vbi_data_s)) {
+					solve_vbi_data(cc, pd);
+
+					pd ++;
+					ret -= sizeof(struct vbi_data_s);
+				}
+			} else {
+				cc->process_update_flag = 1;
+				vbi_refresh_cc(cc->decoder.vbi);
+				cc->process_update_flag = 0;
+			}
+		} else {
+			cc->process_update_flag = 1;
+			vbi_refresh_cc(cc->decoder.vbi);
+			cc->process_update_flag = 0;
+		}
+
+		AM_TIME_GetClock(&now);
+
+		if (cc->curr_data_mask) {
+			cc->curr_data_mask |= (1 << AM_CC_CAPTION_DATA);
+		}
+
+		if (cc->curr_data_mask & (1 << AM_CC_CAPTION_DATA)) {
+			if (!(last_data_mask & (1 << AM_CC_CAPTION_DATA))) {
+				last_data_mask |= (1 << AM_CC_CAPTION_DATA);
+				if (cc->cpara.data_cb) {
+					cc->cpara.data_cb(cc, last_data_mask);
+				}
 			}
 		}
+
+		if (now - last >= timeout) {
+			if (last_data_mask != cc->curr_data_mask) {
+				if (cc->cpara.data_cb) {
+					cc->cpara.data_cb(cc, cc->curr_data_mask);
+				}
+				//AM_DEBUG(0, "CC data mask 0x%x -> 0x%x", last_data_mask, cc->curr_data_mask);
+				last_data_mask = cc->curr_data_mask;
+			}
+			cc->curr_data_mask = 0;
+			last = now;
+			timeout = cc->cpara.data_timeout;
+		}
+		cc->process_update_flag = 1;
+		vbi_refresh_cc(cc->decoder.vbi);
+		cc->process_update_flag = 0;
 	}
+
 	AM_DEBUG(0, "am_vbi_data_thread exit");
 	ioctl(fd, VBI_IOC_STOP);
 	close(fd);
@@ -596,17 +749,25 @@ static void *am_vbi_data_thread(void *arg)
 static void *am_cc_data_thread(void *arg)
 {
 	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)arg;
-	uint8_t buf[5*1024];
-	uint8_t cc_data[256];/*In fact, 99 is enough*/
+	uint8_t cc_buffer[5*1024];/*In fact, 99 is enough*/
+	uint8_t *cc_data;
 	int cnt, left, fd, cc_data_cnt;
 	struct pollfd fds;
 	int last_pkg_idx = -1, pkg_idx;
 	int ud_dev_no = 0;
 	AM_USERDATA_OpenPara_t para;
+	int now, last, last_switch;
+	int last_data_mask = 0;
+	int last_switch_mask = 0;
+	uint32_t *cc_pts;
 
-    AM_DEBUG(1, "CC data thread start.");
+	char display_buffer[8192];
+	int i;
+
+	AM_DEBUG(1, "CC data thread start.");
 
 	memset(&para, 0, sizeof(para));
+	para.vfmt = cc->vfmt;
 	/* Start the cc data */
 	if (AM_USERDATA_Open(ud_dev_no, &para) != AM_SUCCESS)
 	{
@@ -614,28 +775,37 @@ static void *am_cc_data_thread(void *arg)
 		return NULL;
 	}
 
+	AM_TIME_GetClock(&last);
+	last_switch = last;
+
 	while (cc->running)
 	{
-		cc_data_cnt = AM_USERDATA_Read(ud_dev_no, cc_data, sizeof(cc_data), CC_POLL_TIMEOUT);
-		if (cc_data_cnt > 4 &&
+		cc_data_cnt = AM_USERDATA_Read(ud_dev_no, cc_buffer, sizeof(cc_buffer), CC_POLL_TIMEOUT);
+		cc_data = cc_buffer + 4;
+		cc_data_cnt -= 4;
+		dump_cc_data(cc_buffer, cc_data_cnt);
+		if (cc_data_cnt > 8 &&
 			cc_data[0] == 0x47 &&
 			cc_data[1] == 0x41 &&
 			cc_data[2] == 0x39 &&
 			cc_data[3] == 0x34)
 		{
-			dump_cc_data(cc_data+4, cc_data_cnt-4);
+			cc_pts = cc_buffer;
+			cc->decoder_cc_pts = *cc_pts;
+			AM_DEBUG(4, "cc_data_thread mpeg cc_count %d pts %x", cc_data_cnt,*cc_pts);
+			//dump_cc_data(cc_data, cc_data_cnt);
 
 			if (cc_data[4] != 0x03 /* 0x03 indicates cc_data */)
 			{
-				AM_DEBUG(1, "Unprocessed user_data_type_code 0x%02x, we only expect 0x03", cc_data[4]);
+				AM_DEBUG(4, "Unprocessed user_data_type_code 0x%02x, we only expect 0x03", cc_data[4]);
 				continue;
 			}
-			if(vout_fd != -1)
+			if (vout_fd != -1)
 				am_cc_set_tv(cc_data+4, cc_data_cnt-4);
 			/*decode this cc data*/
 			tvcc_decode_data(&cc->decoder, 0, cc_data+4, cc_data_cnt-4);
 		}
-		else if(cc_data_cnt > 4 &&
+		else if (cc_data_cnt > 4 &&
 			cc_data[0] == 0xb5 &&
 			cc_data[1] == 0x00 &&
 			cc_data[2] == 0x2f )
@@ -654,6 +824,56 @@ static void *am_cc_data_thread(void *arg)
 			/*decode this cc data*/
 			tvcc_decode_data(&cc->decoder, 0, cc_data+4, cc_data_cnt-4);
 		}
+		{
+			cc->process_update_flag = 1;
+			update_service_status(&cc->decoder);
+			vbi_refresh_cc(cc->decoder.vbi);
+			cc->process_update_flag = 0;
+		}
+
+		AM_TIME_GetClock(&now);
+
+		if (cc->curr_data_mask) {
+			cc->curr_data_mask |= (1 << AM_CC_CAPTION_DATA);
+		}
+
+		if (cc->curr_data_mask & (1 << AM_CC_CAPTION_DATA)) {
+			if (!(last_data_mask & (1 << AM_CC_CAPTION_DATA))) {
+				last_data_mask |= (1 << AM_CC_CAPTION_DATA);
+				if (cc->cpara.data_cb) {
+					cc->cpara.data_cb(cc, last_data_mask);
+				}
+			}
+		}
+
+		if (now - last >= cc->cpara.data_timeout) {
+			if (last_data_mask != cc->curr_data_mask) {
+				if (cc->cpara.data_cb) {
+					cc->cpara.data_cb(cc, cc->curr_data_mask);
+				}
+				AM_DEBUG(4, "CC data mask 0x%x -> 0x%x", last_data_mask, cc->curr_data_mask);
+				last_data_mask = cc->curr_data_mask;
+			}
+			cc->curr_data_mask = 0;
+			last = now;
+		}
+
+		if (now - last_switch >= cc->cpara.switch_timeout) {
+			if (last_switch_mask != cc->curr_switch_mask) {
+				if (!(cc->curr_switch_mask & (1 << cc->vbi_pgno))) {
+					if ((cc->vbi_pgno == cc->spara.caption1) && (cc->spara.caption2 != AM_CC_CAPTION_NONE)) {
+						AM_DEBUG(4, "CC switch %d -> %d", cc->vbi_pgno, cc->spara.caption2);
+						cc->vbi_pgno = cc->spara.caption2;
+					} else if ((cc->vbi_pgno == cc->spara.caption2) && (cc->spara.caption1 != AM_CC_CAPTION_NONE)) {
+						AM_DEBUG(4, "CC switch %d -> %d", cc->vbi_pgno, cc->spara.caption1);
+						cc->vbi_pgno = cc->spara.caption1;
+					}
+				}
+				last_switch_mask = cc->curr_switch_mask;
+			}
+			cc->curr_switch_mask = 0;
+			last_switch = now;
+		}
 	}
 
 	/*Stop the cc data*/
@@ -668,47 +888,131 @@ static void *am_cc_render_thread(void *arg)
 {
 	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)arg;
 	struct timespec ts;
-	int cnt;
+	int cnt, timeout, ret;
+	int last, now;
+	int nodata = 0;
+	char vpts_buf[16];
+	uint32_t vpts;
+	int32_t pts_gap_cc_video;
+	int32_t vpts_gap;
+	AM_CC_JsonChain_t *node;
 
-    AM_DEBUG(1, "CC rendering thread start.");
+	/* Get fps of video */
+	int fps;
+#if 0
+	int fd = open("/sys/class/video/fps_info", O_RDONLY);
+	char fps_info[32];
+	char* fps_start, *fps_end;
+	read(fd, fps_info, 32);
+	fps_start = strstr(fps_info, ":") + 1;
+	fps_end = strstr(fps_info, " ");
+	fps_end[0] = 0;
+	fps = strtoul(fps_start, NULL, 16);
+#endif
+	AM_TIME_GetClock(&last);
 
 	pthread_mutex_lock(&cc->lock);
 
-	am_cc_check_flash(cc);
+	//am_cc_check_flash(cc);
+
+	/* timeout must be calculate from fps, ie 60fps for 16ms */
+#if 0
+	if (fps != 0)
+		timeout = 1000/fps;
+	else
+		timeout = 16;
+	if (timeout == 0)
+		timeout = 16;
+#endif
+	timeout = 1000;
 
 	while (cc->running)
 	{
-		if (cc->timeout > 0)
+		// Update video pts
+		node = cc->json_chain_head->json_chain_next;
+
+		vpts = am_cc_get_video_pts();
+
+		// If has cc data in chain, set gap time to timeout
+		if (node)
 		{
-			AM_TIME_GetTimeSpecTimeout(cc->timeout,  &ts);
-			pthread_cond_timedwait(&cc->cond, &cc->lock, &ts);
+			pts_gap_cc_video = (int32_t)(node->pts - vpts);
+			if (pts_gap_cc_video <= 0)
+				timeout = 0;
+			else
+			{
+				timeout = pts_gap_cc_video*1000/90000;
+				//AM_DEBUG(0, "render_thread timeout node_pts %x vpts %x gap %d calculate %d", node->pts, vpts, pts_gap_cc_video, timeout);
+				// Set timeout to 1 second If pts gap is more than 1 second.
+				// We need to judge if video is continuous
+				timeout = (timeout>1000)?1000:timeout;
+			}
 		}
 		else
 		{
-			pthread_cond_wait(&cc->cond, &cc->lock);
+			AM_DEBUG(4, "render_thread no node in chain, timeout set to 1000");
+			timeout = 1000;
 		}
-		if(cc->need_clear && cc->flash_stat == FLASH_NONE)
+
+		AM_TIME_GetTimeSpecTimeout(timeout, &ts);
+		pthread_cond_timedwait(&cc->cond, &cc->lock, &ts);
+
+		vpts = am_cc_get_video_pts();
+		cc->video_pts = vpts;
+
+		// Judge if video pts gap is in valid range
+		if (node)
+		{
+			vpts_gap = (int32_t)(node->pts - cc->video_pts);
+			AM_DEBUG(4, "render_thread after timeout node_pts %x vpts %x gap %d calculate %d",
+				node->pts, vpts, vpts_gap, timeout);
+		}
+		//If gap time is large than 5 secs, clean cc
+#if 0
+		if (abs(vpts_gap) > 500000)
+		{
+			AM_DEBUG(0, "Video pts gap too large, clean cc, gap: %d", vpts_gap);
+			am_cc_clear(cc);
+			continue;
+		}
+#endif
+
+#if 0
+		if (cc->need_clear && cc->flash_stat == FLASH_NONE)
 		{
 			am_cc_clear(cc);
 			cc->need_clear = AM_FALSE;
 		}
-
+#endif
 		if (cc->evt >= 0)
 		{
 			am_cc_handle_event(cc, cc->evt);
 			cc->evt = 0;
 		}
 
-		if (cc->render_flag)
-		{
-			am_cc_render(cc);
-			cc->render_flag = AM_FALSE;
-			cc->need_clear = AM_TRUE;
+		//if (!nodata)
+		am_cc_render(cc);
+
+		AM_TIME_GetClock(&now);
+		if (cc->curr_data_mask & (1 << cc->vbi_pgno)) {
+			nodata = 0;
+			last   = now;
+		} else if ((now - last) > 14000) {
+			last = now;
+			AM_DEBUG(0, "No data now.");
+			if ((cc->vbi_pgno < AM_CC_CAPTION_TEXT1) || (cc->vbi_pgno > AM_CC_CAPTION_TEXT4)) {
+				am_cc_clear(cc);
+				//if (cc->vbi_pgno < AM_CC_CAPTION_TEXT1)
+				//	vbi_caption_reset(cc->decoder.vbi);
+				nodata = 1;
+			}
 		}
 	}
+	am_cc_clear(cc);
 
 	pthread_mutex_unlock(&cc->lock);
 
+	//close(fd);
 	AM_DEBUG(1, "CC rendering thread exit now");
 	return NULL;
 }
@@ -733,16 +1037,20 @@ AM_ErrorCode_t AM_CC_Create(AM_CC_CreatePara_t *para, AM_CC_Handle_t *handle)
 	cc = (AM_CC_Decoder_t*)malloc(sizeof(AM_CC_Decoder_t));
 	if (cc == NULL)
 		return AM_CC_ERR_NO_MEM;
-	if(para->bypass_cc_enable)
+	if (para->bypass_cc_enable)
 	{
 		vout_fd= open("/dev/tv", O_RDWR);
-		if(vout_fd == -1)
+		if (vout_fd == -1)
 		{
 			AM_DEBUG(0, "open vdin error");
 		}
 	}
 
 	memset(cc, 0, sizeof(AM_CC_Decoder_t));
+	cc->json_chain_head = (AM_CC_JsonChain_t*) calloc (sizeof(AM_CC_JsonChain_t), 1);
+	cc->json_chain_head->json_chain_next = cc->json_chain_head;
+	cc->json_chain_head->json_chain_prior = cc->json_chain_head;
+	cc->json_chain_head->count = 0;
 
 	/* init the tv cc decoder */
 	tvcc_init(&cc->decoder);
@@ -776,7 +1084,7 @@ AM_ErrorCode_t AM_CC_Destroy(AM_CC_Handle_t handle)
 {
 	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)handle;
 
-	if(vout_fd != -1)
+	if (vout_fd != -1)
 		close(vout_fd);
 
 	if (cc == NULL)
@@ -788,8 +1096,11 @@ AM_ErrorCode_t AM_CC_Destroy(AM_CC_Handle_t handle)
 	pthread_mutex_destroy(&cc->lock);
 	pthread_cond_destroy(&cc->cond);
 
+	if (cc->json_chain_head)
+		free(cc->json_chain_head);
 	free(cc);
 
+	AM_DEBUG(0, "am_cc_destroy ok");
 	return AM_SUCCESS;
 }
 
@@ -851,16 +1162,22 @@ AM_ErrorCode_t AM_CC_Start(AM_CC_Handle_t handle, AM_CC_StartPara_t *para)
 		goto start_done;
 	}
 
-	if (para->caption <= AM_CC_CAPTION_DEFAULT ||
-		para->caption >= AM_CC_CAPTION_MAX)
-		para->caption = AM_CC_CAPTION_CC1;
+	if (para->caption1 <= AM_CC_CAPTION_DEFAULT ||
+		para->caption1 >= AM_CC_CAPTION_MAX)
+		para->caption1 = AM_CC_CAPTION_CC1;
 
-	AM_DEBUG(0, "AM_CC_Start para->caption == %d", para->caption );
+	AM_DEBUG(1, "AM_CC_Start vfmt %d para->caption1=%d para->caption2=%d",
+		para->vfmt, para->caption1, para->caption2);
 
+	cc->vfmt = para->vfmt;
 	cc->evt = -1;
 	cc->spara = *para;
-	cc->vbi_pgno = para->caption;
+	cc->vbi_pgno = para->caption1;
 	cc->running = AM_TRUE;
+
+	cc->curr_switch_mask = 0;
+	cc->curr_data_mask   = 0;
+	cc->video_pts = 0;
 
 	/* start the rendering thread */
 	rc = pthread_create(&cc->render_thread, NULL, am_cc_render_thread, (void*)cc);
@@ -908,12 +1225,15 @@ AM_ErrorCode_t AM_CC_Stop(AM_CC_Handle_t handle)
 	if (cc == NULL)
 		return AM_CC_ERR_INVALID_PARAM;
 
+	AM_DEBUG(0, "am_cc_stop wait lock");
 	pthread_mutex_lock(&cc->lock);
+	AM_DEBUG(0, "am_cc_stop enter lock");
 	if (cc->running)
 	{
 		cc->running = AM_FALSE;
 		join = AM_TRUE;
 	}
+	am_cc_clear(cc);
 	pthread_mutex_unlock(&cc->lock);
 
 	pthread_cond_broadcast(&cc->cond);
@@ -923,7 +1243,7 @@ AM_ErrorCode_t AM_CC_Stop(AM_CC_Handle_t handle)
 		pthread_join(cc->data_thread, NULL);
 		pthread_join(cc->render_thread, NULL);
 	}
-
+	AM_DEBUG(0, "am_cc_stop ok");
 	return ret;
 }
 

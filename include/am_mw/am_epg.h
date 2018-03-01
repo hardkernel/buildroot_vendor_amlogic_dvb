@@ -94,13 +94,14 @@ enum AM_EPG_Mode
 	AM_EPG_SCAN_RRT	= 0x2000,	/**< Scan ATSC RRT*/
 	AM_EPG_SCAN_PSIP_EIT = 0x4000,	/**< Scan ATSC EIT*/
 	AM_EPG_SCAN_PSIP_ETT = 0x8000,	/**< Scan ATSC ETT*/
+	AM_EPG_SCAN_PSIP_CEA = 0x10000,	/**< Scan ATSC CEA*/
 	
 	/*Composed mode*/
 	AM_EPG_SCAN_EIT_PF_ALL		= AM_EPG_SCAN_EIT_PF_ACT | AM_EPG_SCAN_EIT_PF_OTH,/**< Scan EIT PF of all the TS*/
 	AM_EPG_SCAN_EIT_SCHE_ALL 	= AM_EPG_SCAN_EIT_SCHE_ACT | AM_EPG_SCAN_EIT_SCHE_OTH,/**< Scan EIT schedule of all the TS*/
 	AM_EPG_SCAN_EIT_ALL 		= AM_EPG_SCAN_EIT_PF_ALL | AM_EPG_SCAN_EIT_SCHE_ALL, /**< Scan all EIT*/
 	AM_EPG_SCAN_ALL				= AM_EPG_SCAN_PAT|AM_EPG_SCAN_PMT|AM_EPG_SCAN_CAT|AM_EPG_SCAN_SDT|AM_EPG_SCAN_NIT|AM_EPG_SCAN_TDT|AM_EPG_SCAN_EIT_ALL|
-									AM_EPG_SCAN_MGT|AM_EPG_SCAN_VCT|AM_EPG_SCAN_STT|AM_EPG_SCAN_RRT|AM_EPG_SCAN_PSIP_EIT|AM_EPG_SCAN_PSIP_ETT,
+									AM_EPG_SCAN_MGT|AM_EPG_SCAN_VCT|AM_EPG_SCAN_STT|AM_EPG_SCAN_RRT|AM_EPG_SCAN_PSIP_EIT|AM_EPG_SCAN_PSIP_ETT|AM_EPG_SCAN_PSIP_CEA,
 };
 
 /**\brief EPG event type*/
@@ -125,6 +126,8 @@ enum AM_EPG_EventType
 	AM_EPG_EVT_UPDATE_PROGRAM_AV,	/**< Program's AV information is changed*/
 	AM_EPG_EVT_UPDATE_PROGRAM_NAME,	/**< Program name is changed*/
 	AM_EPG_EVT_UPDATE_TS,	/**< TS information is updated*/
+	AM_EPG_EVT_NEW_CEA,    /**< New ATSC CEA received, parameter type is dvbpsi_atsc_cea_t*/
+	AM_EPG_EVT_PMT_RATING,    /**< New PMT received, parameter type is AM_EPG_PmtRating_t*/
 	AM_EPG_EVT_END
 };
 
@@ -152,6 +155,7 @@ enum AM_EPG_TAB
 	AM_EPG_TAB_VCT,		/**<VCT*/
 	AM_EPG_TAB_PSIP_EIT,	/**<PSIP EIT*/
 	AM_EPG_TAB_PSIP_ETT,	/**<PSIP ETT*/
+	AM_EPG_TAB_PSIP_CEA,	/**<PSIP ETT*/
 	AM_EPG_TAB_MAX
 };
 
@@ -161,6 +165,12 @@ typedef void (*AM_EPG_Events_UpdateCB_t) (AM_EPG_Handle_t handle, int event_coun
 typedef void (*AM_EPG_PMT_UpdateCB_t) (AM_EPG_Handle_t handle, dvbpsi_pmt_t *pmts);
 typedef void (*AM_EPG_TAB_UpdateCB_t) (AM_EPG_Handle_t handle, int type, void *tables, void *user_data);
 
+/**\brief EPG scanner's create parameters*/
+typedef struct
+{
+	int  i_program_number;	/**< program number*/
+	char rating[1024];  /**< rating buf*/
+}AM_EPG_PmtRating_t;
 
 /**\brief EPG scanner's create parameters*/
 typedef struct

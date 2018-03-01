@@ -106,6 +106,7 @@ typedef struct
 	dvbpsi_pat_program_t program;   /**< Program information*/
 	AM_REC_MediaInfo_t media_info;  /**< Media information*/
 	int total_time;			/**< Total duration time in seconds, <=0 means recoding will stopped manually*/
+	int64_t total_size;                 /**< Max size, <=0 means no limit*/
 	char prefix_name[AM_REC_NAME_MAX];    /**< Filename prefix*/
 	char suffix_name[AM_REC_SUFFIX_MAX];  /**< Filename suffix*/
 }AM_REC_RecPara_t;
@@ -185,6 +186,11 @@ extern AM_ErrorCode_t AM_REC_SetRecordPath(AM_REC_Handle_t handle, const char *p
  * \return Error code
  */
 extern AM_ErrorCode_t AM_REC_GetRecordInfo(AM_REC_Handle_t handle, AM_REC_RecInfo_t *info);
+
+#define REC_TFILE_FLAG_AUTO_CREATE 1
+#define REC_TFILE_FLAG_DETACH 2
+extern AM_ErrorCode_t AM_REC_SetTFile(AM_REC_Handle_t handle, AM_TFile_t tfile, int flag);
+extern AM_ErrorCode_t AM_REC_GetTFile(AM_REC_Handle_t handle, AM_TFile_t *tfile, int *flag);
 
 #ifdef __cplusplus
 }

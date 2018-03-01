@@ -55,9 +55,13 @@ dvbpsi_atsc_content_advisory_dr_t *dvbpsi_decode_atsc_content_advisory_dr(dvbpsi
     p_decoded->i_rating_region_count = 0x2f & buf[0];
     buf++;
 
-    while ((buf + 3 + buf[1]*2 + buf[2+buf[1]*2]) <= end
-            && region < p_decoded->i_rating_region_count) {
+    while (region < p_decoded->i_rating_region_count) {
         dvbpsi_content_advisory_region_t * p_region = &p_decoded->rating_regions[region];
+
+        //if ((buf+1) > end ||
+        //    || ((buf+2+buf[1]*2) > end)
+        //    || ((buf + 3 + buf[1]*2 + buf[2+buf[1]*2]) > end))
+        //    break;
 
         p_region->i_rating_region = buf[0];
         p_region->i_rated_dimensions = buf[1];
@@ -70,10 +74,13 @@ dvbpsi_atsc_content_advisory_dr_t *dvbpsi_decode_atsc_content_advisory_dr(dvbpsi
         }
         p_region->i_rating_description_length = buf[0];
         buf++;
+        memset(p_region->i_rating_description, 0, sizeof(p_region->i_rating_description));
         memcpy(p_region->i_rating_description, &buf[0], p_region->i_rating_description_length);
         buf += p_region->i_rating_description_length;
 
         region++;
     }
+
+    p_decoded->i_rating_region_count = region;
     return p_decoded;
 }

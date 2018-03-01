@@ -36,6 +36,7 @@
 #include "libdvbsi/tables/atsc_stt.h"
 #include "libdvbsi/tables/atsc_eit.h"
 #include "libdvbsi/tables/atsc_ett.h"
+#include "libdvbsi/tables/atsc_cea.h"
 
 #include "atsc/atsc_descriptor.h"
 #include "atsc/atsc_rrt.h"
@@ -94,6 +95,7 @@ extern "C"
 #define AM_SI_TID_PSIP_STT			ATSC_PSIP_STT_TID
 #define AM_SI_TID_PSIP_DCCT			ATSC_PSIP_DCCT_TID
 #define AM_SI_TID_PSIP_DCCSCT		ATSC_PSIP_DCCSCT_TID
+#define AM_SI_TID_PSIP_CEA			ATSC_PSIP_CEA_TID
 
 /**\brief descriptor tag define*/
 /**\brief ISO/IEC 13818-1*/
@@ -148,6 +150,8 @@ extern "C"
 #define AM_SI_DESCR_PDC						(0x69)
 #define AM_SI_DESCR_AC3						(0x6A)
 #define AM_SI_DESCR_ENHANCED_AC3			(0x7A)
+#define AM_SI_DESCR_PSIPENHANCED_AC3		(0xCC)
+#define AM_SI_DESCR_PSIP_AUDIOSTREAM_AC3	(0x81)
 #define AM_SI_DESCR_DTS						(0x7B)
 #define AM_SI_DESCR_AAC						(0x7C)
 #define AM_SI_DESCR_EXTENSION				(0x7f)

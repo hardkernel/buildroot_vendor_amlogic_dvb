@@ -423,6 +423,8 @@ static void *am_rec_record_thread(void* arg)
 		goto close_dvr;
 	}
 
+	AM_EVT_Signal((long)rec, AM_REC_EVT_RECORD_START, NULL);
+
 	/*从DVR设备读取数据并存入文件*/
 	while (rec->stat_flag & REC_STAT_FL_RECORDING)
 	{
@@ -453,10 +455,21 @@ static void *am_rec_record_thread(void* arg)
 		}
 		if (rec->rec_para.is_timeshift)
 		{
-			if (AM_AV_TimeshiftFillData(0, buf, cnt) != AM_SUCCESS)
+			if (rec->tfile_flag & REC_TFILE_FLAG_AUTO_CREATE)
 			{
-				err = AM_REC_ERR_CANNOT_WRITE_FILE;
-				break;
+				if (AM_TFile_Write(rec->tfile, buf, cnt) != cnt)
+				{
+					err = AM_REC_ERR_CANNOT_WRITE_FILE;
+					break;
+				}
+			}
+			else
+			{
+				if (AM_AV_TimeshiftFillData(0, buf, cnt) != AM_SUCCESS)
+				{
+					err = AM_REC_ERR_CANNOT_WRITE_FILE;
+					break;
+				}
 			}
 		}
 		else
@@ -482,6 +495,12 @@ close_file:
 	{
 		close(rec->rec_fd);
 		rec->rec_fd = -1;
+	}
+	AM_DEBUG(1, "ready to stop, %d %p", rec->tfile_flag, rec->tfile);
+	if (!(rec->tfile_flag & REC_TFILE_FLAG_DETACH) && rec->tfile)
+	{
+	    AM_DEBUG(1, "TFile Close");
+		AM_TFile_Close(rec->tfile);
 	}
 
 	/* Maybe there is no space left in disk, we need to remove this empty file */
@@ -543,6 +562,11 @@ static int am_rec_fill_rec_param(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start
 		rec->rec_file_index = 1;
 		return am_rec_gen_next_file_name(rec, start_para->prefix_name, start_para->suffix_name);
 	}
+	else
+	{
+		snprintf(rec->rec_file_name, sizeof(rec->rec_file_name),
+			"%s/%s.%s", rec->create_para.store_dir, start_para->prefix_name, start_para->suffix_name);
+	}
 	
 	return 0;
 }
@@ -565,6 +589,7 @@ static int am_rec_start_record(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start_p
 	/*打开录像文件*/
 	rec->rec_fd = -1;
 	rec->rec_para = *start_para;
+
 	if (! rec->rec_para.is_timeshift)
 	{
 		rec->rec_fd = open(rec->rec_file_name, O_TRUNC|O_CREAT|O_WRONLY, 0666);
@@ -583,7 +608,18 @@ static int am_rec_start_record(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start_p
 		am_rec_insert_file_header(rec);
 		am_rec_insert_pat(rec);
 	}
-	
+	else if ((rec->tfile_flag & REC_TFILE_FLAG_AUTO_CREATE) && !rec->tfile)
+	{
+		//timeshifting use tfile
+		ret = AM_TFile_Open(&rec->tfile, rec->rec_file_name, AM_TRUE, rec->rec_para.total_time, rec->rec_para.total_size);
+		if (ret != AM_SUCCESS)
+		{
+			AM_DEBUG(1, "Cannot open timeshifting file '%s', cannot start", rec->rec_file_name);
+			goto start_end;
+		}
+		AM_DEBUG(1, "create Tfile %p", rec->tfile);
+	}
+
 	rec->rec_start_time = 0;
 	rec->stat_flag |= REC_STAT_FL_RECORDING;
 	rc = pthread_create(&rec->rec_thread, NULL, am_rec_record_thread, (void*)rec);
@@ -595,7 +631,7 @@ static int am_rec_start_record(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start_p
 	}
 
 start_end:
-	AM_DEBUG(0, "start record return %d", ret);
+	AM_DEBUG(1, "start record return %d", ret);
 	if (ret != 0)
 	{
 		rec->stat_flag &= ~REC_STAT_FL_RECORDING;
@@ -613,7 +649,7 @@ start_end:
 			AM_EVT_Signal((long)rec, AM_REC_EVT_RECORD_END, (void*)&epara);
 		}
 	}
-	
+
 	return ret;
 }
 
@@ -647,7 +683,7 @@ AM_ErrorCode_t AM_REC_Create(AM_REC_CreatePara_t *para, AM_REC_Handle_t *handle)
 {
 	AM_REC_Recorder_t *rec;
 	pthread_mutexattr_t mta;
-	
+
 	assert(para && handle);
 
 	*handle = 0;
@@ -686,9 +722,9 @@ AM_ErrorCode_t AM_REC_Destroy(AM_REC_Handle_t handle)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 	pthread_t thread;
-	
+
 	assert(rec);
-	
+
 	AM_REC_StopRecord(handle);
 	pthread_mutex_destroy(&rec->lock);
 	free(rec);
@@ -707,7 +743,7 @@ AM_ErrorCode_t AM_REC_StartRecord(AM_REC_Handle_t handle, AM_REC_RecPara_t *star
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	assert(rec && start_para);
 	pthread_mutex_lock(&rec->lock);
 	ret = am_rec_start_record(rec, start_para);
@@ -726,13 +762,13 @@ AM_ErrorCode_t AM_REC_StopRecord(AM_REC_Handle_t handle)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	assert(rec);
-	
+
 	pthread_mutex_lock(&rec->lock);
 	ret = am_rec_stop_record(rec);
 	pthread_mutex_unlock(&rec->lock);
-	
+
 	return AM_SUCCESS;
 }
 
@@ -769,7 +805,7 @@ AM_ErrorCode_t AM_REC_GetUserData(AM_REC_Handle_t handle, void **user_data)
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
 
 	assert(user_data);
-	
+
 	if (rec)
 	{
 		pthread_mutex_lock(&rec->lock);
@@ -830,5 +866,34 @@ AM_ErrorCode_t AM_REC_GetRecordInfo(AM_REC_Handle_t handle, AM_REC_RecInfo_t *in
 	pthread_mutex_unlock(&rec->lock);
 
 	return AM_SUCCESS;
+}
+
+AM_ErrorCode_t AM_REC_SetTFile(AM_REC_Handle_t handle, AM_TFile_t tfile, int flag)
+{
+	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	assert(rec && tfile);
+	pthread_mutex_lock(&rec->lock);
+	rec->tfile = tfile;
+	rec->tfile_flag = flag;
+	pthread_mutex_unlock(&rec->lock);
+
+	return ret;
+}
+
+AM_ErrorCode_t AM_REC_GetTFile(AM_REC_Handle_t handle, AM_TFile_t *tfile, int *flag)
+{
+	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	assert(rec && tfile);
+	pthread_mutex_lock(&rec->lock);
+	*tfile = rec->tfile;
+	if (flag)
+		*flag = rec->tfile_flag;
+	pthread_mutex_unlock(&rec->lock);
+
+	return ret;
 }
 

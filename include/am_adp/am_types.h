@@ -83,6 +83,7 @@ enum AM_MOD_ID
 	AM_MOD_CC,     /**< Close caption module*/
 	AM_MOD_AD,     /**< Audio description module*/
 	AM_MOD_UPD,    /**< Uploader module*/
+	AM_MOD_TFILE, /*File wrapper module*/
 	AM_MOD_MAX
 };
 

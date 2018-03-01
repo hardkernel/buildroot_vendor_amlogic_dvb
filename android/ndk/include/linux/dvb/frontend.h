@@ -773,15 +773,15 @@ enum fe_layer {
 
 /* Satellite blind scan settings */
 struct dvbsx_blindscanpara {
-	__u32 minfrequency;/* minimum tuner frequency in kHz */
-	__u32 maxfrequency;/* maximum tuner frequency in kHz */
-	__u32 minSymbolRate;/* minimum symbol rate in sym/sec */
-	__u32 maxSymbolRate;/* maximum symbol rate in sym/sec */
-	/*search range in kHz. freq -/+freqRange will be searched */
-	__u32 frequencyRange;
-	__u32 frequencyStep;/* tuner step frequency in kHz */
-	__s32 timeout;/* blindscan event timeout*/
+	__u32 minfrequency;			/* minimum tuner frequency in kHz */
+	__u32 maxfrequency;			/* maximum tuner frequency in kHz */
+	__u32 minSymbolRate;		/* minimum symbol rate in sym/sec */
+	__u32 maxSymbolRate;		/* maximum symbol rate in sym/sec */
+	__u32 frequencyRange;		/* search range in kHz. freq -/+freqRange will be searched */
+	__u32 frequencyStep;			/* tuner step frequency in kHz */
+	__s32 timeout;				/* blindscan event timeout*/
 };
+
 /**
  * When set, this flag will disable any zigzagging or other "normal" tuning
  * behaviour. Additionally, there will be no automatic monitoring of the lock
