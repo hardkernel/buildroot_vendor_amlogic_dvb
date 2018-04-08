@@ -1,5 +1,5 @@
 
-#include <ISystemControlService.h>
+#include <SystemControlClient.h>
 
 #include <binder/Binder.h>
 #include <binder/IServiceManager.h>
@@ -28,43 +28,9 @@ class DeathNotifier: public IBinder::DeathRecipient
         }
 };
 
-static sp < ISystemControlService > amSystemControlService;
+static SystemControlClient *mScc = new SystemControlClient();
 static sp < DeathNotifier > amDeathNotifier;
 static Mutex amgLock;
-
-/**\brief 获取system control 服务
- * \param[in] none
- * \return
- *   - ISystemControlService 成功
- *   - 其他值 null
- */
-const sp < ISystemControlService > &getSystemControlService()
-{
-    Mutex::Autolock _l(amgLock);
-    if (amSystemControlService.get() == 0)
-    {
-        sp < IServiceManager > sm = defaultServiceManager();
-        sp < IBinder > binder;
-        do
-        {
-            binder = sm->getService(String16("system_control"));
-            if (binder != 0)
-                break;
-            AM_DEBUG(1,"SystemControl not published, waiting...");
-            usleep(500000); // 0.5 s
-        }
-        while (true);
-        if (amDeathNotifier == NULL)
-        {
-            amDeathNotifier = new DeathNotifier();
-        }
-        binder->linkToDeath(amDeathNotifier);
-        amSystemControlService =
-            interface_cast < ISystemControlService > (binder);
-    }
-    //ALOGE_IF(amSystemControlService == 0, "no System Control Service!?");
-    return amSystemControlService;
-}
 
 /**\brief read sysfs value
  * \param[in] path file name
@@ -81,13 +47,13 @@ AM_ErrorCode_t AM_SystemControl_Read_Sysfs(const char *path, char *value)
         return AM_FAILURE;
     }
     //AM_DEBUG(1,"AM_SystemControl_Read_Sysfs:%s",path);
-    const sp < ISystemControlService > &scs = getSystemControlService();
-    if (scs != 0)
+    if (mScc != NULL)
     {
-        String16 v;
-        if (scs->readSysfs(String16(path), v))
+        const std::string stdPath(path);
+        std::string stdValue(value);
+        if (mScc->readSysfs(stdPath, stdValue))
         {
-            strcpy(value, String8(v).string());
+            strcpy(value, stdValue.c_str());
             return AM_SUCCESS;
         }
     }
@@ -110,25 +76,25 @@ AM_ErrorCode_t AM_SystemControl_ReadNum_Sysfs(const char *path, char *value, int
         return AM_FAILURE;
     }
     //AM_DEBUG(1,"AM_SystemControl_ReadNum_Sysfs:%s",path);
-    const sp < ISystemControlService > &scs = getSystemControlService();
-    if (scs != 0 && value != NULL && access(path, 0) != -1)
+    if (mScc != NULL && value != NULL && access(path, 0) != -1)
     {
-        String16 v;
-        if (scs->readSysfs(String16(path), v))
+        const std::string stdPath(path);
+        std::string stdValue(value);
+        if (mScc->readSysfs(stdPath, stdValue))
         {
-            if (v.size() != 0)
+            if (stdValue.size() != 0)
             {
                 //AM_DEBUG(1,"readSysfs ok:%s,%s,%d", path, String8(v).string(), String8(v).size());
                 memset(value, 0, size);
-                if (size <= String8(v).size() + 1)
+                if (size <= stdValue.size() + 1)
                 {
-                    memcpy(value, String8(v).string(),
+                    memcpy(value, stdValue.c_str(),
                            size - 1);
                     value[strlen(value)] = '\0';
                 }
                 else
                 {
-                    strcpy(value, String8(v).string());
+                    strcpy(value, stdValue.c_str());
                 }
                 return AM_SUCCESS;
             }
@@ -152,11 +118,11 @@ AM_ErrorCode_t AM_SystemControl_Write_Sysfs(const char *path, char *value)
         return AM_FAILURE;
     }
     //AM_DEBUG(1,"AM_SystemControl_Write_Sysfs:%s",path);
-    const sp < ISystemControlService > &scs = getSystemControlService();
-    if (scs != 0)
+    if (mScc != NULL)
     {
-        String16 v(value);
-        if (scs->writeSysfs(String16(path), v))
+        const std::string stdPath(path);
+        std::string stdValue(value);
+        if (mScc->writeSysfs(stdPath, stdValue))
         {
             //AM_DEBUG(1,"writeSysfs ok");
             return AM_SUCCESS;

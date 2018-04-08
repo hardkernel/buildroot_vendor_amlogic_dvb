@@ -19,6 +19,9 @@
 /**\brief int value: 1*/
 #define __DVB_CORE__       (1)
 #endif
+
+#include <linux/dvb/frontend.h>
+
 typedef struct atv_status_s atv_status_t;
 typedef struct tuner_param_s tuner_param_t;
 typedef enum fe_ofdm_mode fe_ofdm_mode_t;
