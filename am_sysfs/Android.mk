@@ -21,6 +21,8 @@ LOCAL_SHARED_LIBRARIES+=libutils  libbinder libsystemcontrolservice libam_adp ve
 
 LOCAL_PRELINK_MODULE := false
 
+LOCAL_PROPRIETARY_MODULE := true
+
 #LOCAL_32_BIT_ONLY := true
 
 include $(BUILD_SHARED_LIBRARY)

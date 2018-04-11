@@ -147,6 +147,8 @@ LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libcutils liblog libdl libc
 
 LOCAL_PRELINK_MODULE := false
 
+LOCAL_PROPRIETARY_MODULE := true
+
 #LOCAL_32_BIT_ONLY := true
 
 include $(BUILD_SHARED_LIBRARY)
