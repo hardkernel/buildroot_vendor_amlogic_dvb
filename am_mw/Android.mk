@@ -32,6 +32,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_si/atsc/huffman_decode.c\
 		   am_fend_ctrl/am_sec.c\
 		   am_fend_ctrl/am_fend_ctrl.c\
+		   am_fend_ctrl/atv_frontend.c\
 		   am_caman/am_caman.c \
 		   am_caman/ca_dummy.c \
 		   am_cc/am_cc.c \

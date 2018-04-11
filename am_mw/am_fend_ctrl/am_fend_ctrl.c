@@ -25,6 +25,7 @@
 #include "am_fend_ctrl_internal.h"
 #include "am_sec_internal.h"
 #include "am_fend_ctrl.h"
+#include "atv_frontend.h"
 
 #include <assert.h>
 
@@ -32,7 +33,7 @@
  * Macro definitions
  ***************************************************************************/
 
-	
+
 /****************************************************************************
  * Static data
  ***************************************************************************/
@@ -57,14 +58,16 @@
 AM_ErrorCode_t AM_FENDCTRL_SetPara(int dev_no, const AM_FENDCTRL_DVBFrontendParameters_t *para)
 {
 	assert(para);
-	
+
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
-	ret = AM_FEND_SetMode(dev_no, para->m_type);
-	if(ret != AM_SUCCESS){
-		return ret;
+	if (para->m_type != FE_ANALOG)
+	{
+		ret = AM_FEND_SetMode(dev_no, para->m_type);
+		if (ret != AM_SUCCESS) {
+			return ret;
+		}
 	}
-
 	switch(para->m_type)
 	{
 		case FE_QPSK:
@@ -87,8 +90,18 @@ AM_ErrorCode_t AM_FENDCTRL_SetPara(int dev_no, const AM_FENDCTRL_DVBFrontendPara
 			ret = AM_FEND_SetPara(dev_no, &(para->atsc.para));
 			break;
 		case FE_ANALOG:
-			ret = AM_FEND_SetPara(dev_no, &(para->analog.para));
-			break;	
+			{
+				struct v4l2_analog_parameters v4l2_para;
+
+				v4l2_para.frequency = para->analog.para.frequency;
+				v4l2_para.audmode = para->analog.para.u.analog.audmode;
+				v4l2_para.soundsys = para->analog.para.u.analog.soundsys;
+				v4l2_para.std = para->analog.para.u.analog.std;
+				v4l2_para.flag = para->analog.para.u.analog.flag;
+				v4l2_para.afc_range = para->analog.para.u.analog.afc_range;
+				ret = ATV_FEND_SetProp(0, &v4l2_para);
+			}
+			break;
 		case FE_DTMB:
 			ret = AM_FEND_SetPara(dev_no, &(para->dtmb.para));
 			break;
@@ -114,14 +127,15 @@ AM_ErrorCode_t AM_FENDCTRL_Lock(int dev_no, const AM_FENDCTRL_DVBFrontendParamet
 {
 	assert(para);
 	assert(status);
-	
+
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
-	ret = AM_FEND_SetMode(dev_no, para->m_type);
-	if(ret != AM_SUCCESS){
-		return ret;
+	if (para->m_type != FE_ANALOG) {
+		ret = AM_FEND_SetMode(dev_no, para->m_type);
+		if (ret != AM_SUCCESS) {
+			return ret;
+		}
 	}
-
 	switch(para->m_type)
 	{
 		case FE_QPSK:
@@ -142,13 +156,23 @@ AM_ErrorCode_t AM_FENDCTRL_Lock(int dev_no, const AM_FENDCTRL_DVBFrontendParamet
 			break;
 		case FE_ATSC:
 			AM_FEND_Lock(dev_no, &(para->atsc.para), status);
-			break;	
+			break;
 		case FE_ANALOG:
-			ret = AM_FEND_SetPara(dev_no, &(para->analog.para));
-			break;	
+			{
+				struct v4l2_analog_parameters v4l2_para;
+
+				v4l2_para.frequency = para->analog.para.frequency;
+				v4l2_para.audmode = para->analog.para.u.analog.audmode;
+				v4l2_para.soundsys = para->analog.para.u.analog.soundsys;
+				v4l2_para.std = para->analog.para.u.analog.std;
+				v4l2_para.flag = para->analog.para.u.analog.flag;
+				v4l2_para.afc_range = para->analog.para.u.analog.afc_range;
+				ret = ATV_FEND_SetProp(0, &v4l2_para);
+			}
+			break;
 		case FE_DTMB:
 			AM_FEND_Lock(dev_no, &(para->dtmb.para), status);
-			break;	
+			break;
 		case FE_ISDBT:
 			AM_FEND_Lock(dev_no, &(para->isdbt.para), status);
 			break;

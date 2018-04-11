@@ -291,6 +291,7 @@ struct AM_SCAN_Scanner_s
 	int								end_code;		/**< 搜索结束码*/
 	void							*user_data;		/**< 用户数据*/
 	AM_Bool_t						store;			/**< 是否存储*/
+	bool 							atv_open;
 
 	struct
 	{

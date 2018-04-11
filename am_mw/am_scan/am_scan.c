@@ -34,6 +34,7 @@
 #include <linux/ioctl.h>
 #include <linux/types.h>
 #include "am_check_scramb.h"
+#include "atv_frontend.h"
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
@@ -4241,6 +4242,30 @@ static void am_scan_fend_callback(long dev_no, int event_type, void *param, void
 	pthread_mutex_unlock(&scanner->lock);
 }
 
+static void atv_scan_fend_callback(long dev_no,void *param, void *user_data)
+{
+	struct v4l2_frontend_event *evt = (struct v4l2_frontend_event*)param;
+	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)user_data;
+
+	UNUSED(dev_no);
+
+	if (!scanner || !evt || (evt->status == 0))
+		return;
+
+	pthread_mutex_lock(&scanner->lock);
+	scanner->fe_evt.status = evt->status;
+	scanner->fe_evt.parameters.frequency = evt->parameters.frequency;
+	scanner->fe_evt.parameters.u.analog.afc_range = evt->parameters.afc_range;
+	scanner->fe_evt.parameters.u.analog.audmode = evt->parameters.audmode;
+	scanner->fe_evt.parameters.u.analog.flag = evt->parameters.flag;
+	scanner->fe_evt.parameters.u.analog.soundsys = evt->parameters.soundsys;
+	scanner->fe_evt.parameters.u.analog.std = evt->parameters.std;
+	scanner->evt_flag |= AM_SCAN_EVT_FEND;
+	pthread_cond_signal(&scanner->cond);
+	pthread_mutex_unlock(&scanner->lock);
+}
+
+
 /**\brief 卫星BlindScan回调*/
 static void am_scan_blind_scan_callback(int dev_no, AM_FEND_BlindEvent_t *evt, void *user_data)
 {
@@ -4573,6 +4598,11 @@ static AM_ErrorCode_t am_scan_start_dtv(AM_SCAN_Scanner_t *scanner)
 		return AM_SUCCESS;
 	}
 	
+	if (scanner->atv_open)
+	{
+		ATV_FEND_Close(0);
+		scanner->atv_open = FALSE;
+	}
 	AM_DEBUG(1, "@@@ Start dtv scan use standard: %s @@@", (dtv_start_para.standard==AM_SCAN_DTV_STD_DVB)?"DVB" :
 		(dtv_start_para.standard==AM_SCAN_DTV_STD_ISDB)?"ISDB" : "ATSC");
 
@@ -4769,6 +4799,14 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 		return AM_SUCCESS;
 	}
 	AM_DEBUG(1, "@@@ Start atv scan use mode: %d @@@", atv_start_para.mode);
+
+	//open atv device
+	if (!scanner->atv_open)
+	{
+		ATV_FEND_Open(0);
+		ATV_FEND_SetCallback(0, atv_scan_fend_callback, (void*)scanner);
+		scanner->atv_open = TRUE;
+	}
 	if (atv_start_para.mode == AM_SCAN_ATVMODE_FREQ)
 	{
 		scanner->atvctl.direction = 1;
@@ -4825,6 +4863,12 @@ static AM_ErrorCode_t am_scan_stop_atv(AM_SCAN_Scanner_t *scanner)
 
 		AM_DEBUG(1, "Stopping atv ...");
 		AM_DEBUG(1, "Closing AFE device ...");
+
+		if (scanner->atv_open)
+		{
+			ATV_FEND_Close(0);
+			scanner->atv_open = FALSE;
+		}
 
 		ts = scanner->result.tses;
 		while (ts)
