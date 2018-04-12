@@ -14,6 +14,7 @@ endif
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libam_adp
+LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_fend/am_fend.c am_fend/am_fend_diseqc_cmd.c am_fend/am_rotor_calc.c am_fend/linux_dvb/linux_dvb.c\
@@ -155,6 +156,7 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libam_adp
+LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_fend/am_fend.c am_fend/am_fend_diseqc_cmd.c am_fend/am_rotor_calc.c am_fend/linux_dvb/linux_dvb.c\
