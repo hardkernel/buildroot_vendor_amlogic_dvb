@@ -75,6 +75,8 @@ LOCAL_SHARED_LIBRARIES+=libicuuc libzvbi libam_adp libsqlite $(AMADEC_LIBS) libl
 
 LOCAL_PRELINK_MODULE := false
 
+LOCAL_PROPRIETARY_MODULE := true
+
 #LOCAL_32_BIT_ONLY := true
 
 include $(BUILD_SHARED_LIBRARY)
