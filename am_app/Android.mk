@@ -32,6 +32,7 @@ app_prelink_module := false
 
 include $(CLEAR_VARS)
 LOCAL_MODULE    := libam_app
+LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_TAGS := $(app_module_tags)
 LOCAL_SRC_FILES := $(app_src_files)
 LOCAL_CFLAGS+=$(app_cflags)
@@ -45,6 +46,7 @@ include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE    := libam_app
+LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_TAGS := $(app_module_tags)
 LOCAL_SRC_FILES := $(app_src_files)
 LOCAL_CFLAGS+=$(app_cflags)

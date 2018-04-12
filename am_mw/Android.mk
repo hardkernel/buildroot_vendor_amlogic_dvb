@@ -14,6 +14,7 @@ endif
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libam_mw
+LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_epg/am_epg.c\
@@ -80,6 +81,7 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libam_mw
+LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_epg/am_epg.c\
