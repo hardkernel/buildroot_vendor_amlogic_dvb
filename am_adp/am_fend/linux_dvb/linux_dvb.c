@@ -41,6 +41,7 @@
 #include <linux/dvb/frontend.h>
 #include <sys/ioctl.h>
 #include <poll.h>
+#include <atv_frontend.h>
 
 /****************************************************************************
  * Macro definitions
@@ -124,15 +125,16 @@ static AM_ErrorCode_t dvb_open (AM_FEND_Device_t *dev, const AM_FEND_OpenPara_t 
 	char name[PATH_MAX];
 	int fd, ret;
 
-	snprintf(name, sizeof(name), "/dev/dvb0.frontend%d", dev->dev_no);
-	
+	/* snprintf(name, sizeof(name), "/dev/dvb0.frontend%d", dev->dev_no);*/
+	snprintf(name, sizeof(name), "/dev/v4l2_frontend");
+
 	fd = open(name, O_RDWR);
 	if(fd==-1)
 	{
 		AM_DEBUG(1, "cannot open %s, error:%s", name, strerror(errno));
 		return AM_FEND_ERR_CANNOT_OPEN;
 	}
-	
+	AM_DEBUG(1, "open %s, %d.", name, fd);
 	dev->drv_data = (void*)(long)fd;
 
 	if (para->mode != -1) {
@@ -151,6 +153,16 @@ static AM_ErrorCode_t dvb_set_mode (AM_FEND_Device_t *dev, int mode)
 	int fd = (long)dev->drv_data;
 	int ret;
 	int fe_mode = SYS_UNDEFINED;
+	if (mode == FE_UNKNOWN)
+	{
+		int fd = (long)dev->drv_data;
+		AM_DEBUG(1, "set mode fd %d.\n", fd);
+		if (ioctl(fd, V4L2_SET_MODE, 0) == -1)
+		{
+			AM_DEBUG(1, "ioctl V4L2_SET_MODE failed, error:%s", strerror(errno));
+			return AM_FAILURE;
+		}
+	}
 	if(mode < 0)
 		return AM_SUCCESS;
 
@@ -196,7 +208,15 @@ static AM_ErrorCode_t dvb_set_mode (AM_FEND_Device_t *dev, int mode)
 			break;
 		case FE_ANALOG:
 			fe_mode = SYS_ANALOG;
-			break;	
+			int fd = (long)dev->drv_data;
+			AM_DEBUG(1, "set mode fd %d.\n", fd);
+			if (ioctl(fd, V4L2_SET_MODE, mode) == -1)
+			{
+				AM_DEBUG(1, "ioctl V4L2_SET_MODE failed, error:%s", strerror(errno));
+				return AM_FAILURE;
+			}
+			return AM_SUCCESS;
+			/*break;*/
 		case FE_DTMB:
 			fe_mode = SYS_DTMB;
 			break;
@@ -289,8 +309,17 @@ static AM_ErrorCode_t dvb_set_para (AM_FEND_Device_t *dev, const struct dvb_fron
 {
 	int fd = (long)dev->drv_data;
 
-	AM_DEBUG(1, "ioctl FE_SET_FRONTEND \n");
-	if(ioctl(fd, FE_SET_FRONTEND, para)==-1)
+	struct v4l2_analog_parameters v4l2_para;
+
+	v4l2_para.frequency = para->frequency;
+	v4l2_para.audmode = para->u.analog.audmode;
+	v4l2_para.soundsys = para->u.analog.soundsys;
+	v4l2_para.std = para->u.analog.std;
+	v4l2_para.flag = para->u.analog.flag;
+	v4l2_para.afc_range = para->u.analog.afc_range;
+
+	AM_DEBUG(1, "ioctl FE_SET_FRONTEND fd %d\n", fd);
+	if (ioctl(fd, V4L2_SET_FRONTEND, &v4l2_para) == -1)
 	{
 		AM_DEBUG(1, "ioctl FE_SET_FRONTEND failed, error:%s", strerror(errno));
 		return AM_FAILURE;
@@ -342,12 +371,16 @@ static AM_ErrorCode_t dvb_get_prop (AM_FEND_Device_t *dev, struct dtv_properties
 static AM_ErrorCode_t dvb_get_status (AM_FEND_Device_t *dev, fe_status_t *status)
 {
 	int fd = (long)dev->drv_data;
+	enum v4l2_status v4l2_st;
 	
-	if(ioctl(fd, FE_READ_STATUS, status)==-1)
+	/* if(ioctl(fd, FE_READ_STATUS, status)==-1) */
+	if (ioctl(fd, V4L2_READ_STATUS, &v4l2_st) == -1)
 	{
 		AM_DEBUG(1, "ioctl FE_READ_STATUS failed, error:%s", strerror(errno));
 		return AM_FAILURE;
 	}
+
+	*status = (enum fe_status) v4l2_st;
 
 	return AM_SUCCESS;
 }
@@ -402,6 +435,7 @@ static AM_ErrorCode_t dvb_wait_event (AM_FEND_Device_t *dev, struct dvb_frontend
 	int fd = (long)dev->drv_data;
 	struct pollfd pfd;
 	int ret;
+	struct v4l2_frontend_event v4l2_evt;
 	
 	pfd.fd = fd;
 	pfd.events = POLLIN;
@@ -412,12 +446,16 @@ static AM_ErrorCode_t dvb_wait_event (AM_FEND_Device_t *dev, struct dvb_frontend
 		return AM_FEND_ERR_TIMEOUT;
 	}
 	
-	if(ioctl(fd, FE_GET_EVENT, evt)==-1)
+	/* if(ioctl(fd, FE_GET_EVENT, evt)==-1) */
+	if (ioctl(fd, V4L2_GET_EVENT, &v4l2_evt) == -1)
 	{
 		AM_DEBUG(1, "ioctl FE_GET_EVENT failed, error:%s", strerror(errno));
 		return AM_FAILURE;
 	}
-	
+
+	evt->status = (enum fe_status) v4l2_evt.status;
+	evt->parameters.frequency = v4l2_evt.parameters.frequency;
+
 	return AM_SUCCESS;
 }
 
