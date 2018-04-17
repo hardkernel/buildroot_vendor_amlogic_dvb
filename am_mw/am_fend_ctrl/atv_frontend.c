@@ -178,7 +178,8 @@ AM_ErrorCode_t ATV_FEND_Open(int dev_no)
 		return ret;
 	}
 
-	ioctl(dev->fd, V4L2_SET_MODE, 1);
+	/* ioctl(dev->fd, V4L2_SET_MODE, 1); */
+	ATV_FEND_SetMode(dev_no, 0);
 	dev->open_count++;
 
 	return AM_SUCCESS;
@@ -205,7 +206,8 @@ AM_ErrorCode_t ATV_FEND_Close(int dev_no)
 		pthread_mutex_destroy(&dev->lock);
 		pthread_cond_destroy(&dev->cond);
 
-		ioctl(dev->fd, V4L2_SET_MODE, 0);
+		/* ioctl(dev->fd, V4L2_SET_MODE, 0); */
+		ATV_FEND_SetMode(dev_no, 0);
 
 		close(dev->fd);
 		dev->fd = -1;
@@ -243,6 +245,22 @@ AM_ErrorCode_t ATV_FEND_SetCallback(int dev_no, ATV_FEND_Callback_t cb, void *us
 	return ret;
 }
 
+AM_ErrorCode_t ATV_FEND_SetMode(int dev_no, const mode)
+{
+	AM_ATV_FEND_Device_t *dev;
+
+	AM_TRY(atv_fend_get_openned_dev(dev_no, &dev));
+
+	AM_DEBUG(1, "ioctl V4L2_SET_MODE \n");
+	if (ioctl(dev->fd, V4L2_SET_MODE, mode) == -1)
+	{
+		AM_DEBUG(1, "ioctl V4L2_SET_MODE failed, error:%s", strerror(errno));
+		return -1;
+	}
+	AM_DEBUG(1, "ioctl V4L2_SET_MODE success \n");
+
+	return AM_SUCCESS;
+}
 
 AM_ErrorCode_t ATV_FEND_SetProp (int dev_no, const struct v4l2_analog_parameters *para)
 {

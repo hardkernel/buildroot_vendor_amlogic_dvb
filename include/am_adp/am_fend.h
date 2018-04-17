@@ -89,6 +89,7 @@ enum AM_FEND_EventType
 	AM_FEND_EVT_ROTOR_STOP,    /**< Rotor stop*/
 	AM_FEND_EVT_SHORT_CIRCUIT, /**< Frontend circuit*/
 	AM_FEND_EVT_SHORT_CIRCUIT_REPAIR, /**< Frontend circuit repair*/
+	AM_VLFEND_EVT_STATUS_CHANGED,
 	AM_FEND_EVT_END
 };
 

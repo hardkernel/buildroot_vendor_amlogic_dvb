@@ -35,7 +35,6 @@
 #include <math.h>
 #include <errno.h>
 #include "../am_adp_internal.h"
-#include <atv_frontend.h>
 
 /****************************************************************************
  * Macro definitions
@@ -59,7 +58,7 @@ extern const AM_FEND_Driver_t linux_dvb_fend_drv;
 #ifdef EMU_FEND
 extern const AM_FEND_Driver_t emu_fend_drv;
 #endif
-
+extern const AM_FEND_Driver_t linux_v4l2_fend_drv;
 
 static AM_FEND_Device_t fend_devices[FEND_DEV_COUNT] =
 {
@@ -82,7 +81,7 @@ static AM_FEND_Device_t fend_devices[FEND_DEV_COUNT] =
 #if  FEND_DEV_COUNT > 1
 	[1] = {
 		.dev_no = 1,
-		.drv = &linux_dvb_fend_drv,
+		.drv = &linux_v4l2_fend_drv,
 	},
 #endif
 #endif

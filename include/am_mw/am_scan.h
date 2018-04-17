@@ -303,6 +303,7 @@ typedef struct AM_SCAN_TS_s
 		{
 			int freq;		/**< frequency*/
 			int std;		/**< tuner std*/
+			int audmode;	/**< audmode std*/
 			int logicalChannelNum;	/**< logical channel number*/
 		}analog;
 	};
@@ -380,6 +381,7 @@ typedef void (*AM_SCAN_StoreCb) (AM_SCAN_Result_t *result);
 struct AM_SCAN_CreatePara_s
 {
 	int fend_dev_id; 					/**< fend device number*/
+	int vlfend_dev_id; 					/**< v4l2 fend device number*/
 	int mode;							/**< TV scan mode，see AM_SCAN_Mode*/
 	AM_SCAN_StoreCb store_cb;			/**< callback of scan finish*/
 	sqlite3 *hdb;						/**< the handle of database*/

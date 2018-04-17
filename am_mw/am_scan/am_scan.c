@@ -3973,8 +3973,8 @@ static AM_ErrorCode_t am_scan_atv_step_tune(AM_SCAN_Scanner_t *scanner)
 				dvb_fend_para(cur_fe_para)->frequency,
 				scanner->atvctl.min_freq, scanner->atvctl.max_freq);
 			
-            /* Set frontend */
-			ret = AM_FENDCTRL_SetPara(scanner->start_para.fend_dev_id, &cur_fe_para);
+			/* Set frontend */
+			ret = AM_FENDCTRL_SetPara(scanner->start_para.vlfend_dev_id, &cur_fe_para);
 			if (ret == AM_SUCCESS)
 			{
 				scanner->recv_status |= AM_SCAN_RECVING_WAIT_FEND;
@@ -4196,7 +4196,10 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 		}
 		
 		/* try set frontend */
-		ret = AM_FENDCTRL_SetPara(scanner->start_para.fend_dev_id, &cur_fe_para);
+		if (cur_fe_para.m_type == FE_ANALOG)
+			ret = AM_FENDCTRL_SetPara(scanner->start_para.vlfend_dev_id, &cur_fe_para);
+		else
+			ret = AM_FENDCTRL_SetPara(scanner->start_para.fend_dev_id, &cur_fe_para);
 		if (ret == AM_SUCCESS)
 		{
 			scanner->recv_status |= AM_SCAN_RECVING_WAIT_FEND;
@@ -4242,9 +4245,10 @@ static void am_scan_fend_callback(long dev_no, int event_type, void *param, void
 	pthread_mutex_unlock(&scanner->lock);
 }
 
-static void atv_scan_fend_callback(long dev_no,void *param, void *user_data)
+static void atv_scan_fend_callback(int dev_no, struct dvb_frontend_event *evt, void *user_data)
 {
-	struct v4l2_frontend_event *evt = (struct v4l2_frontend_event*)param;
+	//struct v4l2_frontend_event *evt = (struct v4l2_frontend_event*)param;
+	//struct dvb_frontend_event *evt = (struct dvb_frontend_event*)param;
 	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)user_data;
 
 	UNUSED(dev_no);
@@ -4253,6 +4257,7 @@ static void atv_scan_fend_callback(long dev_no,void *param, void *user_data)
 		return;
 
 	pthread_mutex_lock(&scanner->lock);
+	/*
 	scanner->fe_evt.status = evt->status;
 	scanner->fe_evt.parameters.frequency = evt->parameters.frequency;
 	scanner->fe_evt.parameters.u.analog.afc_range = evt->parameters.afc_range;
@@ -4260,6 +4265,8 @@ static void atv_scan_fend_callback(long dev_no,void *param, void *user_data)
 	scanner->fe_evt.parameters.u.analog.flag = evt->parameters.flag;
 	scanner->fe_evt.parameters.u.analog.soundsys = evt->parameters.soundsys;
 	scanner->fe_evt.parameters.u.analog.std = evt->parameters.std;
+	*/
+	scanner->fe_evt = *evt;
 	scanner->evt_flag |= AM_SCAN_EVT_FEND;
 	pthread_cond_signal(&scanner->cond);
 	pthread_mutex_unlock(&scanner->lock);
@@ -4600,7 +4607,7 @@ static AM_ErrorCode_t am_scan_start_dtv(AM_SCAN_Scanner_t *scanner)
 	
 	if (scanner->atv_open)
 	{
-		ATV_FEND_Close(0);
+		AM_VLFEND_Close(scanner->start_para.vlfend_dev_id);
 		scanner->atv_open = FALSE;
 	}
 	AM_DEBUG(1, "@@@ Start dtv scan use standard: %s @@@", (dtv_start_para.standard==AM_SCAN_DTV_STD_DVB)?"DVB" :
@@ -4803,8 +4810,9 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 	//open atv device
 	if (!scanner->atv_open)
 	{
-		ATV_FEND_Open(0);
-		ATV_FEND_SetCallback(0, atv_scan_fend_callback, (void*)scanner);
+		AM_VLFEND_Open(scanner->start_para.vlfend_dev_id);
+		AM_VLFEND_SetCallback(scanner->start_para.vlfend_dev_id, atv_scan_fend_callback, (void *)scanner);
+
 		scanner->atv_open = TRUE;
 	}
 	if (atv_start_para.mode == AM_SCAN_ATVMODE_FREQ)
@@ -4866,7 +4874,7 @@ static AM_ErrorCode_t am_scan_stop_atv(AM_SCAN_Scanner_t *scanner)
 
 		if (scanner->atv_open)
 		{
-			ATV_FEND_Close(0);
+			AM_VLFEND_Close(scanner->start_para.vlfend_dev_id);
 			scanner->atv_open = FALSE;
 		}
 
@@ -5075,7 +5083,8 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			struct dvb_frontend_parameters para;
 			int mode = scanner->start_para.store_mode;
 
-			AM_FEND_GetPara(scanner->start_para.fend_dev_id, &para);
+			/*AM_FEND_GetPara(scanner->start_para.fend_dev_id, &para);*/
+			AM_VLFEND_GetPara(scanner->start_para.vlfend_dev_id, &para);
 			AM_DEBUG(1, "cvbs lock !");
 			formatted_freq = am_scan_format_atv_freq(scanner->atvctl.afc_locked_freq);
 			memset(&si, 0, sizeof(si));
@@ -5117,6 +5126,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			//scanner->curr_ts->analog.std = scanner->start_para.atv_para.default_std;
 			//scanner->curr_ts->analog.std = scanner->fe_evt.parameters.u.analog.std;
 			scanner->curr_ts->analog.std = para.u.analog.std;
+			scanner->curr_ts->analog.audmode = para.u.analog.audmode;
 			//scanner->curr_ts->analog.std = dvb_fend_para(cur_fe_para)->u.analog.std;
 
 			/*添加到搜索结果列表*/
