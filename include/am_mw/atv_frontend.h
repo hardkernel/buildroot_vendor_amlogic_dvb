@@ -39,13 +39,4 @@ struct v4l2_frontend_event {
 
  /* audmode */
 
-
-typedef void (*ATV_FEND_Callback_t) (int dev_no, struct v4l2_frontend_event *evt, void *user_data);
-
-AM_ErrorCode_t ATV_FEND_Open(int dev_no);
-AM_ErrorCode_t ATV_FEND_Close(int dev_no);
-AM_ErrorCode_t ATV_FEND_SetCallback(int dev_no, ATV_FEND_Callback_t cb, void *user_data);
-AM_ErrorCode_t ATV_FEND_SetProp (int dev_no, const struct v4l2_analog_parameters *para);
-AM_ErrorCode_t ATV_FEND_GetProp (int dev_no, struct v4l2_analog_parameters *para);
-
 #endif /* __V4L2_FRONTEND_H__ */

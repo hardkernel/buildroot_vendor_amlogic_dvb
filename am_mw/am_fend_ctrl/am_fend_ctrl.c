@@ -26,6 +26,7 @@
 #include "am_sec_internal.h"
 #include "am_fend_ctrl.h"
 #include "atv_frontend.h"
+#include "am_vlfend.h"
 
 #include <assert.h>
 

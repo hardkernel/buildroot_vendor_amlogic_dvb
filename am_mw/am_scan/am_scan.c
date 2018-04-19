@@ -35,6 +35,7 @@
 #include <linux/types.h>
 #include "am_check_scramb.h"
 #include "atv_frontend.h"
+#include "am_vlfend.h"
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
@@ -4810,7 +4811,10 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 	//open atv device
 	if (!scanner->atv_open)
 	{
-		AM_VLFEND_Open(scanner->start_para.vlfend_dev_id);
+		AM_FEND_OpenPara_t para;
+
+		para.mode = 4;
+		AM_VLFEND_Open(scanner->start_para.vlfend_dev_id, &para);
 		AM_VLFEND_SetCallback(scanner->start_para.vlfend_dev_id, atv_scan_fend_callback, (void *)scanner);
 
 		scanner->atv_open = TRUE;
