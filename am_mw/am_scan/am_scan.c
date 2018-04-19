@@ -4813,7 +4813,7 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 	{
 		AM_FEND_OpenPara_t para;
 
-		para.mode = 4;
+		para.mode = FE_ANALOG;
 		AM_VLFEND_Open(scanner->start_para.vlfend_dev_id, &para);
 		AM_VLFEND_SetCallback(scanner->start_para.vlfend_dev_id, atv_scan_fend_callback, (void *)scanner);
 

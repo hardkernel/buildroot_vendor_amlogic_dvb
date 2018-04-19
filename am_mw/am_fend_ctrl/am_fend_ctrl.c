@@ -94,7 +94,7 @@ AM_ErrorCode_t AM_FENDCTRL_SetPara(int dev_no, const AM_FENDCTRL_DVBFrontendPara
 			{
 				struct v4l2_analog_parameters v4l2_para;
 
-				ret = AM_VLFEND_SetMode(dev_no, 1);
+				ret = AM_VLFEND_SetMode(dev_no, FE_ANALOG);
 				if (ret < 0)
 					return ret;
 
