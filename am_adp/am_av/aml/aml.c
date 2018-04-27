@@ -3163,7 +3163,7 @@ static int aml_set_sync_mode(int has_audio, int has_video, int afmt)
 	}
 	AM_DEBUG(1, "aml_set_sync_mode:-----------1\n");
 #ifdef ANDROID
-	if (aml_get_audio_digital_raw() == 0) {
+	if (aml_get_audio_digital_raw() == 0 && has_audio) {
 		AM_FileEcho(TSYNC_MODE_FILE, "2");
 	} else if (has_video && !has_audio) {
 		AM_FileEcho(TSYNC_MODE_FILE, "0");
