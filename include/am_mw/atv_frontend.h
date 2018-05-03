@@ -34,7 +34,7 @@ struct v4l2_frontend_event {
 #define V4L2_SET_FRONTEND    _IOW('V', 105, struct v4l2_analog_parameters)
 #define V4L2_GET_FRONTEND    _IOR('V', 106, struct v4l2_analog_parameters)
 #define V4L2_GET_EVENT       _IOR('V', 107, struct v4l2_frontend_event)
-#define V4L2_SET_MODE        _IO('V', 108) /* 1 : entry atv, 0 : leave atv */
+#define V4L2_SET_MODE        _IOW('V', 108, int) /* 1 : entry atv, 0 : leave atv */
 #define V4L2_READ_STATUS     _IOR('V', 109, enum v4l2_status)
 
  /* audmode */

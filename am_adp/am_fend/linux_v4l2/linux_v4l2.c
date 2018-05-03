@@ -142,7 +142,7 @@ static AM_ErrorCode_t v4l2_set_mode(AM_FEND_Device_t *dev, int mode)
 		fe_mode = 0;
 	}
 
-	if (ioctl(fd, V4L2_SET_MODE, fe_mode) == -1)
+	if (ioctl(fd, V4L2_SET_MODE, &fe_mode) == -1)
 	{
 		AM_DEBUG(1, "ioctl V4L2_SET_MODE failed, error:%s", strerror(errno));
 		return AM_FAILURE;
