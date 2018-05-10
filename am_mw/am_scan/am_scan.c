@@ -5747,6 +5747,7 @@ static void am_scan_copy_atv_feparas(AM_SCAN_ATVCreatePara_t *para, AM_SCAN_Fron
 		if (para->mode != AM_SCAN_ATVMODE_FREQ)
 		{
 			dvb_fend_para(fe_start->fe_para)->u.analog.std = para->default_std;
+			dvb_fend_para(fe_start->fe_para)->u.analog.audmode = para->default_std & 0x00FFFFFF;
 		}
 
 		if (para->mode == AM_SCAN_ATVMODE_MANUAL)
