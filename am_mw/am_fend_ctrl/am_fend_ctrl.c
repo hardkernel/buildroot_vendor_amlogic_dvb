@@ -68,7 +68,11 @@ AM_ErrorCode_t AM_FENDCTRL_SetPara(int dev_no, const AM_FENDCTRL_DVBFrontendPara
 		if (ret != AM_SUCCESS) {
 			return ret;
 		}
+	}else{
+		//disable dtv demod, but it will return error.
+		AM_FEND_SetMode(dev_no, FE_ANALOG);
 	}
+
 	switch(para->m_type)
 	{
 		case FE_QPSK:
