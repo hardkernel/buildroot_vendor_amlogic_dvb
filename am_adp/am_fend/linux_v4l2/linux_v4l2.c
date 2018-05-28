@@ -55,6 +55,8 @@ static AM_ErrorCode_t v4l2_open (AM_FEND_Device_t *dev, const AM_FEND_OpenPara_t
 static AM_ErrorCode_t v4l2_set_mode (AM_FEND_Device_t *dev, int mode);
 static AM_ErrorCode_t v4l2_set_para (AM_FEND_Device_t *dev, const struct dvb_frontend_parameters *para);
 static AM_ErrorCode_t v4l2_get_para (AM_FEND_Device_t *dev, struct dvb_frontend_parameters *para);
+static AM_ErrorCode_t v4l2_set_prop (AM_FEND_Device_t *dev, const struct dtv_properties *prop);
+static AM_ErrorCode_t v4l2_get_prop (AM_FEND_Device_t *dev, struct dtv_properties *prop);
 static AM_ErrorCode_t v4l2_get_status (AM_FEND_Device_t *dev, fe_status_t *status);
 static AM_ErrorCode_t v4l2_wait_event (AM_FEND_Device_t *dev, struct dvb_frontend_event *evt, int timeout);
 static AM_ErrorCode_t v4l2_close (AM_FEND_Device_t *dev);
@@ -70,8 +72,8 @@ const AM_FEND_Driver_t linux_v4l2_fend_drv =
 	.get_ts   = NULL,
 	.set_para = v4l2_set_para,
 	.get_para = v4l2_get_para,
-	.set_prop = NULL,
-	.get_prop = NULL,
+	.set_prop = v4l2_set_prop,
+	.get_prop = v4l2_get_prop,
 	.get_status = v4l2_get_status,
 	.get_snr = NULL,
 	.get_ber = NULL,
@@ -197,9 +199,99 @@ static AM_ErrorCode_t v4l2_get_para(AM_FEND_Device_t *dev, struct dvb_frontend_p
 	return AM_SUCCESS;
 }
 
+static AM_ErrorCode_t v4l2_set_prop (AM_FEND_Device_t *dev, const struct dtv_properties *prop)
+{
+	int fd = (long) dev->drv_data;
+	struct v4l2_properties v4l2_prop;
+	struct v4l2_property *property = NULL;
+	int i = 0;
+
+	property = malloc(prop->num * sizeof(struct v4l2_property));
+	if (property == NULL)
+	{
+		AM_DEBUG(1, "malloc failed, error:%s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	v4l2_prop.num = prop->num;
+	v4l2_prop.props = property;
+
+	for (i = 0; i < prop->num; ++i)
+	{
+		(v4l2_prop.props + i)->cmd = (prop->props + i)->cmd;
+		(v4l2_prop.props + i)->data = (prop->props + i)->u.data;
+	}
+
+	AM_DEBUG(1, "V4L2_SET_PROPERTY cmd = 0x%x", prop->props->cmd);
+	if (ioctl(fd, V4L2_SET_PROPERTY, &v4l2_prop) == -1)
+	{
+		AM_DEBUG(1, "ioctl V4L2_SET_PROPERTY failed, error:%s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	for (i = 0; i < prop->num; ++i)
+	{
+		(prop->props + i)->result = (v4l2_prop.props + i)->result;
+	}
+
+	if (property != NULL)
+	{
+		free(property);
+		property = NULL;
+	}
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t v4l2_get_prop (AM_FEND_Device_t *dev, struct dtv_properties *prop)
+{
+	int fd = (long) dev->drv_data;
+	struct v4l2_properties v4l2_prop;
+	struct v4l2_property *property = NULL;
+	int i = 0;
+
+	property = malloc(prop->num * sizeof(struct v4l2_property));
+	if (property == NULL)
+	{
+		AM_DEBUG(1, "malloc failed, error:%s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	v4l2_prop.num = prop->num;
+	v4l2_prop.props = property;
+
+	for (i = 0; i < prop->num; ++i)
+	{
+		(v4l2_prop.props + i)->cmd = (prop->props + i)->cmd;
+		(v4l2_prop.props + i)->data = (prop->props + i)->u.data;
+	}
+
+	AM_DEBUG(1, "V4L2_GET_PROPERTY cmd = 0x%x", prop->props->cmd);
+	if (ioctl(fd, V4L2_GET_PROPERTY, &v4l2_prop) == -1)
+	{
+		AM_DEBUG(1, "ioctl V4L2_GET_PROPERTY failed, error:%s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	for (i = 0; i < prop->num; ++i)
+	{
+		(prop->props + i)->result = (v4l2_prop.props + i)->result;
+		(prop->props + i)->u.data = (v4l2_prop.props + i)->data;
+	}
+
+	if (property != NULL)
+	{
+		free(property);
+		property = NULL;
+		v4l2_prop.props = NULL;
+	}
+
+	return AM_SUCCESS;
+}
+
 static AM_ErrorCode_t v4l2_get_status(AM_FEND_Device_t *dev, fe_status_t *status)
 {
-	int fd = (long)dev->drv_data;
+	int fd = (long) dev->drv_data;
 	enum v4l2_status v4l2_st;
 
 	if (ioctl(fd, V4L2_READ_STATUS, &v4l2_st) == -1)

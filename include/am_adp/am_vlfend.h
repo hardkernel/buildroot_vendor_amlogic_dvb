@@ -91,6 +91,16 @@ extern AM_ErrorCode_t AM_VLFEND_SetPara(int dev_no, const struct dvb_frontend_pa
 extern AM_ErrorCode_t AM_VLFEND_GetPara(int dev_no, struct dvb_frontend_parameters *para);
 
 /**
+ * \brief set frontend property
+ * \param dev_no frontend device number
+ * \param[in] prop frontend device property
+ * \return
+ *   - AM_SUCCESS onSuccess
+ *   - or error code
+ */
+extern AM_ErrorCode_t AM_VLFEND_SetProp(int dev_no, const struct dtv_properties *prop);
+
+/**
  * \brief get frontend property
  * \param dev_no frontend device number
  * \param[out] prop return frontend device property

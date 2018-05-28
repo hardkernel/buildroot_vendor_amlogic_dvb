@@ -1,7 +1,9 @@
 #ifndef __ATV_FRONTEND_H__
 #define __ATV_FRONTEND_H__
 
+#include <linux/types.h>
 #include <linux/videodev2.h>
+
 
 #define V4L2_FE_DEV    "/dev/v4l2_frontend"
 
@@ -26,6 +28,20 @@ struct v4l2_analog_parameters {
 	unsigned int reserved;
 };
 
+struct v4l2_property {
+	unsigned int cmd;
+	unsigned int data;
+	int result;
+};
+
+struct v4l2_properties {
+	unsigned int num;
+	union {
+		struct v4l2_property *props;
+		__u64 reserved;
+	};
+};
+
 struct v4l2_frontend_event {
 	enum v4l2_status status;
 	struct v4l2_analog_parameters parameters;
@@ -36,7 +52,14 @@ struct v4l2_frontend_event {
 #define V4L2_GET_EVENT       _IOR('V', 107, struct v4l2_frontend_event)
 #define V4L2_SET_MODE        _IOW('V', 108, int) /* 1 : entry atv, 0 : leave atv */
 #define V4L2_READ_STATUS     _IOR('V', 109, enum v4l2_status)
+#define V4L2_SET_PROPERTY    _IOWR('V', 110, struct v4l2_properties)
+#define V4L2_GET_PROPERTY    _IOWR('V', 111, struct v4l2_properties)
 
- /* audmode */
+#define V4L2_TUNE                1
+#define V4L2_SOUND_SYS           2
+#define V4L2_SLOW_SEARCH_MODE    3
+
+/* audmode */
+
 
 #endif /* __V4L2_FRONTEND_H__ */

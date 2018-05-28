@@ -373,6 +373,54 @@ AM_ErrorCode_t AM_VLFEND_GetPara(int dev_no, struct dvb_frontend_parameters *par
 	return ret;
 }
 
+AM_ErrorCode_t AM_VLFEND_SetProp(int dev_no, const struct dtv_properties *prop)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	assert(prop);
+
+	AM_TRY(vlfend_get_openned_dev(dev_no, &dev));
+
+	if (!dev->drv->set_prop)
+	{
+		AM_DEBUG(1, "vlfronend %d no not support set_prop", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+
+	pthread_mutex_lock(&dev->lock);
+
+	ret = dev->drv->set_prop(dev, prop);
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+AM_ErrorCode_t AM_VLFEND_GetProp(int dev_no, struct dtv_properties *prop)
+{
+	AM_FEND_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	assert(prop);
+
+	AM_TRY(vlfend_get_openned_dev(dev_no, &dev));
+
+	if (!dev->drv->get_prop)
+	{
+		AM_DEBUG(1, "vlfronend %d no not support get_prop", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+
+	pthread_mutex_lock(&dev->lock);
+
+	ret = dev->drv->get_prop(dev, prop);
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
 /**\brief 取得前端设备当前的锁定状态
  * \param dev_no 前端设备号
  * \param[out] status 返回前端设备的锁定状态

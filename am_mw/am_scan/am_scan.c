@@ -4246,10 +4246,10 @@ static void am_scan_fend_callback(long dev_no, int event_type, void *param, void
 	pthread_mutex_unlock(&scanner->lock);
 }
 
-static void atv_scan_fend_callback(int dev_no, struct dvb_frontend_event *evt, void *user_data)
+static void atv_scan_fend_callback(long dev_no, int event_type, void *param, void *user_data)
 {
 	//struct v4l2_frontend_event *evt = (struct v4l2_frontend_event*)param;
-	//struct dvb_frontend_event *evt = (struct dvb_frontend_event*)param;
+	struct dvb_frontend_event *evt = (struct dvb_frontend_event*)param;
 	AM_SCAN_Scanner_t *scanner = (AM_SCAN_Scanner_t*)user_data;
 
 	UNUSED(dev_no);
@@ -4815,7 +4815,7 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 
 		para.mode = FE_ANALOG;
 		AM_VLFEND_Open(scanner->start_para.vlfend_dev_id, &para);
-		AM_VLFEND_SetCallback(scanner->start_para.vlfend_dev_id, atv_scan_fend_callback, (void *)scanner);
+		AM_EVT_Subscribe(scanner->start_para.vlfend_dev_id, AM_VLFEND_EVT_STATUS_CHANGED, atv_scan_fend_callback, (void*)scanner);
 
 		scanner->atv_open = TRUE;
 	}
@@ -5056,7 +5056,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 	if (scanner->stage == AM_SCAN_STAGE_TS)
 	{
 		/* For analog ts, we must check the tv decoder */
-		if (cur_fe_para.m_type == FE_ANALOG )
+		if (0 /*cur_fe_para.m_type == FE_ANALOG */)
 		{
 			atv_lock_para.pData = scanner->user_data;
 			atv_lock_para.checkStable = (scanner->proc_mode & AM_SCAN_PROCMODE_AUTOPAUSE_ON_ATV_FOUND) ? 1 : 0;
@@ -5110,7 +5110,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 				AM_DEBUG(1, "Skip program for atv pal mode at lock proc");
 				goto next_ts;
 			} else {
-				AM_DEBUG(1, "not Skip program for atv pal mode at lock proc std[%x]pal[%x]mode[%d]", para.u.analog.std, V4L2_COLOR_STD_PAL, mode);
+				AM_DEBUG(1, "not Skip program for atv pal mode at lock proc std[%x]pal[%x]mode[%d]", (unsigned int) para.u.analog.std, V4L2_COLOR_STD_PAL, mode);
 			}
 			if (((para.u.analog.std & V4L2_COLOR_STD_SECAM) == V4L2_COLOR_STD_SECAM) &&
 				(mode & AM_SCAN_DTV_STOREMODE_NOSECAM) == AM_SCAN_DTV_STOREMODE_NOSECAM)
@@ -5118,7 +5118,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 				AM_DEBUG(1, "Skip program for atv secam mode at lock proc");
 				goto next_ts;
 			} else {
-				AM_DEBUG(1, "not Skip program for atv secam mode at lock proc std[%x]pal[%x]mode[%d]", para.u.analog.std, V4L2_COLOR_STD_PAL, mode);
+				AM_DEBUG(1, "not Skip program for atv secam mode at lock proc std[%x]pal[%x]mode[%d]", (unsigned int) para.u.analog.std, V4L2_COLOR_STD_PAL, mode);
 			}
 
 			SIGNAL_EVENT(AM_SCAN_EVT_SIGNAL, (void*)&si);
@@ -5132,6 +5132,7 @@ static int am_scan_new_ts_locked_proc(AM_SCAN_Scanner_t *scanner)
 			scanner->curr_ts->analog.std = para.u.analog.std;
 			scanner->curr_ts->analog.audmode = para.u.analog.audmode;
 			//scanner->curr_ts->analog.std = dvb_fend_para(cur_fe_para)->u.analog.std;
+			AM_DEBUG(1, "scanner->curr_ts->analog.std [0x%x] audmode [0x%x]", scanner->curr_ts->analog.std, scanner->curr_ts->analog.audmode);
 
 			/*添加到搜索结果列表*/
 			APPEND_TO_LIST(AM_SCAN_TS_t, scanner->curr_ts, scanner->result.tses);
@@ -5673,6 +5674,8 @@ handle_events:
 
 	/*反注册前端事件*/
 	AM_EVT_Unsubscribe(scanner->start_para.fend_dev_id, AM_FEND_EVT_STATUS_CHANGED, am_scan_fend_callback, (void*)scanner);
+	AM_EVT_Unsubscribe(scanner->start_para.vlfend_dev_id, AM_VLFEND_EVT_STATUS_CHANGED, atv_scan_fend_callback, (void*)scanner);
+
 	pthread_mutex_destroy(&scanner->lock);
 	pthread_cond_destroy(&scanner->cond);
 	pthread_mutex_destroy(&scanner->lock_pause);
