@@ -461,6 +461,7 @@ static AM_ErrorCode_t aml_set_audio_ad(AM_AV_Device_t *dev, int enable, uint16_t
 static AM_ErrorCode_t aml_set_inject_audio(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt);
 static AM_ErrorCode_t aml_set_inject_subtitle(AM_AV_Device_t *dev, uint16_t spid, int stype);
 static AM_ErrorCode_t aml_timeshift_get_tfile(AM_AV_Device_t *dev, AM_TFile_t *tfile);
+static int aml_restart_inject_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread);
 
 const AM_AV_Driver_t aml_av_drv =
 {
@@ -3520,14 +3521,23 @@ static void* aml_av_monitor_thread(void *arg)
 	int is_dts_dolby = 0;
 
 	AV_Monitor_t *mon;
-	AV_TSData_t *ts;
+	AV_TSData_t *ts,ts_temp;
 	AV_TSPlayPara_t *tp;
+	AV_InjectData_t *inj;
 
 	if (dev->mode == AV_TIMESHIFT) {
 		AV_TimeshiftData_t *tshift_d = (AV_TimeshiftData_t*)dev->timeshift_player.drv_data;
 		mon = &dev->timeshift_player.mon;
 		tp = &tshift_d->tp;
 		ts = &tshift_d->ts;
+	} else if (dev->mode == AV_INJECT){
+		mon = &dev->ts_player.mon;
+		tp = &dev->ts_player.play_para;
+		inj = (AV_InjectData_t *)dev->inject_player.drv_data;
+		ts_temp.fd = inj->vid_fd;
+		ts_temp.vid_fd = inj->cntl_fd;
+		ts_temp.adec = inj->adec;
+		ts = &ts_temp;
 	} else {//ts mode default
 		mon = &dev->ts_player.mon;
 		tp = &dev->ts_player.play_para;
@@ -3570,7 +3580,18 @@ static void* aml_av_monitor_thread(void *arg)
 		pthread_cond_timedwait(&gAVMonCond, &gAVMonLock, &rt);
 
 		if (! mon->av_thread_running)
+		{
+			AM_DEBUG(1,"[aml_av_monitor_thread] ending");
 			break;
+		}
+		has_audio = VALID_AUDIO(tp->apid, tp->afmt);
+		has_video = VALID_VIDEO(tp->vpid, tp->vfmt);
+		if ((!has_audio) && (!has_video)) {
+			AM_DEBUG(1,"Audio && Video is None");
+			continue;
+		} else {
+			//AM_DEBUG(1,"Audio:%d or Video:%d is Running.",has_audio,has_video);
+			}
 		if (is_dts_dolby == 1) {
 			if (mChange_audio_flag == -1) {
 				mChange_audio_flag = aml_get_audio_digital_raw();
@@ -3582,7 +3603,7 @@ static void* aml_av_monitor_thread(void *arg)
 		//switch audio pid or fmt
 		if (dev->audio_switch == AM_TRUE)
 		{
-			if (dev->mode == AV_PLAY_TS)
+			if (dev->mode == AV_PLAY_TS || dev->mode == AV_INJECT)
 				aml_switch_ts_audio_fmt(dev);
 			dev->audio_switch = AM_FALSE;
 		}
@@ -3595,11 +3616,13 @@ static void* aml_av_monitor_thread(void *arg)
 				abuf_level = astatus.status.data_len;
 				abuf_read_ptr = astatus.status.read_pointer;
 			} else {
-				//AM_DEBUG(1, "cannot get audio buffer status");
+				AM_DEBUG(1, "cannot get audio buffer status");
 				abuf_size  = 0;
 				abuf_level = 0;
 				abuf_read_ptr = 0;
 			}
+		} else {
+				AM_DEBUG(1, "Audio is None.");
 		}
 		if (has_video)
 		{
@@ -3609,11 +3632,13 @@ static void* aml_av_monitor_thread(void *arg)
 				vbuf_read_ptr = vstatus.status.read_pointer;
 				//is_hd_video = vstatus.vstatus.width > 720;
 			} else {
-				//AM_DEBUG(1, "cannot get video buffer status");
+				AM_DEBUG(1, "cannot get video buffer status");
 				vbuf_size  = 0;
 				vbuf_level = 0;
 				vbuf_read_ptr = 0;
 			}
+		} else {
+			AM_DEBUG(1, "Video is None.");
 		}
 		if (vbuf_level == 0) {
 			if(!vbuf_level_empty_time)
@@ -4135,14 +4160,95 @@ static void* aml_av_monitor_thread(void *arg)
 			}
 		}
 
-		//AM_DEBUG(1, "vbuf_level--0x%08x---- abuf_level---0x%08x",vbuf_level,abuf_level);
+		AM_DEBUG(1, "tsync_mode:%d--vbuf_level--0x%08x---- abuf_level---0x%08x",
+			tsync_mode,vbuf_level,abuf_level);
 
-		if (need_replay && dev->mode == AV_PLAY_TS) {
+		if (!av_paused && dev->mode == AV_INJECT) {
+			if (has_video && (vbuf_level < DEC_STOP_VIDEO_LEVEL))
+				av_paused = AM_TRUE;
+			if (has_audio && adec_start && (abuf_level < DEC_STOP_AUDIO_LEVEL))
+				av_paused = AM_TRUE;
+
+			if (av_paused) {
+				if (has_audio && adec_start) {
+					AM_DEBUG(1, "[avmon] AV_INJECT audio pause");
+					audio_decode_pause(ts->adec);
+				}
+				if (has_video) {
+					AM_DEBUG(1, "[avmon] AV_INJECT video pause");
+					ioctl(ts->vid_fd, AMSTREAM_IOC_VPAUSE, 1);
+				}
+				//AM_DEBUG(1, "[avmon] pause av play vlevel %d alevel %d", vbuf_level, abuf_level);
+			}
+		}
+
+		if (av_paused && dev->mode == AV_INJECT) {
+			av_paused = AM_FALSE;
+			if (has_audio && (abuf_level < (ADEC_START_AUDIO_LEVEL/2)))
+				av_paused = AM_TRUE;
+			if (has_video && (vbuf_level < (ADEC_START_VIDEO_LEVEL*16))) {
+				av_paused = AM_TRUE;
+			} else {
+				av_paused = AM_FALSE;
+			}
+
+			if (tsync_mode != 1) {
+				AM_DEBUG(1,"tsync_mode change to A_master.");
+				AM_FileEcho(TSYNC_MODE_FILE,"1");
+			}
+			if (!av_paused) {
+				if (has_audio && adec_start) {
+					AM_DEBUG(1, "[avmon] AV_INJECT audio resume");
+					audio_decode_resume(ts->adec);
+				}
+				if (has_video) {
+					AM_DEBUG(1, "[avmon] AV_INJECT video resume");
+					ioctl(ts->vid_fd, AMSTREAM_IOC_VPAUSE, 0);
+				}
+				//AM_DEBUG(1, "[avmon] resume av play vlevel %d alevel %d", vbuf_level, abuf_level);
+			}
+		}
+
+		if (need_replay && (dev->mode == AV_PLAY_TS)) {
 			AM_DEBUG(1, "[avmon] replay ts vlevel %d alevel %d vpts_stop %d vmaster %d",
 				vbuf_level, abuf_level, vpts_stop_dur, vmaster_dur);
 			aml_close_ts_mode(dev, AM_FALSE);
 			aml_open_ts_mode(dev);
 			aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
+#ifndef ENABLE_PCR
+			adec_start = AM_FALSE;
+			av_paused  = AM_TRUE;
+#else
+			adec_start = (adec_handle != NULL);
+			av_paused  = AM_FALSE;
+#endif
+			resample_type = 0;
+			next_resample_type = resample_type;
+			next_resample_start_time = 0;
+			last_apts = 0;
+			last_vpts = 0;
+			last_dmx_apts = 0;
+			last_dmx_vpts = 0;
+			apts_stop_time = 0;
+			vpts_stop_time = 0;
+			dmx_apts_stop_time = 0;
+			dmx_vpts_stop_time = 0;
+			vmaster_time = 0;
+			down_audio_cache_time = 0;
+			down_video_cache_time = 0;
+			vdec_stop_time = 0;
+			vdec_stop_dur  = 0;
+			has_amaster = AM_FALSE;
+		}else if (need_replay && (dev->mode == AV_INJECT)) {
+			AM_DEBUG(1, "[avmon] replay AV_INJECT vlevel %d alevel %d vpts_stop %d vmaster %d",
+				vbuf_level, abuf_level, vpts_stop_dur, vmaster_dur);
+			aml_restart_inject_mode(dev, AM_FALSE);
+			tp = &dev->ts_player.play_para;
+			inj = (AV_InjectData_t *)dev->inject_player.drv_data;
+			ts_temp.fd = inj->vid_fd;
+			ts_temp.vid_fd = inj->cntl_fd;
+			ts_temp.adec = inj->adec;
+			ts = &ts_temp;
 #ifndef ENABLE_PCR
 			adec_start = AM_FALSE;
 			av_paused  = AM_TRUE;
@@ -4293,6 +4399,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 	AV_DataSource_t *src;
 	int fd, val;
 	AV_TSPlayPara_t *tp;
+	AV_TSData_t *ts;
 #ifdef PLAYER_API_NEW
 	AV_FilePlayerData_t *data;
 	AV_FilePlayPara_t *pp;
@@ -4392,7 +4499,19 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 			inj_p = (AV_InjectPlayPara_t *)para;
 			inj = dev->inject_player.drv_data;
 			if (aml_start_inject(inj, inj_p) != AM_SUCCESS)
+				{
+				AM_DEBUG(1,"[aml_start_mode]  AM_AV_ERR_SYS");
 				return AM_AV_ERR_SYS;
+				} else {
+		dev->ts_player.play_para.afmt = inj->aud_fmt;
+		dev->ts_player.play_para.apid = inj->aud_id;
+			dev->ts_player.play_para.vfmt = inj->vid_fmt;
+			dev->ts_player.play_para.vpid = inj->vid_id;
+			dev->ts_player.play_para.sub_afmt = inj->sub_type;
+			dev->ts_player.play_para.sub_apid = inj->sub_id;
+			dev->ts_player.play_para.pcrpid = 0x1fff;
+			aml_start_av_monitor(dev, &dev->ts_player.mon);
+				}
 		break;
 		case AV_TIMESHIFT:
 			tshift_p = (AV_TimeShiftPlayPara_t *)para;
@@ -4460,6 +4579,7 @@ static AM_ErrorCode_t aml_close_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode)
 		// 	aml_destroy_jpeg_data(jpeg);
 		// break;
 		case AV_INJECT:
+			aml_stop_av_monitor(dev, &dev->ts_player.mon);
 			inj = dev->inject_player.drv_data;
 			aml_destroy_inject_data(inj);
 		break;
@@ -5945,6 +6065,63 @@ static AM_ErrorCode_t aml_set_audio_ad(AM_AV_Device_t *dev, int enable, uint16_t
 			break;
 		default:
 			break;
+	}
+
+	return AM_SUCCESS;
+}
+
+static int aml_restart_inject_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
+{
+	AV_InjectData_t *inj,pre_inject_data;
+	AV_InjectPlayPara_t inj_data;
+
+	AM_DEBUG(1, "aml_restart_inject_mode");
+
+	inj = dev->inject_player.drv_data;
+	memcpy(&pre_inject_data,inj,sizeof(AV_InjectData_t));
+	aml_destroy_inject_data(inj);
+	if (destroy_thread) {
+		aml_stop_av_monitor(dev, &dev->ts_player.mon);
+	}
+	//malloc
+	inj = aml_create_inject_data();
+	if (!inj)
+	{
+		AM_DEBUG(1, "not enough memory");
+		return AM_AV_ERR_NO_MEM;
+	}
+	dev->inject_player.drv_data = inj;
+	///replace the inject data
+
+	inj_data.para.aud_fmt = pre_inject_data.aud_fmt;
+	inj_data.para.aud_id = pre_inject_data.aud_id;
+	inj_data.para.pkg_fmt = pre_inject_data.pkg_fmt;
+	inj_data.para.vid_fmt = pre_inject_data.vid_fmt;
+	inj_data.para.vid_id = pre_inject_data.vid_id;
+	inj_data.para.sub_id = pre_inject_data.sub_id;
+	inj_data.para.sub_type = pre_inject_data.sub_type;
+	inj_data.para.channel = 0;
+	inj_data.para.data_width = 0;
+	inj_data.para.sample_rate = 0;
+
+	if (aml_start_inject(inj, &inj_data) != AM_SUCCESS)
+	{
+		AM_DEBUG(1,"[aml_start_mode]  AM_AV_ERR_SYS");
+		return AM_AV_ERR_SYS;
+	} else {
+		dev->ts_player.play_para.afmt = inj->aud_fmt;
+		dev->ts_player.play_para.apid = inj->aud_id;
+		dev->ts_player.play_para.vfmt = inj->vid_fmt;
+		dev->ts_player.play_para.vpid = inj->vid_id;
+		dev->ts_player.play_para.sub_afmt = inj->sub_type;
+		dev->ts_player.play_para.sub_apid = inj->sub_id;
+		dev->ts_player.play_para.pcrpid = 0x1fff;
+
+		//ts = (AV_TSData_t*)dev->ts_player.drv_data;
+		//ts->fd = inj->vid_fd;//"/dev/amstream_mpts"
+		//ts->vid_fd = inj->cntl_fd;//"/dev/amvideo"
+		if (destroy_thread)
+			aml_start_av_monitor(dev, &dev->ts_player.mon);
 	}
 
 	return AM_SUCCESS;

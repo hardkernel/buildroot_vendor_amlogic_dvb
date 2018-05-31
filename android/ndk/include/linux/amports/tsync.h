@@ -43,6 +43,19 @@ typedef enum {
     TSYNC_MODE_AMASTER,
 } tsync_mode_t;
 
+enum tysnc_func_type_e {
+	TSYNC_PCRSCR_VALID,
+	TSYNC_PCRSCR_GET,
+	TSYNC_FIRST_PCRSCR_GET,
+	TSYNC_PCRAUDIO_VALID,
+	TSYNC_PCRVIDEO_VALID,
+	TSYNC_BUF_BY_BYTE,
+	TSYNC_STBUF_LEVEL,
+	TSYNC_STBUF_SPACE,
+	TSYNC_STBUF_SIZE,
+	TSYNC_FUNC_TYPE_MAX,
+};
+
 extern void tsync_avevent(avevent_t event, u32 param);
 
 extern void tsync_audio_break(int audio_break);
@@ -59,5 +72,6 @@ static inline u32 tsync_vpts_discontinuity_margin(void)
 {
     return AV_DISCONTINUE_THREDHOLD;
 }
+extern int register_tync_func(enum tysnc_func_type_e ntype, void *pfunc);
 
 #endif /* TSYNC_H */
