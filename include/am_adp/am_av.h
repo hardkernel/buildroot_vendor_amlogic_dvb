@@ -110,6 +110,7 @@ enum AM_AV_EventType
 	AM_AV_EVT_AUDIO_AC3_LICENCE_RESUME, /**< AC3 audio resumed*/
 	AM_AV_EVT_VIDEO_NOT_SUPPORT,        /**< Video format is not supported*/
 	AM_AV_EVT_VIDEO_AVAILABLE,  /**< Cannot get valid video information*/
+	AM_AV_EVT_AUDIO_CB, /**< Audio function will implement in cb */
 	AM_AV_EVT_END
 };
 
@@ -1141,6 +1142,40 @@ extern AM_ErrorCode_t AM_AV_SetVdecErrorRecoveryMode(int dev_no, uint8_t error_r
  * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetAudioAd(int dev_no, int enable, uint16_t apid, AM_AV_AFormat_t afmt);
+
+typedef struct _AUDIO_PARMS_
+{
+	int cmd;
+	int param1;
+	int param2;
+}AudioParms;
+
+#if 0
+typedef struct _AUDIO_STATUS_
+{
+	int sample_rate_orig;
+	int channels_orig;
+	int lfepresent_orig;
+	int channels;
+	int sample_rate;
+}AudioStatus;
+#endif
+
+#define ADEC_START_DECODE 		1
+#define ADEC_PAUSE_DECODE 		2
+#define ADEC_RESUME_DECODE 		3
+#define ADEC_STOP_DECODE  		4
+#define ADEC_SET_DECODE_AD 		5
+#define ADEC_SET_VOLUME 		6
+#define ADEC_SET_MUTE			7
+#define ADEC_SET_OUTPUT_MODE 	8
+#define ADEC_SET_PRE_GAIN		9
+#define ADEC_SET_PRE_MUTE 		10
+#define ADEC_GET_STATUS			11
+
+typedef void (*AM_AV_Audio_CB_t)(int event_type, AudioParms* parm, void *user_data);
+
+extern AM_ErrorCode_t AM_AV_SetAudioCallback(int dev_no,AM_AV_Audio_CB_t cb,void *user_data);
 
 #ifdef __cplusplus
 }

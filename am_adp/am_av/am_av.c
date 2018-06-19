@@ -3016,3 +3016,21 @@ AM_ErrorCode_t AM_AV_SetAudioAd(int dev_no, int enable, uint16_t apid, AM_AV_AFo
 
 	return ret;
 }
+AM_ErrorCode_t AM_AV_SetAudioCallback(int dev_no,AM_AV_Audio_CB_t cb,void *user_data)
+{
+	AM_AV_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_TRY(av_get_openned_dev(dev_no, &dev));
+
+	pthread_mutex_lock(&dev->lock);
+
+	if (dev->drv->set_audio_cb)
+	{
+		dev->drv->set_audio_cb(dev, cb, user_data);
+	}
+
+	pthread_mutex_unlock(&dev->lock);
+	return 0;
+}
+
