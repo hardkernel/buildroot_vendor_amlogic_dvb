@@ -930,7 +930,8 @@ static void *am_cc_render_thread(void *arg)
 	{
 		// Update video pts
 		node = cc->json_chain_head->json_chain_next;
-
+                if (node == cc->json_chain_head)
+			node = NULL;
 		vpts = am_cc_get_video_pts();
 
 		// If has cc data in chain, set gap time to timeout
