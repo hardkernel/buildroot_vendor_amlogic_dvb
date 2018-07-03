@@ -95,6 +95,7 @@ enum AM_EPG_Mode
 	AM_EPG_SCAN_PSIP_EIT = 0x4000,	/**< Scan ATSC EIT*/
 	AM_EPG_SCAN_PSIP_ETT = 0x8000,	/**< Scan ATSC ETT*/
 	AM_EPG_SCAN_PSIP_CEA = 0x10000,	/**< Scan ATSC CEA*/
+	AM_EPG_SCAN_PSIP_EIT_VERSION_CHANGE = 0x20000, /**< Scan ATSC EIT version change flag*/
 	
 	/*Composed mode*/
 	AM_EPG_SCAN_EIT_PF_ALL		= AM_EPG_SCAN_EIT_PF_ACT | AM_EPG_SCAN_EIT_PF_OTH,/**< Scan EIT PF of all the TS*/

@@ -138,6 +138,9 @@ enum AM_SCAN_DTVMode
 	AM_SCAN_DTVMODE_SCRAMB_TSHEAD	= 0x400, /**< is check scramb by ts head*/
 	AM_SCAN_DTVMODE_NOVCT			= 0x800, /**< Donot store in vct but not in pmt programs*/
 	AM_SCAN_DTVMODE_NOVCTHIDE		= 0x1000, /**< Donot store in vct hide flag is set 1*/
+	AM_SCAN_DTVMODE_CHECKDATA		= 0x2000, /**< Check AV data.*/
+	AM_SCAN_DTVMODE_INVALIDPID		= 0x4000,  /**< SKIP no video and audio pid.*/
+    AM_SCAN_DTVMODE_CHECK_AUDIODATA	= 0x8000  /**< Check Audio data, remove it that nodata.*/
 };
 
 /**\brief ATVscan mode*/

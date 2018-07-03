@@ -645,6 +645,7 @@ static int _get_aud_disabled() {
 static int _get_dvb_loglevel() {
 	return property_get_int32(DVB_LOGLEVEL_PROP, AM_DEBUG_LOGLEVEL_DEFAULT);
 }
+
 static void adec_start_decode(int fd, int fmt, int has_video, void **padec)
 {
 #if !defined(ADEC_API_NEW)
@@ -2178,6 +2179,7 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 				tshift->timeout = 0;
 				tshift->state = AV_TIMESHIFT_STAT_FFFB;
 				AM_DEBUG(1, "[timeshift] [fast] speed: %d", tshift->speed);
+				AM_FileEcho(VID_BLACKOUT_FILE, "0");
 				if (tshift->last_cmd == AV_PLAY_START)
 				{
 					AM_DEBUG(1, "set di bypass_all to 1");
@@ -3027,7 +3029,65 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 			dev->vout_h = 1080;
 		}
 	}
-
+#ifdef CHIP_8226H
+	if (AM_FileRead(VID_ASPECT_RATIO_FILE, buf, sizeof(buf)) == AM_SUCCESS)
+	{
+		if (!strncmp(buf, "auto", 4))
+		{
+			dev->video_ratio = AM_AV_VIDEO_ASPECT_AUTO;
+		}
+		else if (!strncmp(buf, "16x9", 4))
+		{
+			dev->video_ratio = AM_AV_VIDEO_ASPECT_16_9;
+		}
+		else if (!strncmp(buf, "4x3", 3))
+		{
+			dev->video_ratio = AM_AV_VIDEO_ASPECT_4_3;
+		}
+	}
+	if (AM_FileRead(VID_ASPECT_MATCH_FILE, buf, sizeof(buf)) == AM_SUCCESS)
+	{
+		if (!strncmp(buf, "ignore", 4))
+		{
+			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_IGNORE;
+		}
+		else if (!strncmp(buf, "letter box", 10))
+		{
+			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX;
+		}
+		else if (!strncmp(buf, "pan scan", 8))
+		{
+			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN;
+		}
+		else if (!strncmp(buf, "combined", 8))
+		{
+			dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_COMBINED;
+		}
+	}
+#else
+	if (AM_FileRead(VID_ASPECT_MATCH_FILE, buf, sizeof(buf)) == AM_SUCCESS)
+	{
+		if (sscanf(buf, "%d", &v) == 1)
+		{
+			switch (v)
+			{
+				case 0:
+				case 1:
+					dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_IGNORE;
+					break;
+				case 2:
+					dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN;
+					break;
+				case 3:
+					dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX;
+					break;
+				case 4:
+					dev->video_match = AM_AV_VIDEO_ASPECT_MATCH_COMBINED;
+					break;
+			}
+		}
+	}
+#endif
 //#endif
 
 #if !defined(ADEC_API_NEW)
@@ -4840,6 +4900,73 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 #endif
 #endif
 		break;
+		case AV_VIDEO_PARA_RATIO:
+#ifndef 	CHIP_8226H
+			name = VID_SCREEN_MODE_FILE;
+			switch ((long)val)
+			{
+				case AM_AV_VIDEO_ASPECT_AUTO:
+					cmd = "0";
+				break;
+				case AM_AV_VIDEO_ASPECT_16_9:
+					cmd = "3";
+				break;
+				case AM_AV_VIDEO_ASPECT_4_3:
+					cmd = "2";
+				break;
+			}
+#else
+			name = VID_ASPECT_RATIO_FILE;
+			switch ((long)val)
+			{
+				case AM_AV_VIDEO_ASPECT_AUTO:
+					cmd = "auto";
+				break;
+				case AM_AV_VIDEO_ASPECT_16_9:
+					cmd = "16x9";
+				break;
+				case AM_AV_VIDEO_ASPECT_4_3:
+					cmd = "4x3";
+				break;
+			}
+ #endif
+		break;
+		case AV_VIDEO_PARA_RATIO_MATCH:
+			name = VID_ASPECT_MATCH_FILE;
+#ifndef 	CHIP_8226H
+			switch ((long)val)
+			{
+				case AM_AV_VIDEO_ASPECT_MATCH_IGNORE:
+					cmd = "1";
+				break;
+				case AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX:
+					cmd = "3";
+				break;
+				case AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN:
+					cmd = "2";
+				break;
+				case AM_AV_VIDEO_ASPECT_MATCH_COMBINED:
+					cmd = "4";
+				break;
+			}
+#else
+			switch ((long)val)
+			{
+				case AM_AV_VIDEO_ASPECT_MATCH_IGNORE:
+					cmd = "ignore";
+				break;
+				case AM_AV_VIDEO_ASPECT_MATCH_LETTER_BOX:
+					cmd = "letter box";
+				break;
+				case AM_AV_VIDEO_ASPECT_MATCH_PAN_SCAN:
+					cmd = "pan scan";
+				break;
+				case AM_AV_VIDEO_ASPECT_MATCH_COMBINED:
+					cmd = "combined";
+				break;
+			}
+#endif
+		break;
 		case AV_VIDEO_PARA_MODE:
 			name = VID_SCREEN_MODE_FILE;
 			cmd = ((AM_AV_VideoDisplayMode_t)val)?"1":"0";
@@ -5966,7 +6093,7 @@ static AM_ErrorCode_t aml_set_ad_source(AM_AD_Handle_t *ad, int enable, int pid,
 	AM_DEBUG(1, "AD set source enable[%d] pid[%d] fmt[%d]", enable, pid, fmt);
 
 	if (enable) {
-		AM_AD_Para_t para = {.dmx_id = 0, .pid = pid, };
+		AM_AD_Para_t para = {.dmx_id = 0, .pid = pid, .fmt = fmt};
 		err = AM_AD_Create(ad, &para);
 		if (err == AM_SUCCESS) {
 			err = AM_AD_SetCallback(*ad, ad_callback, user);

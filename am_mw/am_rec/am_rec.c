@@ -396,6 +396,7 @@ static void *am_rec_record_thread(void* arg)
 {
 	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)arg;
 	int cnt, err = 0, check_time, update_time=0;
+	int retry_count = 0;
 	uint8_t buf[256*1024];
 	AM_DVR_OpenPara_t para;
 	AM_DVR_StartRecPara_t spara;
@@ -445,13 +446,22 @@ static void *am_rec_record_thread(void* arg)
 				update_time = check_time;
 			}
 		}
-		
-		cnt = AM_DVR_Read(rec->create_para.dvr_dev, buf, sizeof(buf), 1000);
+		retry_count = 5;
+		cnt = AM_DVR_Read(rec->create_para.dvr_dev, buf, sizeof(buf), 50);
 		if (cnt <= 0)
 		{
-			AM_DEBUG(1, "No data available from DVR%d", rec->create_para.dvr_dev);
-			usleep(200*1000);
-			continue;
+			while (retry_count--) {
+				if  (rec->stat_flag & REC_STAT_FL_RECORDING)
+					usleep(10*1000);
+				else
+					break;
+			}
+			if  (rec->stat_flag & REC_STAT_FL_RECORDING) {
+				AM_DEBUG(1, "No data available from DVR%d", rec->create_para.dvr_dev);
+				continue;
+			} else
+				break;
+
 		}
 		if (rec->rec_para.is_timeshift)
 		{

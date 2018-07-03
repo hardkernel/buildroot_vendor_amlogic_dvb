@@ -797,6 +797,8 @@ dtvcc_window_to_json (struct dtvcc_window *win, Output *out)
 	int                     i;
 	int                     column_count_no_lock = 0;
 	int                     column_final_count;
+	int                     row_count_no_lock = 0;
+	int                     row_final_count;
 
 	if (o_symbol(out, '{') < 0)
 		return -1;
@@ -818,6 +820,17 @@ dtvcc_window_to_json (struct dtvcc_window *win, Output *out)
 
 	if (o_bool_prop(out, "column_lock", win->column_lock) < 0)
 		return -1;
+
+	if (win->row_lock == 0)
+	{
+		row_count_no_lock = win->row_no_lock_length;
+		row_final_count =
+			(row_count_no_lock > win->row_count) ?
+			row_count_no_lock : win->row_count;
+	}
+	else
+		row_final_count = win->row_count;
+	win->row_count = row_final_count;
 
 	if (o_int_prop(out, "row_count", win->row_count) < 0)
 		return -1;
@@ -901,6 +914,9 @@ dtvcc_window_to_json (struct dtvcc_window *win, Output *out)
 		return -1;
 
 	if (o_int_prop(out, "border_color", win->style.border_color) < 0)
+		return -1;
+
+	if (o_int_prop(out, "heart_beat", out->flash) < 0)
 		return -1;
 
 	if (o_prop_begin(out, "rows") < 0)

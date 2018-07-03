@@ -1,17 +1,21 @@
 /*
  * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * Description: 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Description:
  */
 #ifdef _FORTIFY_SOURCE
 #undef _FORTIFY_SOURCE
@@ -19,12 +23,29 @@
 
 #define AM_DEBUG_LEVEL 5
 
+#define PESPACKET_STREAMID_MASK 0x100
+#define PROGRAM_STREAM_MAP 0x1bc
+#define PRIVATE_STREAM_2   0x1bf
+#define ECM_STREAM		   0x1f0
+#define EMM_STREAM 		   0x1f1
+#define PROGRAM_STREAM_DIRECTORY 0x1ff
+#define DSMCC_STREAM       0x1f2
+#define H222_TYPE_E_STREAM 0x1f8
+#define PADDING_STREAM 	   0x1be
+
+#define PES_PAYLOADINFO_LEN			3
+#define PES_PAECKET_HEAD_LEN		6
+#define PES_START_CODE_LEN			3
+#define AC3_PAYLOAD_START_CODE_1	0x0b77
+#define AC3_PAYLOAD_START_CODE_2	0x770b
+
 #include <stdlib.h>
 #include <malloc.h>
 #include <string.h>
 #include <am_debug.h>
 #include <am_pes.h>
 #include <am_util.h>
+#include <amports/aformat.h>
 
 typedef struct
 {
@@ -197,6 +218,9 @@ AM_ErrorCode_t AM_PES_Decode(AM_PES_Handle_t handle, uint8_t *buf, int size)
 		AM_Bool_t found = AM_FALSE;
 		int i, plen = 0;
 		int dpos = 0, dlen = 0;
+		/*pes header len*/
+		int pes_header_len = 0;
+		/*need skip data len*/
 		int hlen = 0;
 		int invalid = 0;
 
@@ -218,16 +242,56 @@ AM_ErrorCode_t AM_PES_Decode(AM_PES_Handle_t handle, uint8_t *buf, int size)
 		plen = (parser->buf[pos+4]<<8) | (parser->buf[pos+5]);
 		if (plen == 0xffff || plen == 0x0) {
 			invalid = 1;
+			AM_DEBUG(1, "pes packet plen error plen[%d]parser->len[%d]", plen, parser->len);
 		}
-
-		if ((parser->len - pos) < (plen + 6) && invalid == 0)
+		if ((parser->len - pos) < (plen + PES_PAECKET_HEAD_LEN) && invalid == 0)
 		{
+			// check is valid pes packet
+			// check ac3 payload is flag is ac3, is not ac3 payload
+			// we need skip
+			int stream_id = parser->buf[pos + PES_START_CODE_LEN] | PESPACKET_STREAMID_MASK;
+			int start_code = 0;
+			/* program_stream_map, private_stream_2 */
+			/* ECM, EMM */
+			/* program_stream_directory, DSMCC_stream */
+			/* ITU-T Rec. H.222.1 type E stream */
+			if (stream_id != PROGRAM_STREAM_MAP && stream_id != PRIVATE_STREAM_2 &&
+				stream_id != ECM_STREAM && stream_id != EMM_STREAM &&
+				stream_id != PROGRAM_STREAM_DIRECTORY && stream_id != DSMCC_STREAM &&
+				stream_id != H222_TYPE_E_STREAM) {
+				/*get pes header len, case have pes header*/
+				pes_header_len = parser->buf[pos + PES_PAECKET_HEAD_LEN + 2];
+				/*pes table skip len*/
+				hlen = PES_PAECKET_HEAD_LEN + PES_PAYLOADINFO_LEN + pes_header_len;
+				if (parser->para.afmt == AFORMAT_AC3 || parser->para.afmt == AFORMAT_EAC3) {
+					start_code = ((uint16_t)parser->buf[pos + hlen] << 8)
+					| parser->buf[pos + hlen + 1];
+					if (start_code != AC3_PAYLOAD_START_CODE_1 && start_code != AC3_PAYLOAD_START_CODE_2) {
+						// skip this pes data
+						AM_DEBUG(1, "pes packet skip not ac3 data [0x%x]", start_code);
+						plen = 0;
+						goto skip;
+					}
+				}
+			} else {
+				/*payload case*/
+				hlen = PES_PAECKET_HEAD_LEN;
+				if (parser->para.afmt == AFORMAT_AC3 || parser->para.afmt == AFORMAT_EAC3) {
+					start_code = ((uint16_t)parser->buf[pos + hlen] << 8)
+								| parser->buf[pos + hlen + 1];
+					if (start_code != AC3_PAYLOAD_START_CODE_1 && start_code != AC3_PAYLOAD_START_CODE_2) {
+						// skip this pes data
+						AM_DEBUG(1, "pes packet skip not ac3 data payload [0x%x] ", start_code);
+						plen = 0;
+						goto skip;
+					}
+				}
+			}
 			goto end;
 		}
 
 		if (parser->para.payload_only) {
 			if (invalid == 1) {
-
 				dpos = pos;
 				if (calc_invalid_pes_offset(parser->buf +pos, parser->len - pos, &plen, &dpos, &dlen) != 0) {
 					AM_DEBUG(1, "pes packet calc error");
@@ -236,35 +300,70 @@ AM_ErrorCode_t AM_PES_Decode(AM_PES_Handle_t handle, uint8_t *buf, int size)
 					AM_DEBUG(1, "pes packet calc plen=[%d]dpos[%d]dlen[%d]", plen, dpos, dlen);
 				}
 			} else {
-				if ((parser->buf[pos+6] & 0xC0) == 0x80) {
-					hlen = 6 + 3 + parser->buf[pos+8];
-				} else {
-					AM_DEBUG(1, "pes packet assume MPEG-1 [%#x]\n", parser->buf[pos+6]);
-					hlen = calc_mpeg1_pes_offset(parser->buf +pos, plen);
+				int stream_id = parser->buf[pos+3] | PESPACKET_STREAMID_MASK;
+				if (stream_id == PADDING_STREAM) {
+					/* padding_stream,need skip padding stream */
+					AM_DEBUG(1, "pes packet skip padding");
+					goto skip;
 				}
-				dpos = pos + hlen;
-				dlen = plen + 6 - hlen;
+				/* program_stream_map, private_stream_2 */
+				/* ECM, EMM */
+				/* program_stream_directory, DSMCC_stream */
+				/* ITU-T Rec. H.222.1 type E stream */
+				if (stream_id != PROGRAM_STREAM_MAP && stream_id != PRIVATE_STREAM_2 &&
+					stream_id != ECM_STREAM && stream_id != EMM_STREAM &&
+					stream_id != PROGRAM_STREAM_DIRECTORY && stream_id != DSMCC_STREAM &&
+					stream_id != H222_TYPE_E_STREAM) {
+					/*get pes header len, case have pes header*/
+					pes_header_len = parser->buf[pos+8];
+					/*pes table skip len*/
+					hlen = 6 + 3 + pes_header_len;
+					/*payload pos*/
+					dpos = pos + hlen;
+					/* payload len*/
+					dlen = plen + 6 - hlen;
+					/* skip stuf data*/
+					AM_DEBUG(2, "pes packet has head");
+				} else {
+					/*payload case*/
+					hlen = 6;
+					dpos = pos + hlen;
+					dlen = plen + 6 - hlen;
+					AM_DEBUG(1, "pes packet payload");
+				}
+				if (0) {
+					if ((parser->buf[pos+6] & 0xC0) == 0x80) {
+						hlen = 6 + 3 + parser->buf[pos+8];
+					} else {
+						AM_DEBUG(1, "pes packet assume MPEG-1 [%#x][%#x]\n", parser->buf[pos+3], parser->buf[pos+6]);
+						hlen = calc_mpeg1_pes_offset(parser->buf +pos, plen);
+					}
+					dpos = pos + hlen;
+					dlen = plen + 6 - hlen;
+				}
 			}
-
 		} else {
 			dpos = pos;
 			dlen = plen + 6;
 		}
-
-		if (parser->para.packet)
-		{
-			parser->para.packet(handle, parser->buf + dpos, dlen);
+		if (parser->para.packet) {
+			if (parser->len < dpos + dlen) {
+				AM_DEBUG(1, "pes packet parse error plen=[%d]dpos[%d]dlen[%d]", parser->len, dpos, dlen);
+			} else {
+				parser->para.packet(handle, parser->buf + dpos, dlen);
+			}
 		}
-
+skip:
 		pos += plen + 6;
 	} while(pos < parser->len);
 
 end:
 	left = parser->len - pos;
 
-	if (left)
-	{
+	if (left > 0) {
 		memmove(parser->buf, parser->buf + pos, left);
+	} else {
+		left = 0;
 	}
 	parser->len = left;
 	return AM_SUCCESS;

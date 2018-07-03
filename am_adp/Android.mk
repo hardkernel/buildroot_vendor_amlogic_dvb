@@ -24,7 +24,7 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_aout/am_aout.c\
 		   am_vout/am_vout.c\
 		   am_vout/aml/aml.c\
-		   am_misc/am_adplock.c am_misc/am_misc.c am_misc/am_iconv.c\
+		   am_misc/am_adplock.c am_misc/am_misc.c am_misc/am_iconv.c am_misc/am_sig_handler.c\
 		   am_time/am_time.c\
 		   am_evt/am_evt.c\
 		   am_kl/am_kl.c \
@@ -168,7 +168,7 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 	           am_aout/am_aout.c\
 	           am_vout/am_vout.c\
 	           am_vout/aml/aml.c\
-	           am_misc/am_adplock.c am_misc/am_misc.c am_misc/am_iconv.c\
+	           am_misc/am_adplock.c am_misc/am_misc.c am_misc/am_iconv.c am_misc/am_sig_handler.c\
 	           am_time/am_time.c\
 	           am_evt/am_evt.c\
 			   am_kl/am_kl.c\

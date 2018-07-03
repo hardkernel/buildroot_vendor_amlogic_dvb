@@ -38,12 +38,13 @@
 
 #define USERDATA_POLL_TIMEOUT 100
 #define MAX_CC_NUM			64
+#define MAX_CC_DATA_LEN  (1024*5 + 4)
 
 #define IS_H264(p)	((p[0] == 0xb5 && p[3] == 0x47 && p[4] == 0x41 && p[5] == 0x39 && p[6] == 0x34))
 #define IS_DIRECTV(p) ((p[0] == 0xb5 && p[1] == 0x00 && p[2] == 0x2f))
 #define IS_AVS(p)	 ((p[0] == 0x47) && (p[1] == 0x41) && (p[2] == 0x39) && (p[3] == 0x34))
-#define IS_ATSC(p)	((p[0] == 0x47) && (p[1] == 0x41) && (p[2] == 0x39) && (p[3] == 0x34))
-#define IS_SCTE(p)  ((p[0]==0x3) && (p[1]=0x81))
+#define IS_ATSC(p)	((p[0] == 0x47) && (p[1] == 0x41) && (p[2] == 0x39) && (p[3] == 0x34) && (p[4] == 0x3))
+#define IS_SCTE(p)  ((p[0]==0x3) && ((p[1]&0x7f) == 1))
 
 #define AMSTREAM_IOC_MAGIC  'S'
 #define AMSTREAM_IOC_UD_LENGTH _IOR(AMSTREAM_IOC_MAGIC, 0x54, unsigned long)
@@ -466,6 +467,7 @@ static int aml_process_scte_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 	uint8_t* cc_section;
 	uint8_t cc_data[64] = {0};
 	uint8_t* scte_head;
+	uint8_t* scte_head_search_position;
 	int head_posi = 0;
 	int prio, field, line, cc1, cc2, mark, size, ptype, ref;
 	int write_position, bits = 0, array_position = 0;
@@ -474,8 +476,10 @@ static int aml_process_scte_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 	int left_bits;
 	uint32_t v;
 	uint32_t *pts_in_buffer;
-	uint8_t userdata_with_pts[256];
+	uint8_t userdata_with_pts[MAX_CC_DATA_LEN];
+#if 0
 	char display_buffer[10240];
+#endif
 	int top_bit_value, top_bit_valid;
 
 	AM_UDDrvData *ud = dev->drv_data;
@@ -489,12 +493,14 @@ static int aml_process_scte_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 	if (top_bit_valid == 0)
 		top_bit_value = 1;
 
-	ref = (v >> 16) & 0x3f;
+	ref = (v >> 16) & 0x3ff;
 	ptype = (v >> 26) & 7;
 
+#if 0
 	for (i=0; i<len; i++)
 		sprintf(display_buffer+3*i, " %02x", data[i]);
 	AM_DEBUG(0, "scte buffer type %d ref %d top_bit %d %s", ptype, ref, top_bit_value, display_buffer);
+#endif
 
 	if (ptype == I_TYPE)
 		aml_flush_cc_data(dev);
@@ -502,7 +508,8 @@ static int aml_process_scte_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 	scte_head = data;
 	while (head_posi < len)
 	{
-		if (scte_head[head_posi] == 0x3 && scte_head[head_posi+1] == 0x81)
+		scte_head_search_position = &scte_head[head_posi];
+		if (IS_SCTE(scte_head_search_position))
 			break;
 		head_posi += 8;
 	}
@@ -583,10 +590,11 @@ static int aml_process_scte_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 	pts_in_buffer = userdata_with_pts;
 	*pts_in_buffer = pts;
 	memcpy(userdata_with_pts+4, cc_data, size);
-
+#if 0
 	for (i=0; i<size; i++)
 			sprintf(display_buffer+3*i, " %02x", cc_data[i]);
-		AM_DEBUG(0, "scte_write_buffer len: %d data: %s", size, display_buffer);
+		//AM_DEBUG(0, "scte_write_buffer len: %d data: %s", size, display_buffer);
+#endif
 	if (cc_count > 0)
 		aml_add_cc_data(dev, ref, ptype, userdata_with_pts, size+4);
 error:
@@ -603,7 +611,7 @@ static int aml_process_mpeg_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 	int package_count = 0;
 	uint32_t *pts_in_buffer;
 	int userdata_length;
-	static uint8_t userdata_with_pts[1024];
+	uint8_t userdata_with_pts[MAX_CC_DATA_LEN];
 
 	while (left >= (int)sizeof(aml_ud_header_t)) {
 		aml_ud_header_t *hdr = (aml_ud_header_t*)pd;
@@ -654,13 +662,12 @@ static int aml_process_h264_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 	int left = len;
 	int r = 0;
 	uint32_t *pts_in_buffer;
-	static uint8_t userdata_with_pts[1024];
+	uint8_t userdata_with_pts[MAX_CC_DATA_LEN];
 
 	while (left >= 8) {
 		if (IS_H264(pd) || IS_DIRECTV(pd) || IS_AVS(pd)) {
 			int hdr = (ud->format == H264_CC_TYPE) ? 3 : 0;
 			int pl;
-			int r;
 
 			pd += hdr;
 
@@ -674,7 +681,7 @@ static int aml_process_h264_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 			if (poc == 0) {
 				aml_flush_cc_data(dev);
 			}
-			dump_cc_data("process h264:", poc, pd, pl);
+			//dump_cc_data("process h264:", poc, pd, pl);
 			pts_in_buffer = userdata_with_pts;
 			*pts_in_buffer = pts;
 			memcpy(userdata_with_pts+4, pd, pl);
@@ -700,9 +707,11 @@ static void* aml_userdata_thread (void *arg)
 	int fd = ud->fd;
 	int r, ret, i;
 	struct pollfd pfd;
-	uint8_t data[5*1024];
+	uint8_t data[MAX_CC_DATA_LEN];
 	uint8_t *pd = data;
+#if 0
 	char display_buffer[10*1024];
+#endif
 	int left = 0;
 	int flush = 1;
 	struct userdata_param_t user_para_info;
@@ -714,17 +723,19 @@ static void* aml_userdata_thread (void *arg)
 	while (ud->running) {
 		//If scte and mpeg both exist, we need to ignore scte cc data,
 		//so we need to check cc type every time.
-		ud->format = INVALID_TYPE;
+		left = 0;
 
 		ret = poll(&pfd, 1, USERDATA_POLL_TIMEOUT);
+		if (!ud->running)
+			break;
 		if (ret != 1)
 			continue;
 		if (!(pfd.revents & POLLIN))
 			continue;
 		do {
-		memset(&user_para_info, 0, sizeof(struct userdata_param_t));
-		user_para_info.pbuf_addr= (unsigned long long)data;
-		user_para_info.buf_len = sizeof(data);
+			memset(&user_para_info, 0, sizeof(struct userdata_param_t));
+			user_para_info.pbuf_addr= (unsigned long long)(size_t)data;
+			user_para_info.buf_len = sizeof(data);
 
 		if (-1 == ioctl(fd, AMSTREAM_IOC_UD_BUF_READ, &user_para_info))
 			AM_DEBUG(0, "call AMSTREAM_IOC_UD_BUF_READ failed\n");
@@ -734,26 +745,28 @@ static void* aml_userdata_thread (void *arg)
 		//Old userdata was read from node. now use ioctl to get data.
 		// memset(&poc_block, 0, sizeof(userdata_poc_info_t));
 		// r = read(fd, data + left, sizeof(data) - left);
-		if (flush) {
-			ioctl(fd, AMSTREAM_IOC_UD_FLUSH_USERDATA, NULL);
-			flush = 0;
-			continue;
-		}
-		r = user_para_info.data_size;
+			if (flush) {
+				ioctl(fd, AMSTREAM_IOC_UD_FLUSH_USERDATA, NULL);
+				flush = 0;
+				continue;
+			}
+			r = user_para_info.data_size;
+			r = (r > MAX_CC_DATA_LEN) ? MAX_CC_DATA_LEN : r;
 
-		if (r <= 0)
-			continue;
-		aml_swap_data(data + left, r);
-		left += r;
-		pd = data;
-#if 1
-		for (i=0; i<left; i++)
-			sprintf(&display_buffer[i*3], " %02x", data[i]);
-		AM_DEBUG(0, "ud_aml_buffer: %s", display_buffer);
+			if (r <= 0)
+				continue;
+			aml_swap_data(data + left, r);
+			left += r;
+			pd = data;
+#if 0
+			for (i=0; i<left; i++)
+				sprintf(&display_buffer[i*3], " %02x", data[i]);
+			AM_DEBUG(0, "ud_aml_buffer: %s", display_buffer);
 #endif
-		while (ud->format == INVALID_TYPE) {
-			if (left < 8)
-				break;
+			ud->format = INVALID_TYPE;
+			while (ud->format == INVALID_TYPE) {
+				if (left < 8)
+					break;
 
 			ud->format = aml_check_userdata_format(pd, ud->vfmt, left);
 			if (ud->format == INVALID_TYPE) {
@@ -762,20 +775,19 @@ static void* aml_userdata_thread (void *arg)
 			}
 		}
 
-		if (ud->format == MPEG_CC_TYPE) {
-			ud->scte_enable = 0;
-			r = aml_process_mpeg_userdata(dev, pd, user_para_info.meta_info.flags,user_para_info.meta_info.vpts, left);
-		} else if (ud->format == SCTE_CC_TYPE) {
-			if (ud->scte_enable == 1)
-				r = aml_process_scte_userdata
-					(dev, pd, left, user_para_info.meta_info.flags, user_para_info.meta_info.vpts);
-			else
+			if (ud->format == MPEG_CC_TYPE) {
+				ud->scte_enable = 0;
+				r = aml_process_mpeg_userdata(dev, pd, user_para_info.meta_info.flags,user_para_info.meta_info.vpts, left);
+			} else if (ud->format == SCTE_CC_TYPE) {
+				if (ud->scte_enable == 1)
+					r = aml_process_scte_userdata(dev, pd, left, user_para_info.meta_info.flags, user_para_info.meta_info.vpts);
+				else
+					r = left;
+			} else if (ud->format != INVALID_TYPE) {
+				r = aml_process_h264_userdata(dev, pd, left, user_para_info.meta_info.poc_number , user_para_info.meta_info.vpts);
+			} else {
 				r = left;
-		} else if (ud->format != INVALID_TYPE) {
-			r = aml_process_h264_userdata(dev, pd, left, user_para_info.meta_info.poc_number , user_para_info.meta_info.vpts);
-		} else {
-			r = left;
-		}
+			}
 
 		if ((data != pd + r) && (r < left)) {
 			memmove(data, pd + r, left - r);
@@ -820,6 +832,7 @@ static AM_ErrorCode_t aml_open(AM_USERDATA_Device_t *dev, const AM_USERDATA_Open
 		free(ud);
 		return AM_USERDATA_ERR_SYS;
 	}
+	AM_SigHandlerInit();
 
 	dev->drv_data = ud;
 	return AM_SUCCESS;
@@ -831,6 +844,7 @@ static AM_ErrorCode_t aml_close(AM_USERDATA_Device_t *dev)
 	AM_CCData *cc, *cc_next;
 
 	ud->running = AM_FALSE;
+	pthread_kill(ud->th, SIGALRM);
 	pthread_join(ud->th, NULL);
 	close(ud->fd);
 

@@ -57,6 +57,7 @@ typedef struct
 {
 	int dmx_id; /**< 使用Demux设备的ID*/
 	int pid;    /**< AD 音频的PID*/
+	int fmt;	/**< AD 音频的fmt*/
 }AM_AD_Para_t;
 
 typedef void (*AM_AD_Callback_t) (const uint8_t *data, int len, void *user_data);

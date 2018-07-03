@@ -121,6 +121,12 @@ extern void AM_DebugSetLogLevel(int level);
  */
 extern int AM_DebugGetLogLevel();
 
+/**\brief Make sure signal is declared only once in one process
+ * \return
+ *   None
+ */
+void AM_SigHandlerInit();
+
 #ifdef __cplusplus
 }
 #endif

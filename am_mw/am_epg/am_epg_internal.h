@@ -133,10 +133,12 @@ struct AM_EPG_Monitor_s
 	int					new_eit_check_time; /**< EIT数据更新检查时间*/
 	int					sub_check_time;	/**< 预约播放检查时间*/
 	int					psip_eit_count;	/**<ATSC EIT 最大个数, max 128*/
+	int					parallel_psip_eit_count; /**<ATSC EIT 同时并行接收的个数*/
 	uint8_t				psip_eit_done_flag[16];	/**< ATSC EIT 接收完成标志*/
 	AM_Bool_t			eit_looped;
 	AM_Bool_t			eit_has_data;		/**< 是否有需要通知更新的EIT数据*/
 	int					psip_ett_count; /**<ATSC ETT 最大个数, max 128*/
+	int					parallel_psip_ett_count; /**<ATSC ETT 同时并行接收的个数*/
 	uint8_t				psip_ett_done_flag[16]; /**< ATSC ETT 接收完成标志*/
 
 	dvbpsi_pat_t		*pats;

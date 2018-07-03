@@ -60,9 +60,11 @@
 #define NIT_TIMEOUT 10000
 #define CAT_TIMEOUT 3000
 #define BAT_TIMEOUT 10000
-#define MGT_TIMEOUT 2500
+int am_scan_mgt_timeout = 2500;
+#define MGT_TIMEOUT am_scan_mgt_timeout
 #define STT_TIMEOUT 0
-#define VCT_TIMEOUT 2500
+int am_scan_vct_timeout = 2500;
+#define VCT_TIMEOUT am_scan_vct_timeout
 #define RRT_TIMEOUT 70000
 #define ISDBT_PAT_TIMEOUT 1000
 
@@ -881,6 +883,90 @@ static dvbpsi_pat_t *get_valid_pats(AM_SCAN_TS_t *ts)
 	return valid_pat;
 }
 
+/**\brief check program is need skip*/
+static int am_scan_check_skip(AM_SCAN_ServiceInfo_t *srv_info, int mode)
+{
+	int pkt_num;
+	int i;
+	int ret = 1;
+	/* Skip program for FTA mode */
+	if (srv_info->scrambled_flag && (mode & AM_SCAN_DTVMODE_FTA))
+	{
+		AM_DEBUG(1, "Skip program '%s' vid[%d]for FTA mode", srv_info->name, srv_info->vid);
+		return ret;
+	}
+	/* Skip program for vct hide is set 1, we need hide this channel */
+	if (srv_info->hidden == 1 && (mode & AM_SCAN_DTVMODE_NOVCTHIDE))
+	{
+		AM_DEBUG(1, "Skip program '%s' vid[%d]for vct hide mode", srv_info->name, srv_info->vid);
+		return ret;
+	}
+
+	/* Skip program for service_type mode */
+	if (srv_info->srv_type == AM_SCAN_SRV_DTV && (mode & AM_SCAN_DTVMODE_NOTV))
+	{
+		AM_DEBUG(1, "Skip program '%s' for NO-TV mode", srv_info->name);
+		return ret;
+	}
+	if (srv_info->srv_type == AM_SCAN_SRV_DRADIO && (mode & AM_SCAN_DTVMODE_NORADIO))
+	{
+		AM_DEBUG(1, "Skip program '%s' for NO-RADIO mode", srv_info->name);
+		return ret;
+	}
+	if (srv_info->srv_type == AM_SCAN_SRV_UNKNOWN &&
+		(mode & AM_SCAN_DTVMODE_INVALIDPID)) {
+		AM_DEBUG(1, "Skip program '%s' for NO-valid pid mode", srv_info->name);
+		return ret;
+	}
+	if (mode & AM_SCAN_DTVMODE_CHECKDATA) {
+		/*check has ts package of video pid */
+		AM_Check_Has_Tspackage(srv_info->vid, &pkt_num);
+		/*if no video ts package, need check has ts package of audio pid */
+		if (!pkt_num) {
+			for (i = 0; i < srv_info->aud_info.audio_count; i++) {
+				AM_Check_Has_Tspackage(srv_info->aud_info.audios[i].pid, &pkt_num);
+			}
+		}
+		if (!pkt_num) {
+			AM_DEBUG(1, "Skip program '%s' for NO-ts package", srv_info->name);
+			return ret;
+		}
+	}
+	/*only check has ts package of audio pid, turn the track with data into first place*/
+	if (mode & AM_SCAN_DTVMODE_CHECK_AUDIODATA) {
+		int pid,fmt,audio_type,audio_exten;
+		char lang[10] = {0};
+	for (i = 0; i < srv_info->aud_info.audio_count; i++) {
+		pkt_num = 0;
+		AM_Check_Has_Tspackage(srv_info->aud_info.audios[i].pid, &pkt_num);
+		if (pkt_num) {
+		if (i == 0) {
+			AM_DEBUG(1,"first index hasdata,needn't insert, pid[%d]=%d",i,srv_info->aud_info.audios[i].pid);
+		}else {
+			pid = srv_info->aud_info.audios[0].pid;
+			fmt = srv_info->aud_info.audios[0].fmt;
+			memcpy(lang, srv_info->aud_info.audios[0].lang, 10);
+			audio_type = srv_info->aud_info.audios[0].audio_type;
+			audio_exten = srv_info->aud_info.audios[0].audio_exten;
+			srv_info->aud_info.audios[0].pid = srv_info->aud_info.audios[i].pid;
+			srv_info->aud_info.audios[0].fmt = srv_info->aud_info.audios[i].fmt;
+			memcpy(srv_info->aud_info.audios[0].lang, srv_info->aud_info.audios[i].lang, 10);
+			srv_info->aud_info.audios[0].audio_type = srv_info->aud_info.audios[i].audio_type;
+			srv_info->aud_info.audios[0].audio_exten = srv_info->aud_info.audios[i].audio_exten;
+			srv_info->aud_info.audios[i].pid = pid;
+			srv_info->aud_info.audios[i].fmt = fmt;
+			memcpy(srv_info->aud_info.audios[i].lang, lang, 10);
+			srv_info->aud_info.audios[i].audio_type = audio_type;
+			srv_info->aud_info.audios[i].audio_exten = audio_exten;
+		}
+		break;
+	}
+	}
+	}
+
+	ret = 0;
+	return ret;
+}
 /***\brief 更新一个TS数据*/
 static void am_scan_update_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, int net_dbid, int dbid, AM_SCAN_TS_t *ts)
 {
@@ -1043,31 +1129,9 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 			srv_info->srv_type = AM_SCAN_SRV_UNKNOWN;
 		}
 
-		/* Skip program for FTA mode */
-		if (srv_info->scrambled_flag && (mode & AM_SCAN_DTVMODE_FTA))
-		{
-			AM_DEBUG(1, "Skip program '%s' vid[%d]for FTA mode", srv_info->name, srv_info->vid);
+		if (am_scan_check_skip(srv_info, mode)) {
 			return;
 		}
-		/* Skip program for vct hide is set 1, we need hide this channel */
-		if (srv_info->hidden == 1 && (mode & AM_SCAN_DTVMODE_NOVCTHIDE))
-		{
-			AM_DEBUG(1, "Skip program '%s' vid[%d]for vct hide mode", srv_info->name, srv_info->vid);
-			return;
-		}
-
-		/* Skip program for service_type mode */
-		if (srv_info->srv_type == AM_SCAN_SRV_DTV && (mode & AM_SCAN_DTVMODE_NOTV))
-		{
-			AM_DEBUG(1, "Skip program '%s' for NO-TV mode", srv_info->name);
-			return;
-		}
-		if (srv_info->srv_type == AM_SCAN_SRV_DRADIO && (mode & AM_SCAN_DTVMODE_NORADIO))
-		{
-			AM_DEBUG(1, "Skip program '%s' for NO-RADIO mode", srv_info->name);
-			return;
-		}
-
 		/* Set default name to tv/radio program if no name specified */
 		if (!strcmp(srv_info->name, "") &&
 			(srv_info->srv_type == AM_SCAN_SRV_DTV ||
@@ -1168,7 +1232,6 @@ static void am_scan_update_service_info(sqlite3_stmt **stmts, AM_SCAN_Result_t *
 static void am_scan_extract_ca_scrambled_flag(dvbpsi_descriptor_t *p_first_descriptor, AM_SCAN_ServiceInfo_t *psrv_info, int mode, int *pmt_scramble_flag)
 {
 	dvbpsi_descriptor_t *descr;
-	int scrambled_pids[AM_DVB_PID_MAXCOUNT + 1];
 	if (*pmt_scramble_flag == 1) {
 		//AM_DEBUG(1, "pmt_scramble_flag is 1, vid( pid %d)", psrv_info->vid);
 		psrv_info->scrambled_flag = 1;
@@ -1177,35 +1240,22 @@ static void am_scan_extract_ca_scrambled_flag(dvbpsi_descriptor_t *p_first_descr
 
 	if ((mode & AM_SCAN_DTVMODE_SCRAMB_TSHEAD)) {
 		int i = 0;
-		int j = 0;
 		int video_scramb = 0;
 		int audio_scramb = 0;
-		memset(scrambled_pids, 0, sizeof(scrambled_pids));
-		AM_Check_Scramb_GetPid(scrambled_pids);
-		for (i = 0; i < AM_DVB_PID_MAXCOUNT; i++) {
-			if (scrambled_pids[i] == psrv_info->vid) {
-				video_scramb = 1;
-				//AM_DEBUG(1, "Program to check scramble video is scrambled check end( pid %d)", psrv_info->vid);
-				break;
-			}
-			if (scrambled_pids[i] == 0) {
+		int pkt_num, scramb_pkt_num;
+
+		AM_Check_Scramb_GetInfo(psrv_info->vid, &pkt_num, &scramb_pkt_num);
+		if (scramb_pkt_num * 10 > pkt_num)
+			video_scramb = 1;
+
+		for (i = 0; i < psrv_info->aud_info.audio_count; i++) {
+			AM_Check_Scramb_GetInfo(psrv_info->aud_info.audios[i].pid, &pkt_num, &scramb_pkt_num);
+			if (scramb_pkt_num * 10 > pkt_num) {
+				audio_scramb = 1;
 				break;
 			}
 		}
 
-		for (i = 0; i < AM_DVB_PID_MAXCOUNT; i++) {
-			if (scrambled_pids[i] == 0) {
-				break;
-			}
-			for (j = 0; j < psrv_info->aud_info.audio_count; j++) {
-				if (psrv_info->aud_info.audios[j].pid == scrambled_pids[i]) {
-					audio_scramb = 1;
-					//AM_DEBUG(1, "Program to check scramble audios is scrambled check end( pid %d)", psrv_info->aud_info.audios[j].pid);
-					goto check_end;
-				}
-			}
-		}
-check_end:
 		if (audio_scramb != 0 || video_scramb != 0) {
 				psrv_info->scrambled_flag = 1;
 				*pmt_scramble_flag = 1;
@@ -1596,6 +1646,7 @@ static void store_atsc_ts(sqlite3_stmt **stmts, AM_SCAN_Result_t *result, AM_SCA
 	AM_Bool_t store = (stmts != NULL);
 
 	if(ts->digital.vcts
+		&& ts->digital.pats
 		&& (ts->digital.vcts->i_extension != ts->digital.pats->i_ts_id)
 		&& (ts->digital.pats->i_ts_id == 0))
 		ts->digital.use_vct_tsid = 1;
@@ -5180,7 +5231,7 @@ next_ts:
 			scanner->curr_ts->digital.snr = 0;
 			scanner->curr_ts->digital.ber = 0;
 			scanner->curr_ts->digital.strength = 0;
-			if (scanner->start_para.dtv_para.mode & AM_SCAN_DTVMODE_SCRAMB_TSHEAD) {
+			if (scanner->start_para.dtv_para.mode & (AM_SCAN_DTVMODE_SCRAMB_TSHEAD|AM_SCAN_DTVMODE_CHECKDATA)) {
 				int ret = AM_Check_Scramb_Start(SCAN_DVR_DEV_ID, SCAN_DVR_SRC, SCAN_DMX_DEV_ID, SCAN_DMX_SRC);
 				if (ret != AM_SUCCESS) {
 					AM_Check_Scramb_Stop();
@@ -5648,7 +5699,7 @@ handle_events:
 
 		SET_PROGRESS_EVT(AM_SCAN_PROGRESS_STORE_BEGIN, NULL);
 		if (scanner->store_cb) {
-			if (scanner->start_para.dtv_para.mode & AM_SCAN_DTVMODE_SCRAMB_TSHEAD) {
+			if (scanner->start_para.dtv_para.mode & (AM_SCAN_DTVMODE_SCRAMB_TSHEAD|AM_SCAN_DTVMODE_CHECKDATA)) {
 				AM_DEBUG(1, "AM_Check_Scramb_Stop --1");
 				AM_Check_Scramb_Stop();
 			}

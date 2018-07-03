@@ -120,6 +120,11 @@ static AM_ErrorCode_t am_cc_calc_caption_size(int *w, int *h)
 	vw = 1920;
 	vh = 1080;
 #endif
+	if (vh == 0)
+	{
+		vw = 1920;
+		vh = 1080;
+	}
 	rows = (vw * 3 * 32) / (vh * 4);
 	if (rows < 32)
 		rows = 32;
@@ -530,7 +535,8 @@ static int am_cc_render(AM_CC_Decoder_t *cc)
 			}
 			else
 #endif
-			if (decode_time_gap >= 0 && decode_time_gap < 20000)
+			//do sync in 5secs time gap
+			if (decode_time_gap > 0 && decode_time_gap < 450000)
 			{
 				AM_DEBUG(4, "render_thread pts gap large than 0, value %d", decode_time_gap);
 				has_data_to_render = 0;
@@ -781,6 +787,9 @@ static void *am_cc_data_thread(void *arg)
 	while (cc->running)
 	{
 		cc_data_cnt = AM_USERDATA_Read(ud_dev_no, cc_buffer, sizeof(cc_buffer), CC_POLL_TIMEOUT);
+		/* There is a poll action in userdata read */
+		if (!cc->running)
+			break;
 		cc_data = cc_buffer + 4;
 		cc_data_cnt -= 4;
 		dump_cc_data(cc_buffer, cc_data_cnt);
@@ -924,14 +933,13 @@ static void *am_cc_render_thread(void *arg)
 	if (timeout == 0)
 		timeout = 16;
 #endif
-	timeout = 1000;
+	timeout = 30;
 
 	while (cc->running)
 	{
 		// Update video pts
 		node = cc->json_chain_head->json_chain_next;
-                if (node == cc->json_chain_head)
-			node = NULL;
+
 		vpts = am_cc_get_video_pts();
 
 		// If has cc data in chain, set gap time to timeout
@@ -946,17 +954,20 @@ static void *am_cc_render_thread(void *arg)
 				//AM_DEBUG(0, "render_thread timeout node_pts %x vpts %x gap %d calculate %d", node->pts, vpts, pts_gap_cc_video, timeout);
 				// Set timeout to 1 second If pts gap is more than 1 second.
 				// We need to judge if video is continuous
-				timeout = (timeout>1000)?1000:timeout;
+				timeout = (timeout>30)?30:timeout;
 			}
 		}
 		else
 		{
 			AM_DEBUG(4, "render_thread no node in chain, timeout set to 1000");
-			timeout = 1000;
+			timeout = 30;
 		}
 
 		AM_TIME_GetTimeSpecTimeout(timeout, &ts);
-		pthread_cond_timedwait(&cc->cond, &cc->lock, &ts);
+		if (cc->running)
+			pthread_cond_timedwait(&cc->cond, &cc->lock, &ts);
+		else
+			break;
 
 		vpts = am_cc_get_video_pts();
 		cc->video_pts = vpts;
@@ -1071,6 +1082,7 @@ AM_ErrorCode_t AM_CC_Create(AM_CC_CreatePara_t *para, AM_CC_Handle_t *handle)
 	cc->cpara = *para;
 
 	*handle = cc;
+	AM_SigHandlerInit();
 
 	return AM_SUCCESS;
 }
@@ -1234,10 +1246,10 @@ AM_ErrorCode_t AM_CC_Stop(AM_CC_Handle_t handle)
 		cc->running = AM_FALSE;
 		join = AM_TRUE;
 	}
-	am_cc_clear(cc);
 	pthread_mutex_unlock(&cc->lock);
 
 	pthread_cond_broadcast(&cc->cond);
+	pthread_kill(cc->data_thread, SIGALRM);
 
 	if (join)
 	{

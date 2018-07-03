@@ -23,10 +23,11 @@ extern "C"
 /****************************************************************************
  * Function prototypes
  ***************************************************************************/
-#define AM_DVB_PID_MAXCOUNT (2000)
+#define AM_DVB_PID_MAXCOUNT 1024
 extern AM_ErrorCode_t AM_Check_Scramb_Start(int dvr_dev, int fifo_id, int dmx_dev, int dmx_src);
 extern AM_ErrorCode_t AM_Check_Scramb_Stop(void);
-extern AM_ErrorCode_t AM_Check_Scramb_GetPid(int *pids);
+extern AM_ErrorCode_t AM_Check_Scramb_GetInfo(int pid, int *pkt, int *scramb_pkt);
+extern AM_ErrorCode_t AM_Check_Has_Tspackage(int pid, int *pkt_num);
 #ifdef __cplusplus
 }
 #endif

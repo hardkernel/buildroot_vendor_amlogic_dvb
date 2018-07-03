@@ -30,6 +30,9 @@
 #include <am_iconv.h>
 #include <am_av.h>
 #include <am_cond.h>
+#include <cutils/properties.h>
+#include <sys/system_properties.h>
+
 
 /****************************************************************************
  * Macro definitions
@@ -72,10 +75,11 @@
 #define EPG_PRE_NOTIFY_TIME (60*1000)
 
 /*并行接收ATSC EIT的个数*/
-#define PARALLEL_PSIP_EIT_CNT 4
+//#define PARALLEL_PSIP_EIT_CNT 4
 /*并行接收ATSC ETT的个数*/
-#define PARALLEL_PSIP_ETT_CNT 4
-
+//#define PARALLEL_PSIP_ETT_CNT 4
+#define PARALLEL_PSIP_EIT_CNT_PROP "parallel.psip.eit.cnt"
+#define PARALLEL_PSIP_ETT_CNT_PROP "parallel.psip.ett.cnt"
 
  /*位操作*/
 #define BIT_MASK(b) (1 << ((b) % 8))
@@ -2864,7 +2868,7 @@ static void am_epg_pat_done(AM_EPG_Monitor_t *mon)
 	{
 		//mon->patctl.subctl->ver++;
 		mon->patctl.subctl->ver = 0xff;
-		am_epg_request_section(mon, &mon->patctl);
+		//am_epg_request_section(mon, &mon->patctl);
 	}
 	
 	/* Search for PMT of mon_service */
@@ -2913,7 +2917,7 @@ static void am_epg_pmt_done(AM_EPG_Monitor_t *mon)
 	/*监控下一版本*/
 	if (mon->pmtctl.subctl)
 	{
-		am_epg_request_section(mon, &mon->pmtctl);
+		//am_epg_request_section(mon, &mon->pmtctl);
 	}
 }
 
@@ -3088,7 +3092,7 @@ static void am_epg_psip_eit_start(AM_EPG_Monitor_t *mon)
 			if (j == 0 && first_start == 0)
 				first_start = 1;
 			if (first_start) {//parallel the first start
-				if (j >= PARALLEL_PSIP_EIT_CNT)
+				if (j >= mon->parallel_psip_eit_count)
 					break;
 				am_epg_request_section(mon, &mon->psip_eitctl[j]);
 				mon->eit_looped = AM_FALSE;
@@ -3154,12 +3158,18 @@ static void am_epg_stt_done(AM_EPG_Monitor_t *mon)
 
 	/*设置完成时间以进行下一次刷新*/
 	AM_TIME_GetClock(&mon->sttctl.check_time);
+	if (mon->sttctl.subctl)
+	{
+		am_epg_request_section(mon, &mon->sttctl);
+	}
 
+#if 0
 	if (mon->psip_eit_request) {
 		mon->psip_eit_request = 0;
 		AM_DEBUG(1, "eit requested, start mgt:");
 		SET_MODE_FORCE(atsc_mgt, mgtctl, AM_EPG_SCAN_MGT, AM_TRUE);
 	}
+#endif
 }
 
 /**\brief RRT搜索完毕处理*/
@@ -3242,11 +3252,11 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 				AM_DEBUG(1, "EIT changed:%d pid/version(0x%x /%d -> 0x%x/%d)", eit,
 					mon->psip_eitctl[eit].pid, mon->psip_eitctl[eit].subctl->ver,
 					table->i_table_type_pid, table->i_table_type_version);
+				am_epg_tablectl_clear(&mon->psip_eitctl[eit]);
 				mon->psip_eitctl[eit].pid = table->i_table_type_pid;
 				mon->psip_eitctl[eit].subctl->ver = table->i_table_type_version;
-				mon->psip_eitctl[eit].data_arrive_time = 0;
 				//we only add EIT0~EIT3
-				if ((parallel_cnt < PARALLEL_PSIP_EIT_CNT) && (eit < PARALLEL_PSIP_EIT_CNT))
+				if ((parallel_cnt < mon->parallel_psip_eit_count) && (eit < mon->parallel_psip_eit_count))
 				{
 					am_epg_request_section(mon, &mon->psip_eitctl[parallel_cnt]);
 					parallel_cnt++;
@@ -3282,9 +3292,10 @@ static void am_epg_mgt_done(AM_EPG_Monitor_t *mon)
 				AM_DEBUG(1, "ETT changed:%d pid/ver(%d/%d -> %d/%d)", ett,
 					mon->psip_ettctl[ett].pid, mon->psip_ettctl[ett].subctl->ver,
 						table->i_table_type_pid, table->i_table_type_version);
+				am_epg_tablectl_clear(&mon->psip_ettctl[ett]);
 				mon->psip_ettctl[ett].pid = table->i_table_type_pid;
 				mon->psip_ettctl[ett].subctl->ver = table->i_table_type_version;
-				if (ett_parallel_cnt < PARALLEL_PSIP_ETT_CNT)
+				if (ett_parallel_cnt < mon->parallel_psip_ett_count)
 				{
 					ett_parallel_cnt++;
 					//do not start here, start in eit done
@@ -3325,7 +3336,7 @@ static void am_epg_vct_done(AM_EPG_Monitor_t *mon)
 	/*监控下一版本*/
 	if (mon->vctctl.subctl)
 	{
-		am_epg_request_section(mon, &mon->vctctl);
+		//am_epg_request_section(mon, &mon->vctctl);
 	}
 }
 
@@ -3446,6 +3457,30 @@ static void am_epg_set_mode(AM_EPG_Monitor_t *mon, AM_Bool_t reset)
 	
 	AM_DEBUG(1, "EPG Setmode 0x%x, reset:%d", mon->mode, reset);
 
+	if (mon->mode & AM_EPG_SCAN_PSIP_EIT_VERSION_CHANGE && (!(mon->mode & AM_EPG_SCAN_PSIP_EIT))) {
+		for (i=0; i<mon->psip_eit_count; i++)
+		{
+			if (mon->psip_eitctl[i].fid != -1)
+				am_epg_free_filter(mon, &mon->psip_eitctl[i].fid);
+		}
+		for (i=0; i<mon->psip_ett_count; i++)
+		{
+			if (mon->psip_ettctl[i].fid != -1)
+				am_epg_free_filter(mon, &mon->psip_ettctl[i].fid);
+		}
+		return;
+	}else if (mon->mode & AM_EPG_SCAN_PSIP_EIT_VERSION_CHANGE && mon->mode & AM_EPG_SCAN_PSIP_EIT) {
+		for (i=0; i<mon->psip_eit_count; i++)
+		{
+			if (mon->psip_eitctl[i].fid == -1 && mon->psip_eitctl[i].pid < 0x1fff) {
+				am_epg_request_section(mon, &mon->psip_eitctl[i]);
+                if (i >= mon->parallel_psip_eit_count)
+				     break;
+			}
+		}
+		return;
+	}
+
 	SET_MODE(pat, patctl, AM_EPG_SCAN_PAT, reset);
 	if (mon->pmtctl.fid != -1)
 	{
@@ -3503,13 +3538,14 @@ static void am_epg_set_mode(AM_EPG_Monitor_t *mon, AM_Bool_t reset)
 		else
 			mon->psip_ett_request = 1;
 	}
-
+#if 0
 	if (HAS_MODE(mon->mode, AM_EPG_SCAN_PSIP_EIT) && mon->psip_eit_request) {
 		if (curr_time.tdt_utc_time)//assue stt done
 			SET_MODE_FORCE(atsc_mgt, mgtctl, AM_EPG_SCAN_MGT, AM_TRUE);
 		else//request stt first for the gps offset, then eit
 			SET_MODE_FORCE(atsc_stt, sttctl, AM_EPG_SCAN_STT, AM_TRUE);
 	}
+#endif
 }
 
 /**\brief 按照当前模式重置所有表监控*/
@@ -3879,6 +3915,9 @@ AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, AM_EPG_Handle_t *handle)
 	mon->curr_ts_tsid = -1;
 	mon->psip_eit_count = (int)AM_ARRAY_SIZE(mon->psip_eitctl);
 	mon->psip_ett_count = (int)AM_ARRAY_SIZE(mon->psip_ettctl);
+	mon->parallel_psip_eit_count = property_get_int32(PARALLEL_PSIP_EIT_CNT_PROP, 4);
+	mon->parallel_psip_ett_count = property_get_int32(PARALLEL_PSIP_ETT_CNT_PROP, 4);
+
 	AM_TIME_GetClock(&mon->new_eit_check_time);
 	mon->eit_has_data = AM_FALSE;
 
@@ -4226,6 +4265,7 @@ AM_ErrorCode_t AM_EPG_SubscribeEvent(AM_EPG_Handle_t handle, int db_evt_id)
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
+	assert(mon && mon->hdb);
 
 	sqlite3 *hdb;
 	pthread_mutex_lock(&mon->lock);
@@ -4254,6 +4294,8 @@ AM_ErrorCode_t AM_EPG_UnsubscribeEvent(AM_EPG_Handle_t handle, int db_evt_id)
 {
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	assert(mon && mon->hdb);
 
 	sqlite3 *hdb;
 	pthread_mutex_lock(&mon->lock);

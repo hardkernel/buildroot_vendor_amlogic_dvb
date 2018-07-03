@@ -192,6 +192,7 @@ AM_AD_Create(AM_AD_Handle_t *handle, AM_AD_Para_t *para)
 	pes_para.packet = pes_packet_callback;
 	pes_para.payload_only = AM_TRUE;
 	pes_para.user_data = ad;
+	pes_para.afmt = para->fmt;
 	ret = AM_PES_Create(&ad->h_pes, &pes_para);
 	if (ret != AM_SUCCESS)
 		goto error;
@@ -233,12 +234,14 @@ AM_ErrorCode_t
 AM_AD_Start(AM_AD_Handle_t handle)
 {
 	AM_AD_Data_t *ad = (AM_AD_Data_t *)handle;
+	#define AD_BUF_SIZE (2*768*1024)
 
 	if (!ad)
 		return AM_AD_ERR_INVALID_HANDLE;
 
+	AM_DMX_SetBufferSize(ad->para.dmx_id, ad->filter, AD_BUF_SIZE);
 	AM_DMX_StartFilter(ad->para.dmx_id, ad->filter);
-	AM_DEBUG(1, "AM_AD_Start");
+	AM_DEBUG(1, "AM_AD_Start %d", AD_BUF_SIZE);
 
 	return AM_SUCCESS;
 }

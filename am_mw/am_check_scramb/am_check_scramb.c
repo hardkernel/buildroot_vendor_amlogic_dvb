@@ -43,8 +43,10 @@
 typedef struct ScrambInfo
 {
 	int pid;
-	int scramble;
-	int checked_scrambled_count;
+	//int scramble;
+	//int checked_scrambled_count;
+	int pkt_num;
+	int scramb_pkt_num;
 }ScrambInfo_t;
 
 typedef struct CheckScramData
@@ -60,34 +62,35 @@ typedef struct CheckScramData
 }CheckScramData_t;
 
 CheckScramData_t  ScramData;
-#define MAX_SCRAMBLE_CHECK_COUNT 1000
-#define MIN_SCRAMBLE_CHECK_COUNT 50
+
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
-static void am_add_pid_and_scramble(int pid, int scramb) {
-	int i = 0;
-	int found = 0;
-	if (pid == 0)
+static inline void am_add_pid_and_scramble(int pid, int scramb) {
+	int i, begin;
+
+	if ((pid <= 0) || (pid >= 0x1fff))
 		return;
-	for (i = 0; i < AM_DVB_PID_MAXCOUNT; i++) {
-		if (ScramData.ScrambInfo[i].pid == pid) {
-			if (ScramData.ScrambInfo[i].checked_scrambled_count < MAX_SCRAMBLE_CHECK_COUNT) {
-				ScramData.ScrambInfo[i].checked_scrambled_count++;
-			}
-			return;
-		}
-		if (ScramData.ScrambInfo[i].pid == 0) {
+
+	begin = pid & (AM_DVB_PID_MAXCOUNT - 1);
+	i     = begin;
+
+	do {
+		if ((ScramData.ScrambInfo[i].pid == pid) || !ScramData.ScrambInfo[i].pid) {
 			ScramData.ScrambInfo[i].pid = pid;
-			ScramData.ScrambInfo[i].scramble = scramb;
-			ScramData.ScrambInfo[i].checked_scrambled_count = 1;
-			AM_DEBUG(0, "am-check-scram am_add_pid_and_scramble pid[%d] scramble[%d]", pid, scramb);
-			return;
+			ScramData.ScrambInfo[i].pkt_num ++;
+
+			if ((scramb == 2) || (scramb == 3))
+				ScramData.ScrambInfo[i].scramb_pkt_num ++;
+			break;
 		}
-	}
+		i ++;
+		if (i == AM_DVB_PID_MAXCOUNT)
+			i = 0;
+	} while (i != begin);
 }
 
-static void am_get_pid_and_scramble(char* buf, int len) {
+static void am_get_pid_and_scramble(uint8_t* buf, int len) {
 	int pid;
 	int scramb;
 	char *tmp;
@@ -100,9 +103,8 @@ static void am_get_pid_and_scramble(char* buf, int len) {
 		}
 		pid = ((buf[i + 1] & 0x1f) << 8 | buf[i + 2]);//13 bit
 		scramb = (buf[i + 3] >> 6);//2 bit
-		if ((scramb == 2) || (scramb == 3)) {
-			am_add_pid_and_scramble(pid, scramb);
-		}
+		am_add_pid_and_scramble(pid, scramb);
+
 		i = i + 188;
 	}
 }
@@ -224,23 +226,48 @@ AM_ErrorCode_t AM_Check_Scramb_Stop(void)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_rec.h)
  */
-AM_ErrorCode_t AM_Check_Scramb_GetPid(int *pids)
+AM_ErrorCode_t AM_Check_Scramb_GetInfo(int pid, int *pkt_num, int *scramb_pkt_num)
 {
-	int i = 0, d = 0;
-	if (pids == NULL) {
-		AM_DEBUG(1, "am-check-scram pid point is null");
-		return AM_FAILURE;
-	}
-	for (i = 0; i < AM_DVB_PID_MAXCOUNT; i++) {
-		if (ScramData.ScrambInfo[i].pid != 0 && ScramData.ScrambInfo[i].checked_scrambled_count >= MIN_SCRAMBLE_CHECK_COUNT) {
-			pids[d ++] = ScramData.ScrambInfo[i].pid;
-			//AM_DEBUG(1, "am-check-scram pid [%d] checked_scrambled_count[%d]", ScramData.ScrambInfo[i].pid, ScramData.ScrambInfo[i].checked_scrambled_count);
-		} else if (ScramData.ScrambInfo[i].pid == 0) {
-			//AM_DEBUG(1, "am-check-scram get pid count [%d]", i);
-			return AM_SUCCESS;
-		} else {
-		    //AM_DEBUG(1, "am-check-scram pid [%d] checked_scrambled_count[%d]", ScramData.ScrambInfo[i].pid, ScramData.ScrambInfo[i].checked_scrambled_count);
+	int i, begin;
+
+	if (pkt_num)
+		*pkt_num = 0;
+	if (scramb_pkt_num)
+		*scramb_pkt_num = 0;
+
+	if ((pid <= 0) || (pid >= 0x1fff))
+		return AM_SUCCESS;
+
+	begin = pid & (AM_DVB_PID_MAXCOUNT - 1);
+	i     = begin;
+
+	do {
+		if (ScramData.ScrambInfo[i].pid == pid) {
+			if (pkt_num)
+				*pkt_num = ScramData.ScrambInfo[i].pkt_num;
+			if (scramb_pkt_num)
+				*scramb_pkt_num = ScramData.ScrambInfo[i].scramb_pkt_num;
+			break;
+		} else if (!ScramData.ScrambInfo[i].pid) {
+			break;
 		}
-	}
+		i ++;
+		if (i == AM_DVB_PID_MAXCOUNT)
+			i = 0;
+	} while (i != begin);
+
+	return AM_SUCCESS;
+}
+
+/**\brief 检查PID是否有ts package data.
+ * \param pid The stream's PID
+ * \param [out] pkt_num The packet number of the PID
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_rec.h)
+ */
+AM_ErrorCode_t AM_Check_Has_Tspackage(int pid, int *pkt_num)
+{
+	AM_Check_Scramb_GetInfo(pid, pkt_num, NULL);
 	return AM_SUCCESS;
 }

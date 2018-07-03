@@ -701,7 +701,7 @@ void si_decode_descriptor_ex(dvbpsi_descriptor_t *descr, SI_Descriptor_Flag_t fl
 /**\brief 解析一个描述符,自行查找解析函数,为libdvbsi调用*/
 void si_decode_descriptor(dvbpsi_descriptor_t *descr, void *user)
 {
-
+	assert(des);
 	SI_Descriptor_Flag_t flag = (SI_Descriptor_Flag_t)(long)user;
 
 	si_decode_descriptor_ex(descr, flag);
