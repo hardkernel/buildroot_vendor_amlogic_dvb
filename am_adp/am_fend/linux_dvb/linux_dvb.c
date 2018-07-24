@@ -141,6 +141,12 @@ static AM_ErrorCode_t dvb_open (AM_FEND_Device_t *dev, const AM_FEND_OpenPara_t 
 			close(fd);
 			return ret;
 		}
+	} else {
+		ret = dvb_set_mode(dev, FE_ANALOG);
+		if (ret != AM_SUCCESS) {
+			close(fd);
+			return ret;
+		}
 	}
 
 	return AM_SUCCESS;

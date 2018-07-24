@@ -125,6 +125,15 @@ static AM_ErrorCode_t v4l2_open(AM_FEND_Device_t *dev, const AM_FEND_OpenPara_t 
 			return ret;
 		}
 	}
+	else
+	{
+		ret = v4l2_set_mode(dev, 0);
+		if (ret != AM_SUCCESS)
+		{
+			close(fd);
+			return ret;
+		}
+	}
 
 	return AM_SUCCESS;
 }
