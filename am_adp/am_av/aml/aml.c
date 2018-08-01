@@ -4432,6 +4432,13 @@ static void* aml_av_monitor_thread(void *arg)
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
 		}
 
+		//when no signal, switch channel, it can trigger no data event
+		if (has_audio && !adec_start && no_video_data && !no_data_evt && vpts_stop_dur > NO_DATA_CHECK_TIME) {
+			no_data_evt = AM_TRUE;
+			AM_DEBUG(1, "[avmon] send no AV data signal");
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AV_NO_DATA, NULL);
+		}
+
 		//AM_DEBUG(3,"no_audio = %d, dmx_a_stop = %d, a_stop= %d, no_video=%d, dmx_v_stop=%d, v_stop=%d, abuf_empty=%d, vbuf_empty=%d\n",no_audio_data,dmx_apts_stop_dur,apts_stop_dur, no_video_data, dmx_vpts_stop_dur, vpts_stop_dur, abuf_level_empty_dur,vbuf_level_empty_dur);
 
 		if (no_audio_data && dmx_apts_stop_dur == 0) {
