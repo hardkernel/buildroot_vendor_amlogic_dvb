@@ -3486,9 +3486,6 @@ static void am_epg_set_mode(AM_EPG_Monitor_t *mon, AM_Bool_t reset)
 	{
 		SET_MODE(pmt, pmtctl, AM_EPG_SCAN_PMT, reset);
 	}
-	SET_MODE(cat, catctl, AM_EPG_SCAN_CAT, reset);
-	SET_MODE(sdt, sdtctl, AM_EPG_SCAN_SDT, reset);
-	SET_MODE(nit, nitctl, AM_EPG_SCAN_NIT, reset);
 	SET_MODE(tot, totctl, AM_EPG_SCAN_TDT, reset);
 	SET_MODE(eit, eit4ectl, AM_EPG_SCAN_EIT_PF_ACT, reset);
 	SET_MODE(eit, eit4fctl, AM_EPG_SCAN_EIT_PF_OTH, reset);
@@ -3496,6 +3493,9 @@ static void am_epg_set_mode(AM_EPG_Monitor_t *mon, AM_Bool_t reset)
 	SET_MODE(eit, eit51ctl, AM_EPG_SCAN_EIT_SCHE_ACT, reset);
 	SET_MODE(eit, eit60ctl, AM_EPG_SCAN_EIT_SCHE_OTH, reset);
 	SET_MODE(eit, eit61ctl, AM_EPG_SCAN_EIT_SCHE_OTH, reset);
+	SET_MODE(cat, catctl, AM_EPG_SCAN_CAT, reset);
+	SET_MODE(sdt, sdtctl, AM_EPG_SCAN_SDT, reset);
+	SET_MODE(nit, nitctl, AM_EPG_SCAN_NIT, reset);
 
 	/*For ATSC*/
 	SET_MODE(atsc_stt, sttctl, AM_EPG_SCAN_STT, reset);
