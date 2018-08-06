@@ -233,6 +233,7 @@ struct AM_AV_Driver
 	AM_ErrorCode_t (*set_inject_audio)(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt);
 	AM_ErrorCode_t (*set_inject_subtitle)(AM_AV_Device_t *dev, uint16_t spid, int stype);
 	AM_ErrorCode_t (*timeshift_get_tfile)(AM_AV_Device_t *dev, AM_TFile_t *tfile);
+	void (*set_audio_cb)(AM_AV_Device_t *dev,AM_AV_Audio_CB_t cb,void *user_data);
 };
 
 /**\brief 音视频播放参数*/
