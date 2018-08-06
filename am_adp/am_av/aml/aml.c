@@ -2604,7 +2604,6 @@ static void *aml_timeshift_thread(void *arg)
 	//AM_FileEcho(VID_BLACKOUT_FILE, "0");
 	AM_FileEcho(VID_BLACKOUT_FILE, tshift->dev->video_blackout ? "1" : "0");
 
-
 	while (tshift->running || tshift->cmd != tshift->last_cmd )
 	{
 		pthread_mutex_lock(&tshift->lock);
@@ -4585,7 +4584,39 @@ static void* aml_av_monitor_thread(void *arg)
 			vdec_stop_time = 0;
 			vdec_stop_dur  = 0;
 			has_amaster = AM_FALSE;
-		}else if (need_replay && (dev->mode == AV_INJECT)) {
+		}else if (need_replay && (dev->mode == AV_TIMESHIFT)) {
+			AM_DEBUG(1, "[avmon] replay timshift vlevel %d alevel %d vpts_stop %d vmaster %d",
+				vbuf_level, abuf_level, vpts_stop_dur, vmaster_dur);
+			AV_TimeshiftData_t *tshift = NULL;
+
+			tshift = dev->timeshift_player.drv_data;
+			am_timeshift_reset_continue(tshift, -1, AM_TRUE);
+#ifndef ENABLE_PCR
+			adec_start = AM_FALSE;
+			av_paused  = AM_TRUE;
+#else
+			adec_start = (adec_handle != NULL);
+			av_paused  = AM_FALSE;
+#endif
+			resample_type = 0;
+			next_resample_type = resample_type;
+			next_resample_start_time = 0;
+			last_apts = 0;
+			last_vpts = 0;
+			last_dmx_apts = 0;
+			last_dmx_vpts = 0;
+			apts_stop_time = 0;
+			vpts_stop_time = 0;
+			dmx_apts_stop_time = 0;
+			dmx_vpts_stop_time = 0;
+			vmaster_time = 0;
+			down_audio_cache_time = 0;
+			down_video_cache_time = 0;
+			vdec_stop_time = 0;
+			vdec_stop_dur  = 0;
+			has_amaster = AM_FALSE;
+		}
+		else if (need_replay && (dev->mode == AV_INJECT)) {
 			AM_DEBUG(1, "[avmon] replay AV_INJECT vlevel %d alevel %d vpts_stop %d vmaster %d",
 				vbuf_level, abuf_level, vpts_stop_dur, vmaster_dur);
 			aml_restart_inject_mode(dev, AM_FALSE);
