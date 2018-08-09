@@ -4891,11 +4891,11 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 		scanner->atvctl.min_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx].fe_para)->frequency;
 		scanner->atvctl.max_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+1].fe_para)->frequency;
 		scanner->atvctl.start_freq = dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency ;
-        if(scanner->atvctl.direction == 1)
-            dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency+=ATV_3MHZ;
-        else
-            dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency-=ATV_3MHZ;
-        AM_DEBUG(1,"%s zk scanner->atvctl.start_freq = %d", __FUNCTION__,scanner->atvctl.start_freq);
+		//if(scanner->atvctl.direction == 1)
+		//	dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency+=ATV_3MHZ;
+		//else
+		//	dvb_fend_para(scanner->start_freqs[scanner->atvctl.start_idx+2].fe_para)->frequency-=ATV_3MHZ;
+		//AM_DEBUG(1,"%s zk scanner->atvctl.start_freq = %d", __FUNCTION__,scanner->atvctl.start_freq);
 		/* start from start freq */
 		scanner->curr_freq = scanner->atvctl.start_idx + 2;
 	}
@@ -5209,7 +5209,8 @@ next_ts:
 			//check if auto pause
 			am_scan_check_need_pause(scanner, AM_SCAN_STATUS_PAUSED);
 
-			if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL)
+			/* to support atv manual scan can pause when fonud a channel, then resume by user */
+			if (atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL && (scanner->proc_mode & AM_SCAN_PROCMODE_NORMAL))
 			{
 				AM_DEBUG(1, "ATV manual scan done!");
 				/* this will cause start dtv or complete scan */
@@ -5846,7 +5847,7 @@ static void am_scan_check_need_pause(AM_SCAN_Scanner_t *scanner, int pause_flag)
 	if (!scanner->request_destory)
 	{
 		pthread_mutex_lock(&scanner->lock_pause);
-		while (scanner->status & AM_SCAN_STATUS_PAUSED_USER)
+		while (scanner->status & pause_flag)
 			pthread_cond_wait(&scanner->cond_pause, &scanner->lock_pause);
 		pthread_mutex_unlock(&scanner->lock_pause);
 	}
