@@ -4478,15 +4478,17 @@ static void* aml_av_monitor_thread(void *arg)
 			AM_DEBUG(1, "[avmon] apts_dmx_stop: %d arp_stop: %d vpts_dmx_stop: %d vrp_stop: %d",
 					dmx_apts_stop_dur, arp_stop_dur, dmx_vpts_stop_dur, vrp_stop_dur);
 		}
-		if (vbuf_level * 5 > vbuf_size * 4)
-		{
-			need_replay = AM_TRUE;
-			AM_DEBUG(1, "[avmon] 1 replay ts vlevel %d vbuf_size %d",vbuf_level*6, vbuf_size*5);
-		}
-		if (abuf_level * 5 > abuf_size * 4)
-		{
-			need_replay = AM_TRUE;
-			AM_DEBUG(1, "[avmon] 2 replay ts vlevel %d vbuf_size %d",abuf_level*6, abuf_size*5);
+		if (dev->mode == AV_PLAY_TS) {
+			if (vbuf_level * 5 > vbuf_size * 4)
+			{
+				need_replay = AM_TRUE;
+				AM_DEBUG(1, "[avmon] 1 replay ts vlevel %d vbuf_size %d",vbuf_level*6, vbuf_size*5);
+			}
+			if (abuf_level * 5 > abuf_size * 4)
+			{
+				need_replay = AM_TRUE;
+				AM_DEBUG(1, "[avmon] 2 replay ts vlevel %d vbuf_size %d",abuf_level*6, abuf_size*5);
+			}
 		}
 		//if(adec_start && !av_paused && has_amaster && !apts_stop_dur && !vpts_stop_dur && (vmaster_dur > VMASTER_REPLAY_TIME))
 			//need_replay = AM_TRUE;
