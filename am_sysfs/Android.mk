@@ -17,7 +17,13 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_sysfs\
 LOCAL_SHARED_LIBRARIES+=libcutils liblog libc
 #for bind
 
-LOCAL_SHARED_LIBRARIES+=libutils  libbinder libsystemcontrolservice libam_adp vendor.amlogic.hardware.systemcontrol@1.0_vendor
+LOCAL_SHARED_LIBRARIES+=libutils  libbinder libsystemcontrolservice libam_adp
+
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
+LOCAL_SHARED_LIBRARIES+=vendor.amlogic.hardware.systemcontrol@1.0
+else
+LOCAL_SHARED_LIBRARIES+=vendor.amlogic.hardware.systemcontrol@1.0_vendor
+endif
 
 
 LOCAL_PRELINK_MODULE := false
