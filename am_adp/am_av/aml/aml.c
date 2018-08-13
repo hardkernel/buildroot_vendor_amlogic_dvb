@@ -2419,7 +2419,8 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 					AM_TFile_Seek(tshift->file, offset);
 				}
 				ioctl(tshift->ts.vid_fd, AMSTREAM_IOC_TRICKMODE, TRICKMODE_NONE);
-				am_timeshift_reset(tshift, 2, AM_TRUE);
+				if (tshift->last_cmd != -1)
+					am_timeshift_reset(tshift, 2, AM_TRUE);
 
 				//if (tshift->last_cmd == AV_PLAY_FF || tshift->last_cmd == AV_PLAY_FB)
 				{
