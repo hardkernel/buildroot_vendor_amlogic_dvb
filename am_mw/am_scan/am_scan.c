@@ -4005,11 +4005,11 @@ static AM_ErrorCode_t am_scan_atv_step_tune(AM_SCAN_Scanner_t *scanner)
 		/* step to next */
 		do
 		{
-			/* Auto scan reach the max freq ? */
+			/* Auto/Manual scan reach the max freq ? */
 			if ((int)dvb_fend_para(cur_fe_para)->frequency >= scanner->atvctl.max_freq &&
-				atv_start_para.mode == AM_SCAN_ATVMODE_AUTO)
+				(atv_start_para.mode == AM_SCAN_ATVMODE_AUTO || atv_start_para.mode == AM_SCAN_ATVMODE_MANUAL))
 			{
-				AM_DEBUG(1, "ATV auto scan reach max freq.");
+				AM_DEBUG(1, "ATV auto/manual scan reach max freq.");
 				return am_scan_start_next_ts(scanner);
 			}
 
