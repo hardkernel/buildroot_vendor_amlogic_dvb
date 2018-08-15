@@ -299,8 +299,12 @@ static int _get_aud_disabled();
 static AM_ErrorCode_t set_dec_control(AM_Bool_t enable);
 
 #define VALID_VIDEO(_pid_, _fmt_) (!_get_vid_disabled() && VALID_PID(_pid_))
-#define VALID_AUDIO(_pid_, _fmt_) (!_get_aud_disabled() && VALID_PID(_pid_) && audio_get_format_supported(_fmt_))
 
+#ifdef USE_ADEC_IN_DVB
+#define VALID_AUDIO(_pid_, _fmt_) (!_get_aud_disabled() && VALID_PID(_pid_) && audio_get_format_supported(_fmt_))
+#else
+#define VALID_AUDIO(_pid_, _fmt_) (!_get_aud_disabled() && VALID_PID(_pid_))
+#endif
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
@@ -535,6 +539,7 @@ const AM_AOUT_Driver_t adec_aout_drv =
 .set_pre_mute = adec_aout_set_pre_mute,
 };
 
+#if 0
 /*音频控制（通过amplayer2）操作*/
 static AM_ErrorCode_t amp_open(AM_AOUT_Device_t *dev, const AM_AOUT_OpenPara_t *para);
 static AM_ErrorCode_t amp_set_volume(AM_AOUT_Device_t *dev, int vol);
@@ -550,6 +555,7 @@ const AM_AOUT_Driver_t amplayer_aout_drv =
 .set_output_mode = amp_set_output_mode,
 .close        = amp_close
 };
+#endif
 static void adec_start_decode(int fd, int fmt, int has_video, void **padec);
 static void adec_stop_decode(void **padec);
 static void adec_set_decode_ad(int enable, int pid, int fmt, void *adec);
@@ -562,6 +568,7 @@ static void adec_pause_decode(void *handle);
 static void adec_resume_decode(void *handle);
 static void adec_get_status(void *adec, AM_AV_AudioStatus_t *para);
 
+#ifdef USE_ADEC_IN_DVB
 const AM_AUDIO_Driver_t native_audio_drv =
 {
 .adec_start_decode = adec_start_decode,
@@ -576,7 +583,7 @@ const AM_AUDIO_Driver_t native_audio_drv =
 .adec_set_pre_mute = adec_set_pre_mute,
 .adec_get_status = adec_get_status
 };
-
+#endif
 static void adec_start_decode_cb(int fd, int fmt, int has_video, void **padec);
 static void adec_stop_decode_cb(void **padec);
 static void adec_set_decode_ad_cb(int enable, int pid, int fmt, void *adec);
@@ -604,7 +611,11 @@ const AM_AUDIO_Driver_t callback_audio_drv =
 .adec_get_status = adec_get_status_cb
 };
 
+#ifdef USE_ADEC_IN_DVB
 static AM_AUDIO_Driver_t *audio_ops = &native_audio_drv;
+#else
+static AM_AUDIO_Driver_t *audio_ops = &callback_audio_drv;
+#endif
 
 /*监控AV buffer, PTS 操作*/
 static pthread_mutex_t gAVMonLock = PTHREAD_MUTEX_INITIALIZER;
@@ -852,6 +863,7 @@ static void adec_get_status_cb(void *adec, AM_AV_AudioStatus_t *para)
 	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
 	//TBD for get audio para
 }
+#ifdef USE_ADEC_IN_DVB
 static void adec_start_decode(int fd, int fmt, int has_video, void **padec)
 {
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
@@ -942,7 +954,7 @@ static AM_ErrorCode_t adec_cmd(const char *cmd)
 	return 0;
 #endif
 }
-
+#endif
 static AM_ErrorCode_t adec_aout_open(AM_AOUT_Device_t *dev, const AM_AOUT_OpenPara_t *para)
 {
 	UNUSED(dev);
@@ -953,6 +965,7 @@ static AM_ErrorCode_t adec_aout_set_volume(AM_AOUT_Device_t *dev, int vol)
 {
 	return audio_ops->adec_set_volume(dev,vol);
 }
+#ifdef USE_ADEC_IN_DVB
 static AM_ErrorCode_t adec_set_volume(AM_AOUT_Device_t *dev, int vol)
 {
 #ifndef ADEC_API_NEW
@@ -977,10 +990,13 @@ static AM_ErrorCode_t adec_set_volume(AM_AOUT_Device_t *dev, int vol)
 		return AM_SUCCESS;
 #endif
 }
+#endif
+
 static AM_ErrorCode_t adec_aout_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 {
 	return audio_ops->adec_set_mute(dev,mute);
 }
+#ifdef USE_ADEC_IN_DVB
 static AM_ErrorCode_t adec_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 {
 #ifndef ADEC_API_NEW
@@ -1000,10 +1016,13 @@ static AM_ErrorCode_t adec_set_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 		return AM_SUCCESS;
 #endif
 }
+#endif
+
 static AM_ErrorCode_t adec_aout_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_OutputMode_t mode)
 {
 	return audio_ops->adec_set_output_mode(dev,mode);
 }
+#ifdef USE_ADEC_IN_DVB
 static AM_ErrorCode_t adec_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_OutputMode_t mode)
 {
 #ifndef ADEC_API_NEW
@@ -1055,16 +1074,21 @@ static AM_ErrorCode_t adec_set_output_mode(AM_AOUT_Device_t *dev, AM_AOUT_Output
 		return AM_SUCCESS;
 #endif
 }
+#endif
 
 static AM_ErrorCode_t adec_aout_close(AM_AOUT_Device_t *dev)
 {
 	UNUSED(dev);
 	return AM_SUCCESS;
 }
+
+
 static AM_ErrorCode_t adec_aout_set_pre_gain(AM_AOUT_Device_t *dev, float gain)
 {
 	return audio_ops->adec_set_pre_gain(dev,gain);
 }
+
+#ifdef USE_ADEC_IN_DVB
 static AM_ErrorCode_t adec_set_pre_gain(AM_AOUT_Device_t *dev, float gain)
 {
 #ifndef ADEC_API_NEW
@@ -1086,12 +1110,12 @@ static AM_ErrorCode_t adec_set_pre_gain(AM_AOUT_Device_t *dev, float gain)
 		return AM_SUCCESS;
 #endif
 }
-
+#endif
 static AM_ErrorCode_t adec_aout_set_pre_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 {
 	return audio_ops->adec_set_pre_mute(dev,mute);
 }
-
+#ifdef USE_ADEC_IN_DVB
 static AM_ErrorCode_t adec_set_pre_mute(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 {
 #ifndef ADEC_API_NEW
@@ -1164,7 +1188,8 @@ static void adec_get_status(void *adec, AM_AV_AudioStatus_t *para)
 	}
 
 }
-
+#endif
+#if 0
 /*音频控制（通过amplayer2）操作*/
 static AM_ErrorCode_t amp_open(AM_AOUT_Device_t *dev, const AM_AOUT_OpenPara_t *para)
 {
@@ -1172,7 +1197,6 @@ static AM_ErrorCode_t amp_open(AM_AOUT_Device_t *dev, const AM_AOUT_OpenPara_t *
 	UNUSED(para);
 	return AM_SUCCESS;
 }
-
 static AM_ErrorCode_t amp_set_volume(AM_AOUT_Device_t *dev, int vol)
 {
 #ifdef PLAYER_API_NEW
@@ -1295,7 +1319,7 @@ static AM_ErrorCode_t amp_close(AM_AOUT_Device_t *dev)
 	UNUSED(dev);
 	return AM_SUCCESS;
 }
-
+#endif
 /**\brief 音视频数据注入线程*/
 static void* aml_data_source_thread(void *arg)
 {
@@ -3380,7 +3404,10 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 	adec_cmd("stop");
 	return AM_SUCCESS;
 #else
-	audio_decode_basic_init();
+#ifdef USE_ADEC_IN_DVB
+	if (s_audio_cb == NULL)
+		audio_decode_basic_init();
+#endif
 	return AM_SUCCESS;
 #endif
 }
@@ -4328,18 +4355,22 @@ static void* aml_av_monitor_thread(void *arg)
 			}
 		}
 #endif /*!defined ENABLE_PCR*/
-                if (s_audio_cb == NULL) {
-		        int status = audio_decoder_get_enable_status(ts->adec);
-			if (status == 1) {
-				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_AC3_LICENCE_RESUME, NULL);
-			}
-			else if (status == 0) {
-				AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_AC3_NO_LICENCE, NULL);
-			}
-			else if (status == -1) {
 
-			}
+#ifdef USE_ADEC_IN_DVB
+            if (s_audio_cb == NULL) {
+		        int status = audio_decoder_get_enable_status(ts->adec);
+				if (status == 1) {
+					AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_AC3_LICENCE_RESUME, NULL);
+				}
+				else if (status == 0) {
+					AM_EVT_Signal(dev->dev_no, AM_AV_EVT_AUDIO_AC3_NO_LICENCE, NULL);
+				}
+				else if (status == -1) {
+
+				}
 	        }
+#endif
+
 #ifdef ENABLE_BYPASS_DI
 		if (has_video && is_hd_video && !bypass_di && (vbuf_level * 6 > vbuf_size * 5)) {
 			AM_FileEcho(DI_BYPASS_FILE, "1");
@@ -6361,8 +6392,12 @@ AM_ErrorCode_t aml_set_inject_subtitle(AM_AV_Device_t *dev, uint16_t spid, int s
 
 static void ad_callback(const uint8_t * data,int len,void * user_data)
 {
-	printf("ad_callback [%d:%p] [user:%p]\n", len, data, user_data);
-	audio_send_associate_data(user_data, (uint8_t *)data, len);
+#ifdef USE_ADEC_IN_DVB
+	if (s_audio_cb == NULL) {
+	    printf("ad_callback [%d:%p] [user:%p]\n", len, data, user_data);
+	    audio_send_associate_data(user_data, (uint8_t *)data, len);
+	}
+#endif
 }
 
 static AM_ErrorCode_t aml_set_ad_source(AM_AD_Handle_t *ad, int enable, int pid, int fmt, void *user)
@@ -6546,7 +6581,11 @@ static void aml_set_audio_cb(AM_AV_Device_t *dev,AM_AV_Audio_CB_t cb,void *user_
 		s_audio_cb = cb;
 		pUserData = user_data;
 	} else {
+#ifdef USE_ADEC_IN_DVB
 		audio_ops = &native_audio_drv;
+#else
+		audio_ops = &callback_audio_drv;
+#endif
 	}
 }
 

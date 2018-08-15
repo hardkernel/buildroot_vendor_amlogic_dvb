@@ -4,11 +4,18 @@ AMLOGIC_LIBPLAYER :=y
 ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 25)))
 AMADEC_C_INCLUDES:=hardware/amlogic/media/amcodec/include\
        hardware/amlogic/LibAudio/amadec/include
-AMADEC_LIBS:=libamadec
 else
 AMADEC_C_INCLUDES:=vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
        vendor/amlogic/frameworks/av/LibPlayer/amadec/include
+endif
+
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
+else
+ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 25)))
+AMADEC_LIBS:=libamadec
+else
 AMADEC_LIBS:=libamplayer
+endif
 endif
 
 include $(CLEAR_VARS)
@@ -131,6 +138,11 @@ ifeq ($(AMLOGIC_LIBPLAYER), y)
 LOCAL_CFLAGS+=-DAMLOGIC_LIBPLAYER
 endif
 LOCAL_CFLAGS+=-std=gnu99
+
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
+else
+LOCAL_CFLAGS+=-DUSE_ADEC_IN_DVB
+endif
 
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\

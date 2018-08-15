@@ -1,15 +1,4 @@
 LOCAL_PATH := $(call my-dir)
-AMLOGIC_LIBPLAYER :=y
-
-ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 25)))
-AMADEC_C_INCLUDES:=hardware/amlogic/media/amcodec/include\
-       hardware/amlogic/LibAudio/amadec/include
-AMADEC_LIBS:=libamadec
-else
-AMADEC_C_INCLUDES:=vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
-       vendor/amlogic/frameworks/av/LibPlayer/amadec/include
-AMADEC_LIBS:=libamplayer
-endif
 
 include $(CLEAR_VARS)
 
@@ -115,10 +104,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
                    am_check_scramb/am_check_scramb.c
 
 
-LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1 #
-ifeq ($(AMLOGIC_LIBPLAYER), y)
-LOCAL_CFLAGS+=-DAMLOGIC_LIBPLAYER
-endif
+LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1
 
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
