@@ -58,6 +58,23 @@ extern void (*am_ucnv_convertEx_ptr)(UConverter *targetCnv, UConverter *sourceCn
 
 extern void am_ucnv_dlink(void);
 
+
+#ifdef USE_VENDOR_ICU
+#define am_ucnv_open(conv, err)\
+	({\
+        UConverter *ret;\
+        ret = ucnv_open(conv, err);\
+        ret;\
+	 })
+#define am_ucnv_close(conv)\
+	AM_MACRO_BEGIN\
+		ucnv_close(conv);\
+	AM_MACRO_END
+#define am_ucnv_convertEx(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13)\
+	AM_MACRO_BEGIN\
+		ucnv_convertEx(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13);\
+	AM_MACRO_END
+#else
 #define am_ucnv_open(conv, err)\
 	({\
 	 	UConverter *ret;\
@@ -78,6 +95,7 @@ extern void am_ucnv_dlink(void);
 	 		am_ucnv_dlink();\
 		am_ucnv_convertEx_ptr(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13);\
 	AM_MACRO_END
+#endif
 
 static inline iconv_t
 iconv_open(const char *tocode, const char *fromcode)
@@ -89,8 +107,8 @@ iconv_open(const char *tocode, const char *fromcode)
 	if(!cd)
 		goto error;
 	
-	cd->target = am_ucnv_open(tocode, &err1);
-	cd->source = am_ucnv_open(fromcode, &err2);
+	cd->target = (UConverter *)am_ucnv_open(tocode, &err1);
+	cd->source = (UConverter *)am_ucnv_open(fromcode, &err2);
 	if((!U_SUCCESS(err1)) || (!U_SUCCESS(err2)))
 		goto error;
 	

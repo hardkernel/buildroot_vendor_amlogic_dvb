@@ -153,10 +153,16 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw\
 		    $(LOCAL_PATH)/../android/ndk/include\
 			$(AMADEC_C_INCLUDES)\
-		    external/icu/icu4c/source/common\
 		    common/include/linux/amlogic
 
-LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libcutils liblog libdl libc
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
+LOCAL_CFLAGS += -DUSE_VENDOR_ICU
+LOCAL_C_INCLUDES += vendor/amlogic/external/icu/icu4c/source/common
+LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libicuuc_vendor libcutils liblog libdl libc
+else
+LOCAL_C_INCLUDES += external/icu/icu4c/source/common
+LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libicuuc libcutils liblog libdl libc
+endif
 
 LOCAL_PRELINK_MODULE := false
 
@@ -299,10 +305,16 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_mw\
 		    $(LOCAL_PATH)/../android/ndk/include\
 			$(AMADEC_C_INCLUDES)\
-		    external/icu/icu4c/source/common\
 		    common/include/linux/amlogic
 
-LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libcutils liblog libdl libc
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
+LOCAL_CFLAGS += -DUSE_VENDOR_ICU
+LOCAL_C_INCLUDES += vendor/amlogic/external/icu/icu4c/source/common
+LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libicuuc_vendor libcutils liblog libdl libc
+else
+LOCAL_C_INCLUDES += external/icu/icu4c/source/common
+LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libicuuc libcutils liblog libdl libc
+endif
 
 LOCAL_PRELINK_MODULE := false
 
