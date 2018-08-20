@@ -1141,8 +1141,8 @@ static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char l
 	for (i=0; i<ai->audio_count; i++)
 	{
 		if (ai->audios[i].pid == aud_pid &&
-			ai->audios[i].fmt == aud_fmt /*&&
-			! memcmp(ai->audios[i].lang, lang, 3)*/)
+			ai->audios[i].fmt == aud_fmt &&
+			! memcmp(ai->audios[i].lang, lang, 3))
 		{
 			if ((strncmp(ai->audios[i].lang, "Audio", 5) == 0) && lang[0] != 0) {
 				memset(ai->audios[i].lang, 0, sizeof(ai->audios[i].lang));
