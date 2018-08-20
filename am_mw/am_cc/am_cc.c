@@ -378,6 +378,8 @@ static void am_cc_vbi_event_handler(vbi_event *ev, void *user_data)
 			if (ret == -1)
 			{
 				AM_DEBUG(1, "tvcc_to_json failed");
+				if (json_buffer)
+					free(json_buffer);
 				pthread_mutex_unlock(&cc->lock);
 				return;
 			}

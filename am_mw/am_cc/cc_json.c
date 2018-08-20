@@ -606,6 +606,7 @@ edge_to_str (enum edge e)
 		str = "shadow_right";
 		break;
 	default:
+		str = "none";
 		// AM_DEBUG(1, "edge style error: %s", e);
 		break;
 	}
