@@ -14,6 +14,7 @@
 #define AM_DEBUG_LEVEL 5
 
 #include <am_debug.h>
+#include <sys/types.h>
 #include <am_dsc.h>
 #include <am_av.h>
 #include <am_fend.h>

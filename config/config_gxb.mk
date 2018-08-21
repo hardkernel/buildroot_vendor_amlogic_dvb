@@ -3,8 +3,9 @@ ARCH=arm
 CHIP=gxb
 HOST_32=n
 
-OUTPUT:=/mnt/fileroot/hualing.chen/linux-sdk/output/mesongxl_p230_kernel49
-CROSS_COMPILE:=$(OUTPUT)/host/usr/bin/aarch64-linux-gnu-
+OUTPUT := /home/brooks/src/vmx_m9du2/m9du2-buildroot/output/mesong12a_skt_32_release
+#OUTPUT:=/mnt/fileroot/hualing.chen/linux-sdk/output/mesongxl_p230_kernel49
+CROSS_COMPILE:=$(OUTPUT)/host/usr/bin/arm-none-linux-gnueabi-
 
 ifeq ($(HOST_32),y)
 	OUTPUT:=/mnt/fileroot/hualing.chen/linux-sdk/output/mesongxl_p230_32_kernel49
@@ -39,7 +40,7 @@ EMU_VOUT=n
 
 IMG_BMP=y
 IMG_GIF=y
-IMG_PNG=y
+IMG_PNG=n
 
 IMG_JPEG=n
 

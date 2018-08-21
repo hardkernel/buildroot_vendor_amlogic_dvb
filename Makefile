@@ -2,7 +2,7 @@ BASE=.
 
 include $(BASE)/rule/def.mk
 
-SUBDIRS=doc script include am_adp am_mw am_app am_ver test
+SUBDIRS=include am_adp test
 
 
 include $(BASE)/rule/rule.mk

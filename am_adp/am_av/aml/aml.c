@@ -719,19 +719,39 @@ static int _get_prop_int(char *prop, int def) {
 #define DVB_LOGLEVEL_PROP "tv.dvb.loglevel"
 
 static int _get_asso_enable() {
+#ifdef ANDROID
 	return property_get_int32(AUD_ASSO_PROP, 0);
+#else
+	return 0;
+#endif
 }
 static int _get_asso_mix() {
+#ifdef ANDROID
 	return property_get_int32(AUD_ASSO_MIX_PROP, 50);
+#else
+	return 0;
+#endif
 }
 static int _get_vid_disabled() {
+#ifdef ANDROID
 	return property_get_int32(VID_DISABLED_PROP, 0);
+#else
+	return 0;
+#endif
 }
 static int _get_aud_disabled() {
+#ifdef ANDROID
 	return property_get_int32(AUD_DISABLED_PROP, 0);
+#else
+	return 0;
+#endif
 }
 static int _get_dvb_loglevel() {
+#ifdef ANDROID
 	return property_get_int32(DVB_LOGLEVEL_PROP, AM_DEBUG_LOGLEVEL_DEFAULT);
+#else
+	return 0;//AM_DEBUG_LOGLEVEL_DEFAULT;
+#endif
 }
 
 static void adec_start_decode_cb(int fd, int fmt, int has_video, void **padec)
@@ -879,6 +899,7 @@ static void adec_start_decode(int fd, int fmt, int has_video, void **padec)
 			param.has_video = has_video;
 			param.associate_dec_supported = _get_asso_enable();
 			param.mixing_level = _get_asso_mix();
+			//param.use_hardabuf = 1; //should be use hardabuf ???
 			audio_decode_init(padec, &param);
 			audio_set_av_sync_threshold(*padec, AV_SYNC_THRESHOLD);
 			audio_decode_set_volume(*padec, 1.);
@@ -2026,7 +2047,9 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AV_TimeShi
 	if ((tp->afmt == AFORMAT_AC3) || (tp->afmt == AFORMAT_EAC3))
 	{
 		char buf[32];
+#ifdef ANDROID
 		property_get(AC3_AMASTER_PROP, buf, "0");
+#endif
 
 		if (!strcmp(buf, "1"))
 		{
@@ -2156,7 +2179,9 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AV_TimeShi
 
 	if (has_audio && !ac3_amaster) {
 		if (!show_first_frame_nosync()) {
+#ifdef ANDROID
 			property_set("sys.amplayer.drop_pcm", "1");
+#endif
 		}
 		AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
 
@@ -3375,6 +3400,7 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 		}
 	}
 #else
+#ifdef ANDROID
 	if (AM_FileRead(VID_ASPECT_MATCH_FILE, buf, sizeof(buf)) == AM_SUCCESS)
 	{
 		if (sscanf(buf, "%d", &v) == 1)
@@ -3397,6 +3423,7 @@ static AM_ErrorCode_t aml_open(AM_AV_Device_t *dev, const AM_AV_OpenPara_t *para
 			}
 		}
 	}
+#endif
 #endif
 //#endif
 
@@ -4398,6 +4425,7 @@ static void* aml_av_monitor_thread(void *arg)
 
 		//check video frame available
 		if (has_video && !no_video_data) {
+#ifdef ANDROID
 			if (AM_FileRead(VIDEO_NEW_FRAME_COUNT_FILE, buf, sizeof(buf)) >= 0) {
 				sscanf(buf, "%i", &vframes_now);
 
@@ -4416,6 +4444,7 @@ static void* aml_av_monitor_thread(void *arg)
 				AM_DEBUG(1, "[avmon] cannot read \"%s\"", VIDEO_NEW_FRAME_TOGGLED_FILE);
 				vframes_now = 0;
 			}
+#endif
 		}
 
 		//first no_data
@@ -4537,6 +4566,7 @@ static void* aml_av_monitor_thread(void *arg)
 			need_replay = AM_TRUE;
 		}
 
+#ifdef ANDROID
 		if (AM_FileRead(TSYNCPCR_RESETFLAG_FILE, buf, sizeof(buf)) >= 0) {
 			int val = 0;
 			sscanf(buf, "%d", &val);
@@ -4548,6 +4578,7 @@ static void* aml_av_monitor_thread(void *arg)
 
 		AM_DEBUG(1, "tsync_mode:%d--vbuf_level--0x%08x---- abuf_level---0x%08x",
 			tsync_mode,vbuf_level,abuf_level);
+#endif
 
 		if (!av_paused && dev->mode == AV_INJECT) {
 			if (has_video && (vbuf_level < DEC_STOP_VIDEO_LEVEL))
@@ -5290,7 +5321,6 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
  #endif
 		break;
 		case AV_VIDEO_PARA_RATIO_MATCH:
-			name = VID_ASPECT_MATCH_FILE;
 #ifndef 	CHIP_8226H
 			switch ((long)val)
 			{
@@ -5308,6 +5338,7 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 				break;
 			}
 #else
+			name = VID_ASPECT_MATCH_FILE;
 			switch ((long)val)
 			{
 				case AM_AV_VIDEO_ASPECT_MATCH_IGNORE:

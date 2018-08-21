@@ -36,6 +36,9 @@
 extern "C" {
 #endif
 
+#ifndef ANDROID
+#include <unistd.h>
+#endif
 #include <stdbool.h>
 
 #define DVBPSI_BCD2VALUE(b) ((((b)&0xf0)>>4)*10 + ((b)&0x0f))

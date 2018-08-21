@@ -22,6 +22,9 @@
  *
  ***************************************************************************/
 
+#ifndef ANDROID
+#define _LARGEFILE64_SOURCE
+#endif
 #define AM_DEBUG_LEVEL 5
 
 #include <unistd.h>

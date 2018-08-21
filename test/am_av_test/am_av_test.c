@@ -12,6 +12,7 @@
 
 #define AM_DEBUG_LEVEL 5
 
+#include <sys/types.h>
 #include <am_debug.h>
 #include <am_av.h>
 #include <am_fend.h>
@@ -25,7 +26,6 @@
 #include <sys/socket.h>
 #endif
 #include <arpa/inet.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 /*
