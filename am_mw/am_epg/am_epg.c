@@ -2835,10 +2835,10 @@ static void am_epg_proc_pmt_section(AM_EPG_Monitor_t *mon, void *pmt_section)
 static void am_epg_nit_done(AM_EPG_Monitor_t *mon)
 {
 	am_epg_free_filter(mon, &mon->nitctl.fid);
-
 	/*触发通知事件*/
-	SIGNAL_EVENT(AM_EPG_EVT_NEW_NIT, (void*)(long)mon->nits->i_version);
-
+	if (mon->nits != NULL) {
+		SIGNAL_EVENT(AM_EPG_EVT_NEW_NIT, (void*)(long)mon->nits->i_version);
+	}
 	TAB_CB(mon, AM_EPG_TAB_NIT, mon->nits);
 
 	/* release for updating new tables */
