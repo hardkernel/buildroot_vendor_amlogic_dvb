@@ -59,7 +59,8 @@ ifeq ($(strip $(BOARD_TV_USE_NEW_TVIN_PARAM)),true)
 LOCAL_CFLAGS += -DCC_TV_USE_NEW_TVIN_PARAM=1
 endif
 
-LOCAL_SHARED_LIBRARIES+= libzvbi libam_adp libsqlite $(AMADEC_LIBS) liblog libdl libc libcutils
+LOCAL_STATIC_LIBRARIES+= libsqlite
+LOCAL_SHARED_LIBRARIES+= libzvbi libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
 
 LOCAL_PRELINK_MODULE := false
 
@@ -122,7 +123,8 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    vendor/amlogic/external/libzvbi/src\
 		    $(LOCAL_PATH)/../am_adp/am_open_lib/am_ci
 
-LOCAL_SHARED_LIBRARIES+= libzvbi libam_adp libsqlite $(AMADEC_LIBS) liblog libdl libc libcutils
+LOCAL_STATIC_LIBRARIES+= libsqlite
+LOCAL_SHARED_LIBRARIES+= libzvbi libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
 
 LOCAL_PRELINK_MODULE := false
 
