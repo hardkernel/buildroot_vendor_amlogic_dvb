@@ -51,7 +51,6 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    external/libzvbi/src\
 		    external/sqlite/dist\
 			$(AMADEC_C_INCLUDES)\
-		    external/icu/icu4c/source/common\
 		    vendor/amlogic/external/libzvbi/src\
 		    $(LOCAL_PATH)/../am_adp/am_open_lib/am_ci
 
@@ -60,9 +59,12 @@ LOCAL_CFLAGS += -DCC_TV_USE_NEW_TVIN_PARAM=1
 endif
 
 ifeq ($(BOARD_VNDK_VERSION), current)
+LOCAL_CFLAGS += -DUSE_VENDOR_ICU
+LOCAL_C_INCLUDES += vendor/amlogic/external/icu/icu4c/source/common
 LOCAL_STATIC_LIBRARIES+= libsqlite
 LOCAL_SHARED_LIBRARIES+= libzvbi libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
 else
+LOCAL_C_INCLUDES += external/icu/icu4c/source/common
 LOCAL_SHARED_LIBRARIES+= libzvbi libsqlite libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
 endif
 
@@ -123,14 +125,16 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    external/sqlite/dist\
 		    $(LOCAL_PATH)/am_closecaption/am_vbi\
 			$(AMADEC_C_INCLUDES)\
-		    external/icu/icu4c/source/common\
 		    vendor/amlogic/external/libzvbi/src\
 		    $(LOCAL_PATH)/../am_adp/am_open_lib/am_ci
 
 ifeq ($(BOARD_VNDK_VERSION), current)
+LOCAL_CFLAGS += -DUSE_VENDOR_ICU
+LOCAL_C_INCLUDES += vendor/amlogic/external/icu/icu4c/source/common
 LOCAL_STATIC_LIBRARIES+= libsqlite
 LOCAL_SHARED_LIBRARIES+= libzvbi libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
 else
+LOCAL_C_INCLUDES += external/icu/icu4c/source/common
 LOCAL_SHARED_LIBRARIES+= libzvbi libsqlite libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
 endif
 LOCAL_PRELINK_MODULE := false
