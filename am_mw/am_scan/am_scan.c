@@ -3903,7 +3903,7 @@ static AM_ErrorCode_t am_scan_try_nit(AM_SCAN_Scanner_t *scanner)
 
 		HELPER_CB(AM_SCAN_HELPER_ID_FE_TYPE_CHANGE, (void*)(long)(cur_fe_para.m_type));
 
-		AM_FEND_SetMode(scanner->start_para.vlfend_dev_id, 0);
+		AM_VLFEND_SetMode(scanner->start_para.vlfend_dev_id, 0);
 		ret = AM_FENDCTRL_SetPara(scanner->start_para.fend_dev_id, &cur_fe_para);
 		if (ret == AM_SUCCESS)
 		{
@@ -4026,8 +4026,9 @@ static AM_ErrorCode_t am_scan_atv_step_tune(AM_SCAN_Scanner_t *scanner)
 				scanner->atvctl.min_freq, scanner->atvctl.max_freq);
 
 			/* Set frontend */
-			AM_FEND_SetMode(scanner->start_para.fend_dev_id, FE_ANALOG);
-			ret = AM_FENDCTRL_SetPara(scanner->start_para.vlfend_dev_id, &cur_fe_para);
+			AM_FEND_SetMode(scanner->start_para.fend_dev_id, FE_ANALOG);/* release FE for VLFE */
+			AM_VLFEND_SetMode(scanner->start_para.vlfend_dev_id, FE_ANALOG);/* set mode for VLFE */
+			ret = AM_VLFEND_SetPara(scanner->start_para.vlfend_dev_id, &cur_fe_para);
 			if (ret == AM_SUCCESS)
 			{
 				scanner->recv_status |= AM_SCAN_RECVING_WAIT_FEND;
@@ -4250,11 +4251,11 @@ static AM_ErrorCode_t am_scan_start_ts(AM_SCAN_Scanner_t *scanner, int step)
 
 		/* try set frontend */
 		if (cur_fe_para.m_type == FE_ANALOG) {
-			AM_FEND_SetMode(scanner->start_para.fend_dev_id, FE_ANALOG);
-			ret = AM_FENDCTRL_SetPara(scanner->start_para.vlfend_dev_id, &cur_fe_para);
-		}
-		else {
-			AM_VLFEND_SetMode(scanner->start_para.vlfend_dev_id, 0);
+			AM_FEND_SetMode(scanner->start_para.fend_dev_id, FE_ANALOG);/* release FE for VLFE */
+			AM_VLFEND_SetMode(scanner->start_para.vlfend_dev_id, FE_ANALOG);/* set mode for VLFE */
+			ret = AM_VLFEND_SetPara(scanner->start_para.vlfend_dev_id, &cur_fe_para);
+		} else {
+			AM_VLFEND_SetMode(scanner->start_para.vlfend_dev_id, 0);/* release VLFE for FE */
 			ret = AM_FENDCTRL_SetPara(scanner->start_para.fend_dev_id, &cur_fe_para);
 		}
 		if (ret == AM_SUCCESS)

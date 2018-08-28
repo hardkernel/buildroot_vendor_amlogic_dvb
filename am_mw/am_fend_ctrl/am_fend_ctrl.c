@@ -95,22 +95,6 @@ AM_ErrorCode_t AM_FENDCTRL_SetPara(int dev_no, const AM_FENDCTRL_DVBFrontendPara
 			ret = AM_FEND_SetPara(dev_no, &(para->atsc.para));
 			break;
 		case FE_ANALOG:
-			{
-				struct v4l2_analog_parameters v4l2_para;
-
-				ret = AM_VLFEND_SetMode(dev_no, FE_ANALOG);
-				if (ret < 0)
-					return ret;
-
-				v4l2_para.frequency = para->analog.para.frequency;
-				v4l2_para.audmode = para->analog.para.u.analog.audmode;
-				v4l2_para.soundsys = para->analog.para.u.analog.soundsys;
-				v4l2_para.std = para->analog.para.u.analog.std;
-				v4l2_para.flag = para->analog.para.u.analog.flag;
-				v4l2_para.afc_range = para->analog.para.u.analog.afc_range;
-
-				ret = AM_VLFEND_SetPara(dev_no, &para->analog.para);
-			}
 			break;
 		case FE_DTMB:
 			ret = AM_FEND_SetPara(dev_no, &(para->dtmb.para));
@@ -168,21 +152,6 @@ AM_ErrorCode_t AM_FENDCTRL_Lock(int dev_no, const AM_FENDCTRL_DVBFrontendParamet
 			AM_FEND_Lock(dev_no, &(para->atsc.para), status);
 			break;
 		case FE_ANALOG:
-			{
-				struct v4l2_analog_parameters v4l2_para;
-
-				ret = AM_VLFEND_SetMode(0, 1);
-				if (ret < 0)
-					return ret;
-
-				v4l2_para.frequency = para->analog.para.frequency;
-				v4l2_para.audmode = para->analog.para.u.analog.audmode;
-				v4l2_para.soundsys = para->analog.para.u.analog.soundsys;
-				v4l2_para.std = para->analog.para.u.analog.std;
-				v4l2_para.flag = para->analog.para.u.analog.flag;
-				v4l2_para.afc_range = para->analog.para.u.analog.afc_range;
-				ret = AM_VLFEND_SetPara(0, &para->analog.para);
-			}
 			break;
 		case FE_DTMB:
 			AM_FEND_Lock(dev_no, &(para->dtmb.para), status);
