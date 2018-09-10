@@ -42,6 +42,32 @@ extern "C"
 /****************************************************************************
  * API function prototypes  
  ***************************************************************************/
+/**\brief 读sysfs
+ *  name 文件名
+ *  buf  存放字符串的缓冲区
+ *  len  缓冲区大小
+ */
+typedef void (*AM_Read_Sysfs_Cb)(const char *name, char *buf, int len);
+
+/**\brief 写sysfs
+ *  name 文件名
+ *  cmd  向文件打印的字符串
+ */
+typedef void (*AM_Write_Sysfs_Cb)(const char *name, const char *cmd);
+
+
+/**\brief 注册读写sysfs的回调函数
+ * \param[in] fun 回调
+ * \return
+ *	 - AM_SUCCESS 成功
+ *	 - 其他值 错误代码
+ */
+extern void AM_RegisterRWSysfsFun(AM_Read_Sysfs_Cb RCb, AM_Write_Sysfs_Cb WCb);
+
+/**\brief 卸载注册
+ */
+extern void AM_UnRegisterRWSysfsFun();
+
 
 /**\brief 向一个文件打印字符串
  * \param[in] name 文件名

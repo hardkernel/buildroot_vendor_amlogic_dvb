@@ -52,6 +52,15 @@ int (*Read_Sysfs_ptr)(const char *path, char *value);
 
 static int AM_SYSTEMCONTROL_INIT=0;
 
+typedef struct am_rw_sysfs_cb_s
+{
+	AM_Read_Sysfs_Cb readSysfsCb;
+	AM_Write_Sysfs_Cb writeSysfsCb;
+}am_rw_sysfs_cb_t;
+
+am_rw_sysfs_cb_t rwSysfsCb = {.readSysfsCb = NULL, .writeSysfsCb = NULL};
+
+
 #ifdef ANDROID
 
 # define SUN_LEN(ptr) ((size_t) (((struct sockaddr_un*) 0)->sun_path) + strlen ((ptr)->sun_path) )
@@ -76,7 +85,7 @@ static AM_ErrorCode_t am_init_syscontrol_api()
 		}
 		if(handle==NULL)
 		{
-			AM_DEBUG(1, "open lib error--\r\n");
+			AM_DEBUG(1, "open lib error--%s\r\n",dlerror());
 			return AM_FAILURE;
 		}
 		AM_DEBUG(1, "open lib ok--\r\n");
@@ -152,6 +161,35 @@ static AM_ErrorCode_t try_read(int fd, char *buf, int len)
  * API functions
  ***************************************************************************/
 
+/**\brief 注册读写sysfs的回调函数
+ * \param[in] fun 回调
+ * \return
+ *	 - AM_SUCCESS 成功
+ *	 - 其他值 错误代码
+ */
+void AM_RegisterRWSysfsFun(AM_Read_Sysfs_Cb RCb, AM_Write_Sysfs_Cb WCb)
+{
+	assert(RCb && WCb);
+
+	if (!rwSysfsCb.readSysfsCb)
+		rwSysfsCb.readSysfsCb = RCb;
+	if (!rwSysfsCb.writeSysfsCb)
+		rwSysfsCb.writeSysfsCb = WCb;
+
+	AM_DEBUG(1, "AM_RegisterRWSysfsFun !!");
+}
+
+/**\brief 卸载注册
+ */
+void AM_UnRegisterRWSysfsFun()
+{
+	if (rwSysfsCb.readSysfsCb)
+		rwSysfsCb.readSysfsCb = NULL;
+	if (rwSysfsCb.writeSysfsCb)
+		rwSysfsCb.writeSysfsCb = NULL;
+}
+
+
 /**\brief 向一个文件打印字符串
  * \param[in] name 文件名
  * \param[in] cmd 向文件打印的字符串
@@ -164,11 +202,18 @@ AM_ErrorCode_t AM_FileEcho(const char *name, const char *cmd)
 	int fd, len, ret;
 	
 	assert(name && cmd);
-	
-	am_init_syscontrol_api();
-	if(Write_Sysfs_ptr!=NULL)
+
+	if (rwSysfsCb.writeSysfsCb)
 	{
-		return Write_Sysfs_ptr(name,cmd);
+		rwSysfsCb.writeSysfsCb(name, cmd);
+		return AM_SUCCESS;
+	}else
+	{
+		am_init_syscontrol_api();
+		if (Write_Sysfs_ptr != NULL)
+		{
+			return Write_Sysfs_ptr(name,cmd);
+		}
 	}
 
 	fd = open(name, O_WRONLY);
@@ -207,10 +252,18 @@ AM_ErrorCode_t AM_FileRead(const char *name, char *buf, int len)
 	char *ret;
 	
 	assert(name && buf);
-	am_init_syscontrol_api();
-	if(ReadNum_Sysfs_ptr!=NULL)
+
+	if (rwSysfsCb.readSysfsCb)
 	{
-		return ReadNum_Sysfs_ptr(name,buf,len);
+		rwSysfsCb.readSysfsCb(name, buf, len);
+		return AM_SUCCESS;
+	}else
+	{
+		am_init_syscontrol_api();
+		if (ReadNum_Sysfs_ptr != NULL)
+		{
+			return ReadNum_Sysfs_ptr(name,buf,len);
+		}
 	}
 
 
