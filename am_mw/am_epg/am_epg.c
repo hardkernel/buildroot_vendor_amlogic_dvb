@@ -765,7 +765,6 @@ static void am_epg_gen_short_event_text(ShortEventLanguage *all_langs, int lang_
 		AM_SI_ConvertDVBTextCode((char*)pse->i_event_name, pse->i_event_name_length,\
 								name, EVT_NAME_LEN);
 		name[EVT_NAME_LEN] = 0;
-		
 		AM_SI_ConvertDVBTextCode((char*)pse->i_text, pse->i_text_length,\
 						desc, EVT_TEXT_LEN);
 		desc[EVT_TEXT_LEN] = 0;

@@ -28,6 +28,8 @@
 #include <stdlib.h>
 #include <am_iconv.h>
 #include <am_debug.h>
+#include <stdbool.h>
+
 
 UConverter* (*am_ucnv_open_ptr)(const char *converterName, UErrorCode *err);
 void (*am_ucnv_close_ptr)(UConverter * converter);
@@ -40,6 +42,22 @@ void (*am_ucnv_convertEx_ptr)(UConverter *targetCnv, UConverter *sourceCnv,
 		UErrorCode *pErrorCode);
 void (*am_u_setDataDirectory_ptr)(const char *directory);
 void (*am_u_init_ptr)(long *status);
+
+#ifdef USE_VENDOR_ICU
+bool actionFlag = false;
+void am_first_action(void)
+{
+	if (!actionFlag) {
+		setenv("ICU_DATA", "/system/usr/icu", 1);
+		u_setDataDirectory("/system/usr/icu");
+		long status = 0;
+		u_init(&status);
+		if (status > 0)
+			AM_DEBUG(1, "icu init fail. [%ld]", status);
+		actionFlag = true;
+	}
+}
+#endif
 
 void
 am_ucnv_dlink(void)

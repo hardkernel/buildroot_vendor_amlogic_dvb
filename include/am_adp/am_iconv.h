@@ -60,18 +60,22 @@ extern void am_ucnv_dlink(void);
 
 
 #ifdef USE_VENDOR_ICU
+extern void am_first_action(void);
 #define am_ucnv_open(conv, err)\
 	({\
         UConverter *ret;\
+        am_first_action();\
         ret = ucnv_open(conv, err);\
         ret;\
 	 })
 #define am_ucnv_close(conv)\
 	AM_MACRO_BEGIN\
+		am_first_action();\
 		ucnv_close(conv);\
 	AM_MACRO_END
 #define am_ucnv_convertEx(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13)\
 	AM_MACRO_BEGIN\
+		am_first_action();\
 		ucnv_convertEx(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13);\
 	AM_MACRO_END
 #else
@@ -126,6 +130,7 @@ error:
 			errno = err2;//use errno for error code export
 		free(cd);
 	}
+
 	return (iconv_t)-1;
 }
 
