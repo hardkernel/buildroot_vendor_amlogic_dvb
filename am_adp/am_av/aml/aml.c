@@ -71,7 +71,7 @@
 #define FILENAME_LENGTH_MAX 2048
 
 #include <codec_type.h>
-#include <adec-external-ctrl.h>
+//#include <adec-external-ctrl.h>
 
 void *adec_handle = NULL;
 
