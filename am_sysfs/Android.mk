@@ -10,9 +10,9 @@ LOCAL_SRC_FILES := am_syswrite.cpp
 
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_sysfs\
- 					$(LOCAL_PATH)/../include/am_adp\
-                    vendor/amlogic/frameworks/services/systemcontrol \
-                    vendor/amlogic/frameworks/services/systemcontrol/PQ/include
+                    $(LOCAL_PATH)/../include/am_adp\
+                    $(LOCAL_PATH)/../../../frameworks/services/systemcontrol \
+                    $(LOCAL_PATH)/../../../frameworks/services/systemcontrol/PQ/include
 
 LOCAL_SHARED_LIBRARIES+=libcutils liblog libc
 #for bind
@@ -43,9 +43,9 @@ LOCAL_SRC_FILES := am_syswrite.cpp
 
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_sysfs\
- 					$(LOCAL_PATH)/../include/am_adp\
-                    vendor/amlogic/frameworks/services/systemcontrol \
-                    vendor/amlogic/frameworks/services/systemcontrol/PQ/include
+                    $(LOCAL_PATH)/../include/am_adp\
+                    $(LOCAL_PATH)/../../../frameworks/services/systemcontrol \
+                    $(LOCAL_PATH)/../../../frameworks/services/systemcontrol/PQ/include
 
 LOCAL_SHARED_LIBRARIES+=libcutils liblog libc
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)

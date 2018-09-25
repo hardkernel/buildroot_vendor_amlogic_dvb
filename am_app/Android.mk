@@ -17,13 +17,12 @@ app_c_includes := $(LOCAL_PATH)/../include/am_adp\
             packages/amlogic/LibPlayer/amadec/include\
             packages/amlogic/LibPlayer/amcodec/include\
             external/icu4c/common\
-            vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
-            vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
-            vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
-            external/icu/icu4c/source/common\
+            $(LOCAL_PATH)/../../../frameworks/av/LibPlayer/amcodec/include\
+            $(LOCAL_PATH)/../../../frameworks/av/LibPlayer/dvbplayer/include\
+            $(LOCAL_PATH)/../../../frameworks/av/LibPlayer/amadec/include\
+            $(LOCAL_PATH)/../../icu/icu4c/source/common\
             common/include/linux/amlogic\
-            vendor/amlogic/external/libzvbi/src\
-            external/libzvbi/src\
+            $(LOCAL_PATH)/../../libzvbi/src\
             external/sqlite/dist
 app_static_libraries := 
 app_shared_libraries := libicuuc libzvbi libam_adp libam_mw libsqlite libamplayer liblog libc 

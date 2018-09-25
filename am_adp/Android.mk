@@ -5,8 +5,8 @@ ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 25)))
 AMADEC_C_INCLUDES:=hardware/amlogic/media/amcodec/include\
        hardware/amlogic/LibAudio/amadec/include
 else
-AMADEC_C_INCLUDES:=vendor/amlogic/frameworks/av/LibPlayer/amcodec/include\
-       vendor/amlogic/frameworks/av/LibPlayer/amadec/include
+AMADEC_C_INCLUDES:=$(LOCAL_PATH)/../../../frameworks/av/LibPlayer/amcodec/include\
+       $(LOCAL_PATH)/../../../frameworks/av/LibPlayer/amadec/include
 endif
 
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
@@ -157,7 +157,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
 LOCAL_CFLAGS += -DUSE_VENDOR_ICU
-LOCAL_C_INCLUDES += vendor/amlogic/external/icu/icu4c/source/common
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
 LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libicuuc_vendor libcutils liblog libdl libc
 else
 LOCAL_C_INCLUDES += external/icu/icu4c/source/common
@@ -309,7 +309,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
 LOCAL_CFLAGS += -DUSE_VENDOR_ICU
-LOCAL_C_INCLUDES += vendor/amlogic/external/icu/icu4c/source/common
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
 LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libicuuc_vendor libcutils liblog libdl libc
 else
 LOCAL_C_INCLUDES += external/icu/icu4c/source/common

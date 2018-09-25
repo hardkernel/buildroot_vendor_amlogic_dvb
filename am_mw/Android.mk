@@ -48,10 +48,9 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/tables\
 		    $(LOCAL_PATH)/am_closecaption/am_vbi\
 		    $(LOCAL_PATH)/../android/ndk/include\
-		    external/libzvbi/src\
+		    $(LOCAL_PATH)/../../libzvbi/src\
 		    external/sqlite/dist\
 			$(AMADEC_C_INCLUDES)\
-		    vendor/amlogic/external/libzvbi/src\
 		    $(LOCAL_PATH)/../am_adp/am_open_lib/am_ci
 
 ifeq ($(strip $(BOARD_TV_USE_NEW_TVIN_PARAM)),true)
@@ -60,7 +59,7 @@ endif
 
 ifeq ($(BOARD_VNDK_VERSION), current)
 LOCAL_CFLAGS += -DUSE_VENDOR_ICU
-LOCAL_C_INCLUDES += vendor/amlogic/external/icu/icu4c/source/common
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
 LOCAL_STATIC_LIBRARIES+= libsqlite
 LOCAL_SHARED_LIBRARIES+= libzvbi libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
 else
@@ -121,16 +120,15 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/tables\
 		    $(LOCAL_PATH)/am_scan/libsigdetect\
 		    $(LOCAL_PATH)/../android/ndk/include\
-		    external/libzvbi/src\
+		    $(LOCAL_PATH)/../../libzvbi/src\
 		    external/sqlite/dist\
 		    $(LOCAL_PATH)/am_closecaption/am_vbi\
 			$(AMADEC_C_INCLUDES)\
-		    vendor/amlogic/external/libzvbi/src\
 		    $(LOCAL_PATH)/../am_adp/am_open_lib/am_ci
 
 ifeq ($(BOARD_VNDK_VERSION), current)
 LOCAL_CFLAGS += -DUSE_VENDOR_ICU
-LOCAL_C_INCLUDES += vendor/amlogic/external/icu/icu4c/source/common
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
 LOCAL_STATIC_LIBRARIES+= libsqlite
 LOCAL_SHARED_LIBRARIES+= libzvbi libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
 else
