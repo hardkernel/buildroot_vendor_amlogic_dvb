@@ -16,6 +16,7 @@ endif
 ifeq ($(AMLOGIC_LIBPLAYER), y)
 LOCAL_CFLAGS+=-DAMLOGIC_LIBPLAYER
 endif
+LOCAL_VENDOR_MODULE := true
 
 LOCAL_SRC_FILES:= am_av_test.c
 
@@ -36,6 +37,7 @@ LOCAL_SHARED_LIBRARIES := $(AMADEC_LIBS) libcutils liblog libc
 include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)
+LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES:= am_av_server.c
 LOCAL_MODULE:= am_av_server
 LOCAL_MODULE_TAGS := optional

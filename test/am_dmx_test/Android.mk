@@ -1,6 +1,7 @@
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
+LOCAL_VENDOR_MODULE := true
 
 LOCAL_SRC_FILES:= am_dmx_test.c
 

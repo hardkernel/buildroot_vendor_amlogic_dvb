@@ -14,6 +14,7 @@ ifeq ($(AMLOGIC_LIBPLAYER), y)
 LOCAL_CFLAGS+=-DAMLOGIC_LIBPLAYER
 endif
 include $(CLEAR_VARS)
+LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES:= am_dvr_test.c
 LOCAL_MODULE:= am_dvr_test
 LOCAL_MODULE_TAGS := optional
@@ -29,6 +30,7 @@ LOCAL_SHARED_LIBRARIES := $(AMADEC_LIBS) libcutils liblog libc libdl
 include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)
+LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES:= am_dvr_keyladder_test.c
 LOCAL_MODULE:= am_dvr_test_keyladder
 LOCAL_MODULE_TAGS := optional
