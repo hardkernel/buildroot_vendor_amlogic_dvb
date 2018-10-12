@@ -215,12 +215,14 @@ static AM_ErrorCode_t v4l2_set_prop (AM_FEND_Device_t *dev, const struct dtv_pro
 	struct v4l2_property *property = NULL;
 	int i = 0;
 
-	property = malloc(prop->num * sizeof(struct v4l2_property));
+	property = (struct v4l2_property *) malloc(prop->num * sizeof(struct v4l2_property));
 	if (property == NULL)
 	{
 		AM_DEBUG(1, "malloc failed, error:%s", strerror(errno));
 		return AM_FAILURE;
 	}
+
+	memset(&v4l2_prop, 0, sizeof(struct v4l2_properties));
 
 	v4l2_prop.num = prop->num;
 	v4l2_prop.props = property;
@@ -259,12 +261,14 @@ static AM_ErrorCode_t v4l2_get_prop (AM_FEND_Device_t *dev, struct dtv_propertie
 	struct v4l2_property *property = NULL;
 	int i = 0;
 
-	property = malloc(prop->num * sizeof(struct v4l2_property));
+	property = (struct v4l2_property *) malloc(prop->num * sizeof(struct v4l2_property));
 	if (property == NULL)
 	{
 		AM_DEBUG(1, "malloc failed, error:%s", strerror(errno));
 		return AM_FAILURE;
 	}
+
+	memset(&v4l2_prop, 0, sizeof(struct v4l2_properties));
 
 	v4l2_prop.num = prop->num;
 	v4l2_prop.props = property;
