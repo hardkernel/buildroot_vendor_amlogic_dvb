@@ -3921,7 +3921,7 @@ static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 		close(ts->fd);
 	if (ts->vid_fd != -1)
 		close(ts->vid_fd);
-
+	aml_set_tsync_enable(0);
 	aml_set_ad_source(&ts->ad, 0, 0, 0, ts->adec);
 	audio_ops->adec_set_decode_ad(0, 0, 0, ts->adec);
 	audio_ops->adec_stop_decode(&ts->adec);
