@@ -251,8 +251,8 @@ void *adec_handle = NULL;
 #endif
 
 #ifdef ANDROID
-#define DEC_CONTROL_PROP "media.dec_control"
-#define AC3_AMASTER_PROP "media.ac3_amaster"
+#define DEC_CONTROL_PROP "vendor.media.dec_control"
+#define AC3_AMASTER_PROP "vendor.media.ac3_amaster"
 #endif
 
 #define CANVAS_ALIGN(x)    (((x)+7)&~7)
@@ -298,12 +298,12 @@ static int _get_vid_disabled();
 static int _get_aud_disabled();
 static AM_ErrorCode_t set_dec_control(AM_Bool_t enable);
 
-#define VALID_VIDEO(_pid_, _fmt_) (!_get_vid_disabled() && VALID_PID(_pid_))
+#define VALID_VIDEO(_pid_, _fmt_) (VALID_PID(_pid_))
 
 #ifdef USE_ADEC_IN_DVB
-#define VALID_AUDIO(_pid_, _fmt_) (!_get_aud_disabled() && VALID_PID(_pid_) && audio_get_format_supported(_fmt_))
+#define VALID_AUDIO(_pid_, _fmt_) (VALID_PID(_pid_) && audio_get_format_supported(_fmt_))
 #else
-#define VALID_AUDIO(_pid_, _fmt_) (!_get_aud_disabled() && VALID_PID(_pid_))
+#define VALID_AUDIO(_pid_, _fmt_) (VALID_PID(_pid_))
 #endif
 /****************************************************************************
  * Type definitions
@@ -735,7 +735,7 @@ static int _get_prop_int(char *prop, int def) {
 	return val;
 }
 
-#define DVB_LOGLEVEL_PROP "tv.dvb.loglevel"
+#define DVB_LOGLEVEL_PROP "vendor.tv.dvb.loglevel"
 
 static int _get_asso_enable() {
 #ifdef ANDROID
@@ -2273,7 +2273,7 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AV_TimeShi
 	if (has_audio && !ac3_amaster) {
 		if (!show_first_frame_nosync()) {
 #ifdef ANDROID
-			property_set("sys.amplayer.drop_pcm", "1");
+			//property_set("sys.amplayer.drop_pcm", "1");
 #endif
 		}
 		AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
@@ -3873,7 +3873,7 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	if (has_audio && !ac3_amaster) {
 		if (!show_first_frame_nosync()) {
 #ifdef ANDROID
-			property_set("sys.amplayer.drop_pcm", "1");
+			//property_set("sys.amplayer.drop_pcm", "1");
 #endif
 		}
 		AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
@@ -3932,7 +3932,7 @@ static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 
 //#ifdef ENABLE_PCR
 #ifdef ANDROID
-	property_set("sys.amplayer.drop_pcm", "0");
+	//property_set("sys.amplayer.drop_pcm", "0");
 #endif
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "0");
 	if (gAVPcrEnable == AM_TRUE)
@@ -4043,7 +4043,7 @@ static void* aml_av_monitor_thread(void *arg)
 #ifndef ENABLE_PCR
 	if (!show_first_frame_nosync()) {
 #ifdef ANDROID
-		property_set("sys.amplayer.drop_pcm", "1");
+		//property_set("sys.amplayer.drop_pcm", "1");
 #endif
 	}
 #else
@@ -6255,7 +6255,7 @@ static AM_ErrorCode_t aml_switch_ts_audio_legacy(AM_AV_Device_t *dev, uint16_t a
 #ifdef ENABLE_PCR
 	if (!show_first_frame_nosync()) {
 #ifdef ANDROID
-		property_set("sys.amplayer.drop_pcm", "1");
+		//property_set("sys.amplayer.drop_pcm", "1");
 #endif
 	}
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
@@ -6327,7 +6327,7 @@ static AM_ErrorCode_t aml_switch_ts_audio_fmt(AM_AV_Device_t *dev)
 #ifdef ENABLE_PCR
 	if (!show_first_frame_nosync()) {
 #ifdef ANDROID
-		property_set("sys.amplayer.drop_pcm", "1");
+		//property_set("sys.amplayer.drop_pcm", "1");
 #endif
 	}
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
