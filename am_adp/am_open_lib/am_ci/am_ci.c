@@ -861,7 +861,7 @@ AM_ErrorCode_t AM_CI_Close(AM_CI_Handle_t handle)
 		pthread_cond_destroy(&ci->cond);
 */
 		ci->status = ci_status_closed;
-		ci->used = 1;
+		ci->used = 0;
 	}
 quit:
 	pthread_mutex_unlock(&ci->lock);
