@@ -251,8 +251,8 @@ void *adec_handle = NULL;
 #endif
 
 #ifdef ANDROID
-#define DEC_CONTROL_PROP "vendor.media.dec_control"
-#define AC3_AMASTER_PROP "vendor.media.ac3_amaster"
+#define DEC_CONTROL_PROP "media.dec_control"
+#define AC3_AMASTER_PROP "media.ac3_amaster"
 #endif
 
 #define CANVAS_ALIGN(x)    (((x)+7)&~7)
@@ -735,7 +735,7 @@ static int _get_prop_int(char *prop, int def) {
 	return val;
 }
 
-#define DVB_LOGLEVEL_PROP "vendor.tv.dvb.loglevel"
+#define DVB_LOGLEVEL_PROP "tv.dvb.loglevel"
 
 static int _get_asso_enable() {
 #ifdef ANDROID
