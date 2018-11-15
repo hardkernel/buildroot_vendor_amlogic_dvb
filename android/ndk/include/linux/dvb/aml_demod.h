@@ -1,3 +1,10 @@
+/*
+* Copyright (c) 2014 Amlogic, Inc. All rights reserved.
+*
+* This source code is subject to the terms and conditions defined in the
+* file 'LICENSE' which is part of this source code package. *
+* Description:
+*/
 #ifndef AML_DEMOD_H
 #define AML_DEMOD_H
 #ifndef CONFIG_AM_DEMOD_FPGA_VER
