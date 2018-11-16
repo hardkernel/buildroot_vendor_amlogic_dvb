@@ -2,40 +2,12 @@
 #undef _FORTIFY_SOURCE
 #endif
 /*
- * Copyright (c) 2000, 2001, 2003, 2005 Greg Haerr <greg@censoft.com>
+ * Copyright (c) 2014 Amlogic, Inc. All rights reserved.
  *
- * Image decode routine for GIF files
+ * This source code is subject to the terms and conditions defined in the
+ * file 'LICENSE' which is part of this source code package.
  *
- * !!! WARNING Not under the standard Microwindows license !!!
- * !!!         Read the following license (GPL)            !!!
- */
-/* Code for GIF decoding has been adapted from XPaint:                   */
-/* +-------------------------------------------------------------------+ */
-/* | Copyright 1990, 1991, 1993 David Koblas.			       | */
-/* | Copyright 1996 Torsten Martinsen.				       | */
-/* |   Permission to use, copy, modify, and distribute this software   | */
-/* |   and its documentation for any purpose and without fee is hereby | */
-/* |   granted, provided that the above copyright notice appear in all | */
-/* |   copies and that both that copyright notice and this permission  | */
-/* |   notice appear in supporting documentation.  This software is    | */
-/* |   provided "as is" without express or implied warranty.	       | */
-/* +-------------------------------------------------------------------+ */
-/* Portions Copyright (C) 1999  Sam Lantinga*/
-/* Adapted for use in SDL by Sam Lantinga -- 7/20/98 */
-/*
-    This library is free software; you can redistribute it and/or
-    modify it under the terms of the GNU Library General Public
-    License as published by the Free Software Foundation; either
-    version 2 of the License, or (at your option) any later version.
-
-    This library is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-    Library General Public License for more details.
-
-    You should have received a copy of the GNU Library General Public
-    License along with this library; if not, write to the Free
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Description:
 */
 #include <stdio.h>
 #include <stdlib.h>

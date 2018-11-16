@@ -2,19 +2,12 @@
 #undef _FORTIFY_SOURCE
 #endif
 /*
- * Copyright (c) 2000, 2001, 2003 Greg Haerr <greg@censoft.com>
- * Portions Copyright (c) 2000 Alex Holden <alex@linuxhacker.org>
+ * Copyright (c) 2014 Amlogic, Inc. All rights reserved.
  *
- * Image decode routine for PNG files
+ * This source code is subject to the terms and conditions defined in the
+ * file 'LICENSE' which is part of this source code package.
  *
- * Currently for simplicity we get the PNG library to convert the file to
- * 24 bit RGB format with no alpha channel information even if we could
- * potentially store the image more efficiently by taking note of the image
- * type and depth and acting accordingly. Similarly, > 8 bits per channel,
- * gamma correction, etc. are not supported.
- *
- * 2007-Nov-15 - Vladimir Ananiev (vovan888 at gmail com)
- *		alpha channel, gamma correction added - ripped from pngm2pnm.c
+ * Description:
  */
 #include <stdio.h>
 #include <stdlib.h>

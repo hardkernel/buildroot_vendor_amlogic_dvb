@@ -2,40 +2,12 @@
 #undef _FORTIFY_SOURCE
 #endif
 /*
- * Copyright (c) 2000, 2001, 2003 Greg Haerr <greg@censoft.com>
- * Portions Copyright (c) 2000 Martin Jolicoeur <martinj@visuaide.com>
- * Portions Copyright (c) Independant JPEG group (ijg)
+ * Copyright (c) 2014 Amlogic, Inc. All rights reserved.
  *
- * Image decode routine for JPEG files
+ * This source code is subject to the terms and conditions defined in the
+ * file 'LICENSE' which is part of this source code package.
  *
- * JPEG support must be enabled (see README.txt in contrib/jpeg)
- *
- * If FASTJPEG is defined, JPEG images are decoded to
- * a 256 color standardized palette (mwstdpal8). Otherwise,
- * the images are decoded depending on their output
- * components (usually 24bpp).
- *
- * SOME FINE POINTS: (from libjpeg)
- * In the below code, we ignored the return value of jpeg_read_scanlines,
- * which is the number of scanlines actually read.  We could get away with
- * this because we asked for only one line at a time and we weren't using
- * a suspending data source.  See libjpeg.doc for more info.
- *
- * We cheated a bit by calling alloc_sarray() after jpeg_start_decompress();
- * we should have done it beforehand to ensure that the space would be
- * counted against the JPEG max_memory setting.  In some systems the above
- * code would risk an out-of-memory error.  However, in general we don't
- * know the output image dimensions before jpeg_start_decompress(), unless we
- * call jpeg_calc_output_dimensions().  See libjpeg.doc for more about this.
- *
- * Scanlines are returned in the same order as they appear in the JPEG file,
- * which is standardly top-to-bottom.  If you must emit data bottom-to-top,
- * you can use one of the virtual arrays provided by the JPEG memory manager
- * to invert the data.  See wrbmp.c for an example.
- *
- * As with compression, some operating modes may require temporary files.
- * On some systems you may need to set up a signal handler to ensure that
- * temporary files are deleted if the program is interrupted.  See libjpeg.doc.
+ * Description:
  */
 #include <stdio.h>
 #include <stdlib.h>
