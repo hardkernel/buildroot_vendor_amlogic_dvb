@@ -4085,6 +4085,20 @@ static AM_ErrorCode_t aml_get_pts(const char *class_file,  uint32_t *pts)
 	return AM_FAILURE;
 }
 
+static inline AM_AV_VideoAspectRatio_t
+convert_aspect_ratio(enum E_ASPECT_RATIO euAspectRatio)
+{
+	switch (euAspectRatio) {
+	case ASPECT_RATIO_16_9:
+		return AM_AV_VIDEO_ASPECT_16_9;
+	case ASPECT_RATIO_4_3:
+		return AM_AV_VIDEO_ASPECT_4_3;
+	default:
+		return AM_AV_VIDEO_ASPECT_AUTO;
+	}
+	return AM_AV_VIDEO_ASPECT_AUTO;
+}
+
 int am_av_restart_pts_repeat_count = 2;
 
 /**\brief AV buffer 监控线程*/
@@ -4125,7 +4139,8 @@ static void* aml_av_monitor_thread(void *arg)
 	int apts_discontinue = 0, vpts_discontinue = 0;
 	struct am_io_param astatus;
 	struct am_io_param vstatus;
-	int vdec_status, frame_width, frame_height;
+	int vdec_status, frame_width, frame_height, aspect_ratio;
+	int frame_width_old = -1, frame_height_old = -1, aspect_ratio_old = -1;
 	struct timespec rt;
 	char buf[32];
 	AM_Bool_t is_avs_plus = AM_FALSE;
@@ -4292,7 +4307,30 @@ static void* aml_av_monitor_thread(void *arg)
 				vdec_status = vstatus.vstatus.status;
 				frame_width = vstatus.vstatus.width;
 				frame_height= vstatus.vstatus.height;
+				aspect_ratio = vstatus.vstatus.euAspectRatio;
 				//AM_DEBUG(1, "vdec width %d height %d status 0x%08x", frame_width, frame_height, vdec_status);
+				if (!no_video) {
+					if (frame_width != frame_width_old || frame_height != frame_height_old) {
+						AM_DEBUG(1, "[avmon] video resolution changed: %dx%d -> %dx%d",
+							frame_width_old, frame_height_old,
+							frame_width, frame_height);
+						frame_width_old = frame_width;
+						frame_height_old = frame_height;
+						{
+							AM_AV_VideoStatus_t vstatus;
+							memset(&vstatus, 0, sizeof(vstatus));
+							vstatus.src_w = frame_width;
+							vstatus.src_h = frame_height;
+							AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_RESOLUTION_CHANGED, &vstatus);
+						}
+					}
+					if (aspect_ratio != aspect_ratio_old) {
+						AM_DEBUG(1, "[avmon] video aspect ratio changed: %d -> %d(kernel's definition)",
+							aspect_ratio_old, aspect_ratio);
+						aspect_ratio_old = aspect_ratio;
+						AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED, (void*)convert_aspect_ratio(aspect_ratio));
+					}
+				}
 			} else {
 				vdec_status = 0;
 				frame_width = 0;
@@ -5915,6 +5953,7 @@ static AM_ErrorCode_t aml_get_vstatus(AM_AV_Device_t *dev, AM_AV_VideoStatus_t *
 	para->src_w     = vstatus.vstatus.width;
 	para->src_h     = vstatus.vstatus.height;
 	para->fps       = vstatus.vstatus.fps;
+	para->vid_ratio = convert_aspect_ratio(vstatus.vstatus.euAspectRatio);
 	para->frames    = 1;
 	para->interlaced  = 1;
 

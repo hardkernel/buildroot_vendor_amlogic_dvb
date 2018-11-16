@@ -466,6 +466,24 @@ static void file_play(const char *name, int loop, int pos)
 	AM_DMX_Close(DMX_DEV_NO);
 }
 
+static void video_callback(long dev_no, int event_type, void *param, void *data)
+{
+	switch (event_type) {
+	case AM_AV_EVT_VIDEO_RESOLUTION_CHANGED:
+		{
+			AM_AV_VideoStatus_t *status = param;
+			printf("[evt] video resolution changed: %dx%d\n",
+				status->src_w, status->src_h);
+		}
+		break;
+	case AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED:
+		printf("[evt] video aspect ratio changed: %ld\n", (long)param);
+		break;
+	default:
+		break;
+	}
+}
+
 static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, int femod, int argc, char *argv[])
 {
 	int running = 1;
@@ -477,7 +495,9 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, 
 	AM_DMX_Open(DMX_DEV_NO, &para);
 	AM_DMX_SetSource(DMX_DEV_NO, src);
 	AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_DMX1);
-	
+	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_RESOLUTION_CHANGED, video_callback, NULL);
+	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED, video_callback, NULL);
+
 	if(freq>0)
 	{
 		AM_FEND_OpenPara_t para;
