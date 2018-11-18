@@ -34,11 +34,13 @@
 //#define USER_REAL_CC608_PARSE
 
 #ifndef DEBUG_CC
+#ifdef ANDROID
 #define TAG      "ATSC_CC_DECODER"
 #define CC_DECODE_DBG(a...) __android_log_print(ANDROID_LOG_INFO, TAG, a)
 #else
 #define CC_DECODE_DBG(a...) printf(a)
-#endif
+#endif//end ANDROID
+#endif//end DEBUG_CC
 #define CC_CNT          512
 #define MAX_CC          512
 #define MAGIC_NUM      (0xABCD)

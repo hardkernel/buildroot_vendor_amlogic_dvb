@@ -1,11 +1,4 @@
 /*
-* Copyright (c) 2014 Amlogic, Inc. All rights reserved.
-*
-* This source code is subject to the terms and conditions defined in the
-* file 'LICENSE' which is part of this source code package. *
-* Description:
-*/
-/*
 *===============================================================^
 *       copyright: ^
 *       Filename:^
@@ -23,6 +16,7 @@
 *                    include files^
 *===============================================================^
 */
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -46,8 +40,12 @@
 *                    macro define
 *===============================================================
 */
+#ifdef ANDROID
 #define TAG      "ATSC_CC"
 #define ATSC_CC_DBG(a...) __android_log_print(ANDROID_LOG_INFO, TAG, a)
+#else
+#define ATSC_CC_DBG(a...) printf(a)
+#endif
 
 #ifdef PTHREAD_RECURSIVE_MUTEX_INITIALIZER
 static pthread_mutex_t cc_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;

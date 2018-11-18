@@ -35,7 +35,9 @@
 #include <sys/mman.h>
 #include <sched.h>
 #include <signal.h>
+#ifdef ANDOIRD
 #include <android/log.h>
+#endif
 #include <am_types.h>
 
 #ifdef __cplusplus
@@ -86,9 +88,14 @@ enum AM_VBI_ErrorCode
 #undef LOG_TAG
 #endif
 
+#ifdef ANDOIRD
 #define LOG_TAG    "AM_VBI"
 #define LOGI(...)  __android_log_print(ANDROID_LOG_INFO,LOG_TAG,__VA_ARGS__)
 #define LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
+#else
+#define LOGI(...) printf(...)
+#define LOGE(...) printf(...)
+#endif
 
 
 

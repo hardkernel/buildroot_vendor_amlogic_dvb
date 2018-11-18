@@ -1,11 +1,4 @@
 /*
-* Copyright (c) 2014 Amlogic, Inc. All rights reserved.
-*
-* This source code is subject to the terms and conditions defined in the
-* file 'LICENSE' which is part of this source code package. *
-* Description:
-*/
-/*
 *===============================================================
 *                    include files
 *===============================================================
@@ -31,8 +24,12 @@
 //#define XDS_DEBUG
 
 #ifndef XDS_DEBUG
+#ifdef ANDROID
 #define TAG      "ATSC_CC_XDS"
 #define AM_XDS_DBG(a...) __android_log_print(ANDROID_LOG_INFO, TAG, a)
+#else
+#define AM_XDS_DBG(a...) printf(a)
+#endif//END ANDROID
 #else
 #define AM_XDS_DBG(a...) AM_XDS_DBG(a)
 #endif

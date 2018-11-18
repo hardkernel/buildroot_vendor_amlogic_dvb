@@ -1,12 +1,37 @@
-BASE=../..
+OUTPUT = am_dsc_test
+DEFINES = -DLINUX_DVB_FEND -DLOG_LEVEL=1
+USING_LIBS =
+USING_LIBS_PATH =
+OBJS = $(patsubst %.c,%.o,$(SRC_FILES))
+LOCAL_PATH = $(shell pwd)
+INSTALL_DIR = $(STAGING_DIR)/usr/bin
 
-include $(BASE)/rule/def.mk
+LOCAL_C_INCLUDES := -I $(ROOT_DIR)/include/am_adp\
+		    -I$(ROOT_DIR)/include/am_adp/libdvbsi\
+		    -I$(ROOT_DIR)/include/am_adp/libdvbsi/descriptors\
+		    -I$(ROOT_DIR)/include/am_adp/libdvbsi/tables\
+		    -I$(ROOT_DIR)/am_open_lib/am_ci\
+		    -I$(ROOT_DIR)/include/am_mw\
+		    -I$(ROOT_DIR)/android/ndk/include\
+			-I$(ROOT_DIR)/am_fend
 
-APP_TARGET=am_dsc_test am_dsc_test2
-am_dsc_test_SRCS=am_dsc_test.c
-am_dsc_test_LIBS=../../am_adp/am_adp
+SRC_FILES = am_dsc_test.c
 
-am_dsc_test2_SRCS=am_dsc_test2.c
-am_dsc_test2_LIBS=../../am_adp/am_adp
+CFLAGS   := -c -Wall -shared -fPIC -Wno-unknown-pragmas -Wno-format -O3 -fexceptions -fnon-call-exceptions
 
-include $(BASE)/rule/rule.mk
+CFLAGS += $(LOCAL_C_INCLUDES) $(DEFINES)
+LDFLAGS  := -shared -fPIC -L$(TARGET_DIR)/usr/lib -lam_adp -lamadec
+
+all : $(OBJS) $(OUTPUT)
+
+$(OBJS) : %.o : %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTPUT) : $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(USING_LIBS_PATH) $(USING_LIBS)
+
+install:
+	-install -m 755 ${OUTPUT} $(INSTALL_DIR)
+
+clean:
+	@rm -f $(OBJS)

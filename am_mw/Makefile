@@ -1,21 +1,54 @@
-BASE=..
+OUTPUT = libam_mw.so
+DEFINES = -DLINUX_DVB_FEND -DLOG_LEVEL=1
+USING_LIBS =
+USING_LIBS_PATH = $(ROOT_DIR)/am_adp
+OBJS = $(patsubst %.c,%.o,$(SRC_FILES))
+LOCAL_PATH = $(ROOT_DIR)/am_mw
+INSTALL_DIR = $(TARGET_DIR)/usr/lib/
 
-MODULE_DEPEND=-L$(TARGET_BUILDDIR)/am_adp -lam_adp
+LOCAL_C_INCLUDES := -I $(LOCAL_PATH)/../include/am_adp\
+		    -I $(LOCAL_PATH)/../include/am_mw\
+		    -I $(LOCAL_PATH)/../include/am_adp/libdvbsi\
+		    -I $(LOCAL_PATH)/../include/am_adp/libdvbsi/descriptors\
+		    -I $(LOCAL_PATH)/../include/am_adp/libdvbsi/tables\
+		    -I $(LOCAL_PATH)/am_closecaption/am_vbi\
+		    -I $(LOCAL_PATH)/../android/ndk/include\
+		    -I $(LOCAL_PATH)/../am_adp/am_open_lib/am_ci\
+		    -I $(LOCAL_PATH)/../../aml_zvbi-1.0/src
 
+#$(LOCAL_PATH)/../../libzvbi/src\
+#external/sqlite/dist\
 
-include $(BASE)/rule/def.mk
-ifeq ($(TARGET),android)
-SUBDIRS=am_cfg am_si am_img am_db am_font am_scan am_epg am_rec am_sub am_tt
-else
-SUBDIRS=am_cfg am_si am_db am_scan am_epg am_rec am_sub2 am_fend_ctrl am_check_scramb
-endif
+SRC_FILES = $(wildcard am_db/*.c\
+		   am_epg/am_epg.c\
+		   am_rec/am_rec.c\
+		   am_scan/am_scan.c\
+		   am_sub2/*.c\
+		   am_tt2/am_tt.c\
+		   am_si/am_si.c\
+		   am_si/atsc/*.c\
+		   am_fend_ctrl/*.c\
+		   am_caman/*.c\
+		   am_cc/*.c\
+		   am_upd/am_upd.c\
+           am_closecaption/*.c\
+           am_check_scramb/*.c)
 
-LIB_TARGET=am_mw
+CFLAGS   := -c -Wall -shared -fPIC -Wno-unknown-pragmas -Wno-format -O3 -fexceptions -fnon-call-exceptions
 
-ifeq ($(TARGET),android)
-am_mw_OBJS=am_cfg/am_cfg am_si/am_si am_img/am_img  am_font/am_font am_scan/am_scan am_epg/am_epg  am_db/am_db am_rec/am_rec am_sub/am_sub am_tt/am_tt
-else
-am_mw_OBJS=am_cfg/am_cfg am_si/am_si am_scan/am_scan am_epg/am_epg am_db/am_db am_rec/am_rec am_sub2/am_sub am_fend_ctrl/am_fend_ctrl am_check_scramb/am_check_scramb
-endif
+CFLAGS += $(LOCAL_C_INCLUDES) $(DEFINES)
+LDFLAGS  := -shared -fPIC -L$(USING_LIBS_PATH) -L$(INSTALL_DIR) -lzvbi -lam_adp -lsqlite3 -lamadec
 
-include $(BASE)/rule/rule.mk
+all : $(OBJS) $(OUTPUT)
+
+$(OBJS) : %.o : %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OUTPUT) : $(OBJS)
+	$(LD) $(LDFLAGS) -o $@ $^
+
+install:
+	-install -m 555 ${OUTPUT} $(INSTALL_DIR)
+
+clean:
+	@rm -f $(OBJS)

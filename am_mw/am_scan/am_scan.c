@@ -36,6 +36,7 @@
 #include "am_check_scramb.h"
 #include "atv_frontend.h"
 #include "am_vlfend.h"
+#include <stdbool.h>
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
@@ -4664,7 +4665,7 @@ static AM_ErrorCode_t am_scan_start_dtv(AM_SCAN_Scanner_t *scanner)
 	if (scanner->atv_open)
 	{
 		AM_VLFEND_Close(scanner->start_para.vlfend_dev_id);
-		scanner->atv_open = FALSE;
+		scanner->atv_open = AM_FALSE;
 	}
 	AM_DEBUG(1, "@@@ Start dtv scan use standard: %s @@@", (dtv_start_para.standard==AM_SCAN_DTV_STD_DVB)?"DVB" :
 		(dtv_start_para.standard==AM_SCAN_DTV_STD_ISDB)?"ISDB" : "ATSC");
@@ -4872,7 +4873,7 @@ static AM_ErrorCode_t am_scan_start_atv(AM_SCAN_Scanner_t *scanner)
 		AM_VLFEND_Open(scanner->start_para.vlfend_dev_id, &para);
 		AM_EVT_Subscribe(scanner->start_para.vlfend_dev_id, AM_VLFEND_EVT_STATUS_CHANGED, atv_scan_fend_callback, (void*)scanner);
 
-		scanner->atv_open = TRUE;
+		scanner->atv_open = AM_TRUE;
 	}
 	if (atv_start_para.mode == AM_SCAN_ATVMODE_FREQ)
 	{
@@ -4934,7 +4935,7 @@ static AM_ErrorCode_t am_scan_stop_atv(AM_SCAN_Scanner_t *scanner)
 		if (scanner->atv_open)
 		{
 			AM_VLFEND_Close(scanner->start_para.vlfend_dev_id);
-			scanner->atv_open = FALSE;
+			scanner->atv_open = AM_FALSE;
 		}
 
 		ts = scanner->result.tses;

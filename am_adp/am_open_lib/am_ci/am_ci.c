@@ -18,6 +18,7 @@
 #endif
 
 #define AM_DEBUG_LEVEL 1
+#define _GNU_SOURCE
 
 #include <assert.h>
 
@@ -31,6 +32,7 @@
 
 #include "am_ci.h"
 #include "am_ci_internal.h"
+#include <am_thread.h>
 
 #define AM_CI_DEV_COUNT 2
 
@@ -142,6 +144,7 @@ struct {
 	_ci_t cis[AM_CI_DEV_COUNT];
 } gci =
 {
+
 #ifdef PTHREAD_RECURSIVE_MUTEX_INITIALIZER
 	.lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER,
 	.cis =

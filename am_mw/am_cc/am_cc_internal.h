@@ -19,6 +19,8 @@
 #include <pthread.h>
 #include <libzvbi.h>
 #include <dtvcc.h>
+#include <am_cc.h>
+#include <am_types.h>
 
 #ifdef __cplusplus
 extern "C"

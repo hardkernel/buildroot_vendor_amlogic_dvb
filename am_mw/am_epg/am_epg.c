@@ -30,8 +30,10 @@
 #include <am_iconv.h>
 #include <am_av.h>
 #include <am_cond.h>
+#ifdef ANDROID
 #include <cutils/properties.h>
 #include <sys/system_properties.h>
+#endif
 
 
 /****************************************************************************
@@ -4264,7 +4266,9 @@ AM_ErrorCode_t AM_EPG_SubscribeEvent(AM_EPG_Handle_t handle, int db_evt_id)
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
+#ifdef ANDROID
 	assert(mon && mon->hdb);
+#endif
 
 	sqlite3 *hdb;
 	pthread_mutex_lock(&mon->lock);
@@ -4294,7 +4298,9 @@ AM_ErrorCode_t AM_EPG_UnsubscribeEvent(AM_EPG_Handle_t handle, int db_evt_id)
 	AM_EPG_Monitor_t *mon = (AM_EPG_Monitor_t*)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
+#ifdef ANDROID
 	assert(mon && mon->hdb);
+#endif
 
 	sqlite3 *hdb;
 	pthread_mutex_lock(&mon->lock);

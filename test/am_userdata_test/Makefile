@@ -1,4 +1,4 @@
-OUTPUT = am_fend_test
+OUTPUT = am_userdata_test
 DEFINES = -DLINUX_DVB_FEND -DLOG_LEVEL=1
 USING_LIBS =
 USING_LIBS_PATH =
@@ -15,7 +15,7 @@ LOCAL_C_INCLUDES := -I $(ROOT_DIR)/include/am_adp\
 		    -I$(ROOT_DIR)/android/ndk/include\
 			-I$(ROOT_DIR)/am_fend
 
-SRC_FILES = am_fend_test.c
+SRC_FILES = am_userdata_test.c
 
 CFLAGS   := -c -Wall -shared -fPIC -Wno-unknown-pragmas -Wno-format -O3 -fexceptions -fnon-call-exceptions
 

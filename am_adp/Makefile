@@ -1,21 +1,63 @@
-BASE=..
+OUTPUT = libam_adp.so
+DEFINES = -DLINUX_DVB_FEND -DLOG_LEVEL=1
+USING_LIBS =
+USING_LIBS_PATH =
+OBJS = $(patsubst %.c,%.o,$(SRC_FILES))
+LOCAL_PATH = $(ROOT_DIR)/am_adp
+INSTALL_DIR = $(STAGING_DIR)/usr/lib
+AMADEC_C_INCLUDES =
+LOCAL_C_INCLUDES := -I $(LOCAL_PATH)/../include/am_adp\
+		    -I$(LOCAL_PATH)/../include/am_adp/libdvbsi\
+		    -I$(LOCAL_PATH)/../include/am_adp/libdvbsi/descriptors\
+		    -I$(LOCAL_PATH)/../include/am_adp/libdvbsi/tables\
+		    -I$(LOCAL_PATH)/am_open_lib/am_ci\
+		    -I$(LOCAL_PATH)/../include/am_mw\
+		    -I$(LOCAL_PATH)/../android/ndk/include\
+			-I$(LOCAL_PATH)/am_fend
 
-include $(BASE)/rule/def.mk
+SRC_FILES = $(wildcard am_dmx/*.c am_dmx/linux_dvb/*.c \
+			am_fend/*.c am_fend/linux_dvb/*.c am_fend/linux_v4l2/*.c\
+			am_av/*.c am_av/aml/*.c\
+	        am_dvr/*.c am_dvr/linux_dvb/*.c\
+	        am_dmx/dvr/*.c\
+	        am_aout/*.c\
+	        am_vout/*.c am_vout/aml/*.c\
+	        am_misc/am_adplock.c am_misc/am_misc.c am_misc/am_sig_handler.c\
+	        am_time/*.c\
+	        am_evt/*.c\
+			am_kl/*.c\
+	        am_dsc/*.c am_dsc/aml/*.c\
+	        am_smc/*.c\
+	        am_smc/aml/*.c\
+		    am_userdata/*.c am_userdata/aml/*.c am_userdata/emu/*.c\
+		    am_pes/*.c \
+		    am_ad/*.c\
+		    am_open_lib/libdvbsi/tables/*.c\
+		    am_open_lib/libdvbsi/*.c\
+		    am_open_lib/libdvbsi/descriptors/*.c\
+		    am_open_lib/am_ci/libdvben50221/*.c\
+		    am_open_lib/am_ci/libucsi/dvb/types.c\
+		    am_open_lib/am_ci/libdvbapi/dvbca.c\
+		    am_open_lib/am_ci/libucsi/mpeg/pmt_section.c\
+		    am_open_lib/am_ci/*.c\
+		    am_open_lib/am_freesat/freesat.c \
+		    am_tfile/am_tfile.c)
 
-MODULE_DEPEND=
+CFLAGS   := -c -Wall -shared -fPIC -Wno-unknown-pragmas -Wno-format -O3 -fexceptions -fnon-call-exceptions
 
-ifeq ($(TARGET),android)
-SUBDIRS=am_misc am_mem am_time am_pes am_ad am_inp am_fend am_smc am_dmx am_osd am_dsc am_av am_aout am_vout am_evt am_dvr am_tfile
-else
-SUBDIRS=am_misc am_mem am_time am_pes am_ad am_inp am_kl am_fend am_smc am_open_lib/libdvbsi am_open_lib/am_freesat am_dmx am_dsc am_av am_aout am_vout am_evt am_dvr am_tfile am_open_lib/am_freesat am_open_lib/libdvbsi am_pes am_kl
-endif
+CFLAGS += $(LOCAL_C_INCLUDES) $(DEFINES)
+LDFLAGS  := -shared -fPIC -L$(TARGET_DIR)/usr/lib -liconv -lamadec
 
-LIB_TARGET=am_adp
-ifeq ($(TARGET),android)
-am_adp_OBJS=am_misc/am_misc am_mem/am_mem am_time/am_time am_pes/am_pes am_ad/am_ad  am_inp/am_inp am_fend/am_fend am_smc/am_smc am_dmx/am_dmx am_osd/am_osd am_dsc/am_dsc am_av/am_av am_aout/am_aout am_vout/am_vout am_evt/am_evt am_dvr/am_dvr am_tfile/am_tfile
-else
-am_adp_OBJS=am_misc/am_misc am_mem/am_mem am_time/am_time am_kl/am_kl am_pes/am_pes am_open_lib/libdvbsi/dvbsi  am_open_lib/am_freesat/am_freesat am_ad/am_ad am_inp/am_inp am_fend/am_fend am_smc/am_smc am_dmx/am_dmx am_dsc/am_dsc am_av/am_av am_aout/am_aout am_vout/am_vout am_evt/am_evt am_dvr/am_dvr am_tfile/am_tfile am_open_lib/am_freesat/am_freesat am_open_lib/libdvbsi/dvbsi am_pes/am_pes am_kl/am_kl
-endif
+all : $(OBJS) $(OUTPUT)
 
+$(OBJS) : %.o : %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-include $(BASE)/rule/rule.mk
+$(OUTPUT) : $(OBJS)
+	$(LD) $(LDFLAGS) -o $@ $^ $(USING_LIBS_PATH) $(USING_LIBS)
+
+install:
+	-install -m 555 ${OUTPUT} $(TARGET_DIR)/usr/lib/
+
+clean:
+	@rm -f $(OBJS)

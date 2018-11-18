@@ -34,6 +34,8 @@
 #include <am_dvr.h>
 #include <am_dmx.h>
 #include "../../am_adp_internal.h"
+#include <limits.h>
+#include <stddef.h>
 
 
 /****************************************************************************
