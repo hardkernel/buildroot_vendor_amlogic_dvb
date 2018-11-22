@@ -4058,9 +4058,9 @@ static void* aml_av_monitor_thread(void *arg)
 
 	pthread_mutex_lock(&gAVMonLock);
 
-	if (dev->ts_player.play_para.afmt == AFORMAT_AC3 ||
-		dev->ts_player.play_para.afmt == AFORMAT_DTS ||
-		dev->ts_player.play_para.afmt == AFORMAT_EAC3) {
+	if (tp->afmt == AFORMAT_AC3 ||
+		tp->afmt == AFORMAT_DTS ||
+		tp->afmt == AFORMAT_EAC3) {
 		is_dts_dolby = 1;
 	}
 
@@ -4315,7 +4315,7 @@ static void* aml_av_monitor_thread(void *arg)
 				info.valid  = 1;
 				ioctl(ts->fd, AMSTREAM_IOC_AUDIO_INFO, (unsigned long)&info);
 
-				audio_ops->adec_start_decode(ts->fd, dev->ts_player.play_para.afmt, has_video, &ts->adec);
+				audio_ops->adec_start_decode(ts->fd, tp->afmt, has_video, &ts->adec);
 
 				if (av_paused) {
 					audio_ops->adec_pause_decode(ts->adec);
@@ -4471,7 +4471,7 @@ static void* aml_av_monitor_thread(void *arg)
 				adec_start = AM_TRUE;
 
 			if (adec_start) {
-				audio_ops->adec_start_decode(ts->fd, dev->ts_player.play_para.afmt, has_video, &ts->adec);
+				audio_ops->adec_start_decode(ts->fd, tp->afmt, has_video, &ts->adec);
 				AM_DEBUG(1, "[avmon] start audio decoder vlevel %d alevel %d", vbuf_level, abuf_level);
 			}
 		}
