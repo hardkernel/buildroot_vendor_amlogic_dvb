@@ -46,7 +46,7 @@ SRC_FILES = $(wildcard am_dmx/*.c am_dmx/linux_dvb/*.c \
 CFLAGS   := -c -Wall -shared -fPIC -Wno-unknown-pragmas -Wno-format -O3 -fexceptions -fnon-call-exceptions
 
 CFLAGS += $(LOCAL_C_INCLUDES) $(DEFINES)
-LDFLAGS  := -shared -fPIC -L$(TARGET_DIR)/usr/lib -liconv -lamadec
+LDFLAGS  := -shared -fPIC -L$(TARGET_DIR)/usr/lib -lamadec
 
 all : $(OBJS) $(OUTPUT)
 
