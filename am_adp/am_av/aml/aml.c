@@ -111,6 +111,7 @@ void *adec_handle = NULL;
 #define TIMESHIFT_INJECT_DIFF_TIME	 4
 #define TIMESHIFT_FFFB_ERROR_CNT	 5
 #define VIDEO_AVAILABLE_MIN_CNT     2
+#define TIME_UNIT90K                 90000
 
 #ifdef ENABLE_PCR
 #ifndef AMSTREAM_IOC_PCRID
@@ -4717,6 +4718,11 @@ static void* aml_av_monitor_thread(void *arg)
 				}
 				//AM_DEBUG(1, "[avmon] resume av play vlevel %d alevel %d", vbuf_level, abuf_level);
 			}
+		}
+
+		if (need_replay && (AM_ABS(dmx_apts - dmx_vpts) > TIME_UNIT90K * 5)) {
+			AM_DEBUG(1, "[avmon] avoid replay %d",need_replay);
+			need_replay = AM_FALSE;
 		}
 
 		if (need_replay && (dev->mode == AV_PLAY_TS)) {
