@@ -734,6 +734,7 @@ static AM_ErrorCode_t dvb_wait_event (AM_FEND_Device_t *dev, struct dvb_frontend
 	int fd = (long)dev->drv_data;
 	struct pollfd pfd;
 	int ret;
+	struct dvb_frontend_event_orig event;
 
 	pfd.fd = fd;
 	pfd.events = POLLIN;
@@ -744,11 +745,19 @@ static AM_ErrorCode_t dvb_wait_event (AM_FEND_Device_t *dev, struct dvb_frontend
 		return AM_FEND_ERR_TIMEOUT;
 	}
 
-	if (ioctl(fd, FE_GET_EVENT, evt) == -1)
+	if (ioctl(fd, FE_GET_EVENT, &event) == -1)
 	{
 		AM_DEBUG(1, "ioctl FE_GET_EVENT failed, error:%s", strerror(errno));
 		return AM_FAILURE;
 	}
+
+	evt->status = event.status;
+	evt->parameters.frequency = event.parameters.frequency;
+	evt->parameters.inversion = event.parameters.inversion;
+	evt->parameters.u.qpsk = event.parameters.u.qpsk;
+	evt->parameters.u.qam = event.parameters.u.qam;
+	evt->parameters.u.ofdm = event.parameters.u.ofdm;
+	evt->parameters.u.vsb = event.parameters.u.vsb;
 
 	return AM_SUCCESS;
 }
