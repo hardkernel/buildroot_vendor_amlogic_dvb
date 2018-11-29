@@ -530,12 +530,14 @@ struct dtv_property {
 			__u32 reserved1[3];
 			void *reserved2;
 		} buffer;
+#if 0
 		struct {
 			__u8 data[32];
 			__u32 len;
 			__u32 reserved1[3];
 			__u64 reserved;
 		} reserved;
+#endif
 	} u;
 	int result;
 } __attribute__ ((packed));
@@ -545,7 +547,7 @@ struct dtv_property {
 
 struct dtv_properties {
 	__u32 num;
-#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+#if 0 && defined(CONFIG_AMLOGIC_DVB_COMPAT)
 	union {
 		struct dtv_property *props;
 		__u64                reserved;
@@ -633,7 +635,7 @@ struct dvb_analog_parameters {
 	unsigned int afc_range;
 };
 
-struct dvb_frontend_parameters {
+struct dvb_frontend_parameters_orig {
 	/* (absolute) frequency in Hz for DVB-C/DVB-T/ATSC */
 	__u32 frequency;
 	/* intermediate frequency in kHz for DVB-S */
@@ -643,13 +645,12 @@ struct dvb_frontend_parameters {
 		struct dvb_qam_parameters  qam;		/* DVB-C */
 		struct dvb_ofdm_parameters ofdm;	/* DVB-T */
 		struct dvb_vsb_parameters vsb;		/* ATSC */
-		struct dvb_analog_parameters analog;
 	} u;
 };
 
 #ifdef CONFIG_AMLOGIC_DVB_COMPAT
 
-struct dvb_frontend_parameters_ex {
+struct dvb_frontend_parameters {
 	__u32 frequency;  /* (absolute) frequency in Hz for DVB-C/DVB-T/ATSC */
 			  /* intermediate frequency in kHz for DVB-S */
 	fe_spectral_inversion_t inversion;
@@ -663,12 +664,18 @@ struct dvb_frontend_parameters_ex {
 	} u;
 };
 
+/*
 static char dvb_check_frontend_parameters_size[
 	(sizeof(struct dvb_frontend_parameters_ex)
 	== sizeof(struct dvb_frontend_parameters)) ? 1 : -1]
-	__attribute__((__unused__));
+	__attribute__((__unused__));*/
 
 #endif /*CONFIG_AMLOGIC_DVB_COMPAT*/
+
+struct dvb_frontend_event_orig {
+	fe_status_t status;
+	struct dvb_frontend_parameters_orig parameters;
+};
 
 struct dvb_frontend_event {
 	fe_status_t status;
@@ -808,10 +815,10 @@ struct dvbsx_blindscanpara {
 #define FE_READ_SNR		   _IOR('o', 72, __u16)
 #define FE_READ_UNCORRECTED_BLOCKS _IOR('o', 73, __u32)
 
-#define FE_SET_FRONTEND		   _IOW('o', 76, struct dvb_frontend_parameters)
-#define FE_GET_FRONTEND		   _IOR('o', 77, struct dvb_frontend_parameters)
+#define FE_SET_FRONTEND		   _IOW('o', 76, struct dvb_frontend_parameters_orig)
+#define FE_GET_FRONTEND		   _IOR('o', 77, struct dvb_frontend_parameters_orig)
 #define FE_SET_FRONTEND_TUNE_MODE  _IO('o', 81) /* unsigned int */
-#define FE_GET_EVENT		   _IOR('o', 78, struct dvb_frontend_event)
+#define FE_GET_EVENT		   _IOR('o', 78, struct dvb_frontend_event_orig)
 
 #define FE_DISHNETWORK_SEND_LEGACY_CMD _IO('o', 80) /* unsigned int */
 
