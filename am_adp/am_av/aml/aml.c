@@ -184,6 +184,8 @@ void *adec_handle = NULL;
 #define AUDIO_DSP_DIGITAL_RAW_FILE "/sys/class/audiodsp/digital_raw"
 #define VID_FRAME_FMT_FILE   "/sys/class/video/frame_format"
 #define VIDEO_NEW_FRAME_TOGGLED_FILE "/sys/module/amvideo/parameters/first_frame_toggled"
+#define TSYNC_FIRSTCHECKIN_APTS_FILE "/sys/class/tsync/checkin_firstapts"
+#define TSYNC_FIRSTCHECKIN_VPTS_FILE "/sys/class/tsync/checkin_firstvpts"
 #else
 
 /*for add new path*/
@@ -241,6 +243,8 @@ void *adec_handle = NULL;
 #define TSYNC_MODE_FILE "/sys/class/tsync/mode"
 #define AV_THRESHOLD_MIN_FILE "/sys/class/tsync/av_threshold_min"
 #define AV_THRESHOLD_MAX_FILE "/sys/class/tsync/av_threshold_max"
+#define TSYNC_FIRSTCHECKIN_APTS_FILE "/sys/class/tsync/checkin_firstapts"
+#define TSYNC_FIRSTCHECKIN_VPTS_FILE "/sys/class/tsync/checkin_firstvpts"
 
 /*not find,android is not find*/
 #define AVS_PLUS_DECT_FILE "/sys/module/amvdec_avs/parameters/profile"
@@ -4000,6 +4004,8 @@ static void* aml_av_monitor_thread(void *arg)
 	int abuf_level_empty_time = 0, abuf_level_empty_dur = 0, vbuf_level_empty_time = 0, vbuf_level_empty_dur = 0;
 	int down_audio_cache_time = 0, down_video_cache_time = 0;
 	int vdec_stop_time = 0, vdec_stop_dur = 0;
+	int checkin_firstapts = 0, checkin_firstvpts = 0;
+	int apts_discontinue = 0, vpts_discontinue = 0;
 	struct am_io_param astatus;
 	struct am_io_param vstatus;
 	int vdec_status, frame_width, frame_height;
@@ -4240,6 +4246,20 @@ static void* aml_av_monitor_thread(void *arg)
 		} else {
 			AM_DEBUG(1, "[avmon] cannot read \"%s\"", VIDEO_DMX_PTS_FILE);
 			dmx_vpts = 0;
+		}
+
+		if (AM_FileRead(TSYNC_FIRSTCHECKIN_APTS_FILE, buf, sizeof(buf)) >= 0) {
+			sscanf(buf, "0x%x", &checkin_firstapts);
+		} else {
+			AM_DEBUG(1, "[avmon] cannot read \"%s\"", TSYNC_FIRSTCHECKIN_APTS_FILE);
+			checkin_firstapts = 0;
+		}
+
+		if (AM_FileRead(TSYNC_FIRSTCHECKIN_VPTS_FILE, buf, sizeof(buf)) >= 0) {
+			sscanf(buf, "0x%x", &checkin_firstvpts);
+		} else {
+			AM_DEBUG(1, "[avmon] cannot read \"%s\"", TSYNC_FIRSTCHECKIN_VPTS_FILE);
+			checkin_firstvpts = 0;
 		}
 
 		if (apts == last_apts) {
@@ -4720,8 +4740,23 @@ static void* aml_av_monitor_thread(void *arg)
 			}
 		}
 
-		if (need_replay && (AM_ABS(dmx_apts - dmx_vpts) > TIME_UNIT90K * 5)) {
-			AM_DEBUG(1, "[avmon] avoid replay %d",need_replay);
+		if (dmx_apts < apts) {
+			apts_discontinue = 1;
+		}
+
+		if (dmx_vpts < vpts) {
+			vpts_discontinue = 1;
+		}
+
+		if (apts_discontinue && vpts_discontinue) {
+			AM_DEBUG(1, "[avmon] apts_discontinue vpts_discontinue replay %d",need_replay);
+			apts_discontinue = 0;
+			vpts_discontinue = 0;
+			need_replay = AM_TRUE;
+		}
+
+		if (need_replay && (AM_ABS(checkin_firstapts - checkin_firstvpts) > TIME_UNIT90K * 5)) {
+			AM_DEBUG(1, "[avmon] avoid replay checkin_firstapts checkin_firstvpts %d",need_replay);
 			need_replay = AM_FALSE;
 		}
 
