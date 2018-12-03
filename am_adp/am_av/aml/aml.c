@@ -790,7 +790,9 @@ static AM_ErrorCode_t adec_aout_set_volume_cb(AM_AOUT_Device_t *dev, int vol)
 	audio_parms.cmd = ADEC_SET_VOLUME;
 	audio_parms.param1 = vol;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 
 	return 0;
 }
@@ -803,7 +805,9 @@ static AM_ErrorCode_t adec_aout_set_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mut
 	audio_parms.cmd = ADEC_SET_MUTE;
 	audio_parms.param1 = mute;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 
 	return 0;
 }
@@ -816,7 +820,9 @@ static AM_ErrorCode_t adec_aout_set_output_mode_cb(AM_AOUT_Device_t *dev, AM_AOU
 	audio_parms.cmd = ADEC_SET_OUTPUT_MODE;
 	audio_parms.param1 = mode;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 	return 0;
 }
 static AM_ErrorCode_t adec_aout_close_cb(AM_AOUT_Device_t *dev)
@@ -832,7 +838,9 @@ static AM_ErrorCode_t adec_aout_set_pre_gain_cb(AM_AOUT_Device_t *dev, float gai
 	audio_parms.cmd = ADEC_SET_PRE_GAIN;
 	audio_parms.param1 = gain*100;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 
 	return 0;
 }
@@ -845,7 +853,9 @@ static AM_ErrorCode_t adec_aout_set_pre_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t
 	audio_parms.cmd = ADEC_SET_PRE_MUTE;
 	audio_parms.param1 = mute;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 
 	return 0;
 }
@@ -860,7 +870,9 @@ static void adec_start_decode_cb(int fd, int fmt, int has_video, void **padec)
 	audio_parms.param1 = fmt;
 	audio_parms.param2 = has_video;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 
 	AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv_cb, NULL);
 }
@@ -873,7 +885,9 @@ static void adec_pause_decode_cb(void *handle)
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_PAUSE_DECODE;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 }
 static void adec_resume_decode_cb(void *handle)
 {
@@ -883,7 +897,9 @@ static void adec_resume_decode_cb(void *handle)
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_RESUME_DECODE;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 }
 
 static void adec_stop_decode_cb(void **padec)
@@ -894,7 +910,9 @@ static void adec_stop_decode_cb(void **padec)
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_STOP_DECODE;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 	return ;
 }
 static void adec_set_decode_ad_cb(int enable, int pid, int fmt, void *adec)
@@ -907,7 +925,9 @@ static void adec_set_decode_ad_cb(int enable, int pid, int fmt, void *adec)
 	audio_parms.param1 = fmt;
 	audio_parms.param2 = pid;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 	return ;
 }
 static AM_ErrorCode_t adec_set_volume_cb(AM_AOUT_Device_t *dev, int vol)
@@ -919,7 +939,9 @@ static AM_ErrorCode_t adec_set_volume_cb(AM_AOUT_Device_t *dev, int vol)
 	audio_parms.cmd = ADEC_SET_VOLUME;
 	audio_parms.param1 = vol;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 	return 0;
 }
 static AM_ErrorCode_t adec_set_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mute)
@@ -931,7 +953,9 @@ static AM_ErrorCode_t adec_set_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 	audio_parms.cmd = ADEC_SET_MUTE;
 	audio_parms.param1 = mute;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 	return 0;
 }
 static AM_ErrorCode_t adec_set_output_mode_cb(AM_AOUT_Device_t *dev, AM_AOUT_OutputMode_t mode)
@@ -943,7 +967,9 @@ static AM_ErrorCode_t adec_set_output_mode_cb(AM_AOUT_Device_t *dev, AM_AOUT_Out
 	audio_parms.cmd = ADEC_SET_OUTPUT_MODE;
 	audio_parms.param1 = mode;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 	return 0;
 }
 static AM_ErrorCode_t adec_set_pre_gain_cb(AM_AOUT_Device_t *dev, float gain)
@@ -955,7 +981,9 @@ static AM_ErrorCode_t adec_set_pre_gain_cb(AM_AOUT_Device_t *dev, float gain)
 	audio_parms.cmd = ADEC_SET_PRE_GAIN;
 	audio_parms.param1 = gain*100;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 	return 0;
 }
 static AM_ErrorCode_t adec_set_pre_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mute)
@@ -967,7 +995,9 @@ static AM_ErrorCode_t adec_set_pre_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mute
 	audio_parms.cmd = ADEC_SET_PRE_MUTE;
 	audio_parms.param1 = mute;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 	return 0;
 }
 static void adec_get_status_cb(void *adec, AM_AV_AudioStatus_t *para)
@@ -978,7 +1008,9 @@ static void adec_get_status_cb(void *adec, AM_AV_AudioStatus_t *para)
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_GET_STATUS;
 
-	s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	if (s_audio_cb) {
+	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
+	}
 	//TBD for get audio para
 }
 #ifdef USE_ADEC_IN_DVB
