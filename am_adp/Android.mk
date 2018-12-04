@@ -108,23 +108,23 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_open_lib/libdvbsi/dvbpsi.c\
 		   am_open_lib/libdvbsi/descriptor.c\
 		   am_open_lib/am_ci/libdvben50221/asn_1.c \
-           am_open_lib/am_ci/libdvben50221/en50221_app_ai.c        \
-           am_open_lib/am_ci/libdvben50221/en50221_app_auth.c      \
-           am_open_lib/am_ci/libdvben50221/en50221_app_ca.c        \
-           am_open_lib/am_ci/libdvben50221/en50221_app_datetime.c  \
-           am_open_lib/am_ci/libdvben50221/en50221_app_dvb.c       \
-           am_open_lib/am_ci/libdvben50221/en50221_app_epg.c       \
-           am_open_lib/am_ci/libdvben50221/en50221_app_lowspeed.c  \
-           am_open_lib/am_ci/libdvben50221/en50221_app_mmi.c       \
-           am_open_lib/am_ci/libdvben50221/en50221_app_rm.c        \
-           am_open_lib/am_ci/libdvben50221/en50221_app_smartcard.c \
-           am_open_lib/am_ci/libdvben50221/en50221_app_teletext.c  \
-           am_open_lib/am_ci/libdvben50221/en50221_app_utils.c     \
-           am_open_lib/am_ci/libdvben50221/en50221_session.c       \
-           am_open_lib/am_ci/libdvben50221/en50221_stdcam.c        \
-           am_open_lib/am_ci/libdvben50221/en50221_stdcam_hlci.c   \
-           am_open_lib/am_ci/libdvben50221/en50221_stdcam_llci.c   \
-           am_open_lib/am_ci/libdvben50221/en50221_transport.c \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_ai.c        \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_auth.c      \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_ca.c        \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_datetime.c  \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_dvb.c       \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_epg.c       \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_lowspeed.c  \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_mmi.c       \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_rm.c        \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_smartcard.c \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_teletext.c  \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_utils.c     \
+		   am_open_lib/am_ci/libdvben50221/en50221_session.c       \
+		   am_open_lib/am_ci/libdvben50221/en50221_stdcam.c        \
+		   am_open_lib/am_ci/libdvben50221/en50221_stdcam_hlci.c   \
+		   am_open_lib/am_ci/libdvben50221/en50221_stdcam_llci.c   \
+		   am_open_lib/am_ci/libdvben50221/en50221_transport.c \
 		   am_open_lib/am_ci/libucsi/dvb/types.c \
 		   am_open_lib/am_ci/libdvbapi/dvbca.c \
 		   am_open_lib/am_ci/libucsi/mpeg/pmt_section.c \
@@ -146,14 +146,14 @@ endif
 
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
-		    $(LOCAL_PATH)/../include/am_adp/libdvbsi\
-		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/descriptors\
-		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/tables\
-		    $(LOCAL_PATH)/am_open_lib/am_ci\
-		    $(LOCAL_PATH)/../include/am_mw\
-		    $(LOCAL_PATH)/../android/ndk/include\
-			$(AMADEC_C_INCLUDES)\
-		    common/include/linux/amlogic
+		   $(LOCAL_PATH)/../include/am_adp/libdvbsi\
+		   $(LOCAL_PATH)/../include/am_adp/libdvbsi/descriptors\
+		   $(LOCAL_PATH)/../include/am_adp/libdvbsi/tables\
+		   $(LOCAL_PATH)/am_open_lib/am_ci\
+		   $(LOCAL_PATH)/../include/am_mw\
+		   $(LOCAL_PATH)/../android/ndk/include\
+		   $(AMADEC_C_INCLUDES)\
+		   common/include/linux/amlogic
 
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
 LOCAL_CFLAGS += -DUSE_VENDOR_ICU
@@ -176,7 +176,6 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libam_adp
-LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_fend/am_fend.c am_fend/am_vlfend.c am_fend/am_fend_diseqc_cmd.c am_fend/am_rotor_calc.c am_fend/linux_dvb/linux_dvb.c am_fend/linux_v4l2/linux_v4l2.c\
@@ -189,7 +188,7 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 	           am_misc/am_adplock.c am_misc/am_misc.c am_misc/am_iconv.c am_misc/am_sig_handler.c\
 	           am_time/am_time.c\
 	           am_evt/am_evt.c\
-			   am_kl/am_kl.c\
+		   am_kl/am_kl.c\
 	           am_dsc/am_dsc.c am_dsc/aml/aml.c\
 	           am_smc/am_smc.c\
 	           am_smc/aml/aml.c\
@@ -263,23 +262,23 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_open_lib/libdvbsi/dvbpsi.c\
 		   am_open_lib/libdvbsi/descriptor.c\
 		   am_open_lib/am_ci/libdvben50221/asn_1.c \
-           am_open_lib/am_ci/libdvben50221/en50221_app_ai.c        \
-           am_open_lib/am_ci/libdvben50221/en50221_app_auth.c      \
-           am_open_lib/am_ci/libdvben50221/en50221_app_ca.c        \
-           am_open_lib/am_ci/libdvben50221/en50221_app_datetime.c  \
-           am_open_lib/am_ci/libdvben50221/en50221_app_dvb.c       \
-           am_open_lib/am_ci/libdvben50221/en50221_app_epg.c       \
-           am_open_lib/am_ci/libdvben50221/en50221_app_lowspeed.c  \
-           am_open_lib/am_ci/libdvben50221/en50221_app_mmi.c       \
-           am_open_lib/am_ci/libdvben50221/en50221_app_rm.c        \
-           am_open_lib/am_ci/libdvben50221/en50221_app_smartcard.c \
-           am_open_lib/am_ci/libdvben50221/en50221_app_teletext.c  \
-           am_open_lib/am_ci/libdvben50221/en50221_app_utils.c     \
-           am_open_lib/am_ci/libdvben50221/en50221_session.c       \
-           am_open_lib/am_ci/libdvben50221/en50221_stdcam.c        \
-           am_open_lib/am_ci/libdvben50221/en50221_stdcam_hlci.c   \
-           am_open_lib/am_ci/libdvben50221/en50221_stdcam_llci.c   \
-           am_open_lib/am_ci/libdvben50221/en50221_transport.c \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_ai.c        \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_auth.c      \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_ca.c        \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_datetime.c  \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_dvb.c       \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_epg.c       \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_lowspeed.c  \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_mmi.c       \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_rm.c        \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_smartcard.c \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_teletext.c  \
+		   am_open_lib/am_ci/libdvben50221/en50221_app_utils.c     \
+		   am_open_lib/am_ci/libdvben50221/en50221_session.c       \
+		   am_open_lib/am_ci/libdvben50221/en50221_stdcam.c        \
+		   am_open_lib/am_ci/libdvben50221/en50221_stdcam_hlci.c   \
+		   am_open_lib/am_ci/libdvben50221/en50221_stdcam_llci.c   \
+		   am_open_lib/am_ci/libdvben50221/en50221_transport.c \
 		   am_open_lib/am_ci/libucsi/dvb/types.c \
 		   am_open_lib/am_ci/libdvbapi/dvbca.c \
 		   am_open_lib/am_ci/libucsi/mpeg/pmt_section.c \
@@ -298,22 +297,22 @@ LOCAL_CFLAGS+=-std=gnu99
 
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
-		    $(LOCAL_PATH)/../include/am_adp/libdvbsi\
-		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/descriptors\
-		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/tables\
-		    $(LOCAL_PATH)/am_open_lib/am_ci\
-		    $(LOCAL_PATH)/../include/am_mw\
-		    $(LOCAL_PATH)/../android/ndk/include\
-			$(AMADEC_C_INCLUDES)\
-		    common/include/linux/amlogic
+		   $(AMADEC_C_INCLUDES)\
+		   $(LOCAL_PATH)/../include/am_adp/libdvbsi\
+		   $(LOCAL_PATH)/../include/am_adp/libdvbsi/descriptors\
+		   $(LOCAL_PATH)/../include/am_adp/libdvbsi/tables\
+		   $(LOCAL_PATH)/am_open_lib/am_ci\
+		   $(LOCAL_PATH)/../include/am_mw\
+		   $(LOCAL_PATH)/../android/ndk/include\
+		   common/include/linux/amlogic
 
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
 LOCAL_CFLAGS += -DUSE_VENDOR_ICU
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
-LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libicuuc_vendor libcutils liblog libdl libc
+LOCAL_SHARED_LIBRARIES+= libicuuc libcutils liblog libdl libc
 else
 LOCAL_C_INCLUDES += external/icu/icu4c/source/common
-LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libicuuc libcutils liblog libdl libc
+LOCAL_SHARED_LIBRARIES+= libicuuc libcutils liblog libdl libc
 endif
 
 LOCAL_PRELINK_MODULE := false
