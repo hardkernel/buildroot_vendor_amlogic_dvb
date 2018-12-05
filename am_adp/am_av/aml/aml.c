@@ -4798,6 +4798,8 @@ static void* aml_av_monitor_thread(void *arg)
 			aml_close_ts_mode(dev, AM_FALSE);
 			aml_open_ts_mode(dev);
 			aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
+			tp = &dev->ts_player.play_para;
+			ts = (AV_TSData_t*)dev->ts_player.drv_data;
 #ifndef ENABLE_PCR
 			adec_start = AM_FALSE;
 			av_paused  = AM_TRUE;
