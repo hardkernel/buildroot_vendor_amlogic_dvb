@@ -451,11 +451,36 @@ static AM_ErrorCode_t dvb_set_para (AM_FEND_Device_t *dev, const struct dvb_fron
 			cmd_num++;
 #endif
 			break;
+		case SYS_ISDBT:
+			p[cmd_num].cmd = DTV_BANDWIDTH_HZ;
+//			p[cmd_num].u.data = para->u.ofdm.bandwidth;
+			switch (para->u.ofdm.bandwidth) {
+			case BANDWIDTH_10_MHZ:
+				p[cmd_num].u.data = 10000000;
+				break;
+			case BANDWIDTH_8_MHZ:
+				p[cmd_num].u.data = 8000000;
+				break;
+			case BANDWIDTH_7_MHZ:
+				p[cmd_num].u.data = 7000000;
+				break;
+			case BANDWIDTH_6_MHZ:
+				p[cmd_num].u.data = 6000000;
+				break;
+			case BANDWIDTH_5_MHZ:
+				p[cmd_num].u.data = 5000000;
+				break;
+			case BANDWIDTH_1_712_MHZ:
+				p[cmd_num].u.data = 1712000;
+				break;
+			case BANDWIDTH_AUTO:
+				p[cmd_num].u.data = 0;
+			}
+			break;
 		/*now don't support below
 		case SYS_DSS:
 		case SYS_DVBS2:
 		case SYS_DVBH:
-		case SYS_ISDBT:
 		case SYS_ISDBS:
 		case SYS_ISDBC:
 		case SYS_ATSCMH:
