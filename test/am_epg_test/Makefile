@@ -4,7 +4,7 @@ USING_LIBS =
 USING_LIBS_PATH =
 OBJS = $(patsubst %.c,%.o,$(SRC_FILES))
 LOCAL_PATH = $(shell pwd)
-INSTALL_DIR = $(STAGING_DIR)/usr/bin
+INSTALL_DIR = $(TARGET_DIR)/usr/bin
 
 LOCAL_C_INCLUDES := -I $(ROOT_DIR)/include/am_adp\
 		    -I$(ROOT_DIR)/include/am_adp/libdvbsi\
