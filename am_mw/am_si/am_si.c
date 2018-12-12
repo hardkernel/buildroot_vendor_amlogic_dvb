@@ -30,6 +30,7 @@
 #include "am_misc.h"
 #include <errno.h>
 #include <freesat.h>
+#include <amports/vformat.h>
 
 /****************************************************************************
  * Macro definitions
@@ -566,7 +567,7 @@ static AM_ErrorCode_t si_get_section_header(uint8_t *buf, AM_SI_SectionHeader_t 
 
 /**\brief 从section原始数据生成dvbpsi_psi_section_t类型的数据*/
 static AM_ErrorCode_t si_gen_dvbpsi_section(uint8_t *buf, uint16_t len, dvbpsi_psi_section_t **psi_sec)
-{	
+{
 	dvbpsi_psi_section_t * p_section;
 	AM_SI_SectionHeader_t header;
 
@@ -579,7 +580,7 @@ static AM_ErrorCode_t si_gen_dvbpsi_section(uint8_t *buf, uint16_t len, dvbpsi_p
 		AM_DEBUG(1, "Invalid section header");
 		return AM_SI_ERR_INVALID_SECTION_DATA;
 	}
-	
+
 	/* Allocate the dvbpsi_psi_section_t structure */
 	p_section  = (dvbpsi_psi_section_t*)malloc(sizeof(dvbpsi_psi_section_t));
 	if (p_section == NULL)
@@ -726,7 +727,7 @@ static AM_ErrorCode_t si_convert_iso6937_to_utf8(const char *src, int src_len, c
 		i++;\
 		ret;\
 	})
-	
+
 	if (!src || !dest || !dest_len || src_len <= 0)
 		return -1;
 
@@ -1092,7 +1093,7 @@ static AM_ErrorCode_t si_convert_iso6937_to_utf8(const char *src, int src_len, c
 			ucs2[dlen++] = ch;
 		}
 	}
-	
+
 iso6937_end:
 	if (dlen > 0)
 	{
@@ -1121,7 +1122,7 @@ iso6937_end:
 
 		*dest_len = l_dest;
 		AM_Check_UTF8(o_dest, *dest_len, o_dest, dest_len);
-		
+
 		free(org_ucs2);
 
 		return iconv_close(handle);
@@ -1130,7 +1131,7 @@ iso6937_end:
     free(ucs2);
 
     return -1;
-} 
+}
 
 static void si_add_audio(AM_SI_AudioInfo_t *ai, int aud_pid, int aud_fmt, char lang[3],int audio_type,int audio_exten)
 {
@@ -1237,7 +1238,7 @@ AM_ErrorCode_t AM_SI_Create(AM_SI_Handle_t *handle)
 	SI_Decoder_t *dec;
 
 	assert(handle);
-	
+
 	dec = (SI_Decoder_t *)malloc(sizeof(SI_Decoder_t));
 	if (dec == NULL)
 	{
@@ -1289,7 +1290,7 @@ AM_ErrorCode_t AM_SI_Destroy(AM_SI_Handle_t handle)
 }
 
 /**\brief 解析一个section,并返回解析数据
- * 支持的表(相应返回结构):CAT(dvbpsi_cat_t) PAT(dvbpsi_pat_t) PMT(dvbpsi_pmt_t) 
+ * 支持的表(相应返回结构):CAT(dvbpsi_cat_t) PAT(dvbpsi_pat_t) PMT(dvbpsi_pmt_t)
  * SDT(dvbpsi_sdt_t) EIT(dvbpsi_eit_t) TOT(dvbpsi_tot_t) NIT(dvbpsi_nit_t).
  * VCT(vct_section_info_t) MGT(mgt_section_info_t)
  * RRT(rrt_section_info_t) STT(stt_section_info_t)
@@ -1316,7 +1317,7 @@ AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, uint8_t 
 	AM_TRY(si_check_handle(handle));
 
 	table_id = buf[0];
-	
+
 	if (table_id <= AM_SI_TID_PSIP_CEA)
 	{
 		/*生成dvbpsi section*/
@@ -1438,7 +1439,7 @@ AM_ErrorCode_t AM_SI_DecodeSection(AM_SI_Handle_t handle, uint16_t pid, uint8_t 
 AM_ErrorCode_t AM_SI_ReleaseSection(AM_SI_Handle_t handle, uint8_t table_id, void *sec)
 {
 	AM_ErrorCode_t ret = AM_SUCCESS;
-	
+
 	assert(sec);
 	AM_TRY(si_check_handle(handle));
 
@@ -1521,7 +1522,7 @@ AM_ErrorCode_t AM_SI_GetSectionHeader(AM_SI_Handle_t handle, uint8_t *buf, uint1
 
 	if (len < 8)
 		return AM_SI_ERR_INVALID_SECTION_DATA;
-		
+
 	AM_TRY(si_get_section_header(buf, sec_header));
 
 	return AM_SUCCESS;
@@ -1956,7 +1957,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 		case 0x42:
 			vfmt_tmp = VFORMAT_AVS;
 			break;
-		/*audio pid and audio format*/ 
+		/*audio pid and audio format*/
 		case 0x3:
 		case 0x4:
 			afmt_tmp = AFORMAT_MPEG;
@@ -2066,7 +2067,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 	/*添加音视频流*/
 	if (vfmt_tmp != -1)
 	{
-		*vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;	
+		*vid = (es->i_pid >= 0x1fff) ? 0x1fff : es->i_pid;
 		AM_DEBUG(1, "Set video format to %d", vfmt_tmp);
 		*vfmt = vfmt_tmp;
 	}
@@ -2222,7 +2223,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromVC(dvbpsi_atsc_vct_channel_t *vcinfo, int *vid
 AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_SubtitleInfo_t *sub_info)
 {
 	dvbpsi_descriptor_t *descr;
-	
+
 	AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
 		if (descr->p_decoded && descr->i_tag == AM_SI_DESCR_SUBTITLING)
 		{
@@ -2231,9 +2232,9 @@ AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_Subtitl
 			dvbpsi_subtitling_dr_t *psd = (dvbpsi_subtitling_dr_t*)descr->p_decoded;
 
 			for (isub=0; isub<psd->i_subtitles_number; isub++)
-			{	
+			{
 				tmp_sub = &psd->p_subtitle[isub];
-				
+
 				/* already added ? */
 				for (i=0; i<sub_info->subtitle_count; i++)
 				{
@@ -2244,8 +2245,8 @@ AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_Subtitl
 						! memcmp(tmp_sub->i_iso6392_language_code, sub_info->subtitles[i].lang, 3))
 					{
 						AM_DEBUG(1, "Skipping a exist subtitle: pid %d, lang %c%c%c",
-							es->i_pid, tmp_sub->i_iso6392_language_code[0], 
-							tmp_sub->i_iso6392_language_code[1], 
+							es->i_pid, tmp_sub->i_iso6392_language_code[0],
+							tmp_sub->i_iso6392_language_code[1],
 							tmp_sub->i_iso6392_language_code[2]);
 						break;
 					}
@@ -2253,16 +2254,16 @@ AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_Subtitl
 
 				if (i < sub_info->subtitle_count)
 					continue;
-				
+
 				if (sub_info->subtitle_count >= AM_SI_MAX_SUB_CNT)
 				{
 					AM_DEBUG(0, "Too many subtitles, Max count %d", AM_SI_MAX_SUB_CNT);
 					return AM_SUCCESS;
 				}
-				
+
 				if (sub_info->subtitle_count < 0)
 					sub_info->subtitle_count = 0;
-				
+
 				sub_info->subtitles[sub_info->subtitle_count].pid          = es->i_pid;
 				sub_info->subtitles[sub_info->subtitle_count].type         = tmp_sub->i_subtitling_type;
 				sub_info->subtitles[sub_info->subtitle_count].comp_page_id = tmp_sub->i_composition_page_id;
@@ -2278,7 +2279,7 @@ AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_Subtitl
 					memcpy(sub_info->subtitles[sub_info->subtitle_count].lang, tmp_sub->i_iso6392_language_code, 3);
 					sub_info->subtitles[sub_info->subtitle_count].lang[3] = 0;
 				}
-				
+
 				AM_DEBUG(1, "Add a subtitle: pid %d, language: %s", es->i_pid, sub_info->subtitles[sub_info->subtitle_count].lang);
 
 				sub_info->subtitle_count++;
@@ -2293,7 +2294,7 @@ AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_Subtitl
 AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_TeletextInfo_t *ttx_info)
 {
 	dvbpsi_descriptor_t *descr;
-	
+
 	AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
 		if (descr->p_decoded==NULL && descr->i_tag == AM_SI_DESCR_TELETEXT){
 			if(descr->i_length == 0){
@@ -2320,9 +2321,9 @@ AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_Teletex
 
 			memset(&def_ttx, 0, sizeof(def_ttx));
 			def_ttx.i_teletext_magazine_number = 1;
-			
+
 			for (itel=0; itel<ptd->i_pages_number; itel++)
-			{	
+			{
 				if (ptd != NULL)
 					tmp_ttx = &ptd->p_pages[itel];
 				else
@@ -2338,8 +2339,8 @@ AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_Teletex
 						! memcmp(tmp_ttx->i_iso6392_language_code, ttx_info->teletexts[i].lang, 3))
 					{
 						AM_DEBUG(1, "Skipping a exist teletext: pid %d, lang %c%c%c",
-							es->i_pid, tmp_ttx->i_iso6392_language_code[0], 
-							tmp_ttx->i_iso6392_language_code[1], 
+							es->i_pid, tmp_ttx->i_iso6392_language_code[0],
+							tmp_ttx->i_iso6392_language_code[1],
 							tmp_ttx->i_iso6392_language_code[2]);
 						break;
 					}
@@ -2347,16 +2348,16 @@ AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_Teletex
 
 				if (i < ttx_info->teletext_count)
 					continue;
-				
+
 				if (ttx_info->teletext_count >= AM_SI_MAX_TTX_CNT)
 				{
 					AM_DEBUG(0, "Too many teletexts, Max count %d", AM_SI_MAX_TTX_CNT);
 					return AM_SUCCESS;
 				}
-				
+
 				if (ttx_info->teletext_count < 0)
 					ttx_info->teletext_count = 0;
-				
+
 				ttx_info->teletexts[ttx_info->teletext_count].pid          = es->i_pid;
 				ttx_info->teletexts[ttx_info->teletext_count].type         = tmp_ttx->i_teletext_type;
 				ttx_info->teletexts[ttx_info->teletext_count].magazine_no  = tmp_ttx->i_teletext_magazine_number;
@@ -2372,7 +2373,7 @@ AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_Teletex
 					memcpy(ttx_info->teletexts[ttx_info->teletext_count].lang, tmp_ttx->i_iso6392_language_code, 3);
 					ttx_info->teletexts[ttx_info->teletext_count].lang[3] = 0;
 				}
-				
+
 				AM_DEBUG(1, "Add a teletext: pid %d, language: %s", es->i_pid, ttx_info->teletexts[ttx_info->teletext_count].lang);
 
 				ttx_info->teletext_count++;

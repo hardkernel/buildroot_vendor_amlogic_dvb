@@ -1,5 +1,12 @@
 LOCAL_PATH := $(call my-dir)
 
+ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 25)))
+AMADEC_C_INCLUDES:=hardware/amlogic/media/amcodec/include \
+       hardware/amlogic/LibAudio/amadec/include
+else
+AMADEC_C_INCLUDES:=$(LOCAL_PATH)/../../../frameworks/av/LibPlayer/amcodec/include \
+       $(LOCAL_PATH)/../../../frameworks/av/LibPlayer/amadec/include
+endif
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libam_mw
@@ -42,16 +49,17 @@ endif
 
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
-		    $(LOCAL_PATH)/../include/am_mw\
-		    $(LOCAL_PATH)/../include/am_adp/libdvbsi\
-		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/descriptors\
-		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/tables\
-		    $(LOCAL_PATH)/am_closecaption/am_vbi\
-		    $(LOCAL_PATH)/../android/ndk/include\
-		    $(LOCAL_PATH)/../../libzvbi/src\
-		    external/sqlite/dist\
-			$(AMADEC_C_INCLUDES)\
-		    $(LOCAL_PATH)/../am_adp/am_open_lib/am_ci
+		   $(AMADEC_C_INCLUDES)\
+		   $(LOCAL_PATH)/../include/am_mw\
+		   $(LOCAL_PATH)/../include/am_adp/libdvbsi\
+		   $(LOCAL_PATH)/../include/am_adp/libdvbsi/descriptors\
+		   $(LOCAL_PATH)/../include/am_adp/libdvbsi/tables\
+		   $(LOCAL_PATH)/am_closecaption/am_vbi\
+		   $(LOCAL_PATH)/../android/ndk/include\
+		   $(LOCAL_PATH)/../android/ndk/include/linux/ \
+		   $(LOCAL_PATH)/../../libzvbi/src\
+		   external/sqlite/dist\
+		   $(LOCAL_PATH)/../am_adp/am_open_lib/am_ci
 
 ifeq ($(strip $(BOARD_TV_USE_NEW_TVIN_PARAM)),true)
 LOCAL_CFLAGS += -DCC_TV_USE_NEW_TVIN_PARAM=1
@@ -78,9 +86,9 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libam_mw
-LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_TAGS := optional
-LOCAL_SRC_FILES := am_db/am_db.c\
+LOCAL_SRC_FILES :=  \
+		   am_db/am_db.c \
 		   am_epg/am_epg.c\
 		   am_rec/am_rec.c\
 		   am_scan/am_scan.c\
@@ -100,40 +108,42 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_caman/am_caman.c \
 		   am_caman/ca_dummy.c \
 		   am_cc/am_cc.c \
+		   am_cc/cc_json.c \
 		   am_upd/am_upd.c \
-                   am_closecaption/am_cc.c \
-                   am_closecaption/am_cc_decoder.c \
-                   am_closecaption/am_xds.c \
-                   am_closecaption/am_cc_slice.c \
-                   am_closecaption/am_vbi/linux_vbi/linux_vbi.c \
-                   am_closecaption/am_vbi/am_vbi_api.c \
-                   am_check_scramb/am_check_scramb.c
+		   am_closecaption/am_cc.c \
+		   am_closecaption/am_cc_decoder.c \
+		   am_closecaption/am_xds.c \
+		   am_closecaption/am_cc_slice.c \
+		   am_closecaption/am_vbi/linux_vbi/linux_vbi.c \
+		   am_closecaption/am_vbi/am_vbi_api.c \
+		   am_check_scramb/am_check_scramb.c
 
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DFONT_FREETYPE -DCHIP_8226M -DLOG_LEVEL=1
 
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
+		    $(AMADEC_C_INCLUDES)\
 		    $(LOCAL_PATH)/../include/am_mw\
 		    $(LOCAL_PATH)/../include/am_adp/libdvbsi\
 		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/descriptors\
 		    $(LOCAL_PATH)/../include/am_adp/libdvbsi/tables\
 		    $(LOCAL_PATH)/am_scan/libsigdetect\
 		    $(LOCAL_PATH)/../android/ndk/include\
+		    $(LOCAL_PATH)/../android/ndk/include/linux/ \
 		    $(LOCAL_PATH)/../../libzvbi/src\
 		    external/sqlite/dist\
 		    $(LOCAL_PATH)/am_closecaption/am_vbi\
-			$(AMADEC_C_INCLUDES)\
 		    $(LOCAL_PATH)/../am_adp/am_open_lib/am_ci
 
 ifeq ($(BOARD_VNDK_VERSION), current)
 LOCAL_CFLAGS += -DUSE_VENDOR_ICU
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
-LOCAL_STATIC_LIBRARIES+= libsqlite
-LOCAL_SHARED_LIBRARIES+= libzvbi libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
+LOCAL_STATIC_LIBRARIES+= libsqlite libicuuc libam_adp libzvbi
+LOCAL_SHARED_LIBRARIES+= liblog libdl libc libcutils
 else
 LOCAL_C_INCLUDES += external/icu/icu4c/source/common
-LOCAL_SHARED_LIBRARIES+= libzvbi libsqlite libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
+LOCAL_SHARED_LIBRARIES+= libzvbi libsqlite libam_adp liblog libdl libc libcutils libicui18n
 endif
 LOCAL_PRELINK_MODULE := false
 
