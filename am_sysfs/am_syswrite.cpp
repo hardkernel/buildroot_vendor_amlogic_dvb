@@ -6,12 +6,38 @@
 * Description:
 */
 
+#include <SystemControlClient.h>
+
+#include <binder/Binder.h>
+#include <binder/IServiceManager.h>
+#include <utils/Atomic.h>
+#include <utils/RefBase.h>
+#include <utils/String8.h>
+#include <utils/String16.h>
+#include <utils/threads.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <string.h>
 
 #include "am_debug.h"
+
 #include "am_sys_write.h"
+
+using namespace android;
+
+class DeathNotifier: public IBinder::DeathRecipient
+{
+    public:
+        DeathNotifier()
+        {
+        }
+        void binderDied(const wp < IBinder > &who)
+        {
+            AM_DEBUG(1, "system_write died !");
+        }
+};
+
+static SystemControlClient *mScc = new SystemControlClient();
+static sp < DeathNotifier > amDeathNotifier;
+static Mutex amgLock;
 
 /**\brief read sysfs value
  * \param[in] path file name
@@ -22,31 +48,24 @@
  */
 AM_ErrorCode_t AM_SystemControl_Read_Sysfs(const char *path, char *value)
 {
-    int ret = 0;
-    int fd = open(path, O_RDONLY);
-
     if (path == NULL || value == NULL)
     {
         AM_DEBUG(1,"[false]AM_SystemControl_Read_Sysfs path or value is null");
         return AM_FAILURE;
     }
-    if (fd <= 0)
+    //AM_DEBUG(1,"AM_SystemControl_Read_Sysfs:%s",path);
+    if (mScc != NULL)
     {
-        ret = AM_FAILURE;
-        goto end;
+        const std::string stdPath(path);
+        std::string stdValue(value);
+        if (mScc->readSysfs(stdPath, stdValue))
+        {
+            strcpy(value, stdValue.c_str());
+            return AM_SUCCESS;
+        }
     }
-    if (read(fd, value, 1024) <= 0)
-    {
-        ret = AM_FAILURE;
-        goto end;
-    }
-    else
-        return AM_SUCCESS;
-
-end:
-    if (fd > 0)
-        close (fd);
-    return ret;
+    //AM_DEBUG(1,"[false]AM_SystemControl_Read_Sysfs%s,",path);
+    return AM_FAILURE;
 }
 /**\brief read num sysfs value
  * \param[in] path file name
@@ -58,29 +77,37 @@ end:
  */
 AM_ErrorCode_t AM_SystemControl_ReadNum_Sysfs(const char *path, char *value, int size)
 {
-    int ret;
-    int fd;
-    char buffer[32] = {0};
     if (path == NULL || value == NULL)
     {
         AM_DEBUG(1,"[false]AM_SystemControl_ReadNum_Sysfs path or value is null");
         return AM_FAILURE;
     }
-
-    if (value != NULL && access(path, 0) != -1)
+    //AM_DEBUG(1,"AM_SystemControl_ReadNum_Sysfs:%s",path);
+    if (mScc != NULL && value != NULL && access(path, 0) != -1)
     {
-        fd = open(path, O_RDONLY);
-        if (fd <= 0)
-            return AM_FAILURE;
-        if (read(fd, value, size) <= 0)
+        const std::string stdPath(path);
+        std::string stdValue(value);
+        if (mScc->readSysfs(stdPath, stdValue))
         {
-            close (fd);
-            return AM_FAILURE;
+            if (stdValue.size() != 0)
+            {
+                //AM_DEBUG(1,"readSysfs ok:%s,%s,%d", path, String8(v).string(), String8(v).size());
+                memset(value, 0, size);
+                if (size <= stdValue.size() + 1)
+                {
+                    memcpy(value, stdValue.c_str(),
+                           size - 1);
+                    value[strlen(value)] = '\0';
+                }
+                else
+                {
+                    strcpy(value, stdValue.c_str());
+                }
+                return AM_SUCCESS;
+            }
         }
-        value[size] = '\0';
-        close (fd);
-        return AM_SUCCESS;
     }
+    //AM_DEBUG(1,"[false]AM_SystemControl_ReadNum_Sysfs%s,",path);
     return AM_FAILURE;
 }
 /**\brief write sysfs value
@@ -92,17 +119,22 @@ AM_ErrorCode_t AM_SystemControl_ReadNum_Sysfs(const char *path, char *value, int
  */
 AM_ErrorCode_t AM_SystemControl_Write_Sysfs(const char *path, char *value)
 {
-    int fd;
     if (path == NULL || value == NULL)
     {
         AM_DEBUG(1,"[false]AM_SystemControl_Write_Sysfs path or value is null");
         return AM_FAILURE;
     }
-    fd = open(path, O_WRONLY);
-    if (fd <= 0)
-        return AM_FAILURE;
-    write(fd, value, strlen(value));
-    close(fd);
-    return AM_SUCCESS;
+    //AM_DEBUG(1,"AM_SystemControl_Write_Sysfs:%s",path);
+    if (mScc != NULL)
+    {
+        const std::string stdPath(path);
+        std::string stdValue(value);
+        if (mScc->writeSysfs(stdPath, stdValue))
+        {
+            //AM_DEBUG(1,"writeSysfs ok");
+            return AM_SUCCESS;
+        }
+    }
+    //AM_DEBUG(1,"[false]AM_SystemControl_Write_Sysfs%s,",path);
     return AM_FAILURE;
 }

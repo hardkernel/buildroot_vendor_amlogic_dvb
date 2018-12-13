@@ -6,7 +6,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := libam_sysfs
 LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_TAGS := optional
-LOCAL_SRC_FILES := am_syswrite_vendor.cpp
+LOCAL_SRC_FILES := am_syswrite.cpp
 
 LOCAL_ARM_MODE := arm
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_sysfs\
@@ -33,33 +33,3 @@ LOCAL_PROPRIETARY_MODULE := true
 #LOCAL_32_BIT_ONLY := true
 
 include $(BUILD_SHARED_LIBRARY)
-
-include $(CLEAR_VARS)
-
-LOCAL_MODULE    := libam_sysfs
-LOCAL_MODULE_TAGS := optional
-LOCAL_SRC_FILES := am_syswrite.cpp
-
-LOCAL_ARM_MODE := arm
-LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_sysfs\
-                    $(LOCAL_PATH)/../include/am_adp\
-                    $(LOCAL_PATH)/../../../frameworks/services/systemcontrol \
-                    $(LOCAL_PATH)/../../../frameworks/services/systemcontrol/PQ/include
-
-LOCAL_SHARED_LIBRARIES+=libcutils liblog libc
-ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
-LOCAL_SHARED_LIBRARIES+=vendor.amlogic.hardware.systemcontrol@1.0
-else
-LOCAL_SHARED_LIBRARIES+=vendor.amlogic.hardware.systemcontrol@1.0
-endif
-#for bind
-
-LOCAL_SHARED_LIBRARIES+=libutils  libbinder
-LOCAL_STATIC_LIBRARIES+=libam_adp
-
-
-LOCAL_PRELINK_MODULE := false
-
-#LOCAL_32_BIT_ONLY := true
-
-include $(BUILD_STATIC_LIBRARY)

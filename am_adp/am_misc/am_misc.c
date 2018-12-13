@@ -80,9 +80,11 @@ static AM_ErrorCode_t am_init_syscontrol_api()
 	if(AM_SYSTEMCONTROL_INIT==0)
 	{
 		void* handle = NULL;
+#ifndef NO_SYSFS
 		if(handle == NULL) {
 			handle = dlopen("libam_sysfs.so", RTLD_NOW);//RTLD_NOW  RTLD_LAZY
 		}
+#endif
 		if(handle==NULL)
 		{
 			AM_DEBUG(1, "open lib error--%s\r\n",dlerror());
