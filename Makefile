@@ -4,7 +4,9 @@ export ROOT_DIR
 
 all:
 	-make -C am_adp all
+	-make -C am_adp install
 	-make -C am_mw all
+	-make -C am_mw install
 	-make -C test all
 install:
 	-make -C am_adp install
