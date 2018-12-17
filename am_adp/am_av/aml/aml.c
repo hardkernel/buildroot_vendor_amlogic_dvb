@@ -4781,10 +4781,15 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 
 		if (apts_discontinue && vpts_discontinue) {
+			AM_Bool_t sf[2];
 			AM_DEBUG(1, "[avmon] apts_discontinue vpts_discontinue replay %d",need_replay);
 			apts_discontinue = 0;
 			vpts_discontinue = 0;
-			need_replay = AM_TRUE;
+
+			AM_DMX_GetScrambleStatus(0, sf);
+			if (sf[0] == 0 && sf[1] == 0) {
+				need_replay = AM_TRUE;
+			}
 		}
 
 		if (need_replay && (AM_ABS(checkin_firstapts - checkin_firstvpts) > TIME_UNIT90K * 5)) {
