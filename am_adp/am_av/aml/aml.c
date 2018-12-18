@@ -2013,6 +2013,8 @@ void aml_term_signal_handler(int signo)
 	if (signo == SIGTERM)
 	{
 		AM_DEBUG(1,"PVR_DEBUG recive SIGTERM");
+		if (m_tshift == NULL)
+			return;
 		AM_TFile_t tfile = m_tshift->file;
 		struct stat tfile_stat;
 
