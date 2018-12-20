@@ -1309,6 +1309,15 @@ void *AM_CC_GetUserData(AM_CC_Handle_t handle)
 	return cc->cpara.user_data;
 }
 
+void *AM_Isdb_GetUserData(AM_ISDB_Handle_t handle)
+{
+	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)handle;
+
+	if (cc == NULL)
+		return NULL;
+
+	return cc->cpara.user_data;
+}
 
 
 

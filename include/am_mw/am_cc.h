@@ -72,6 +72,8 @@ typedef enum
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
+/**Isdb handle parser's handle*/
+typedef void* AM_ISDB_Handle_t;
 
 /**Close caption parser's handle*/
 typedef void* AM_CC_Handle_t;

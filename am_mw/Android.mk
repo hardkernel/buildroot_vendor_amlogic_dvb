@@ -37,6 +37,7 @@ LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_caman/ca_dummy.c \
 		   am_cc/am_cc.c \
 		   am_cc/cc_json.c \
+		   am_isdb/am_isdb.c \
 		   am_upd/am_upd.c \
                    am_closecaption/am_cc.c \
                    am_closecaption/am_cc_decoder.c \
@@ -120,6 +121,7 @@ LOCAL_SRC_FILES :=  \
 		   am_fend_ctrl/am_fend_ctrl.c\
 		   am_caman/am_caman.c \
 		   am_caman/ca_dummy.c \
+		   am_isdb/am_isdb.c \
 		   am_cc/am_cc.c \
 		   am_cc/cc_json.c \
 		   am_upd/am_upd.c \

@@ -140,7 +140,7 @@ enum
 	QUERY_EXIST_SRV_BY_CHAN_ORDER,
 	QUERY_NONEXIST_SRV_BY_SRV_ID_ORDER,
 	DELETE_TS_EVTS_BOOKINGS,
-	SELECT_DBTSID_BY_NUM_AND_SRC,	
+	SELECT_DBTSID_BY_NUM_AND_SRC,
 	UPDATE_TS_FREQ,
 	MAX_STMT
 };
@@ -212,7 +212,7 @@ typedef struct
 	uint8_t 		tid;
 	char			tname[10];
 	void 			(*done)(struct AM_SCAN_Scanner_s *);
-	
+
 	uint16_t subs;				/**< 子表个数*/
 	AM_SCAN_SubCtl_t *subctl; 	/**< 子表控制数据*/
 }AM_SCAN_TableCtl_t;
@@ -264,6 +264,7 @@ typedef struct
 	AM_SI_AudioInfo_t aud_info;
 	AM_SI_SubtitleInfo_t sub_info;
 	AM_SI_TeletextInfo_t ttx_info;
+	AM_SI_IsdbsubtitleInfo_t isdb_info;
 	int sdt_version;
 	int analog_std;
 }AM_SCAN_ServiceInfo_t;
@@ -278,14 +279,14 @@ struct AM_SCAN_Scanner_s
 	pthread_mutex_t     			lock;   		/**< 保护互斥体*/
 	pthread_cond_t      			cond;    		/**< 条件变量*/
 	pthread_t          				thread;         /**< 状态监控线程*/
-	
-	int								curr_freq;		/**< 当前正在搜索的频点*/ 
+
+	int								curr_freq;		/**< 当前正在搜索的频点*/
 	int								curr_plp;		/**< Current PLP index*/
 	int								start_freqs_cnt;/**< 需要搜索的频点个数*/
 	struct dvb_frontend_event		fe_evt;			/**< 前段事件*/
-	AM_SCAN_FrontEndPara_t		 	*start_freqs;	/**< 需要搜索的频点列表*/ 
+	AM_SCAN_FrontEndPara_t		 	*start_freqs;	/**< 需要搜索的频点列表*/
 	AM_SCAN_TS_t					*curr_ts;		/**< 当前正在搜索的TS数据*/
-	
+
 	AM_SCAN_StoreCb 				store_cb;		/**< 存储回调*/
 	AM_SCAN_Result_t				result;			/**< 搜索结果*/
 	int								end_code;		/**< 搜索结束码*/
@@ -311,7 +312,7 @@ struct AM_SCAN_Scanner_s
 		dvbpsi_pat_program_t			*cur_prog;		/**< 当前正在接收PMT的Program*/
 		AM_SCAN_BlindScanCtrl_t			bs_ctl;			/**< 盲扫控制*/
 	}dtvctl;		/**< DTV控制*/
-	
+
 	struct
 	{
 		AM_Bool_t start;
@@ -340,7 +341,7 @@ struct AM_SCAN_Scanner_s
 
 
 /****************************************************************************
- * Function prototypes  
+ * Function prototypes
  ***************************************************************************/
 
 

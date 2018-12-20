@@ -2384,6 +2384,28 @@ AM_ErrorCode_t AM_SI_ExtractDVBTeletextFromES(dvbpsi_pmt_es_t *es, AM_SI_Teletex
 	return AM_SUCCESS;
 }
 
+AM_ErrorCode_t AM_SI_ExtractDVBIsdbsubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_IsdbsubtitleInfo_t *sub_info)
+{
+	dvbpsi_descriptor_t *descr;
+
+	AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+	if (descr->i_tag == AM_SI_DESCR_ISDBSUBTITLING)
+	{
+		if (descr->p_data[0] == 0 && descr->p_data[1] == 8)
+		{
+			sub_info->isdb_count = 1;
+			sub_info->isdbs[0].pid = es->i_pid;
+			sub_info->isdbs[0].type = 7;
+			memcpy(sub_info->isdbs[0].lang, "isdb", 5);
+			AM_DEBUG(0, "Isdb found and added");
+		}
+	}
+	AM_SI_LIST_END()
+
+	return AM_SUCCESS;
+}
+
+
 AM_ErrorCode_t AM_SI_ExtractATSCCaptionFromES(dvbpsi_pmt_es_t *es, AM_SI_CaptionInfo_t *cap_info)
 {
 	dvbpsi_descriptor_t *descr;
