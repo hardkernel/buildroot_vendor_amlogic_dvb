@@ -4794,10 +4794,10 @@ static void* aml_av_monitor_thread(void *arg)
 			}
 		}
 
-		if (need_replay && (AM_ABS(checkin_firstapts - checkin_firstvpts) > TIME_UNIT90K * 5)) {
-			AM_DEBUG(1, "[avmon] avoid replay checkin_firstapts checkin_firstvpts %d",need_replay);
-			need_replay = AM_FALSE;
-		}
+		//if (need_replay && (AM_ABS(checkin_firstapts - checkin_firstvpts) > TIME_UNIT90K * 5)) {
+		//	AM_DEBUG(1, "[avmon] avoid replay checkin_firstapts checkin_firstvpts %d",need_replay);
+		//	need_replay = AM_FALSE;
+		//}
 
 		if (need_replay && (dev->mode == AV_PLAY_TS)) {
 			AM_DEBUG(1, "[avmon] replay ts vlevel %d alevel %d vpts_stop %d vmaster %d",
