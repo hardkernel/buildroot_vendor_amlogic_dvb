@@ -17,10 +17,10 @@ LOCAL_C_INCLUDES := -I $(ROOT_DIR)/include/am_adp\
 
 SRC_FILES = am_userdata_test.c
 
-CFLAGS   := -c -Wall -shared -fPIC -Wno-unknown-pragmas -Wno-format -O3 -fexceptions -fnon-call-exceptions
+CFLAGS   := -c -Wall -Wno-unknown-pragmas -Wno-format -O3 -fexceptions -fnon-call-exceptions
 
 CFLAGS += $(LOCAL_C_INCLUDES) $(DEFINES)
-LDFLAGS  := -shared -fPIC -L$(TARGET_DIR)/usr/lib -lam_adp -lamadec
+LDFLAGS  := -L$(TARGET_DIR)/usr/lib -lam_adp -lamadec -lamavutils
 
 all : $(OBJS) $(OUTPUT)
 

@@ -3916,8 +3916,13 @@ AM_ErrorCode_t AM_EPG_Create(AM_EPG_CreatePara_t *para, AM_EPG_Handle_t *handle)
 	mon->curr_ts_tsid = -1;
 	mon->psip_eit_count = (int)AM_ARRAY_SIZE(mon->psip_eitctl);
 	mon->psip_ett_count = (int)AM_ARRAY_SIZE(mon->psip_ettctl);
+#ifdef ANDROID
 	mon->parallel_psip_eit_count = property_get_int32(PARALLEL_PSIP_EIT_CNT_PROP, 4);
 	mon->parallel_psip_ett_count = property_get_int32(PARALLEL_PSIP_ETT_CNT_PROP, 4);
+#else
+	mon->parallel_psip_eit_count = 4;
+	mon->parallel_psip_ett_count = 4;
+#endif
 
 	AM_TIME_GetClock(&mon->new_eit_check_time);
 	mon->eit_has_data = AM_FALSE;

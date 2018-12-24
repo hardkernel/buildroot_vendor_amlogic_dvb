@@ -1,5 +1,5 @@
 OUTPUT = libam_mw.so
-DEFINES = -DLINUX_DVB_FEND -DLOG_LEVEL=1
+DEFINES = -DLINUX_DVB_FEND -DLOG_LEVEL=1 -DLIBICONV_PLUG
 USING_LIBS =
 USING_LIBS_PATH = $(ROOT_DIR)/am_adp
 OBJS = $(patsubst %.c,%.o,$(SRC_FILES))
@@ -32,6 +32,8 @@ SRC_FILES = $(wildcard am_db/*.c\
 		   am_cc/*.c\
 		   am_upd/am_upd.c\
            am_closecaption/*.c\
+           am_closecaption/am_vbi/*.c\
+           am_closecaption/am_vbi/linux_vbi/*.c\
            am_check_scramb/*.c)
 
 CFLAGS   := -c -Wall -shared -fPIC -Wno-unknown-pragmas -Wno-format -O3 -fexceptions -fnon-call-exceptions

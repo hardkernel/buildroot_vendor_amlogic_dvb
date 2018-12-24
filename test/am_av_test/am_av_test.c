@@ -721,7 +721,7 @@ static void* inject_entry(void *arg)
 			break;
 		}
 */
-		if(left)
+		while (left)
 		{
 			send = left;
 			AM_AV_InjectData(AV_DEV_NO, inject_type, buf, &send, -1);
@@ -732,6 +732,7 @@ static void* inject_entry(void *arg)
 					memmove(buf, buf+send, left);
 				//AM_DEBUG(1, "inject %d bytes", send);
 			}
+			usleep(100);
 		}
 	}
 	AM_DEBUG(1, "inject thread end");
