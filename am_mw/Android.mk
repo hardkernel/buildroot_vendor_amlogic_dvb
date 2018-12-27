@@ -10,7 +10,11 @@ endif
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libam_mw
-LOCAL_VENDOR_MODULE := true
+ifeq ($(BOARD_COMPILE_IN_SYSTEM), true)
+    LOCAL_VENDOR_MODULE := false
+else
+    LOCAL_VENDOR_MODULE := true
+endif
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := am_db/am_db.c\
 		   am_epg/am_epg.c\
@@ -66,10 +70,15 @@ LOCAL_CFLAGS += -DCC_TV_USE_NEW_TVIN_PARAM=1
 endif
 
 ifeq ($(BOARD_VNDK_VERSION), current)
-LOCAL_CFLAGS += -DUSE_VENDOR_ICU
-LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
-LOCAL_STATIC_LIBRARIES+= libsqlite
-LOCAL_SHARED_LIBRARIES+= libzvbi libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
+ifeq ($(BOARD_COMPILE_IN_SYSTEM), true)
+    LOCAL_C_INCLUDES += external/icu/icu4c/source/common
+    LOCAL_SHARED_LIBRARIES+= libzvbi libsqlite libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
+else
+    LOCAL_CFLAGS += -DUSE_VENDOR_ICU
+    LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
+    LOCAL_STATIC_LIBRARIES+= libsqlite
+    LOCAL_SHARED_LIBRARIES+= libzvbi libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
+endif
 else
 LOCAL_C_INCLUDES += external/icu/icu4c/source/common
 LOCAL_SHARED_LIBRARIES+= libzvbi libsqlite libam_adp $(AMADEC_LIBS) liblog libdl libc libcutils
@@ -77,7 +86,11 @@ endif
 
 LOCAL_PRELINK_MODULE := false
 
-LOCAL_PROPRIETARY_MODULE := true
+ifeq ($(BOARD_COMPILE_IN_SYSTEM), true)
+    LOCAL_PROPRIETARY_MODULE := false
+else
+    LOCAL_PROPRIETARY_MODULE := true
+endif
 
 #LOCAL_32_BIT_ONLY := true
 
@@ -137,10 +150,15 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		    $(LOCAL_PATH)/../am_adp/am_open_lib/am_ci
 
 ifeq ($(BOARD_VNDK_VERSION), current)
-LOCAL_CFLAGS += -DUSE_VENDOR_ICU
-LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
-LOCAL_STATIC_LIBRARIES+= libsqlite libicuuc libam_adp libzvbi
-LOCAL_SHARED_LIBRARIES+= liblog libdl libc libcutils
+ifeq ($(BOARD_COMPILE_IN_SYSTEM), true)
+    LOCAL_C_INCLUDES += external/icu/icu4c/source/common
+    LOCAL_SHARED_LIBRARIES+= libzvbi libsqlite libam_adp liblog libdl libc libcutils libicui18nEC_LIBS) liblog libdl libc libcutils
+else
+    LOCAL_CFLAGS += -DUSE_VENDOR_ICU
+    LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
+    LOCAL_STATIC_LIBRARIES+= libsqlite libicuuc libam_adp libzvbi
+    LOCAL_SHARED_LIBRARIES+= liblog libdl libc libcutils
+endif
 else
 LOCAL_C_INCLUDES += external/icu/icu4c/source/common
 LOCAL_SHARED_LIBRARIES+= libzvbi libsqlite libam_adp liblog libdl libc libcutils libicui18n

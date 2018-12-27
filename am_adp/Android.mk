@@ -21,7 +21,11 @@ endif
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libam_adp
-LOCAL_VENDOR_MODULE := true
+ifeq ($(BOARD_COMPILE_IN_SYSTEM), true)
+    LOCAL_VENDOR_MODULE := false
+else
+    LOCAL_VENDOR_MODULE := true
+endif
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_fend/am_fend.c am_fend/am_vlfend.c am_fend/am_fend_diseqc_cmd.c am_fend/am_rotor_calc.c am_fend/linux_dvb/linux_dvb.c am_fend/linux_v4l2/linux_v4l2.c\
@@ -156,9 +160,14 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		   common/include/linux/amlogic
 
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
-LOCAL_CFLAGS += -DUSE_VENDOR_ICU
-LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
-LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libicuuc_vendor libcutils liblog libdl libc
+ifeq ($(BOARD_COMPILE_IN_SYSTEM), true)
+    LOCAL_C_INCLUDES += external/icu/icu4c/source/common
+    LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libicuuc libcutils liblog libdl libc
+else
+    LOCAL_CFLAGS += -DUSE_VENDOR_ICU
+    LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
+    LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libicuuc_vendor libcutils liblog libdl libc
+endif
 else
 LOCAL_C_INCLUDES += external/icu/icu4c/source/common
 LOCAL_SHARED_LIBRARIES+=$(AMADEC_LIBS) libicuuc libcutils liblog libdl libc
@@ -166,7 +175,11 @@ endif
 
 LOCAL_PRELINK_MODULE := false
 
-LOCAL_PROPRIETARY_MODULE := true
+ifeq ($(BOARD_COMPILE_IN_SYSTEM), true)
+    LOCAL_PROPRIETARY_MODULE := false
+else
+    LOCAL_PROPRIETARY_MODULE := true
+endif
 
 #LOCAL_32_BIT_ONLY := true
 
@@ -307,9 +320,14 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 		   common/include/linux/amlogic
 
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
-LOCAL_CFLAGS += -DUSE_VENDOR_ICU
-LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
-LOCAL_SHARED_LIBRARIES+= libicuuc libcutils liblog libdl libc
+    ifeq ($(BOARD_COMPILE_IN_SYSTEM), true)
+        LOCAL_C_INCLUDES += external/icu/icu4c/source/common
+        LOCAL_SHARED_LIBRARIES+= libicuuc libcutils liblog libdl libc
+    else
+        LOCAL_CFLAGS += -DUSE_VENDOR_ICU
+        LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
+        LOCAL_SHARED_LIBRARIES+= libicuuc libcutils liblog libdl libc
+    endif
 else
 LOCAL_C_INCLUDES += external/icu/icu4c/source/common
 LOCAL_SHARED_LIBRARIES+= libicuuc libcutils liblog libdl libc

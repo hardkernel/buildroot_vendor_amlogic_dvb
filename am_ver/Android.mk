@@ -3,7 +3,11 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libam_ver
-LOCAL_VENDOR_MODULE := true
+ifeq ($(BOARD_COMPILE_IN_SYSTEM), true)
+    LOCAL_VENDOR_MODULE := false
+else
+    LOCAL_VENDOR_MODULE := true
+endif
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := am_ver.c
 
@@ -32,7 +36,11 @@ ifeq ($(strip $(BOARD_DVB_NO_VERSION)),)
     LOCAL_CFLAGS+=-DLIBDVB_BUILD_NAME=\"${LIBDVB_BUILD_NAME}\"
 endif
 
-LOCAL_PROPRIETARY_MODULE := true
+ifeq ($(BOARD_COMPILE_IN_SYSTEM), true)
+    LOCAL_PROPRIETARY_MODULE := false
+else
+    LOCAL_PROPRIETARY_MODULE := true
+endif
 
 #LOCAL_32_BIT_ONLY := true
 
