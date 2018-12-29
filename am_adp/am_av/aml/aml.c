@@ -4024,14 +4024,14 @@ static void* aml_av_monitor_thread(void *arg)
 	int resample_type = 0;
 	int next_resample_type = resample_type;
 	int now, next_resample_start_time = 0;
-	int abuf_level, vbuf_level;
-	int abuf_size, vbuf_size;
-	unsigned int abuf_read_ptr, vbuf_read_ptr;
+	int abuf_level = 0, vbuf_level = 0;
+	int abuf_size = 0, vbuf_size = 0;
+	unsigned int abuf_read_ptr = 0, vbuf_read_ptr = 0;
 	unsigned int last_abuf_read_ptr = 0, last_vbuf_read_ptr = 0;
 	int arp_stop_time = 0, vrp_stop_time = 0;
 	int arp_stop_dur = 0, vrp_stop_dur = 0;
-	int apts, vpts, last_apts = 0, last_vpts = 0;
-	int dmx_apts, dmx_vpts, last_dmx_apts = 0, last_dmx_vpts = 0;
+	int apts = 0, vpts = 0, last_apts = 0, last_vpts = 0;
+	int dmx_apts = 0, dmx_vpts = 0, last_dmx_apts = 0, last_dmx_vpts = 0;
 	int apts_stop_time = 0, vpts_stop_time = 0, apts_stop_dur = 0, vpts_stop_dur = 0;
 	int dmx_apts_stop_time = 0, dmx_vpts_stop_time = 0, dmx_apts_stop_dur = 0, dmx_vpts_stop_dur = 0;
 	int tsync_mode, vmaster_time = 0, vmaster_dur = 0;
@@ -4143,37 +4143,29 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 
 		AM_TIME_GetClock(&now);
-		if (has_audio)
-		{
-			if (ioctl(ts->fd, AMSTREAM_IOC_AB_STATUS, (unsigned long)&astatus) != -1) {
-				abuf_size  = astatus.status.size;
-				abuf_level = astatus.status.data_len;
-				abuf_read_ptr = astatus.status.read_pointer;
-			} else {
-				AM_DEBUG(1, "cannot get audio buffer status");
-				abuf_size  = 0;
-				abuf_level = 0;
-				abuf_read_ptr = 0;
-			}
+		if (has_audio && (ioctl(ts->fd, AMSTREAM_IOC_AB_STATUS, (unsigned long)&astatus) != -1)) {
+			abuf_size  = astatus.status.size;
+			abuf_level = astatus.status.data_len;
+			abuf_read_ptr = astatus.status.read_pointer;
 		} else {
-				AM_DEBUG(1, "Audio is None.");
+			AM_DEBUG(1, "cannot get audio buffer status or Audio is None");
+			abuf_size  = 0;
+			abuf_level = 0;
+			abuf_read_ptr = 0;
 		}
-		if (has_video)
-		{
-			if (ioctl(ts->fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1) {
-				vbuf_size  = vstatus.status.size;
-				vbuf_level = vstatus.status.data_len;
-				vbuf_read_ptr = vstatus.status.read_pointer;
-				//is_hd_video = vstatus.vstatus.width > 720;
-			} else {
-				AM_DEBUG(1, "cannot get video buffer status");
-				vbuf_size  = 0;
-				vbuf_level = 0;
-				vbuf_read_ptr = 0;
-			}
+
+		if (has_video && (ioctl(ts->fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1)) {
+			vbuf_size  = vstatus.status.size;
+			vbuf_level = vstatus.status.data_len;
+			vbuf_read_ptr = vstatus.status.read_pointer;
+			//is_hd_video = vstatus.vstatus.width > 720;
 		} else {
-			AM_DEBUG(1, "Video is None.");
+			AM_DEBUG(1, "cannot get video buffer status or Video is None ");
+			vbuf_size  = 0;
+			vbuf_level = 0;
+			vbuf_read_ptr = 0;
 		}
+
 		if (vbuf_level == 0) {
 			if(!vbuf_level_empty_time)
 				vbuf_level_empty_time = now;
@@ -4682,18 +4674,18 @@ static void* aml_av_monitor_thread(void *arg)
 			vdec_stop_dur  = 0;
 		}
 
-		if (vdec_stop_dur > NO_DATA_CHECK_TIME) {
+		if (has_video && (vdec_stop_dur > NO_DATA_CHECK_TIME)) {
 			need_replay = AM_TRUE;
 			AM_DEBUG(1, "[avmon] apts_dmx_stop: %d arp_stop: %d vpts_dmx_stop: %d vrp_stop: %d",
 					dmx_apts_stop_dur, arp_stop_dur, dmx_vpts_stop_dur, vrp_stop_dur);
 		}
 		if (dev->mode == AV_PLAY_TS) {
-			if (vbuf_level * 5 > vbuf_size * 4)
+			if (has_video && (vbuf_level * 5 > vbuf_size * 4))
 			{
 				need_replay = AM_TRUE;
 				AM_DEBUG(1, "[avmon] 1 replay ts vlevel %d vbuf_size %d",vbuf_level*6, vbuf_size*5);
 			}
-			if (abuf_level * 5 > abuf_size * 4)
+			if (has_audio && (abuf_level * 5 > abuf_size * 4))
 			{
 				need_replay = AM_TRUE;
 				AM_DEBUG(1, "[avmon] 2 replay ts vlevel %d vbuf_size %d",abuf_level*6, abuf_size*5);
@@ -4774,11 +4766,11 @@ static void* aml_av_monitor_thread(void *arg)
 			}
 		}
 
-		if (dmx_apts < apts) {
+		if (has_audio && (dmx_apts < apts)) {
 			apts_discontinue = 1;
 		}
 
-		if (dmx_vpts < vpts) {
+		if (has_video && (dmx_vpts < vpts)) {
 			vpts_discontinue = 1;
 		}
 
