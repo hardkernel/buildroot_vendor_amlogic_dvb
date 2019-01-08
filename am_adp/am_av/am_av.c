@@ -2913,7 +2913,7 @@ AM_ErrorCode_t AM_AV_SwitchTSAudio(int dev_no, uint16_t apid, AM_AV_AFormat_t af
 
 	pthread_mutex_lock(&dev->lock);
 
-	if ((dev->mode & AV_PLAY_TS) && dev->drv->switch_ts_audio) 
+	if (dev->drv->switch_ts_audio)
 		ret = dev->drv->switch_ts_audio(dev, apid, afmt);
 
 	pthread_mutex_unlock(&dev->lock);

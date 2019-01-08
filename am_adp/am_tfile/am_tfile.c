@@ -84,7 +84,7 @@ static int timer_get_total(void *timer)
 	return plast->time - pfirst->time;
 }
 
-static int timer_add_fragment(void *timer, loff_t offset, int force)
+static int timer_try_add_fragment(void *timer, loff_t pre_end, loff_t offset, int force)
 {
 	tfile_timer_t *ptimer = (tfile_timer_t*)timer;
 	tfragment_t *plast = NULL;
@@ -112,7 +112,7 @@ static int timer_add_fragment(void *timer, loff_t offset, int force)
 	}
 
 	if (plast)
-		plast->end = offset;
+		plast->end = pre_end;
 
 	pnow = malloc(sizeof(tfragment_t));
 	memset(pnow, 0, sizeof(tfragment_t));
@@ -123,10 +123,15 @@ static int timer_add_fragment(void *timer, loff_t offset, int force)
 
 	list_add_tail(&pnow->head, &ptimer->list);
 
-	AM_DEBUG(3, "[tfile] add fragment %p[time:%d start:%lld]",
-		pnow, pnow->time, pnow->start);
+	AM_DEBUG(3, "[tfile] add fragment %p[time:%d start:%lld] force[%d]",
+		pnow, pnow->time, pnow->start, force);
 
 	return 0;
+}
+
+static int timer_try_add_fragment_continuous(void *timer, loff_t offset, int force)
+{
+	return timer_try_add_fragment(timer, offset, offset, force);
 }
 
 //remove earliest fragment, return removed size and next fragment's start
@@ -184,7 +189,7 @@ static int aml_tfile_attach_timer(AM_TFile_t tfile)
 
 		frag->time = 0;
 		frag->end = 0;
-		frag->start = tfile->start;
+		frag->start = tfile->write;
 		list_add_tail(&frag->head, &timer->list);
 
 		AM_DEBUG(3, "[tfile] add fragment %p[time:%d start:%lld]",
@@ -699,6 +704,9 @@ ssize_t AM_TFile_Write(AM_TFile_t tfile, uint8_t *buf, size_t size)
 	size_t len1 = 0, len2 = 0;
 	loff_t fsize, wpos;
 	int now;
+	size_t size_act;
+	int wrap = 0;
+	int write_fail = 0;
 
 	if (! tfile->opened)
 	{
@@ -721,7 +729,7 @@ ssize_t AM_TFile_Write(AM_TFile_t tfile, uint8_t *buf, size_t size)
 		}
 
 		if (tfile->timer)
-			timer_add_fragment(tfile->timer, tfile->write, 0);
+			timer_try_add_fragment_continuous(tfile->timer, tfile->write, 0);
 
 		goto write_done;
 	}
@@ -739,22 +747,30 @@ ssize_t AM_TFile_Write(AM_TFile_t tfile, uint8_t *buf, size_t size)
 	}
 
 	len1 = size;
-	if ((wpos+len1) > fsize)
+	if ((wpos+len1) >= fsize)
 	{
 		len1 = (fsize - wpos);
 		len2 = size - len1;
+		wrap = 1;
+		AM_DEBUG(2, "[tfile] wrap here, len[%d]=len1[%d]+len2[%d]", size, len1, len2);
 	}
 	if (len1 > 0)
 	{
 		/*write -> end*/
 		ret = aml_timeshift_subfile_write(tfile, buf, len1);
-		if (ret != (ssize_t)len1) {
-			AM_DEBUG(0, "[tfile] data lost, eof write: try:%d act:%d", len1, ret);
-			goto write_done;
-		}
+		if (ret != (ssize_t)len1)
+			write_fail = 1;
 
 		if (tfile->timer)
-			timer_add_fragment(tfile->timer, tfile->write + len1, (len2 > 0)? 1 : 0);
+			timer_try_add_fragment(tfile->timer,
+					tfile->write + ret,
+					(wrap && !write_fail)? 0 : tfile->write+ret,
+					(wrap || (write_fail && ret))? 1 : 0);
+
+		if (write_fail) {
+			AM_DEBUG(0, "[tfile] data lost, eof write: try:%d act:%d", len1, ret);
+			goto adjust_pos;
+		}
 	}
 
 	if (len2 > 0)
@@ -763,72 +779,81 @@ ssize_t AM_TFile_Write(AM_TFile_t tfile, uint8_t *buf, size_t size)
 		aml_timeshift_subfile_seek(tfile, 0, AM_FALSE);
 
 		ret2 = aml_timeshift_subfile_write(tfile, buf+len1, len2);
-		if (ret2 != (ssize_t)len2) {
-			AM_DEBUG(0, "[tfile] data lost, sof write: try:%d act:%d", len2, ret);
-			goto write_done;
-		}
+		if (ret2 != (ssize_t)len2)
+			write_fail = 1;
 
 		if (tfile->timer)
-			timer_add_fragment(tfile->timer, 0, 1);
+			timer_try_add_fragment_continuous(tfile->timer, ret2, 1);
+
+		if (write_fail) {
+			AM_DEBUG(0, "[tfile] data lost, sof write: try:%d act:%d", len2, ret2);
+			goto adjust_pos;
+		}
 	}
 
+	size_act = ret + ret2;
 adjust_pos:
-	if (size > 0)
+	if (size_act > 0)
 	{
 		pthread_mutex_lock(&tfile->lock);
 
 		int debug = 0;
-
-		/*now, ret bytes actually writen*/
+		/*now, ret bytes actually written*/
 		off_t rleft = tfile->size - tfile->avail;
 		off_t sleft = tfile->size - tfile->total;
 
-		tfile->write = (tfile->write + size) % tfile->size;
+		tfile->write = (tfile->write + size_act) % tfile->size;
 
 		//check the start pointer
-		if (size > sleft) {
+		if (size_act > sleft) {
 			if (tfile->timer) {
 				loff_t start;
 				loff_t remove = 0;
 				do {
 					remove += timer_remove_earliest_fragment(tfile->timer, &start);
-					} while(remove < size);
+					} while(remove < size_act);
 				tfile->start = start;//tfile->write;
 				tfile->total -= remove;
-				AM_DEBUG(3, "[tfile] size:%zu w >> s, s:%lld, t:%lld", size, tfile->start, tfile->total);
+				//tfile->avail -= remove;
+				AM_DEBUG(3, "[tfile] size:%zu w >> s, s:%lld, t:%lld", size_act, tfile->start, tfile->total);
 				debug = 1;
 			} else {
 				tfile->start = tfile->write;
-				tfile->total -= size;
+				tfile->total -= size_act;
 			}
 		}
 
 		//check the read pointer
-		if (size > rleft) {
-			tfile->read = tfile->write;
-			tfile->avail -= size - rleft;
+		if (size_act > rleft) {
+			tfile->read = tfile->start;
+			tfile->avail -= size_act - rleft;
 			//AM_DEBUG(3, "ttt size:%zu w >> r, r:%lld, a:%lld",
-			//    size, tfile->read, tfile->avail);
+			//    size_act, tfile->read, tfile->avail);
 			//debug = 1;
 		}
 
 		if (tfile->avail < tfile->size)
 		{
-			tfile->avail += size;
+			tfile->avail += size_act;
 			if (tfile->avail > tfile->size)
 				tfile->avail = tfile->size;
 			pthread_cond_signal(&tfile->cond);
 		}
 		if (tfile->total < tfile->size)
 		{
-			tfile->total += size;
+			tfile->total += size_act;
 			if (tfile->total > tfile->size)
 				tfile->total = tfile->size;
 		}
 
+		if (tfile->avail > tfile->total) {
+			tfile->read = tfile->start;
+			tfile->avail = tfile->total;
+		}
+
 		if (debug) {
 			AM_DEBUG(3, "[tfile] size:%zu now -> s:%lld, r:%lld, w:%lld, t:%lld, a:%lld",
-				size,
+				size_act,
 				tfile->start, tfile->read, tfile->write, tfile->total, tfile->avail);
 
 			if (tfile->timer)
@@ -1015,7 +1040,7 @@ int AM_TFile_TimeGetReadNow(AM_TFile_t tfile)
 					break;
 				now = p->time;
 			}
-		} else {
+		} else if (r < pstart->start) {
 			/*
 				|           s---|
 				|--i-e          |
@@ -1030,6 +1055,8 @@ int AM_TFile_TimeGetReadNow(AM_TFile_t tfile)
 					break;
 				}
 			}
+		} else {
+			now = pstart->time;
 		}
 		AM_DEBUG(3, "[tfile] >>read:\ttime[%d]\toffset[%lld]", now, tfile->read);
 	}
