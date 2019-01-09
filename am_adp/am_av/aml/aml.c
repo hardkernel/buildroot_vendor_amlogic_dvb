@@ -2662,7 +2662,8 @@ static int aml_timeshift_do_play_cmd(AV_TimeshiftData_t *tshift, AV_PlayCmd_t cm
 	AV_TimeshiftState_t	last_state = tshift->state;
 	loff_t offset;
 
-	if (! tshift->rate && (cmd == AV_PLAY_FF || cmd == AV_PLAY_FB || cmd == AV_PLAY_SEEK))
+	if ((tshift->para.para.mode != AM_AV_TIMESHIFT_MODE_TIMESHIFTING && !tshift->rate)
+        && (cmd == AV_PLAY_FF || cmd == AV_PLAY_FB || cmd == AV_PLAY_SEEK))
 	{
 		AM_DEBUG(1, "zzz [timeshift] Have not got the rate, skip this command");
 		return -1;
