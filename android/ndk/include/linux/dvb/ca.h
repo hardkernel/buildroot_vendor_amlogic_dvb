@@ -82,7 +82,9 @@ enum ca_cw_type {
 	CA_CW_AES_EVEN,
 	CA_CW_AES_ODD,
 	CA_CW_AES_EVEN_IV,
-	CA_CW_AES_ODD_IV
+	CA_CW_AES_ODD_IV,
+	CA_CW_DES_EVEN,
+	CA_CW_DES_ODD,
 };
 
 struct ca_descr_ex {

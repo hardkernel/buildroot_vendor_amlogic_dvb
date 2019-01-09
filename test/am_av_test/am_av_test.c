@@ -486,12 +486,15 @@ static void video_callback(long dev_no, int event_type, void *param, void *data)
 	case AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED:
 		printf("[evt] video aspect ratio changed: %ld\n", (long)param);
 		break;
+	case AM_AV_EVT_VIDEO_AVAILABLE:
+		printf("[evt] video available\n");
+		break;
 	default:
 		break;
 	}
 }
 
-static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, int femod, int argc, char *argv[])
+static void dvb_play(int vpid, int apid, int ppid, int vfmt, int afmt, int freq, int src, int dmx, int femod, int argc, char *argv[])
 {
 	int running = 1;
 	char buf[256];
@@ -499,11 +502,12 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, 
 	int SNR;
 	
 	memset(&para, 0, sizeof(para));
-	AM_DMX_Open(DMX_DEV_NO, &para);
-	AM_DMX_SetSource(DMX_DEV_NO, src);
-	AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_DMX1);
+	AM_DMX_Open(dmx, &para);
+	AM_DMX_SetSource(dmx, src);
+	AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_DMX0 + dmx);
 	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_RESOLUTION_CHANGED, video_callback, NULL);
 	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED, video_callback, NULL);
+	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_AVAILABLE, video_callback, NULL);
 
 	if(freq>0)
 	{
@@ -561,7 +565,7 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, 
 		printf("lock status: 0x%x\n", status);
 	}
 	
-	AM_AV_StartTSWithPCR(AV_DEV_NO, vpid, apid, vpid, vfmt, afmt);
+	AM_AV_StartTSWithPCR(AV_DEV_NO, vpid, apid, ppid, vfmt, afmt);
 
 	while(argc--)
 		normal_cmd(argv[argc]);
@@ -599,7 +603,7 @@ static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, 
 		AM_FEND_Close(FEND_DEV_NO);
 	}
 	
-	AM_DMX_Close(DMX_DEV_NO);
+	AM_DMX_Close(dmx);
 }
 
 static void ves_play(const char *name, int vfmt)
@@ -1171,7 +1175,8 @@ int main(int argc, char **argv)
 		if(argc>8)
 			fe_mod = strtol(argv[8], NULL, 0);
 	
-		dvb_play(vpid, apid, vfmt, afmt, freq, tssrc, fe_mod, argc, argv);
+		dvb_play(vpid, apid, vpid, vfmt, afmt,
+			freq, tssrc, DMX_DEV_NO, fe_mod, argc, argv);
 	}
 	else if(strcmp(argv[1], "ves")==0)
 	{
@@ -1264,6 +1269,32 @@ int main(int argc, char **argv)
 
 		inject_play_file(argv[3], fmt, vpid, apid, vfmt, afmt, loop);
 	}
+	else if (strcmp(argv[1], "dvb2") == 0)
+	{
+		int i;
+		int ppid = -1;
+		int tssrc = AM_DMX_SRC_TS0;
+		int fe_mod = VSB_8;
+		int dmx = DMX_DEV_NO;
+
+		for (i = 2; i < argc; i++) {
+			const char *s = argv[i];
+			if (strncmp(s, "v=", 2) == 0)
+				sscanf(s, "v=%i:%i", &vpid, &vfmt);
+			else if (strncmp(s, "a=", 2) == 0)
+				sscanf(s, "a=%i:%i", &apid, &afmt);
+			else if (strncmp(s, "p=", 2) == 0)
+				sscanf(s, "p=%i", &ppid);
+			else if (strncmp(s, "src=", 4) == 0)
+				sscanf(s, "src=%i", &tssrc);
+			else if (strncmp(s, "dmx=", 4) == 0)
+				sscanf(s, "dmx=%i", &dmx);
+		}
+		if (ppid == -1 && vpid != -1)
+			ppid = vpid;
+		dvb_play(vpid, apid, ppid, vfmt, afmt,
+			freq, tssrc, dmx, fe_mod, argc, argv);
+    }
 	else
 	{
 		for(i=2; i<argc; i++)

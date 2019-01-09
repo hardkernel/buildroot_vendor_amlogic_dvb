@@ -178,7 +178,7 @@ static AM_ErrorCode_t aml_set_key (
 		/* Need to ensure type in am_dsc.h equal to the one in ca.h */
 		aes_param.type = alg_type; 
 		memcpy(aes_param.cw, key, 16);
-		if(ioctl(fd, CA_SET_DESCR_EX, &dvbcsa_param)==-1)
+		if(ioctl(fd, CA_SET_DESCR_EX, &aes_param)==-1)
 			goto ERR;
 		else
 			goto SUCCESS;

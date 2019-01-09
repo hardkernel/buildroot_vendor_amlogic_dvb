@@ -96,6 +96,8 @@ typedef enum {
 	AM_DSC_KEY_TYPE_AES_ODD = 3,     /**< AES odd control word*/
 	AM_DSC_KEY_TYPE_AES_IV_EVEN = 4, /**< AES-CBC even control word's IV data*/
 	AM_DSC_KEY_TYPE_AES_IV_ODD = 5,  /**< AES-CBC odd control word's IV data*/
+	AM_DSC_KEY_TYPE_DES_EVEN = 6,    /**< DES even control word*/
+	AM_DSC_KEY_TYPE_DES_ODD = 7,     /**< DES odd control word*/
 	AM_DSC_KEY_FROM_KL = (1<<7)      /**< Read the control word from hardware keyladder*/
 } AM_DSC_KeyType_t;
 

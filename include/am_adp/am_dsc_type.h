@@ -33,6 +33,8 @@ typedef enum {
 	AM_DSC_KEY_TYPE_AES_ODD = 3,     /**< AES odd key */
 	AM_DSC_KEY_TYPE_AES_IV_EVEN = 4, /**< AES-CBC iv even key */
 	AM_DSC_KEY_TYPE_AES_IV_ODD = 5,  /**< AES-CBC iv odd key */
+	AM_DSC_KEY_TYPE_DES_EVEN = 6,    /**< DES even key */
+	AM_DSC_KEY_TYPE_DES_ODD = 7,     /**< DES odd key */
 	AM_DSC_KEY_FROM_KL = (1<<7)      /**< Key from keyladder flag */
 } AM_DSC_KeyType_t;
 #endif
