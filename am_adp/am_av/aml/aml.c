@@ -4675,7 +4675,8 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 
 		if (has_video && (vdec_stop_dur > NO_DATA_CHECK_TIME)) {
-			need_replay = AM_TRUE;
+			if (AM_ABS(checkin_firstapts - checkin_firstvpts) < TIME_UNIT90K * 5)
+				need_replay = AM_TRUE;
 			AM_DEBUG(1, "[avmon] apts_dmx_stop: %d arp_stop: %d vpts_dmx_stop: %d vrp_stop: %d",
 					dmx_apts_stop_dur, arp_stop_dur, dmx_vpts_stop_dur, vrp_stop_dur);
 		}
