@@ -55,6 +55,7 @@ typedef struct dvbpsi_caption_service_s
     uint16_t i_caption_service_number; /*!< Caption Service Number */
     int      b_easy_reader;     /*!< Easy reader flag */
     int      b_wide_aspect_ratio; /*!< Wide aspect ratio flag */
+    unsigned int      private_data;
 } dvbpsi_caption_service_t;
 
 /*****************************************************************************

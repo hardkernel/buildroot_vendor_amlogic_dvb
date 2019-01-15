@@ -96,6 +96,8 @@ struct AM_CC_Decoder
 	AM_Bool_t hide;
 	AM_Bool_t render_flag;
 	AM_Bool_t need_clear;
+	unsigned int decoder_param;
+	char lang[12];
 	pthread_t render_thread;
 	pthread_t data_thread;
 	pthread_mutex_t lock;

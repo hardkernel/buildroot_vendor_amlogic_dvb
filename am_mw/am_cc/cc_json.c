@@ -9,7 +9,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include "dtvcc.h"
-
+#include <am_iconv.h>
 #include "am_debug.h"
 
 
@@ -717,7 +717,15 @@ text_to_json (uint8_t *buf, int len, struct dtvcc_pen_style *pt, Output *out)
 		return -1;
 
 	buf[len] = 0;
-
+#if 0
+	iconv_t cd = iconv_open("utf-8", "euc-kr");
+	if (cd == -1) AM_DEBUG(0, "iconv open failed");
+	char tobuffer[1024] = {0};
+	int outLen = 1024;
+	char* tmpTobuffer = tobuffer;
+	int ret_len = iconv(cd, (const char**)&buf, (size_t *)&len, &tmpTobuffer, (size_t *)&outLen);
+	iconv_close(cd);
+#endif
 	if (o_str_prop(out, "data", (char*)buf) < 0)
 		return -1;
 
@@ -728,9 +736,10 @@ text_to_json (uint8_t *buf, int len, struct dtvcc_pen_style *pt, Output *out)
 }
 
 static int
-row_to_json (struct dtvcc_window *win, Output *out, int row, struct dtvcc_pen_style *pt)
+row_to_json (struct tvcc_decoder *td, struct dtvcc_window *win, Output *out, int row, struct dtvcc_pen_style *pt)
 {
-	uint8_t  buf[win->column_count * 3 + 1];
+	//uint8_t  buf[win->column_count * 3 + 1];
+	uint8_t  buf[1024];
 	uint8_t *pb  = buf;
 	int      len = 0;
 	int      col;
@@ -757,6 +766,46 @@ row_to_json (struct dtvcc_window *win, Output *out, int row, struct dtvcc_pen_st
 		else
 			continuance_flag = 1;
 
+	char* lang_korea;
+	int lang_korea_unicode;
+	lang_korea = strstr(td->dtvcc.lang, "kor");
+	lang_korea_unicode = td->dtvcc.decoder_param & (0x1<<13);
+	if (lang_korea && (lang_korea_unicode == 0))
+	{
+		AM_DEBUG(0, "cc_json convert json in kor lang");
+		if (c) {
+			iconv_t cd = iconv_open("utf-8", "euc-kr");
+			if (cd == -1)
+				AM_DEBUG(0, "iconv open failed");
+			char tobuffer[16] = {0};
+			size_t outLen = 16;
+			size_t inLen = 2;
+			char* in_pointer = &c;
+			char inbuffer[2];
+			char* srcStart = inbuffer;
+			if (!in_pointer[1])
+			{
+				inbuffer[0] = in_pointer[0];
+				inbuffer[1] = 0;
+			}
+			else
+			{
+				inbuffer[0] = in_pointer[1];
+				inbuffer[1] = in_pointer[0];
+			}
+			char* tmpTobuffer = tobuffer;
+			*pt = *cpt;
+			int ret_len = iconv(cd, (const char**)&srcStart, (size_t *)&inLen, &tmpTobuffer, (size_t *)&outLen);
+			AM_DEBUG(0, "ret: %d in: %02x%02x inLen: %d outLen: %d out: %s outlen: %d %x",
+				ret_len, inbuffer[0], inbuffer[1], inLen, outLen, tobuffer, strlen(tobuffer), tobuffer[0]);
+			iconv_close(cd);
+			strcpy(pb, tobuffer);
+			len += strlen(tobuffer);
+			pb += strlen(tobuffer);
+		}
+	}
+	else
+	{
 		if (c) {
 			if (memcmp(pt, cpt, sizeof(*pt))) {
 				if (len) {
@@ -775,9 +824,12 @@ row_to_json (struct dtvcc_window *win, Output *out, int row, struct dtvcc_pen_st
 
 			r = put_uc(pb, uc);
 
+
 			pb  += r;
 			len += r;
 		}
+		}
+
 	}
 
 	if (len) {
@@ -798,7 +850,7 @@ row_to_json (struct dtvcc_window *win, Output *out, int row, struct dtvcc_pen_st
 }
 
 static int
-dtvcc_window_to_json (struct dtvcc_window *win, Output *out)
+dtvcc_window_to_json (struct tvcc_decoder *td, struct dtvcc_window *win, Output *out)
 {
 	struct dtvcc_pen_style  pt;
 	char                   *str;
@@ -935,7 +987,7 @@ dtvcc_window_to_json (struct dtvcc_window *win, Output *out)
 
 	memset(&pt, 0, sizeof(pt));
 	for (i = 0; i < win->row_count; i ++) {
-		if (row_to_json(win, out, i, &pt) < 0)
+		if (row_to_json(td, win, out, i, &pt) < 0)
 			return -1;
 	}
 
@@ -952,7 +1004,7 @@ dtvcc_window_to_json (struct dtvcc_window *win, Output *out)
 }
 
 static int
-dtvcc_service_to_json (struct dtvcc_service *srv, Output *out)
+dtvcc_service_to_json (struct tvcc_decoder *td, struct dtvcc_service *srv, Output *out)
 {
 	struct dtvcc_window *wins[8];
 	int i, j, n;
@@ -990,7 +1042,7 @@ dtvcc_service_to_json (struct dtvcc_service *srv, Output *out)
 		return -1;
 
 	for (i = 0; i < n; i ++) {
-		if (dtvcc_window_to_json(wins[i], out) < 0)
+		if (dtvcc_window_to_json(td, wins[i], out) < 0)
 			return -1;
 	}
 
@@ -1045,7 +1097,7 @@ tvcc_to_json (struct tvcc_decoder *td, int pgno, char *buf, size_t len)
 	} else {
 		struct dtvcc_service *ds = &td->dtvcc.service[pgno - 1 - 8];
 
-		r = dtvcc_service_to_json(ds, &out);
+		r = dtvcc_service_to_json(td, ds, &out);
 	}
 
 	return r;
