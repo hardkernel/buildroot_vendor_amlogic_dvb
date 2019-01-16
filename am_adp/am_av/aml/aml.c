@@ -143,6 +143,7 @@ void *adec_handle = NULL;
 #define STREAM_VBUF_FILE    "/dev/amstream_vbuf"
 #define STREAM_ABUF_FILE    "/dev/amstream_abuf"
 #define STREAM_TS_FILE      "/dev/amstream_mpts"
+#define STREAM_TS_SCHED_FILE      "/dev/amstream_mpts_sched"
 #define STREAM_PS_FILE      "/dev/amstream_mpps"
 #define STREAM_RM_FILE      "/dev/amstream_rm"
 #define JPEG_DEC_FILE       "/dev/amjpegdec"
@@ -201,6 +202,7 @@ void *adec_handle = NULL;
 #define STREAM_VBUF_FILE    "/dev/amstream_vbuf"
 #define STREAM_ABUF_FILE    "/dev/amstream_abuf"
 #define STREAM_TS_FILE      "/dev/amstream_mpts"
+#define STREAM_TS_SCHED_FILE      "/dev/amstream_mpts_sched"
 #define STREAM_PS_FILE      "/dev/amstream_mpps"
 #define STREAM_RM_FILE      "/dev/amstream_rm"
 #define JPEG_DEC_FILE       "/dev/amjpegdec"
@@ -674,6 +676,25 @@ static AM_ErrorCode_t aml_set_ad_source(AM_AD_Handle_t *ad, int enable, int pid,
 /****************************************************************************
  * Static functions
  ***************************************************************************/
+
+/****************************************************************************
+ * for now only mpeg2/h264/h265/vp9/avs2/mjpeg/mpeg4
+ * support multi instance video decoder
+ * use /dev/amstream_mpts_sched
+ ***************************************************************************/
+static AM_Bool_t check_vfmt_support_sched(AM_AV_VFormat_t vfmt)
+{
+	if (vfmt == VFORMAT_MPEG12 ||
+			vfmt == VFORMAT_H264 ||
+			vfmt == VFORMAT_HEVC ||
+			vfmt == VFORMAT_MJPEG ||
+			vfmt == VFORMAT_MPEG4 ||
+			vfmt == VFORMAT_VP9 ||
+			vfmt == VFORMAT_AVS2)
+		return AM_TRUE;
+	else
+		return AM_FALSE;
+}
 
 static AM_Bool_t show_first_frame_nosync(void)
 {
@@ -1842,11 +1863,23 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AV_InjectPlayPara_t
 			inj->vid_fd = afd = vfd;
 		break;
 		case PFORMAT_TS:
-			vfd = open(STREAM_TS_FILE, O_RDWR);
-			if (vfd == -1)
+			if (check_vfmt_support_sched(para->vid_fmt) == AM_FALSE)
 			{
-				AM_DEBUG(1, "cannot open device \"%s\"", STREAM_TS_FILE);
-				return AM_AV_ERR_CANNOT_OPEN_FILE;
+				vfd = open(STREAM_TS_FILE, O_RDWR);
+				if (vfd == -1)
+				{
+					AM_DEBUG(1, "cannot open device \"%s\"", STREAM_TS_FILE);
+					return AM_AV_ERR_CANNOT_OPEN_FILE;
+				}
+			}
+			else
+			{
+				vfd = open(STREAM_TS_SCHED_FILE, O_RDWR);
+				if (vfd == -1)
+				{
+					AM_DEBUG(1, "cannot open device \"%s\"", STREAM_TS_SCHED_FILE);
+					return AM_AV_ERR_CANNOT_OPEN_FILE;
+				}
 			}
 			inj->vid_fd = afd = vfd;
 		break;
@@ -2210,12 +2243,25 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AV_TimeShi
 	AM_FileEcho(DVB_STB_ASYNCFIFO_FLUSHSIZE_FILE, buf);
 
 
-	AM_DEBUG(1, "Openning mpts");
-	ts->fd = open(STREAM_TS_FILE, O_RDWR);
-	if (ts->fd == -1)
+	if (check_vfmt_support_sched(tp->vfmt) == AM_FALSE)
 	{
-		AM_DEBUG(1, "cannot open device \"%s\"", STREAM_TS_FILE);
-		return AM_AV_ERR_CANNOT_OPEN_FILE;
+		AM_DEBUG(1, "Openning mpts");
+		ts->fd = open(STREAM_TS_FILE, O_RDWR);
+		if (ts->fd == -1)
+		{
+			AM_DEBUG(1, "cannot open device \"%s\"", STREAM_TS_FILE);
+			return AM_AV_ERR_CANNOT_OPEN_FILE;
+		}
+	}
+	else
+	{
+		AM_DEBUG(1, "Openning mpts_sched");
+		ts->fd = open(STREAM_TS_SCHED_FILE, O_RDWR);
+		if (ts->fd == -1)
+		{
+			AM_DEBUG(1, "cannot open device \"%s\"", STREAM_TS_SCHED_FILE);
+			return AM_AV_ERR_CANNOT_OPEN_FILE;
+		}
 	}
 	AM_DEBUG(1, "Openning video");
 	ts->vid_fd = open(AMVIDEO_FILE, O_RDWR);
@@ -3652,12 +3698,25 @@ static AM_ErrorCode_t aml_open_ts_mode(AM_AV_Device_t *dev)
 	ts->vid_fd = open(AMVIDEO_FILE, O_RDWR);
 
 #ifndef MPTSONLYAUDIOVIDEO
-	ts->fd = open(STREAM_TS_FILE, O_RDWR);
-	if (ts->fd == -1)
+	if (check_vfmt_support_sched(dev->ts_player.play_para.vfmt) == AM_FALSE)
 	{
-		AM_DEBUG(1, "cannot open \"/dev/amstream_mpts\" error:%d \"%s\"", errno, strerror(errno));
-		free(ts);
-		return AM_AV_ERR_CANNOT_OPEN_DEV;
+		ts->fd = open(STREAM_TS_FILE, O_RDWR);
+		if (ts->fd == -1)
+		{
+			AM_DEBUG(1, "cannot open \"/dev/amstream_mpts\" error:%d \"%s\"", errno, strerror(errno));
+			free(ts);
+			return AM_AV_ERR_CANNOT_OPEN_DEV;
+		}
+	}
+	else
+	{
+		ts->fd = open(STREAM_TS_SCHED_FILE, O_RDWR);
+		if (ts->fd == -1)
+		{
+			AM_DEBUG(1, "cannot open \"/dev/amstream_mpts_sched\" error:%d \"%s\"", errno, strerror(errno));
+			free(ts);
+			return AM_AV_ERR_CANNOT_OPEN_DEV;
+		}
 	}
 	AM_DEBUG(1, "try to init subtitle ring buf");
 	int sid = 0xffff;
@@ -3771,7 +3830,14 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 
 		if (has_video && has_audio)
 		{
-			ts->fd = open(STREAM_TS_FILE, O_RDWR);
+			if (check_vfmt_support_sched(tp->vfmt) == AM_FALSE)
+			{
+				ts->fd = open(STREAM_TS_FILE, O_RDWR);
+			}
+			else
+			{
+				ts->fd = open(STREAM_TS_SCHED_FILE, O_RDWR);
+			}
 		}
 		else if ((!has_video) && has_audio)
 		{
@@ -3783,7 +3849,14 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 		}
 		else
 		{
-			ts->fd = open(STREAM_TS_FILE, O_RDWR);
+			if (check_vfmt_support_sched(tp->vfmt) == AM_FALSE)
+			{
+				ts->fd = open(STREAM_TS_FILE, O_RDWR);
+			}
+			else
+			{
+				ts->fd = open(STREAM_TS_SCHED_FILE, O_RDWR);
+			}
 		}
 
 		if (ts->fd == -1)

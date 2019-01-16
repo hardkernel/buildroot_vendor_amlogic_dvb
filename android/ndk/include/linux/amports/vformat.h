@@ -34,6 +34,11 @@ typedef enum {
     VFORMAT_YUV,    // Use SW decoder
     VFORMAT_H264MVC,
     VFORMAT_H264_4K2K,
+    VFORMAT_HEVC,
+    VFORMAT_H264_ENC,
+    VFORMAT_JPEG_ENC,
+    VFORMAT_VP9,
+    VFORMAT_AVS2,
     VFORMAT_MAX
 } vformat_t;
 

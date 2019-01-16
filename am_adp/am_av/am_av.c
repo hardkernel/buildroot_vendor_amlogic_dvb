@@ -181,6 +181,7 @@ static AM_ErrorCode_t av_start(AM_AV_Device_t *dev, AV_PlayMode_t mode, void *pa
 			stop_mode = AV_MODE_ALL&~(AV_PLAY_AUDIO_ES|AV_PLAY_FILE);
 		break;
 		case AV_PLAY_TS:
+			dev->ts_player.play_para = *(AV_TSPlayPara_t *)para;
 			stop_mode = AV_MODE_ALL;
 		break;
 		case AV_PLAY_FILE:
