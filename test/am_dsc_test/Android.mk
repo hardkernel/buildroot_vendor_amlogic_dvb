@@ -26,8 +26,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../include/am_adp $(LOCAL_PATH)/../../andro
             $(AMADEC_C_INCLUDES)\
             vendor/amlogic/frameworks/av/LibPlayer/amadec/include
 
-LOCAL_STATIC_LIBRARIES := libam_adp
-LOCAL_SHARED_LIBRARIES := $(AMADEC_LIBS) libcutils liblog libc
+LOCAL_SHARED_LIBRARIES := libam_adp $(AMADEC_LIBS) libcutils liblog libc
 include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)
@@ -37,7 +36,6 @@ LOCAL_MODULE:= am_dsc_test2
 LOCAL_MODULE_TAGS := optional
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND
 LOCAL_C_INCLUDES :=$(LOCAL_PATH)/../../include/am_adp $(LOCAL_PATH)/../../android/ndk/include
-LOCAL_STATIC_LIBRARIES :=libam_adp
-LOCAL_SHARED_LIBRARIES :=libcutils liblog libc
+LOCAL_SHARED_LIBRARIES :=libam_adp libcutils liblog libc
 include $(BUILD_EXECUTABLE)
 

@@ -25,8 +25,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../include/am_adp $(LOCAL_PATH)/../../andro
                     vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
                     vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
                     common/include/linux/amlogic
-LOCAL_STATIC_LIBRARIES := libam_adp
-LOCAL_SHARED_LIBRARIES := $(AMADEC_LIBS) libcutils liblog libc libdl
+LOCAL_SHARED_LIBRARIES := libam_adp $(AMADEC_LIBS) libcutils liblog libc libdl
 include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)
@@ -41,6 +40,5 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../include/am_adp $(LOCAL_PATH)/../../andro
                     vendor/amlogic/frameworks/av/LibPlayer/dvbplayer/include\
                     vendor/amlogic/frameworks/av/LibPlayer/amadec/include\
                     common/include/linux/amlogic
-LOCAL_STATIC_LIBRARIES := libam_adp
-LOCAL_SHARED_LIBRARIES := $(AMADEC_LIBS) libcutils liblog libc libdl
+LOCAL_SHARED_LIBRARIES := libam_adp $(AMADEC_LIBS) libcutils liblog libc libdl
 include $(BUILD_EXECUTABLE)

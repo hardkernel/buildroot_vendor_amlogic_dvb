@@ -17,8 +17,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../include/am_adp \
 				    $(LOCAL_PATH)/../../include/am_mw/libdvbsi/descriptors\
 				    $(LOCAL_PATH)/../../include/am_mw/libdvbsi/tables\
 				    $(LOCAL_PATH)/../../include/am_mw/atsc
-LOCAL_STATIC_LIBRARIES := libam_mw libam_adp
-LOCAL_SHARED_LIBRARIES := liblog libc
+LOCAL_SHARED_LIBRARIES := libam_mw libam_adp liblog libc
 
 LOCAL_LDFLAGS += -ldl
 
