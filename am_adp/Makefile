@@ -43,7 +43,7 @@ SRC_FILES = $(wildcard am_dmx/*.c am_dmx/linux_dvb/*.c \
 		    am_open_lib/am_freesat/freesat.c \
 		    am_tfile/am_tfile.c)
 
-CFLAGS   := -c -Wall -shared -fPIC -Wno-unknown-pragmas -Wno-format -O3 -fexceptions -fnon-call-exceptions
+CFLAGS   := -c -Wall -shared -fPIC -Wno-unknown-pragmas -Wno-format -O3 -fexceptions -fnon-call-exceptions -DUSE_ADEC_IN_DVB
 
 CFLAGS += $(LOCAL_C_INCLUDES) $(DEFINES)
 LDFLAGS  := -shared -fPIC -L$(TARGET_DIR)/usr/lib -lamadec

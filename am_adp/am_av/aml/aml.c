@@ -310,6 +310,13 @@ static AM_ErrorCode_t set_dec_control(AM_Bool_t enable);
 #else
 #define VALID_AUDIO(_pid_, _fmt_) (VALID_PID(_pid_))
 #endif
+
+/*
+ * As not inlude "adec-external-ctrl.h", so we need declare
+ * audio_decode_set_volume. Otherwise it will lost the value of the second
+ * param, AKA volume.
+ */
+extern int audio_decode_set_volume(void *, float);
 /****************************************************************************
  * Type definitions
  ***************************************************************************/
@@ -1029,7 +1036,9 @@ static void adec_start_decode(int fd, int fmt, int has_video, void **padec)
 			param.has_video = has_video;
 			param.associate_dec_supported = _get_asso_enable();
 			param.mixing_level = _get_asso_mix();
-			//param.use_hardabuf = 1; //should be use hardabuf ???
+#ifndef ANDROID
+			param.use_hardabuf = 1; //linux use hardabuf
+#endif
 			audio_decode_init(padec, &param);
 			audio_set_av_sync_threshold(*padec, AV_SYNC_THRESHOLD);
 			audio_decode_set_volume(*padec, 1.);
