@@ -71,8 +71,9 @@
 #define FILENAME_LENGTH_MAX 2048
 
 #include <codec_type.h>
-//#include <adec-external-ctrl.h>
-
+#ifdef USE_ADEC_IN_DVB
+#include <adec-external-ctrl.h>
+#endif
 void *adec_handle = NULL;
 
 #ifndef TRICKMODE_NONE
