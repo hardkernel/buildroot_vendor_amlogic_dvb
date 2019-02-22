@@ -4778,10 +4778,12 @@ static void* aml_av_monitor_thread(void *arg)
 
 		if (has_audio && (dmx_apts < apts)) {
 			apts_discontinue = 1;
+			AM_DEBUG(1, "[avmon] dmx_apts:%d,apts:%d",dmx_apts,apts);
 		}
 
 		if (has_video && (dmx_vpts < vpts)) {
 			vpts_discontinue = 1;
+			AM_DEBUG(1, "[avmon] dmx_vpts:%d,vpts:%d",dmx_vpts,vpts);
 		}
 
 		if (apts_discontinue && vpts_discontinue) {
@@ -4791,7 +4793,7 @@ static void* aml_av_monitor_thread(void *arg)
 			vpts_discontinue = 0;
 
 			AM_DMX_GetScrambleStatus(0, sf);
-			if (sf[0] == 0 && sf[1] == 0) {
+			if (sf[0] == 0 && sf[1] == 0 && is_dts_dolby) {
 				need_replay = AM_TRUE;
 			}
 		}
