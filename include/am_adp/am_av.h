@@ -1179,6 +1179,24 @@ typedef void (*AM_AV_Audio_CB_t)(int event_type, AudioParms* parm, void *user_da
 
 extern AM_ErrorCode_t AM_AV_SetAudioCallback(int dev_no,AM_AV_Audio_CB_t cb,void *user_data);
 
+/**
+ * brief Get current video pts
+ * \param dev_no AV decoder device number
+ * \param[out] Return the 33-bit pts value
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
+extern AM_ErrorCode_t AM_AV_GetVideoPts(int dev_no, uint64_t *pts);
+
+/**
+ * brief Get current audio pts
+ * \param dev_no AV decoder device number
+ * \param[out] Return the 33-bit pts value
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
+extern AM_ErrorCode_t AM_AV_GetAudioPts(int dev_no, uint64_t *pts);
+
 #ifdef __cplusplus
 }
 #endif

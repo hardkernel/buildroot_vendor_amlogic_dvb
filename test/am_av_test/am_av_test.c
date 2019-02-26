@@ -367,6 +367,13 @@ static int normal_cmd(const char *cmd)
 		AM_ErrorCode_t err = AM_AV_SetAudioAd(AV_DEV_NO, 0, 0, 0);
 		printf("SetAudioAd [off] [err:%d]\n", err);
 	}
+	else if(!strncmp(cmd, "pts", 3))
+	{
+		uint64_t vpts, apts;
+		AM_ErrorCode_t err = AM_AV_GetVideoPts(AV_DEV_NO, &vpts);
+		err |= AM_AV_GetAudioPts(AV_DEV_NO, &apts);
+		printf("PTS v[0x%llx]\n    a[0x%llx]\n[err:%d]\n", (unsigned long long)vpts, (unsigned long long)apts, err);
+	}
 	else
 	{
 		return 0;

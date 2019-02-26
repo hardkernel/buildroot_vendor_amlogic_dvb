@@ -174,6 +174,8 @@ void *adec_handle = NULL;
 #define RESAMPLE_TYPE_FILE      "/sys/class/amaudio/resample_type"
 #define AUDIO_DMX_PTS_FILE	"/sys/class/stb/audio_pts"
 #define VIDEO_DMX_PTS_FILE	"/sys/class/stb/video_pts"
+#define AUDIO_DMX_PTS_BIT32_FILE	"/sys/class/stb/audio_pts_bit32"
+#define VIDEO_DMX_PTS_BIT32_FILE	"/sys/class/stb/video_pts_bit32"
 #define AUDIO_PTS_FILE	"/sys/class/tsync/pts_audio"
 #define VIDEO_PTS_FILE	"/sys/class/tsync/pts_video"
 #define TSYNC_MODE_FILE "/sys/class/tsync/mode"
@@ -502,6 +504,7 @@ static AM_ErrorCode_t aml_timeshift_get_tfile(AM_AV_Device_t *dev, AM_TFile_t *t
 static void 		  aml_set_audio_cb(AM_AV_Device_t *dev,AM_AV_Audio_CB_t cb,void *user_data);
 
 static int aml_restart_inject_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread);
+static AM_ErrorCode_t aml_get_pts(AM_AV_Device_t *dev, int type, uint64_t *pts);
 
 const AM_AV_Driver_t aml_av_drv =
 {
@@ -532,6 +535,7 @@ const AM_AV_Driver_t aml_av_drv =
 .set_inject_subtitle = aml_set_inject_subtitle,
 .timeshift_get_tfile = aml_timeshift_get_tfile,
 .set_audio_cb = aml_set_audio_cb,
+.get_pts = aml_get_pts,
 };
 
 /*音频控制（通过解码器）操作*/
@@ -657,7 +661,6 @@ static pthread_cond_t gAVMonCond = PTHREAD_COND_INITIALIZER;
 static AM_Bool_t	gAVPcrEnable = AM_FALSE;
 
 static void* aml_av_monitor_thread(void *arg);
-static AM_ErrorCode_t aml_get_pts(const char *class_file,  uint32_t *pts);
 
 /*Timeshift 操作*/
 static void *aml_timeshift_thread(void *arg);
@@ -4071,19 +4074,6 @@ static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 	return 0;
 }
 
-/**\brief 读取PTS值*/
-static AM_ErrorCode_t aml_get_pts(const char *class_file,  uint32_t *pts)
-{
-	char buf[32];
-
-	if (AM_FileRead(class_file, buf, sizeof(buf)) == AM_SUCCESS)
-	{
-		*pts = (uint32_t)atol(buf);
-		return AM_SUCCESS;
-	}
-
-	return AM_FAILURE;
-}
 
 static inline AM_AV_VideoAspectRatio_t
 convert_aspect_ratio(enum E_ASPECT_RATIO euAspectRatio)
@@ -6910,5 +6900,58 @@ static void aml_set_audio_cb(AM_AV_Device_t *dev,AM_AV_Audio_CB_t cb,void *user_
 		audio_ops = &callback_audio_drv;
 #endif
 	}
+}
+
+static AM_ErrorCode_t aml_get_pts(AM_AV_Device_t *dev, int type, uint64_t *pts)
+{
+#define GAP_10SEC (90000*10)/*10s*/
+	char pts_buf[32];
+	const char *pts_file, *pts_bit32_file, *pts_tsync_file;
+	uint32_t pts_dmx = 0, pts_dmx_bit32 = 0, pts_dmx_2 = 0, pts_tsync = 0;
+	int retry = 0;
+
+	switch (type) {
+	case 1:
+		pts_file = AUDIO_DMX_PTS_FILE;
+		pts_bit32_file = AUDIO_DMX_PTS_BIT32_FILE;
+		pts_tsync_file = AUDIO_PTS_FILE;
+		break;
+	default:
+		pts_file = VIDEO_DMX_PTS_FILE;
+		pts_bit32_file = VIDEO_DMX_PTS_BIT32_FILE;
+		pts_tsync_file = VIDEO_PTS_FILE;
+		break;
+	}
+
+	retry = 2;
+	do {
+		memset(pts_buf, 0, sizeof(pts_buf));
+		if (AM_FileRead(pts_file, pts_buf, sizeof(pts_buf)) >= 0)
+			sscanf(pts_buf, "%d", &pts_dmx);
+
+		memset(pts_buf, 0, sizeof(pts_buf));
+		if (AM_FileRead(pts_bit32_file, pts_buf, sizeof(pts_buf)) >= 0)
+			sscanf(pts_buf, "%d", &pts_dmx_bit32);
+
+		memset(pts_buf, 0, sizeof(pts_buf));
+		if (AM_FileRead(pts_file, pts_buf, sizeof(pts_buf)) >= 0)
+			sscanf(pts_buf, "%d", &pts_dmx_2);
+	} while (retry-- && (abs(pts_dmx_2 - pts_dmx) > GAP_10SEC));
+
+	if ((abs(pts_dmx_2 - pts_dmx) > GAP_10SEC)) {
+		AM_DEBUG(1, "something wrong with the stream's pts");
+		*pts = 0L;
+		return AM_SUCCESS;
+	}
+
+	memset(pts_buf, 0, sizeof(pts_buf));
+	if (AM_FileRead(pts_tsync_file, pts_buf, sizeof(pts_buf)) >= 0)
+		sscanf(pts_buf, "%i", &pts_tsync);
+
+	*pts = pts_tsync;
+	if (pts_dmx_bit32 && (abs(pts_dmx_2 - pts_tsync) < (GAP_10SEC * 3)))
+		*pts += 0x100000000L;
+
+	return AM_SUCCESS;
 }
 

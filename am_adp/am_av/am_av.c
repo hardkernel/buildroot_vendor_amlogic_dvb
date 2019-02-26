@@ -3035,3 +3035,40 @@ AM_ErrorCode_t AM_AV_SetAudioCallback(int dev_no,AM_AV_Audio_CB_t cb,void *user_
 	return 0;
 }
 
+AM_ErrorCode_t AM_AV_GetVideoPts(int dev_no, uint64_t *pts)
+{
+	AM_AV_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_TRY(av_get_openned_dev(dev_no, &dev));
+
+	pthread_mutex_lock(&dev->lock);
+
+	if (dev->drv->get_pts)
+	{
+		ret = dev->drv->get_pts(dev, 0, pts);
+	}
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+AM_ErrorCode_t AM_AV_GetAudioPts(int dev_no, uint64_t *pts)
+{
+	AM_AV_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_TRY(av_get_openned_dev(dev_no, &dev));
+
+	pthread_mutex_lock(&dev->lock);
+
+	if (dev->drv->get_pts)
+	{
+		ret = dev->drv->get_pts(dev, 1, pts);
+	}
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
