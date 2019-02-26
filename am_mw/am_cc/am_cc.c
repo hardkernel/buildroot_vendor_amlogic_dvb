@@ -1068,8 +1068,12 @@ AM_ErrorCode_t AM_CC_Create(AM_CC_CreatePara_t *para, AM_CC_Handle_t *handle)
 	cc->json_chain_head->json_chain_prior = cc->json_chain_head;
 	cc->json_chain_head->count = 0;
 
+	cc->decoder_param = para->decoder_param;
+	strncpy(cc->lang, para->lang, 10);
+
 	/* init the tv cc decoder */
-	tvcc_init(&cc->decoder);
+	tvcc_init(&cc->decoder, para->lang, 10, para->decoder_param);
+
 	if (cc->decoder.vbi == NULL)
 		return AM_CC_ERR_LIBZVBI;
 

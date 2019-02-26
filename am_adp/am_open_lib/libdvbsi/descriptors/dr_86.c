@@ -83,7 +83,7 @@ dvbpsi_atsc_caption_service_dr_t *dvbpsi_decode_atsc_caption_service_dr(dvbpsi_d
         buf++;
         p_service->b_easy_reader            = 0x01 & (buf[0] >> 7);
         p_service->b_wide_aspect_ratio      = 0x01 & (buf[0] >> 6);
-
+        p_service->private_data             = buf[0] << 8 | buf[1];
         buf += 2;
     }
     return p_decoded;

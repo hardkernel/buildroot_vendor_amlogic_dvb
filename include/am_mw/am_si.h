@@ -213,7 +213,7 @@ enum AM_SI_ErrorCode
 };
 
 /**\brief section head define*/
-typedef struct 
+typedef struct
 {
 	uint8_t		table_id;			/**< table_id*/
 	uint8_t		syntax_indicator;	/**< section_syntax_indicator*/
@@ -287,12 +287,13 @@ typedef struct
 		int service_number;	/**<caption service number*/
 		int pid_or_line21;  /**<line21 for analog / es pid for digital*/
 		int flags;                  /**<easy reader(mask:0x80) / wide aspect ratio(mask:0x40) for digital*/
+		unsigned int private_data;
 		char lang[16];		/**<the language of caption for digital*/
 	}captions[AM_SI_MAX_CAP_CNT];/**<caption info*/
 }AM_SI_CaptionInfo_t;
 
 /****************************************************************************
- * Function prototypes  
+ * Function prototypes
  ***************************************************************************/
 
 /**\brief creat a parser of parse si
