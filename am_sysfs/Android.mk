@@ -29,8 +29,10 @@ endif
 
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
 LOCAL_SHARED_LIBRARIES+=vendor.amlogic.hardware.systemcontrol@1.0
+LOCAL_SHARED_LIBRARIES+=vendor.amlogic.hardware.systemcontrol@1.1
 else
 LOCAL_SHARED_LIBRARIES+=vendor.amlogic.hardware.systemcontrol@1.0_vendor
+LOCAL_SHARED_LIBRARIES+=vendor.amlogic.hardware.systemcontrol@1.1_vendor
 endif
 
 
