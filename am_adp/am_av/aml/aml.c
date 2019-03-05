@@ -4104,7 +4104,7 @@ static void* aml_av_monitor_thread(void *arg)
 
 	//AM_FileEcho(VID_BLACKOUT_FILE, "0");
 	AM_FileEcho(VID_BLACKOUT_FILE, dev->video_blackout ? "1" : "0");
-	AM_FileEcho(VDEC_H264_FATAL_ERROR_RESET_FILE, "1");
+	//AM_FileEcho(VDEC_H264_FATAL_ERROR_RESET_FILE, "1");
 
 	pthread_mutex_lock(&gAVMonLock);
 
@@ -4913,7 +4913,7 @@ static void* aml_av_monitor_thread(void *arg)
 	}
 #endif
 
-	AM_FileEcho(VDEC_H264_FATAL_ERROR_RESET_FILE, "0");
+	//AM_FileEcho(VDEC_H264_FATAL_ERROR_RESET_FILE, "0");
 	AM_FileEcho(VID_BLACKOUT_FILE, dev->video_blackout ? "1" : "0");
 
 	if (bypass_di) {
