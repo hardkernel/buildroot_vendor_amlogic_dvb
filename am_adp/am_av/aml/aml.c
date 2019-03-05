@@ -959,7 +959,7 @@ static void adec_stop_decode_cb(void **padec)
 }
 static void adec_set_decode_ad_cb(int enable, int pid, int fmt, void *adec)
 {
-	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
+	AM_DEBUG(1, "%s %d pid:%d,fmt:%d\n", __FUNCTION__,__LINE__,pid,fmt);
 
 	AudioParms audio_parms;
 	memset(&audio_parms,0,sizeof(AudioParms));
@@ -4043,7 +4043,6 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	}
 
 	aml_set_sync_mode(dev, sync_mode);
-
 	if (has_audio && (sync_force != FORCE_AC3_AMASTER)) {
 		if (!show_first_frame_nosync()) {
 #ifdef ANDROID
@@ -6797,6 +6796,8 @@ static AM_ErrorCode_t aml_set_ad_source(AM_AD_Handle_t *ad, int enable, int pid,
 
 	AM_DEBUG(1, "AD set source enable[%d] pid[%d] fmt[%d]", enable, pid, fmt);
 
+#ifdef USE_ADEC_IN_DVB
+
 	if (enable) {
 		AM_AD_Para_t para = {.dmx_id = 0, .pid = pid, .fmt = fmt};
 		err = AM_AD_Create(ad, &para);
@@ -6813,6 +6814,16 @@ static AM_ErrorCode_t aml_set_ad_source(AM_AD_Handle_t *ad, int enable, int pid,
 			*ad = NULL;
 		}
 	}
+#else
+	if (enable) {
+		*ad = (AM_AD_Handle_t) 1;
+	} else {
+		if (*ad) {
+			err = AM_SUCCESS;
+			*ad = NULL;
+		}
+	}
+#endif
 	return err;
 }
 static AM_ErrorCode_t aml_set_audio_ad(AM_AV_Device_t *dev, int enable, uint16_t apid, AM_AV_AFormat_t afmt)
@@ -6848,12 +6859,12 @@ static AM_ErrorCode_t aml_set_audio_ad(AM_AV_Device_t *dev, int enable, uint16_t
 			AM_DEBUG(1, "only valid in TS/INJ/TIMESHIFT mode");
 			return AM_AV_ERR_NOT_SUPPORTED;
 	}
-
+#ifdef USE_ADEC_IN_DVB
 	if (enable && !adec) {
 		AM_DEBUG(1, "no main audio, this is associate audio setting");
 		return AM_AV_ERR_ILLEGAL_OP;
 	}
-
+#endif
 
 	/*assume ad is enabled if ad handle is not NULL*/
 	if ((enable && *pad && (apid == sub_apid) && (afmt == sub_afmt))
@@ -6872,7 +6883,6 @@ static AM_ErrorCode_t aml_set_audio_ad(AM_AV_Device_t *dev, int enable, uint16_t
 		aml_set_ad_source(pad, 1, apid, afmt, adec);
 
 	} else if (!enable && pad && *pad) {
-
 
 		/*shutdown date source*/
 		aml_set_ad_source(pad, 0, apid, afmt, adec);
