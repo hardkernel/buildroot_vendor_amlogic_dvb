@@ -51,7 +51,8 @@
 #define AMSTREAM_IOC_UD_LENGTH _IOR(AMSTREAM_IOC_MAGIC, 0x54, unsigned long)
 #define AMSTREAM_IOC_UD_POC _IOR(AMSTREAM_IOC_MAGIC, 0x55, int)
 #define AMSTREAM_IOC_UD_FLUSH_USERDATA _IOR(AMSTREAM_IOC_MAGIC, 0x56, int)
-#define AMSTREAM_IOC_UD_BUF_READ _IOR(AMSTREAM_IOC_MAGIC, 0x57, struct userdata_param_t)
+#define AMSTREAM_IOC_UD_BUF_READ _IOR(AMSTREAM_IOC_MAGIC, 0x57, unsigned int)
+#define AMSTREAM_IOC_UD_AVAIBLE_VDEC      _IOR(AMSTREAM_IOC_MAGIC, 0x5c, unsigned int)
 
 /****************************************************************************
  * Type definitions
@@ -134,7 +135,7 @@ struct userdata_param_t {
 	uint32_t instance_id; /*input, 0~9*/
 	uint32_t buf_len; /*input*/
 	uint32_t data_size; /*output*/
-	unsigned long long pbuf_addr; /*input*/
+	void* pbuf_addr; /*input*/
 	struct userdata_meta_info_t meta_info; /*output*/
 };
 #if 0
@@ -715,11 +716,11 @@ static void* aml_userdata_thread (void *arg)
 #endif
 	int left = 0;
 	int flush = 1;
+	int vdec_ids;
 	struct userdata_param_t user_para_info;
 
 	pfd.events = POLLIN|POLLERR;
 	pfd.fd	 = fd;
-	int index = 0;
 
 	while (ud->running) {
 		//If scte and mpeg both exist, we need to ignore scte cc data,
@@ -727,30 +728,41 @@ static void* aml_userdata_thread (void *arg)
 		left = 0;
 
 		ret = poll(&pfd, 1, USERDATA_POLL_TIMEOUT);
+		AM_DEBUG(0, "userdata after poll ret %d", ret);
 		if (!ud->running)
 			break;
 		if (ret != 1)
 			continue;
 		if (!(pfd.revents & POLLIN))
 			continue;
+
+		//For multi-instances support
+		vdec_ids = 0;
+		if (-1 == ioctl(fd, AMSTREAM_IOC_UD_AVAIBLE_VDEC, &vdec_ids)) {
+			printf("get avaible vdec failed\n");
+		} else {
+			printf("get avaible vdec OK: 0x%x\n", vdec_ids);
+		}
+
+		if (!(vdec_ids & 1))
+			continue;
+
+		if (flush) {
+			ioctl(fd, AMSTREAM_IOC_UD_FLUSH_USERDATA, NULL);
+			flush = 0;
+			continue;
+		}
+
 		do {
 			memset(&user_para_info, 0, sizeof(struct userdata_param_t));
-			user_para_info.pbuf_addr= (unsigned long long)(size_t)data;
+			user_para_info.pbuf_addr= (void*)(size_t)data;
 			user_para_info.buf_len = sizeof(data);
+			user_para_info.instance_id = 0;
 
-		if (-1 == ioctl(fd, AMSTREAM_IOC_UD_BUF_READ, &user_para_info))
-			AM_DEBUG(0, "call AMSTREAM_IOC_UD_BUF_READ failed\n");
-		AM_DEBUG(0, "ioctl left data: %d",user_para_info.meta_info.records_in_que);
-		index++;
+			if (-1 == ioctl(fd, AMSTREAM_IOC_UD_BUF_READ, &user_para_info))
+				AM_DEBUG(0, "call AMSTREAM_IOC_UD_BUF_READ failed\n");
+			AM_DEBUG(0, "ioctl left data: %d",user_para_info.meta_info.records_in_que);
 
-		//Old userdata was read from node. now use ioctl to get data.
-		// memset(&poc_block, 0, sizeof(userdata_poc_info_t));
-		// r = read(fd, data + left, sizeof(data) - left);
-			if (flush) {
-				ioctl(fd, AMSTREAM_IOC_UD_FLUSH_USERDATA, NULL);
-				flush = 0;
-				continue;
-			}
 			r = user_para_info.data_size;
 			r = (r > MAX_CC_DATA_LEN) ? MAX_CC_DATA_LEN : r;
 
@@ -769,12 +781,12 @@ static void* aml_userdata_thread (void *arg)
 				if (left < 8)
 					break;
 
-			ud->format = aml_check_userdata_format(pd, ud->vfmt, left);
-			if (ud->format == INVALID_TYPE) {
-				pd   += 8;
-				left -= 8;
+				ud->format = aml_check_userdata_format(pd, ud->vfmt, left);
+				if (ud->format == INVALID_TYPE) {
+					pd   += 8;
+					left -= 8;
+				}
 			}
-		}
 
 			if (ud->format == MPEG_CC_TYPE) {
 				ud->scte_enable = 0;
