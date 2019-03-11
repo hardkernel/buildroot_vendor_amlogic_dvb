@@ -192,6 +192,9 @@ extern AM_ErrorCode_t AM_REC_GetRecordInfo(AM_REC_Handle_t handle, AM_REC_RecInf
 extern AM_ErrorCode_t AM_REC_SetTFile(AM_REC_Handle_t handle, AM_TFile_t tfile, int flag);
 extern AM_ErrorCode_t AM_REC_GetTFile(AM_REC_Handle_t handle, AM_TFile_t *tfile, int *flag);
 
+extern AM_ErrorCode_t AM_REC_PauseRecord(AM_REC_Handle_t handle);
+extern AM_ErrorCode_t AM_REC_ResumeRecord(AM_REC_Handle_t handle);
+
 #ifdef __cplusplus
 }
 #endif

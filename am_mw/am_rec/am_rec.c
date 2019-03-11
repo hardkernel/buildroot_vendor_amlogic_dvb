@@ -461,8 +461,11 @@ static void *am_rec_record_thread(void* arg)
 				continue;
 			} else
 				break;
-
 		}
+
+		if (rec->stat_flag & REC_STAT_FL_PAUSED)
+			continue;
+
 		if (rec->rec_para.is_timeshift)
 		{
 			if (rec->tfile_flag & REC_TFILE_FLAG_AUTO_CREATE)
@@ -544,6 +547,7 @@ close_file:
 		/*通知录像结束*/
 		AM_EVT_Signal((long)rec, AM_REC_EVT_RECORD_END, (void*)&epara);
 		rec->stat_flag &= ~REC_STAT_FL_RECORDING;
+		rec->stat_flag &= ~REC_STAT_FL_PAUSED;
 	}
 	
 	return NULL;
@@ -666,6 +670,8 @@ start_end:
 /**\brief 停止录像*/
 static int am_rec_stop_record(AM_REC_Recorder_t *rec)
 {
+	rec->stat_flag &= ~REC_STAT_FL_PAUSED;
+
 	if (! (rec->stat_flag & REC_STAT_FL_RECORDING))
 		return 0;
 
@@ -777,6 +783,34 @@ AM_ErrorCode_t AM_REC_StopRecord(AM_REC_Handle_t handle)
 
 	pthread_mutex_lock(&rec->lock);
 	ret = am_rec_stop_record(rec);
+	pthread_mutex_unlock(&rec->lock);
+
+	return AM_SUCCESS;
+}
+
+AM_ErrorCode_t AM_REC_PauseRecord(AM_REC_Handle_t handle)
+{
+	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	assert(rec);
+
+	pthread_mutex_lock(&rec->lock);
+	rec->stat_flag |= REC_STAT_FL_PAUSED;
+	pthread_mutex_unlock(&rec->lock);
+
+	return AM_SUCCESS;
+}
+
+AM_ErrorCode_t AM_REC_ResumeRecord(AM_REC_Handle_t handle)
+{
+	AM_REC_Recorder_t *rec = (AM_REC_Recorder_t *)handle;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	assert(rec);
+
+	pthread_mutex_lock(&rec->lock);
+	rec->stat_flag &= ~REC_STAT_FL_PAUSED;
 	pthread_mutex_unlock(&rec->lock);
 
 	return AM_SUCCESS;

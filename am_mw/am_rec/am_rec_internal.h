@@ -35,6 +35,7 @@ enum
 {
 	REC_STAT_FL_RECORDING = 0x1,		/**< 录像*/
 	REC_STAT_FL_TIMESHIFTING = 0x2,	/**< Timshifting*/
+	REC_STAT_FL_PAUSED = 0x100,
 };
 
 /**\brief 内部事件定义*/
