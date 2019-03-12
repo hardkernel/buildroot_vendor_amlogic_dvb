@@ -111,7 +111,6 @@ enum AM_AV_EventType
 	AM_AV_EVT_VIDEO_NOT_SUPPORT,        /**< Video format is not supported*/
 	AM_AV_EVT_VIDEO_AVAILABLE,  /**< Cannot get valid video information*/
 	AM_AV_EVT_AUDIO_CB, /**< Audio function will implement in cb */
-	AM_AV_EVT_VIDEO_RESOLUTION_CHANGED, /**< Video resolution changed, the parameter is the AM_AV_VideoStatus_t with new width&height valid only */
 	AM_AV_EVT_END
 };
 
@@ -388,7 +387,6 @@ typedef struct
 	int              vb_size;     /**< Video buffer size*/
 	int              vb_data;     /**< Data size in the video buffer*/
 	int              vb_free;     /**< Free size in the video buffer*/
-	AM_AV_VideoAspectRatio_t vid_ratio; /**< Video source aspect ratio*/
 }AM_AV_VideoStatus_t;
 
 /**\brief Audio decoder status*/

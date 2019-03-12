@@ -473,41 +473,17 @@ static void file_play(const char *name, int loop, int pos)
 	AM_DMX_Close(DMX_DEV_NO);
 }
 
-static void video_callback(long dev_no, int event_type, void *param, void *data)
-{
-	switch (event_type) {
-	case AM_AV_EVT_VIDEO_RESOLUTION_CHANGED:
-		{
-			AM_AV_VideoStatus_t *status = param;
-			printf("[evt] video resolution changed: %dx%d\n",
-				status->src_w, status->src_h);
-		}
-		break;
-	case AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED:
-		printf("[evt] video aspect ratio changed: %ld\n", (long)param);
-		break;
-	case AM_AV_EVT_VIDEO_AVAILABLE:
-		printf("[evt] video available\n");
-		break;
-	default:
-		break;
-	}
-}
-
-static void dvb_play(int vpid, int apid, int ppid, int vfmt, int afmt, int freq, int src, int dmx, int femod, int argc, char *argv[])
+static void dvb_play(int vpid, int apid, int vfmt, int afmt, int freq, int src, int femod, int argc, char *argv[])
 {
 	int running = 1;
 	char buf[256];
 	AM_DMX_OpenPara_t para;
 	int SNR;
-	
+
 	memset(&para, 0, sizeof(para));
-	AM_DMX_Open(dmx, &para);
-	AM_DMX_SetSource(dmx, src);
-	AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_DMX0 + dmx);
-	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_RESOLUTION_CHANGED, video_callback, NULL);
-	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED, video_callback, NULL);
-	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_AVAILABLE, video_callback, NULL);
+	AM_DMX_Open(DMX_DEV_NO, &para);
+	AM_DMX_SetSource(DMX_DEV_NO, src);
+	AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_DMX1);
 
 	if(freq>0)
 	{
@@ -515,7 +491,7 @@ static void dvb_play(int vpid, int apid, int ppid, int vfmt, int afmt, int freq,
 		struct dvb_frontend_parameters p;
 		fe_status_t status;
 		int mode;
-		
+
 		memset(&para, 0, sizeof(para));
 
 		printf("Input fontend mode: (0-DVBC, 1-DVBT, 2-DVBS, 3-DTMB,4-ATSC)\n");
@@ -530,12 +506,11 @@ static void dvb_play(int vpid, int apid, int ppid, int vfmt, int afmt, int freq,
 			case 4: para.mode = FE_ATSC; break;
 			default: para.mode = FE_DTMB; break;
 		}
-		
+
 		AM_FEND_Open(FEND_DEV_NO, &para);
 
 		AM_FEND_SetMode(FEND_DEV_NO, para.mode);
-	
-		
+
 		p.frequency = freq;
 		if(para.mode == FE_ATSC)
 		{
