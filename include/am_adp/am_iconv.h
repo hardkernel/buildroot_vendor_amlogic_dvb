@@ -33,6 +33,8 @@ extern "C"
 #ifdef ANDROID
 #include <malloc.h>
 #include <unicode/ucnv.h>
+#include <unicode/putil.h>
+#include <unicode/uclean.h>
 #include <android/log.h>
 #include <dlfcn.h>
 #include <assert.h>
