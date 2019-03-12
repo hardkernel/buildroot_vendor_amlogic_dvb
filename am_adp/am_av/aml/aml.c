@@ -250,6 +250,8 @@ void *adec_handle = NULL;
 #define AV_THRESHOLD_MAX_FILE "/sys/class/tsync/av_threshold_max"
 #define TSYNC_FIRSTCHECKIN_APTS_FILE "/sys/class/tsync/checkin_firstapts"
 #define TSYNC_FIRSTCHECKIN_VPTS_FILE "/sys/class/tsync/checkin_firstvpts"
+#define AUDIO_DMX_PTS_BIT32_FILE	"/sys/class/stb/audio_pts_bit32"
+#define VIDEO_DMX_PTS_BIT32_FILE	"/sys/class/stb/video_pts_bit32"
 
 /*not find,android is not find*/
 #define AVS_PLUS_DECT_FILE "/sys/module/amvdec_avs/parameters/profile"
@@ -3810,12 +3812,14 @@ static int aml_calc_sync_mode(AM_AV_Device_t *dev, int has_audio, int has_video,
 	if (force_reason)
 		*force_reason = FORCE_NONE;
 
+#ifdef ANDROID
 	if ((afmt == AFORMAT_AC3) || (afmt == AFORMAT_EAC3)) {
 		char buf[32];
 		property_get(AC3_AMASTER_PROP, buf, "0");
 		if (!strcmp(buf, "1"))
 			ac3_amaster = 1;
 	}
+#endif
 
 	if (afmt == AFORMAT_AC3 ||
 		afmt == AFORMAT_DTS ||
