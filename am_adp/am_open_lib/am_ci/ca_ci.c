@@ -511,6 +511,7 @@ static int ca_ci_msg_receive(void *arg, AM_CA_Msg_t *msg)
 	ca_ci_t *ca_ci = (ca_ci_t*)arg;
 	AM_CI_Handle_t dev = ca_ci->ci;
 	ca_ci_msg_t *cimsg = (ca_ci_msg_t *)msg->data;
+	int ret = 0;
 
 	if (!msg->data || !msg->len)
 		return 0;
@@ -521,14 +522,15 @@ static int ca_ci_msg_receive(void *arg, AM_CA_Msg_t *msg)
 	{
 		case ca_ci_msg_type_enter_menu:
 			AM_DEBUG(1, "\t-->|ca ci msg [ca_ci_msg_type_enter_menu]");
-			AM_CI_App_ai_entermenu(dev);
+			ret = AM_CI_App_ai_entermenu(dev);
+			AM_DEBUG(1, "entermenu ret = 0x%x", ret);
 			break;
 
 		case ca_ci_msg_type_answer:
 			AM_DEBUG(1, "\t-->|ca ci msg [ca_ci_msg_type_answer]");
 			{
 				ca_ci_answer_enq_t *answ_enq = (ca_ci_answer_enq_t *)cimsg->msg;
-				AM_CI_App_mmi_answ(dev, answ_enq->answer_id, answ_enq->answer, answ_enq->size);
+				ret = AM_CI_App_mmi_answ(dev, answ_enq->answer_id, answ_enq->answer, answ_enq->size);
 			}
 			break;
 
@@ -536,7 +538,7 @@ static int ca_ci_msg_receive(void *arg, AM_CA_Msg_t *msg)
 			AM_DEBUG(1, "\t-->|ca ci msg [ca_ci_msg_type_answer_menu]");
 			{
 				ca_ci_answer_menu_t *answ_menu = (ca_ci_answer_menu_t *)cimsg->msg;
-				AM_CI_App_mmi_menu_answ(dev, answ_menu->select);
+				ret = AM_CI_App_mmi_menu_answ(dev, answ_menu->select);
 			}
 			break;
 
@@ -544,7 +546,7 @@ static int ca_ci_msg_receive(void *arg, AM_CA_Msg_t *msg)
 			AM_DEBUG(1, "\t-->|ca ci msg [ca_ci_msg_type_close_mmi]");
 			{
 				ca_ci_close_mmi_t *close_mmi = (ca_ci_close_mmi_t*)cimsg->msg;
-				AM_CI_App_mmi_close(dev, close_mmi->cmd_id, close_mmi->delay);
+				ret = AM_CI_App_mmi_close(dev, close_mmi->cmd_id, close_mmi->delay);
 			}
 			break;
 
@@ -555,25 +557,25 @@ static int ca_ci_msg_receive(void *arg, AM_CA_Msg_t *msg)
 				unsigned char *capmt;
 				unsigned int capmt_size;
 				AM_CI_GenerateCAPMT(pmt->pmt, pmt->length, &capmt, &capmt_size, pmt->list_management, pmt->cmd_id, 1);
-				AM_CI_App_ca_pmt(dev, capmt, capmt_size);
+				ret = AM_CI_App_ca_pmt(dev, capmt, capmt_size);
 				free(capmt);
 			}
 			break;
 
 		case ca_ci_msg_type_get_appinfo:
 			AM_DEBUG(1, "\t-->|ca ci msg [ca_ci_msg_type_get_appinfo]");
-			AM_CI_App_ai_enquiry(dev);
+			ret = AM_CI_App_ai_enquiry(dev);
 			break;
 		case ca_ci_msg_type_get_cainfo:
 			AM_DEBUG(1, "\t-->|ca ci msg [ca_ci_msg_type_get_cainfo]");
-			AM_CI_App_ca_info_enq(dev);
+			ret = AM_CI_App_ca_info_enq(dev);
 			break;
 
 		default:
 			break;
 	}
 
-	return 0;
+	return ret;
 }
 
 static void ca_ci_arg_destroy(void *arg)

@@ -2051,6 +2051,7 @@ AM_ErrorCode_t AM_CAMAN_freeMsg(AM_CA_Msg_t *msg)
 AM_ErrorCode_t AM_CAMAN_putMsg(char *name, AM_CA_Msg_t *msg)
 {
 	_caman_t *man = caman;
+	int ret = AM_SUCCESS;
 
 	if(!man)
 		return AM_CAMAN_ERROR_NOTOPEN;
@@ -2064,7 +2065,7 @@ AM_ErrorCode_t AM_CAMAN_putMsg(char *name, AM_CA_Msg_t *msg)
 		_ca_t *cai = get_ca(name);
 		if(cai)
 		{
-			cai->ops.msg_receive(cai->arg, msg);
+			ret = cai->ops.msg_receive(cai->arg, msg);
 		}
 		else
 		{
@@ -2079,7 +2080,7 @@ AM_ErrorCode_t AM_CAMAN_putMsg(char *name, AM_CA_Msg_t *msg)
 
 	pthread_mutex_unlock(&man->lock);
 
-	return AM_SUCCESS;
+	return ret;
 }
 
 AM_ErrorCode_t AM_CAMAN_setCallback(char *caname, int (*cb)(char *name, AM_CA_Msg_t *msg))

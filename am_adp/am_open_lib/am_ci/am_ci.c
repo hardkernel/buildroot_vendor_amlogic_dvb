@@ -1036,7 +1036,7 @@ AM_ErrorCode_t AM_CI_App_ai_entermenu(AM_CI_Handle_t handle)
 		goto quit;
 	}
 
-	if (ci->stdcam->ca_session_number != -1)
+	if (ci->stdcam->ai_session_number != -1)
 	{
 		if ((ci->ca_resource_connected)) {
 			if (en50221_app_ai_entermenu(ci->stdcam->ai_resource,
@@ -1220,7 +1220,7 @@ AM_ErrorCode_t AM_CI_App_ai_enquiry(AM_CI_Handle_t handle)
 		goto quit;
 	}
 
-	if ((ci->stdcam->ca_session_number != -1)
+	if ((ci->stdcam->ai_session_number != -1)
 		&& (ci->ca_resource_connected)) {
 		if (en50221_app_ai_enquiry(ci->stdcam->ai_resource, ci->stdcam->ai_session_number)) {
 			AM_DEBUG(1, "CI: Failed to enq app info\n");

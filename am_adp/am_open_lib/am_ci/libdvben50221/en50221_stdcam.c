@@ -30,28 +30,41 @@
 #include <libdvbapi/dvbca.h>
 #include "en50221_stdcam.h"
 
+#define CA_DEV_MAX 4
+
 struct en50221_stdcam *en50221_stdcam_create(int adapter, int slotnum,
 					     struct en50221_transport_layer *tl,
 					     struct en50221_session_layer *sl)
 {
 	struct en50221_stdcam *result = NULL;
+	int i;
 
-	int cafd = dvbca_open(adapter, 0);
-	if (cafd == -1)
-		return NULL;
+	for (i = 0; i < CA_DEV_MAX; i++) {
+		int cafd = dvbca_open(adapter, i);
+		if (cafd == -1)
+			return NULL;
 
-	int ca_type = dvbca_get_interface_type(cafd, slotnum);
-	switch (ca_type) {
-	case DVBCA_INTERFACE_LINK:
-		result = en50221_stdcam_llci_create(cafd, slotnum, tl, sl);
-		break;
+		int ca_type = dvbca_get_interface_type(cafd, slotnum);
+		switch (ca_type) {
+		case DVBCA_INTERFACE_LINK:
+			result = en50221_stdcam_llci_create(cafd, slotnum, tl, sl);
+			break;
 
-	case DVBCA_INTERFACE_HLCI:
-		result = en50221_stdcam_hlci_create(cafd, slotnum);
-		break;
+		case DVBCA_INTERFACE_HLCI:
+			result = en50221_stdcam_hlci_create(cafd, slotnum);
+			break;
+		}
+
+		if (result == NULL)
+			close(cafd);
+		else
+			break;
 	}
 
-	if (result == NULL)
-		close(cafd);
+	if (result)
+		printf("Found ci device: dvb%d-ca%d\n", adapter, i);
+	else
+		printf("Ci device not found.\n");
+
 	return result;
 }
