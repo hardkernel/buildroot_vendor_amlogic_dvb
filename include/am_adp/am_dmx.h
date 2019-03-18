@@ -27,7 +27,7 @@
 
 #include "am_types.h"
 /*add for config define for linux dvb *.h*/
-#include <am_config.h>
+#include "am_config.h"
 #include <linux/dvb/dmx.h>
 
 #ifdef __cplusplus

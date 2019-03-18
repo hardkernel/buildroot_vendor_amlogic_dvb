@@ -29,7 +29,7 @@
 #include "am_evt.h"
 #include "am_dmx.h"
 /*add for config define for linux dvb *.h*/
-#include <am_config.h>
+#include "am_config.h"
 #include <linux/dvb/frontend.h>
 
 // #ifdef FE_SET_FRONTEND
@@ -392,7 +392,17 @@ extern AM_ErrorCode_t AM_FEND_BlindExit(int dev_no);
  *   - AM_SUCCESS On success
  *   - or error code
  */
-extern AM_ErrorCode_t AM_FEND_BlindGetProcess(int dev_no, unsigned int *process); 
+extern AM_ErrorCode_t AM_FEND_BlindGetProcess(int dev_no, unsigned int *process);
+
+/**\brief 卫星盲扫信息
+ * \param dev_no 前端设备号
+ * \param[in out] para in 盲扫频点信息缓存区大小，out 盲扫频点个数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+AM_ErrorCode_t AM_FEND_BlindGetTPCount(int dev_no, unsigned int *count);
+
 
 /**\brief get blind scan TP infomation
  * \param dev_no frontend device number
@@ -402,7 +412,7 @@ extern AM_ErrorCode_t AM_FEND_BlindGetProcess(int dev_no, unsigned int *process)
  *   - AM_SUCCESS On success
  *   - or error code
  */
-extern AM_ErrorCode_t AM_FEND_BlindGetTPInfo(int dev_no, struct dvb_frontend_parameters *para, unsigned int *count);  
+extern AM_ErrorCode_t AM_FEND_BlindGetTPInfo(int dev_no, struct dvb_frontend_parameters *para, unsigned int count);
 
 /**\brief try to tune
  *\param dev_no frontend device number

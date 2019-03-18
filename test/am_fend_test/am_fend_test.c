@@ -557,6 +557,7 @@ static int lock_fend(int id, int mode)
 			AM_FEND_BlindScan(id, blindscan_cb, (void *)(long)id, 950000000, 2150000000);
 			while(1){
 				if(blindscan_process == 100){
+					blindscan_process = 0;
 					break;
 				}
 				//printf("wait process %u\n", blindscan_process);
@@ -567,7 +568,7 @@ static int lock_fend(int id, int mode)
 
 			printf("start AM_FEND_BlindGetTPInfo\n");
 			
-			AM_FEND_BlindGetTPInfo(id, blindscan_para, &count);
+			AM_FEND_BlindGetTPInfo(id, blindscan_para, count);
 
 			printf("dump TPInfo: %d\n", count);
 

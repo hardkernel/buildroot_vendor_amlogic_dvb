@@ -4354,7 +4354,7 @@ static void am_scan_blind_scan_callback(int dev_no, AM_FEND_BlindEvent_t *evt, v
 		struct dvb_frontend_parameters tps[AM_SCAN_MAX_BS_TP_CNT];
 		struct dvb_frontend_parameters *new_tp_start;
 
-		AM_FEND_BlindGetTPInfo(scanner->start_para.fend_dev_id, tps, (unsigned int*)&cnt);
+		AM_FEND_BlindGetTPInfo(scanner->start_para.fend_dev_id, tps, (unsigned int)cnt);
 
 		if (cnt > scanner->dtvctl.bs_ctl.get_tp_cnt)
 		{
