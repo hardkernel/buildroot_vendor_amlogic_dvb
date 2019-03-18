@@ -4028,7 +4028,7 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 //#ifdef ENABLE_PCR
 	sync_mode = aml_calc_sync_mode(dev, has_audio, has_video, tp->afmt, &sync_force);
 
-	if (has_audio && (sync_force != FORCE_AC3_AMASTER)) {
+	if ((sync_force != FORCE_AC3_AMASTER)) {
 		if (tp->pcrpid && (tp->pcrpid < 0x1fff)) {
 			val = tp->pcrpid;
 			if (ioctl(ts->fd, AMSTREAM_IOC_PCRID, val) == -1)
