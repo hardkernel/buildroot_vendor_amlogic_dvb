@@ -852,7 +852,7 @@ static int en50221_app_mmi_parse_list_menu(struct en50221_app_mmi *mmi,
 	uint8_t *text_flags = NULL;
 	struct en50221_app_mmi_text *text_data = NULL;
 	uint32_t i;
-	uint8_t text_count = 0;
+	uint32_t text_count = 0;
 
 	// first of all, decode the length field
 	uint16_t asn_data_length;
