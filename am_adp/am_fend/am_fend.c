@@ -1593,6 +1593,37 @@ AM_ErrorCode_t AM_FEND_BlindGetProcess(int dev_no, unsigned int *process)
 	return ret;
 }
 
+/**\brief 卫星盲扫信息
+ * \param dev_no 前端设备号
+ * \param[in out] para in 盲扫频点信息缓存区大小，out 盲扫频点个数
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_fend.h)
+ */
+AM_ErrorCode_t AM_FEND_BlindGetTPCount(int dev_no, unsigned int *count)
+{
+	AM_FEND_Device_t *dev = NULL;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	assert(para);
+	assert(count);
+
+	AM_TRY(fend_get_openned_dev(dev_no, &dev));
+
+	pthread_mutex_lock(&dev->lock);
+
+    *count = 0;
+	if(dev->bs_setting.m_uiChannelCount)
+	{
+		*count = (unsigned int)(dev->bs_setting.m_uiChannelCount);
+	}
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+
 /**\brief 卫星盲扫信息 
  * \param dev_no 前端设备号
  * \param[out] para 盲扫频点信息缓存区
@@ -1601,7 +1632,7 @@ AM_ErrorCode_t AM_FEND_BlindGetProcess(int dev_no, unsigned int *process)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_fend.h)
  */
-AM_ErrorCode_t AM_FEND_BlindGetTPInfo(int dev_no, struct dvb_frontend_parameters *para, unsigned int *count)
+AM_ErrorCode_t AM_FEND_BlindGetTPInfo(int dev_no, struct dvb_frontend_parameters *para, unsigned int count)
 {
 	AM_FEND_Device_t *dev = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -1613,12 +1644,12 @@ AM_ErrorCode_t AM_FEND_BlindGetTPInfo(int dev_no, struct dvb_frontend_parameters
 
 	pthread_mutex_lock(&dev->lock);
 
-	if(*count > dev->bs_setting.m_uiChannelCount)
+	if(count > dev->bs_setting.m_uiChannelCount)
 	{
-		*count = (unsigned int)(dev->bs_setting.m_uiChannelCount);
+		count = (unsigned int)(dev->bs_setting.m_uiChannelCount);
 	}
 	
-	memcpy(para, dev->bs_setting.channels, (*count) * sizeof(struct dvb_frontend_parameters));
+	memcpy(para, dev->bs_setting.channels, count * sizeof(struct dvb_frontend_parameters));
 
 	pthread_mutex_unlock(&dev->lock);
 
