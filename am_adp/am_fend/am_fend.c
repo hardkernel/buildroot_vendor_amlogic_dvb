@@ -1605,7 +1605,6 @@ AM_ErrorCode_t AM_FEND_BlindGetTPCount(int dev_no, unsigned int *count)
 	AM_FEND_Device_t *dev = NULL;
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
-	assert(para);
 	assert(count);
 
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
@@ -1638,7 +1637,6 @@ AM_ErrorCode_t AM_FEND_BlindGetTPInfo(int dev_no, struct dvb_frontend_parameters
 	AM_ErrorCode_t ret = AM_SUCCESS;
 
 	assert(para);
-	assert(count);
 		
 	AM_TRY(fend_get_openned_dev(dev_no, &dev));
 
