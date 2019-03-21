@@ -662,7 +662,7 @@ static void *am_vbi_data_thread(void *arg)
 	AM_CC_Decoder_t *cc = (AM_CC_Decoder_t*)arg;
 	struct vbi_data_s  vbi[50];
 	int fd;
-	int type = 0x1;
+	int type = VBI_TYPE_USCC;
 	int now, last;
 	int last_data_mask = 0;
 	int timeout = cc->cpara.data_timeout * 2;
