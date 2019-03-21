@@ -3846,6 +3846,9 @@ static int aml_calc_sync_mode(AM_AV_Device_t *dev, int has_audio, int has_video,
 	if ((tsync_mode == AMASTER) && !has_audio)
 		tsync_mode = VMASTER;
 
+	if (afmt == AFORMAT_DRA && has_audio)
+		tsync_mode = AMASTER;
+
 	return tsync_mode;
 }
 
