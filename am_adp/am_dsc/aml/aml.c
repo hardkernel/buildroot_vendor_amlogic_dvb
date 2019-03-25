@@ -57,6 +57,7 @@ static AM_ErrorCode_t aml_free_chan (AM_DSC_Device_t *dev, AM_DSC_Channel_t *cha
 static AM_ErrorCode_t aml_set_pid (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan, uint16_t pid);
 static AM_ErrorCode_t aml_set_key (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan, AM_DSC_KeyType_t type, const uint8_t *key);
 static AM_ErrorCode_t aml_set_source (AM_DSC_Device_t *dev, AM_DSC_Source_t src);
+static AM_ErrorCode_t aml_set_mode (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan,int mode);
 static AM_ErrorCode_t aml_close (AM_DSC_Device_t *dev);
 
 AM_DSC_Driver_t aml_dsc_drv =
@@ -67,6 +68,7 @@ AM_DSC_Driver_t aml_dsc_drv =
 .set_pid     = aml_set_pid,
 .set_key     = aml_set_key,
 .set_source  = aml_set_source,
+.set_mode	 = aml_set_mode,
 .close       = aml_close
 };
 
@@ -171,14 +173,17 @@ static AM_ErrorCode_t aml_set_key (
 		else
 			goto SUCCESS;
 	}
-	else if(alg_type < AM_DSC_KEY_FROM_KL)/* AES */
+	else if(alg_type < AM_DSC_KEY_FROM_KL)/* AES/DES/SM4 */
 	{
+		memset(&aes_param,0,sizeof(struct ca_descr_ex));
 		aes_param.index = chan->id;
 		aes_param.flags = (kl_flag) ? CA_CW_FROM_KL : 0;
 		/* Need to ensure type in am_dsc.h equal to the one in ca.h */
-		aes_param.type = alg_type; 
+		aes_param.type = alg_type;
+		aes_param.mode = chan->mode;
 		memcpy(aes_param.cw, key, 16);
-		if(ioctl(fd, CA_SET_DESCR_EX, &aes_param)==-1)
+		AM_DEBUG("%s mode:%d\n",__FUNCTION__,aes_param.mode);
+		if (ioctl(fd, CA_SET_DESCR_EX, &aes_param) == -1)
 			goto ERR;
 		else
 			goto SUCCESS;
@@ -190,7 +195,7 @@ ERR:
 	AM_DEBUG(1, "set key failed \"%s\"", strerror(errno));
 	return AM_DSC_ERR_SYS;
 SUCCESS:
-	AM_DEBUG(2, "SET DSC %d KEY %d, %02x %02x %02x %02x %02x %02x %02x %02x", 
+	AM_DEBUG(2, "SET DSC %d KEY %d, %02x %02x %02x %02x %02x %02x %02x %02x",
 		chan->id, type, key[0], key[1], key[2], key[3], key[4], key[5], key[6], key[7]);
 	return AM_SUCCESS;
 }
@@ -223,7 +228,11 @@ static AM_ErrorCode_t aml_set_source (AM_DSC_Device_t *dev, AM_DSC_Source_t src)
 	snprintf(buf, sizeof(buf), "/sys/class/stb/dsc%d_source", dev->dev_no);
 	return AM_FileEcho(buf, cmd);
 }
-
+static AM_ErrorCode_t aml_set_mode (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan,int mode)
+{
+	chan->mode = mode;
+	return AM_SUCCESS;
+}
 static AM_ErrorCode_t aml_close (AM_DSC_Device_t *dev)
 {
 	UNUSED(dev);

@@ -84,7 +84,8 @@ typedef struct
 typedef enum
 {
 	AM_DVR_SRC_ASYNC_FIFO0, /**< asyncfifo 0*/
-	AM_DVR_SRC_ASYNC_FIFO1  /**< asyncfifo 1*/
+	AM_DVR_SRC_ASYNC_FIFO1, /**< asyncfifo 1*/
+	AM_DVR_SRC_ASYNC_FIFO2, /**< asyncfifo 2*/
 }AM_DVR_Source_t;
 
 /****************************************************************************
