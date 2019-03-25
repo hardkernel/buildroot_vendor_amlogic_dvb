@@ -1,8 +1,17 @@
-/*
-*===============================================================
-*                    include files
-*===============================================================
-*/
+/***************************************************************************
+ * Copyright (c) 2014 Amlogic, Inc. All rights reserved.
+ *
+ * This source code is subject to the terms and conditions defined in the
+ * file 'LICENSE' which is part of this source code package.
+ *
+ * Description:
+ */
+/**\file am_xds.c
+ * \brief xds module
+ *
+ * \author Ke Gong <ke.gong@amlogic.com>
+ * \date 2015-08-11: create the document
+ ***************************************************************************/
 #include <am_types.h>
 #include <am_thread.h>
 #include <am_mem.h>
@@ -15,11 +24,6 @@
 #include <am_db.h>
 #include <assert.h>
 #include "atsc/atsc_descriptor.h"
-/*
-*===============================================================
-*                    macro define
-*===============================================================
-*/
 
 //#define XDS_DEBUG
 

@@ -1,21 +1,17 @@
-/*
-*===============================================================^
-*       copyright: ^
-*       Filename:^
-*       Description: ^
-*       Version:^
-*       Author:^
-*       Last modified:^
-*       Compiler:^
-*       Other Description:^
-*
-*===============================================================^
-*/
-/*
-*===============================================================^
-*                    include files^
-*===============================================================^
-*/
+/***************************************************************************
+ * Copyright (c) 2014 Amlogic, Inc. All rights reserved.
+ *
+ * This source code is subject to the terms and conditions defined in the
+ * file 'LICENSE' which is part of this source code package.
+ *
+ * Description:
+ */
+/**\file am_cc.c
+ * \brief cc module
+ *
+ * \author Ke Gong <ke.gong@amlogic.com>
+ * \date 2015-08-11: create the document
+ ***************************************************************************/
 #define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
