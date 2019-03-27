@@ -4178,6 +4178,9 @@ static void* aml_av_monitor_thread(void *arg)
 	AV_TSData_t *ts,ts_temp;
 	AV_TSPlayPara_t *tp;
 	AV_InjectData_t *inj;
+	unsigned int cur_time = 0;
+	unsigned int last_replay_time = 0;
+#define REPLAY_TIME_INTERVAL   1000
 
 	if (dev->mode == AV_TIMESHIFT) {
 		AV_TimeshiftData_t *tshift_d = (AV_TimeshiftData_t*)dev->timeshift_player.drv_data;
@@ -4913,8 +4916,8 @@ static void* aml_av_monitor_thread(void *arg)
 		//	AM_DEBUG(1, "[avmon] avoid replay checkin_firstapts checkin_firstvpts %d",need_replay);
 		//	need_replay = AM_FALSE;
 		//}
-
-		if (need_replay && (dev->mode == AV_PLAY_TS)) {
+		AM_TIME_GetClock(&cur_time);
+		if (need_replay && (dev->mode == AV_PLAY_TS) && (AM_ABS(cur_time - last_replay_time) > REPLAY_TIME_INTERVAL)) {
 			AM_DEBUG(1, "[avmon] replay ts vlevel %d alevel %d vpts_stop %d vmaster %d",
 				vbuf_level, abuf_level, vpts_stop_dur, vmaster_dur);
 			aml_close_ts_mode(dev, AM_FALSE);
@@ -4946,7 +4949,8 @@ static void* aml_av_monitor_thread(void *arg)
 			vdec_stop_time = 0;
 			vdec_stop_dur  = 0;
 			has_amaster = AM_FALSE;
-		}else if (need_replay && (dev->mode == AV_TIMESHIFT)) {
+			AM_TIME_GetClock(&last_replay_time);
+		}else if (need_replay && (dev->mode == AV_TIMESHIFT) && (AM_ABS(cur_time - last_replay_time) > REPLAY_TIME_INTERVAL)) {
 			AM_DEBUG(1, "[avmon] replay timshift vlevel %d alevel %d vpts_stop %d vmaster %d",
 				vbuf_level, abuf_level, vpts_stop_dur, vmaster_dur);
 			AV_TimeshiftData_t *tshift = NULL;
@@ -4977,8 +4981,9 @@ static void* aml_av_monitor_thread(void *arg)
 			vdec_stop_time = 0;
 			vdec_stop_dur  = 0;
 			has_amaster = AM_FALSE;
+			AM_TIME_GetClock(&last_replay_time);
 		}
-		else if (need_replay && (dev->mode == AV_INJECT)) {
+		else if (need_replay && (dev->mode == AV_INJECT) && (AM_ABS(cur_time - last_replay_time) > REPLAY_TIME_INTERVAL)) {
 			AM_DEBUG(1, "[avmon] replay AV_INJECT vlevel %d alevel %d vpts_stop %d vmaster %d",
 				vbuf_level, abuf_level, vpts_stop_dur, vmaster_dur);
 			aml_restart_inject_mode(dev, AM_FALSE);
@@ -5012,6 +5017,7 @@ static void* aml_av_monitor_thread(void *arg)
 			vdec_stop_time = 0;
 			vdec_stop_dur  = 0;
 			has_amaster = AM_FALSE;
+			AM_TIME_GetClock(&last_replay_time);
 		}
 	}
 
