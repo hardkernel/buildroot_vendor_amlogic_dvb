@@ -12,12 +12,12 @@
 # limitations under the License.
 #
 
-LOCAL_PATH := $(call my-dir)
-include $(CLEAR_VARS)
-
+DVB_TOP := $(call my-dir)
 
 ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 22)))
-include $(LOCAL_PATH)/am_sysfs/Android.mk $(LOCAL_PATH)/am_adp/Android.mk $(LOCAL_PATH)/am_mw/Android.mk $(LOCAL_PATH)/am_ver/Android.mk
+include $(DVB_TOP)/am_sysfs/Android.mk $(DVB_TOP)/am_adp/Android.mk $(DVB_TOP)/am_mw/Android.mk $(DVB_TOP)/am_ver/Android.mk
 else
-include $(LOCAL_PATH)/am_adp/Android.mk $(LOCAL_PATH)/am_mw/Android.mk $(LOCAL_PATH)/am_ver/Android.mk
+include $(DVB_TOP)/am_adp/Android.mk $(DVB_TOP)/am_mw/Android.mk $(DVB_TOP)/am_ver/Android.mk
 endif
+
+include $(call all-makefiles-under,$(DVB_TOP)/test)
