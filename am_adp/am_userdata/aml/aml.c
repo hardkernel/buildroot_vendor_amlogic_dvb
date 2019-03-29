@@ -47,6 +47,8 @@
 #define IS_ATSC(p)	((p[0] == 0x47) && (p[1] == 0x41) && (p[2] == 0x39) && (p[3] == 0x34) && (p[4] == 0x3))
 #define IS_SCTE(p)  ((p[0]==0x3) && ((p[1]&0x7f) == 1))
 
+#define IS_AFD(p)	((p[0] == 0x44) && (p[1] == 0x54) && (p[2] == 0x47) && (p[3] == 0x31))
+
 #define AMSTREAM_IOC_MAGIC  'S'
 #define AMSTREAM_IOC_UD_LENGTH _IOR(AMSTREAM_IOC_MAGIC, 0x54, unsigned long)
 #define AMSTREAM_IOC_UD_POC _IOR(AMSTREAM_IOC_MAGIC, 0x55, int)
@@ -64,7 +66,9 @@ typedef enum {
 	H264_CC_TYPE 	= 2,
 	DIRECTV_CC_TYPE = 3,
 	AVS_CC_TYPE 	= 4,
-	SCTE_CC_TYPE = 5
+	SCTE_CC_TYPE = 5,
+	MPEG_AFD_TYPE = 6,
+	H264_AFD_TYPE = 7,
 } userdata_type;
 
 
@@ -180,7 +184,12 @@ typedef struct {
 	uint32_t curr_pts;
 	uint32_t curr_duration;
 	int scte_enable;
+	int mode;
 } AM_UDDrvData;
+
+#define MOD_ON(__mod, __mask) (__mod & __mask)
+#define MOD_ON_CC(__mod) MOD_ON(__mod, AM_USERDATA_MODE_CC)
+#define MOD_ON_AFD(__mod) MOD_ON(__mod, AM_USERDATA_MODE_AFD)
 
 
 /****************************************************************************
@@ -189,10 +198,14 @@ typedef struct {
 
 static AM_ErrorCode_t aml_open(AM_USERDATA_Device_t *dev, const AM_USERDATA_OpenPara_t *para);
 static AM_ErrorCode_t aml_close(AM_USERDATA_Device_t *dev);
+static AM_ErrorCode_t aml_set_mode(AM_USERDATA_Device_t *dev, int mode);
+static AM_ErrorCode_t aml_get_mode(AM_USERDATA_Device_t *dev, int *mode);
 
 const AM_USERDATA_Driver_t aml_ud_drv = {
 .open  = aml_open,
 .close = aml_close,
+.set_mode = aml_set_mode,
+.get_mode = aml_get_mode,
 };
 
 static void dump_cc_data(char *who, int poc, uint8_t *buff, int size)
@@ -282,6 +295,10 @@ static userdata_type aml_check_userdata_format (uint8_t *buf, int vfmt, int len)
 			AM_DEBUG(AM_DEBUG_LEVEL,"CC format is directv_cc_type");
 			return DIRECTV_CC_TYPE;
 		}
+		else if (IS_AFD(buf))
+		{
+			return H264_AFD_TYPE;
+		}
 	}
 	else if (vfmt == 7)
 	{
@@ -305,6 +322,10 @@ static userdata_type aml_check_userdata_format (uint8_t *buf, int vfmt, int len)
 			{
 				AM_DEBUG(AM_DEBUG_LEVEL, "CC format is scte_cc_type");
 				return SCTE_CC_TYPE;
+			}
+			else if (IS_AFD(hdr->atsc_flag))
+			{
+				return MPEG_AFD_TYPE;
 			}
 		}
 	}
@@ -652,7 +673,7 @@ static int aml_process_mpeg_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 		aml_ud_header_t *hdr = (aml_ud_header_t*)pd;
 		int ref, ptype;
 
-		if (IS_ATSC(hdr->atsc_flag) ) {
+		if (MOD_ON_CC(ud->mode) && IS_ATSC(hdr->atsc_flag) ) {
 			aml_ud_header_t *nhdr;
 			uint8_t *pp, t;
 			uint32_t v;
@@ -674,6 +695,12 @@ static int aml_process_mpeg_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 				meta_info->vpts_valid, meta_info->duration);
 			r = len;
 
+			break;
+		} else if (MOD_ON_AFD(ud->mode) && IS_AFD(hdr->atsc_flag)) {
+			uint8_t *pafd_hdr = (uint8_t*)hdr->atsc_flag;
+			AM_USERDATA_AFD_t afd = *((AM_USERDATA_AFD_t *)(pafd_hdr + 4));
+			afd.reserved = afd.pts = 0;
+			AM_EVT_Signal(dev->dev_no, AM_USERDATA_EVT_AFD, (void*)&afd);
 			break;
 		} else {
 			pd   += 8;
@@ -699,7 +726,8 @@ static int aml_process_h264_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 	pts = meta_info->vpts;
 
 	while (left >= 8) {
-		if (IS_H264(pd) || IS_DIRECTV(pd) || IS_AVS(pd)) {
+		if (MOD_ON_CC(ud->mode)
+			&& ((IS_H264(pd) || IS_DIRECTV(pd) || IS_AVS(pd)))) {
 			int hdr = (ud->format == H264_CC_TYPE) ? 3 : 0;
 			int pl;
 
@@ -722,6 +750,13 @@ static int aml_process_h264_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 			pd   += pl;
 			left -= pl + hdr;
 			r	+= pl + hdr;
+		} else if (MOD_ON_AFD(ud->mode) && IS_AFD(pd)) {
+			AM_USERDATA_AFD_t afd = *((AM_USERDATA_AFD_t*)pd);
+			AM_EVT_Signal(dev->dev_no, AM_USERDATA_EVT_AFD, (void*)&afd);
+
+			pd   += 8;
+			left -= 8;
+			r	+= 8;
 		} else {
 			pd   += 8;
 			left -= 8;
@@ -784,6 +819,9 @@ static void* aml_userdata_thread (void *arg)
 		}
 
 		do {
+			if (!ud->running)
+				break;
+
 			memset(&user_para_info, 0, sizeof(struct userdata_param_t));
 			user_para_info.pbuf_addr= (void*)(size_t)data;
 			user_para_info.buf_len = sizeof(data);
@@ -791,7 +829,7 @@ static void* aml_userdata_thread (void *arg)
 
 			if (-1 == ioctl(fd, AMSTREAM_IOC_UD_BUF_READ, &user_para_info))
 				AM_DEBUG(0, "call AMSTREAM_IOC_UD_BUF_READ failed\n");
-			AM_DEBUG(0, "ioctl left data: %d",user_para_info.meta_info.records_in_que);
+			//AM_DEBUG(0, "ioctl left data: %d",user_para_info.meta_info.records_in_que);
 
 			r = user_para_info.data_size;
 			r = (r > MAX_CC_DATA_LEN) ? MAX_CC_DATA_LEN : r;
@@ -818,7 +856,7 @@ static void* aml_userdata_thread (void *arg)
 				}
 			}
 
-			if (ud->format == MPEG_CC_TYPE) {
+			if ((ud->format == MPEG_CC_TYPE) || (ud->format == MPEG_AFD_TYPE)) {
 				ud->scte_enable = 0;
 				r = aml_process_mpeg_userdata(dev, pd, left, &user_para_info.meta_info);
 			} else if (ud->format == SCTE_CC_TYPE) {
@@ -867,6 +905,8 @@ static AM_ErrorCode_t aml_open(AM_USERDATA_Device_t *dev, const AM_USERDATA_Open
 	ud->cc_num	= 0;
 	ud->curr_poc  = -1;
 	ud->scte_enable = 1;
+	if (!para->cc_default_stop)
+		ud->mode = AM_USERDATA_MODE_CC;
 
 	r = pthread_create(&ud->th, NULL, aml_userdata_thread, (void*)dev);
 	if (r) {
@@ -906,3 +946,32 @@ static AM_ErrorCode_t aml_close(AM_USERDATA_Device_t *dev)
 	return AM_SUCCESS;
 }
 
+static AM_ErrorCode_t aml_set_mode(AM_USERDATA_Device_t *dev, int mode)
+{
+	AM_UDDrvData *ud = dev->drv_data;
+
+	if (MOD_ON_CC(mode) != MOD_ON_CC(ud->mode)) {
+		if (MOD_ON_CC(mode)) {
+			ud->mode |= AM_USERDATA_MODE_CC;
+		} else {
+			ud->mode &= ~AM_USERDATA_MODE_CC;
+		}
+	}
+
+	if (MOD_ON_AFD(mode) != MOD_ON_AFD(ud->mode)) {
+		if (MOD_ON_AFD(mode)) {
+			ud->mode |= AM_USERDATA_MODE_AFD;
+		} else {
+			ud->mode &= ~AM_USERDATA_MODE_AFD;
+		}
+	}
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t aml_get_mode(AM_USERDATA_Device_t *dev, int *mode)
+{
+	AM_UDDrvData *ud = dev->drv_data;
+	*mode = ud->mode;
+	return AM_SUCCESS;
+}

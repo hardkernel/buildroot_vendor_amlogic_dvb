@@ -37,6 +37,7 @@
 #include "am_evt.h"
 #include "am_misc.h"
 #include "am_tfile.h"
+#include "am_userdata.h"
 #include <amports/vformat.h>
 #include <amports/aformat.h>
 
@@ -112,6 +113,7 @@ enum AM_AV_EventType
 	AM_AV_EVT_VIDEO_AVAILABLE,  /**< Cannot get valid video information*/
 	AM_AV_EVT_AUDIO_CB, /**< Audio function will implement in cb */
 	AM_AV_EVT_VIDEO_RESOLUTION_CHANGED, /**< Video resolution changed, the parameter is the AM_AV_VideoStatus_t with new width&height valid only */
+	AM_AV_EVT_VIDEO_AFD_CHANGED, /**< Video AFD info changed, parameter is AM_USERDATA_AFD_t*/
 	AM_AV_EVT_END
 };
 
@@ -304,6 +306,7 @@ typedef enum
 typedef struct
 {
 	int      vout_dev_no;         /**< Video output device number*/
+	int      afd_enable;          /**< enable AFD*/
 } AM_AV_OpenPara_t;
 
 /**\brief Media file information*/

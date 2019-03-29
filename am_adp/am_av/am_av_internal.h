@@ -289,6 +289,8 @@ struct AM_AV_Device
 	AM_AV_PPMGRPara_t            vpath_ppmgr;    /**< ppmgr参数*/
 	AM_AV_PlayPara_t curr_para;      /**< 当前播放参数*/
 	void				*ad_date;
+	int                          afd_enable;
+	AM_USERDATA_AFD_t            afd;
 };
 
 /****************************************************************************

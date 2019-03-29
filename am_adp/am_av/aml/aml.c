@@ -49,6 +49,7 @@
 #endif
 #include "am_ad.h"
 #include <am_cond.h>
+#include "am_userdata.h"
 
 #ifdef ANDROID
 #include <cutils/properties.h>
@@ -790,6 +791,7 @@ static int get_amstream(AM_AV_Device_t *dev)
 #define AUD_ASSO_MIX_PROP "media.audio.mix_asso"
 #define VID_DISABLED_PROP "media.dvb.video.disabled"
 #define AUD_DISABLED_PROP "media.dvb.audio.disabled"
+
 static int _get_prop_int(char *prop, int def) {
 	char v[32];
 	int val = 0;
@@ -1537,6 +1539,61 @@ static AM_ErrorCode_t amp_close(AM_AOUT_Device_t *dev)
 	return AM_SUCCESS;
 }
 #endif
+
+
+void afd_evt_callback(long dev_no, int event_type, void *param, void *user_data)
+{
+	UNUSED(user_data);
+
+	if (event_type == AM_USERDATA_EVT_AFD) {
+		AM_USERDATA_AFD_t *afd = (AM_USERDATA_AFD_t *)param;
+		AM_AV_Device_t *dev = (AM_AV_Device_t *)user_data;
+		if (memcmp(afd, &dev->afd, sizeof(*afd))) {
+			dev->afd = *afd;
+			AM_DEBUG(1, "AFD evt: [%02x %01x]", afd->af_flag, afd->af);
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_AFD_CHANGED, afd);
+		}
+	}
+}
+
+
+static int aml_start_afd(AM_AV_Device_t *dev, int vfmt)
+{
+	int afd_dev = 0;
+	AM_ErrorCode_t err;
+	AM_USERDATA_OpenPara_t para;
+	int mode;
+
+	memset(&dev->afd, 0, sizeof(dev->afd));
+
+	memset(&para, 0, sizeof(para));
+	para.vfmt = vfmt;
+	para.cc_default_stop = 1;
+
+	err = AM_USERDATA_Open(afd_dev, &para);
+	if (err != AM_SUCCESS) {
+		AM_DEBUG(1, "userdata open fail.");
+		return err;
+	}
+	AM_USERDATA_GetMode(afd_dev, &mode);
+	AM_USERDATA_SetMode(afd_dev, mode | AM_USERDATA_MODE_AFD);
+	AM_EVT_Subscribe(afd_dev, AM_USERDATA_EVT_AFD, afd_evt_callback, dev);
+	AM_DEBUG(1, "AFD started.");
+	return 0;
+}
+
+static int aml_stop_afd(AM_AV_Device_t *dev)
+{
+	int afd_dev = 0;
+	AM_EVT_Unsubscribe(afd_dev, AM_USERDATA_EVT_AFD, afd_evt_callback, dev);
+	AM_USERDATA_Close(afd_dev);
+	memset(&dev->afd, 0, sizeof(dev->afd));
+	AM_DEBUG(1, "AFD stopped.");
+	return 0;
+}
+
+
+
 /**\brief 音视频数据注入线程*/
 static void* aml_data_source_thread(void *arg)
 {
@@ -4037,6 +4094,10 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 			AM_DEBUG(1, "set video PID failed");
 			return AM_AV_ERR_SYS;
 		}
+		if (dev->afd_enable) {
+			AM_DEBUG(1, "start afd...");
+			aml_start_afd(dev, tp->vfmt);
+		}
 	}
 
 	/*if ((tp->vfmt == VFORMAT_H264) || (tp->vfmt == VFORMAT_VC1))*/
@@ -4152,6 +4213,9 @@ static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 	AV_TSData_t *ts;
 	int fd;
 
+	if (dev->afd_enable)
+		aml_stop_afd(dev);
+
 	if (destroy_thread)
 		aml_stop_av_monitor(dev, &dev->ts_player.mon);
 
@@ -4160,6 +4224,7 @@ static int aml_close_ts_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread)
 		close(ts->fd);
 	if (ts->vid_fd != -1)
 		close(ts->vid_fd);
+
 	aml_set_tsync_enable(0);
 	aml_set_ad_source(&ts->ad, 0, 0, 0, ts->adec);
 	audio_ops->adec_set_decode_ad(0, 0, 0, ts->adec);
@@ -5021,6 +5086,7 @@ static void* aml_av_monitor_thread(void *arg)
 		//	AM_DEBUG(1, "[avmon] avoid replay checkin_firstapts checkin_firstvpts %d",need_replay);
 		//	need_replay = AM_FALSE;
 		//}
+
 		AM_TIME_GetClock(&cur_time);
 		if (need_replay && (dev->mode == AV_PLAY_TS) && (AM_ABS(cur_time - last_replay_time) > REPLAY_TIME_INTERVAL)) {
 			AM_DEBUG(1, "[avmon] replay ts vlevel %d alevel %d vpts_stop %d vmaster %d",
@@ -5390,7 +5456,6 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 		default:
 		break;
 	}
-
 	return AM_SUCCESS;
 }
 

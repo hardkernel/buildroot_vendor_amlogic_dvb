@@ -25,7 +25,8 @@
 
 #include <unistd.h>
 #include <sys/types.h>
-#include <am_types.h>
+#include "am_types.h"
+#include "am_evt.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -55,13 +56,36 @@ enum AM_USERDATA_ErrorCode
 	AM_USERDATA_ERR_END
 };
 
+enum AM_USERDATA_EventType
+{
+	AM_USERDATA_EVT_BASE = AM_EVT_TYPE_BASE(AM_MOD_USERDATA),
+	AM_USERDATA_EVT_AFD,
+};
+
+enum AM_USERDATA_Mode
+{
+	AM_USERDATA_MODE_CC = 0x1,
+	AM_USERDATA_MODE_AFD = 0x2,
+};
 
 /**\brief MPEG user data device open parameters*/
 typedef struct
 {
 	int    foo;
 	int vfmt;
+	int cc_default_stop;
 } AM_USERDATA_OpenPara_t;
+
+typedef struct
+{
+	uint8_t         :6;
+	uint8_t  af_flag:1;
+	uint8_t         :1;
+	uint8_t  af     :4;
+	uint8_t         :4;
+	uint16_t reserved;
+	uint32_t pts;
+} AM_USERDATA_AFD_t;
 
 /****************************************************************************
  * Function prototypes
@@ -90,6 +114,9 @@ extern AM_ErrorCode_t AM_USERDATA_Close(int dev_no);
  * \return Read data length in bytes
  */
 extern int AM_USERDATA_Read(int dev_no, uint8_t *buf, int size, int timeout_ms);
+
+extern AM_ErrorCode_t AM_USERDATA_SetMode(int dev_no, int mode);
+extern AM_ErrorCode_t AM_USERDATA_GetMode(int dev_no, int *mode);
 
 #ifdef __cplusplus
 }

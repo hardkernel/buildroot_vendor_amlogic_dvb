@@ -453,3 +453,40 @@ int AM_USERDATA_Read(int dev_no, uint8_t *buf, int size, int timeout_ms)
 	return cnt;
 }
 
+AM_ErrorCode_t AM_USERDATA_SetMode(int dev_no, int mode)
+{
+	AM_USERDATA_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_TRY(userdata_get_openned_dev(dev_no, &dev));
+
+	pthread_mutex_lock(&dev->lock);
+
+	if (dev->drv->set_mode)
+		ret = dev->drv->set_mode(dev, mode);
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+AM_ErrorCode_t AM_USERDATA_GetMode(int dev_no, int *mode)
+{
+	AM_USERDATA_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	if (!mode)
+		return AM_USERDATA_ERR_INVALID_ARG;
+
+	AM_TRY(userdata_get_openned_dev(dev_no, &dev));
+
+	pthread_mutex_lock(&dev->lock);
+
+	if (dev->drv->get_mode)
+		ret = dev->drv->get_mode(dev, mode);
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
