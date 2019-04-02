@@ -266,6 +266,7 @@ void *adec_handle = NULL;
 #define DEC_CONTROL_PROP "media.dec_control"
 #define AC3_AMASTER_PROP "media.ac3_amaster"
 #endif
+#define SHOW_FIRSTFRAME_NOSYNC_PROP "tv.dtv.showfirstframe_nosync"
 
 #define CANVAS_ALIGN(x)    (((x)+7)&~7)
 #define JPEG_WRTIE_UNIT    (32*1024)
@@ -728,6 +729,13 @@ static AM_Bool_t show_first_frame_nosync(void)
 	}
 
 	return AM_FALSE;
+}
+
+static void set_first_frame_nosync(void)
+{
+	int syncmode = property_get_int32(SHOW_FIRSTFRAME_NOSYNC_PROP, 1);
+	AM_DEBUG(1, "%s %d", __FUNCTION__,syncmode);
+	AM_FileEcho(VIDEO_SHOW_FIRSTFRM_NOSYNC_FILE, syncmode?"1":"0");
 }
 
 static int get_amstream(AM_AV_Device_t *dev)
@@ -3855,6 +3863,7 @@ static int aml_calc_sync_mode(AM_AV_Device_t *dev, int has_audio, int has_video,
 static int aml_set_sync_mode(AM_AV_Device_t *dev, int mode)
 {
 	char mode_str[4];
+	set_first_frame_nosync();
 	snprintf(mode_str, 4, "%d", mode);
 	AM_DEBUG(1, "set sync mode: %d", mode);
 	return AM_FileEcho(TSYNC_MODE_FILE, mode_str);
