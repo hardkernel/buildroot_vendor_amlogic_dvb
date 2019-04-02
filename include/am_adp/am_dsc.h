@@ -88,6 +88,12 @@ typedef enum {
 	CW_ALGO_MAX = 2,
 } CW_ALGO_T;
 
+typedef enum {
+	DSC_DSC_CBC = 1,
+	DSC_DSC_ECB,
+	DSC_DSC_IDSA
+}AM_DSC_MODE_t;
+
 /**\brief CW key type */
 typedef enum {
 	AM_DSC_KEY_TYPE_EVEN = 0,        /**< DVB-CSA even control word*/
@@ -98,6 +104,10 @@ typedef enum {
 	AM_DSC_KEY_TYPE_AES_IV_ODD = 5,  /**< AES-CBC odd control word's IV data*/
 	AM_DSC_KEY_TYPE_DES_EVEN = 6,    /**< DES even control word*/
 	AM_DSC_KEY_TYPE_DES_ODD = 7,     /**< DES odd control word*/
+	AM_DSC_KEY_TYPE_SM4_EVEN = 8,	 /**< SM4 even key */
+	AM_DSC_KEY_TYPE_SM4_ODD = 9,	 /**< SM4 odd key */
+	AM_DSC_KEY_TYPE_SM4_EVEN_IV = 10,/**< SM4-CBC iv even key */
+	AM_DSC_KEY_TYPE_SM4_ODD_IV = 11, /**< SM4-CBC iv odd key */
 	AM_DSC_KEY_FROM_KL = (1<<7)      /**< Read the control word from hardware keyladder*/
 } AM_DSC_KeyType_t;
 
@@ -181,6 +191,19 @@ extern AM_ErrorCode_t AM_DSC_SetSource(int dev_no, AM_DSC_Source_t src);
  * \return Error code
  */
 extern AM_ErrorCode_t AM_DSC_SetOutput(int dev_no, int dst);
+
+/**\brief Set descrambler mode
+ * \param dev_no Descrambler device number
+ * \param mode
+ * \ typedef enum {
+	DSC_DSC_CBC = 1,
+	DSC_DSC_ECB,
+	DSC_DSC_IDSA
+ * \	}AM_DSC_MODE_t
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
+extern AM_ErrorCode_t AM_DSC_SetMode(int dev_no, int chan_id, int mode);
 
 #ifdef __cplusplus
 }

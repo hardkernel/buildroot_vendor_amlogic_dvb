@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <am_misc.h>
 #include <am_kl.h>
+#include <sys/time.h>
 
 /****************************************************************************
  * Macro definitions
@@ -54,11 +55,15 @@
 #endif
 
 #undef DVR_DEV_COUNT
-#define DVR_DEV_COUNT      (1)
+#define DVR_DEV_COUNT      (3)
 
 #define FEND_DEV_NO 0
 #define AV_DEV_NO 0
 #define PLAY_DMX_DEV_NO 1
+
+#define DMX_DEV_NO 0
+#define DVR_DEV_NO 0
+#define ASYNC_FIFO 0
 
 typedef struct
 {
@@ -71,6 +76,8 @@ typedef struct
 
 static int pat_fid, sdt_fid;
 static DVRData data_threads[DVR_DEV_COUNT];
+static int dmx_no = 0;
+static int async_no = 0;
 
 static void section_cbf(int dev_no, int fid, const uint8_t *data, int len, void *user_data)
 {
@@ -79,14 +86,14 @@ static void section_cbf(int dev_no, int fid, const uint8_t *data, int len, void 
 	UNUSED(len);
 	UNUSED(user_data);
 	int i;
-	
+
 	printf("section:\n");
 	for (i=0;i<8;i++)
 	{
 		printf("%02x ", data[i]);
 		if (((i+1)%16) == 0) printf("\n");
 	}
-	
+
 	if ((i%16) != 0) printf("\n");
 }
 
@@ -98,7 +105,7 @@ static void pes_cbf(int dev_no, int fid, const uint8_t *data, int len, void *use
 	UNUSED(len);
 	UNUSED(user_data);
 
-#if 0	
+#if 0
 	int i;
 	printf("pes:\n");
 	for (i=0;i<len;i++)
@@ -106,7 +113,7 @@ static void pes_cbf(int dev_no, int fid, const uint8_t *data, int len, void *use
 		printf("%02x ", data[i]);
 		if (((i+1)%16) == 0) printf("\n");
 	}
-	
+
 	if ((i%16) != 0) printf("\n");
 #endif
 }
@@ -136,7 +143,7 @@ static void start_si(void)
 	AM_DMX_SetSecFilter(DMX_DEV_NO, f, &param);\
 	AM_DMX_SetBufferSize(DMX_DEV_NO, f, 32*1024);\
 	AM_DMX_StartFilter(DMX_DEV_NO, f);
-		
+
 	if (pat_fid == -1)
 	{
 		SET_FILTER(pat_fid, 0, 0)
@@ -154,7 +161,7 @@ static void stop_si(void)
 #define FREE_FILTER(f)\
 	AM_DMX_StopFilter(DMX_DEV_NO, f);\
 	AM_DMX_FreeFilter(DMX_DEV_NO, f);
-	
+
 	if (pat_fid != -1)
 	{
 		FREE_FILTER(pat_fid)
@@ -188,7 +195,7 @@ void start_dsc(int dsc, int src, int pid_cnt, int *pids)
 	int i;
 	int ret;
 	struct meson_kl_config kl_config;
-	
+
 	uint8_t ekey2[16] = {0,1,2,3,4,5,6,7,8,9,0xa,0xb,0xc,0xd,0xe,0xf};//{0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
 	uint8_t ekey1[16] = {0,1,2,3,4,5,6,7,8,9,0xa,0xb,0xc,0xd,0xe,0xf};//{0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
 	uint8_t ecw[16] = //{0xe7,0xda,0x69,0xed,0xb7,0x64,0x6b,0xcf,0xe7,0xda,0x69,0xed,0xb7,0x64,0x6b,0xcf}; //For 1234567890abcdef
@@ -198,14 +205,14 @@ void start_dsc(int dsc, int src, int pid_cnt, int *pids)
 	//{0xd3,0x4b,0x29,0xa3,0x7d,0xd4,0x51,0x68,0xd3,0x4b,0x29,0xa3,0x7d,0xd4,0x51,0x68}; //For key 00000000
 	//{0x92,0x8c,0x92,0xd3,0x4c,0x4f,0xc8,0xd4,0x92,0x8c,0x92,0xd3,0x4c,0x4f,0xc8,0xd4};
 	{0xf3,0xc1,0xb5,0x54,0xb5,0x28,0xdd,0x7c,0xe9,0x30,0xb2,0x5e,0x70,0x4e,0xd7,0xca};
-	
+
 	memcpy(kl_config.ekey2, ekey2, 16);
 	memcpy(kl_config.ekey1, ekey1, 16);
 	memcpy(kl_config.ecw, ecw, 16);
 	kl_config.kl_levels = 3;
-	
+
 	if (g_from_kl)
-	{	
+	{
 		ret = AM_KL_SetKeyladder(&kl_config);
 		if (ret == AM_FAILURE)
 			printf("Set_keyladder failed!!\n");
@@ -223,7 +230,7 @@ void start_dsc(int dsc, int src, int pid_cnt, int *pids)
 				ret = AM_DSC_SetSource(dsc, src);
 				ret = AM_DSC_AllocateChannel(dsc, &dscc[i]);
 				ret = AM_DSC_SetChannelPID(dsc, dscc[i], pids[i]);
-#if 1	
+#if 1
 				ret = AM_DSC_SetKey(dsc, dscc[i],
 					AM_DSC_KEY_TYPE_ODD | (g_from_kl ? AM_DSC_KEY_FROM_KL : 0),
 					(const uint8_t*)key);
@@ -244,6 +251,8 @@ void start_aes(int dsc, int src, int pid_cnt, int *pids)
 	int i;
 	int ret;
 	struct meson_kl_config kl_config;
+
+	char aes_key[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
 	uint8_t ekey2[16] ={0,1,2,3,4,5,6,7,8,9,0xa,0xb,0xc,0xd,0xe,0xf};//{0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
 	uint8_t ekey1[16] ={0,1,2,3,4,5,6,7,8,9,0xa,0xb,0xc,0xd,0xe,0xf}; //{0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
 	uint8_t tmp[16];
@@ -251,30 +260,34 @@ void start_aes(int dsc, int src, int pid_cnt, int *pids)
 	{0xe8,0x74,0x80,0xbd,0xc2,0x01,0xc8,0x09,0x49,0xdf,0x7c,0x24,0xd1,0x37,0xcb,0x1a};
 	//{0x1e,0x20,0xb6,0x55,0xd4,0x50,0x2c,0xf4,0xe0,0x0a,0xe0,0x50,0x63,0xcf,0xce,0x17};
 	//{0x57,0xe7,0x85,0xa9,0x5f,0x5d,0x9e,0x9c,0xfc,0xb5,0x3f,0x23,0xe6,0x16,0x5e,0xf7};
-	memset(&dsc_para, 0, sizeof(AM_DSC_OpenPara_t));
-	ret = AM_DSC_Open(dsc, &dsc_para);
-	memcpy(kl_config.ekey2, ekey2, 16);
-	memcpy(kl_config.ekey1, ekey1, 16);
-	memcpy(kl_config.ecw, ecw, 16);
-	kl_config.kl_levels = 3;
 
 	if (g_from_kl)
 	{
+		memset(&dsc_para, 0, sizeof(AM_DSC_OpenPara_t));
+		ret = AM_DSC_Open(dsc, &dsc_para);
+
+		memcpy(kl_config.ekey2, ekey2, 16);
+		memcpy(kl_config.ekey1, ekey1, 16);
+		memcpy(kl_config.ecw, ecw, 16);
+		kl_config.kl_levels = 3;
+
 		ret = AM_KL_SetKeyladder(&kl_config);
 		if (ret == AM_FAILURE)
 			printf("set_keyladder failed\n");
+	} else {
+
+		memset(&dsc_para, 0, sizeof(AM_DSC_OpenPara_t));
+		ret = AM_DSC_Open(dsc, &dsc_para);
 	}
 
-	memset(&dsc_para, 0, sizeof(AM_DSC_OpenPara_t));
-	ret = AM_DSC_Open(dsc, &dsc_para);
 	for (i=0; i<pid_cnt; i++) {
 		if (pids[i]>0) {
-			char key[16] = {0,1,2,3,4,5,6,7,8,9,0xa,0xb,0xc,0xd,0xe,0xf};
-			uint8_t iv_key[16] =
-			{0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
+			char key[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+			uint8_t iv_key[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
+
 			ret = AM_DSC_SetSource(dsc, src);
-			ret=AM_DSC_AllocateChannel(dsc, &dscc[i]);
-			ret=AM_DSC_SetChannelPID(dsc, dscc[i], pids[i]);
+			ret = AM_DSC_AllocateChannel(dsc, &dscc[i]);
+			ret = AM_DSC_SetChannelPID(dsc, dscc[i], pids[i]);
 #if 0
 			//Set iv key
 			ret = AM_DSC_SetKey(dsc, dscc[i],
@@ -315,12 +328,12 @@ static int dvr_data_write(int fd, uint8_t *buf, int size)
 		{
 			if (errno != EINTR)
 			{
-				AM_DEBUG(0, "Write DVR data failed: %s", strerror(errno));
+				printf("Write DVR data failed: %s\n", strerror(errno));
 				break;
 			}
 			ret = 0;
 		}
-		
+
 		left -= ret;
 		p += ret;
 	}
@@ -333,18 +346,23 @@ static void* dvr_data_thread(void *arg)
 	int cnt;
 	uint8_t buf[256*1024];
 
-	AM_DEBUG(1, "Data thread for DVR%d start ,record file will save to '%s'", dd->id, dd->file_name);
-	
+	printf("Data thread for DVR%d start ,record file will save to '%s'", dd->id, dd->file_name);
+
 	while (dd->running)
 	{
 		cnt = AM_DVR_Read(dd->id, buf, sizeof(buf), 1000);
 		if (cnt <= 0)
 		{
-			AM_DEBUG(1, "No data available from DVR%d", dd->id);
+			printf("No data available from DVR%d", dd->id);
 			usleep(200*1000);
 			continue;
 		}
-		//AM_DEBUG(1, "read from DVR%d return %d bytes", dd->id, cnt);
+		if (cnt > sizeof(buf))
+		{
+			printf("return size:0x%0x bigger than 0x%0x input buf\n",cnt,sizeof(buf));
+			break;
+		}
+		printf("read from DVR%d return %d bytes\n", dd->id, cnt);
 		if (dd->fd != -1)
 		{
 			dvr_data_write(dd->fd, buf, cnt);
@@ -356,15 +374,15 @@ static void* dvr_data_thread(void *arg)
 		close(dd->fd);
 		dd->fd = -1;
 	}
-	AM_DEBUG(1, "Data thread for DVR%d now exit", dd->id);
+	printf("Data thread for DVR%d now exit", dd->id);
 
 	return NULL;
 }
-	
+
 static void start_data_thread(int dev_no)
 {
 	DVRData *dd = &data_threads[dev_no];
-	
+
 	if (dd->running)
 		return;
 	dd->fd = open(dd->file_name, O_TRUNC | O_WRONLY | O_CREAT, 0666);
@@ -397,7 +415,7 @@ int start_dvr_test(void)
 
 	display_usage();
 	pat_fid = sdt_fid = -1;
-	
+
 	while (go)
 	{
 		if (fgets(buf, sizeof(buf), stdin))
@@ -414,7 +432,7 @@ int start_dvr_test(void)
 			}
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -451,12 +469,12 @@ static int start_record(int pid0, int pid1, int len)
 	int pids[8];
 	char name[256] = "a.ts";
 
-	dev_no = 0;
+	dev_no = dmx_no;
 	pid_cnt = len;
 	pids[0] = pid0;
 	pids[1] = pid1;
-	
-	strcpy(data_threads[dev_no].file_name, name);
+	data_threads[dmx_no].id = dev_no;
+	strcpy(data_threads[dmx_no].file_name, name);
 	spara.pid_count = pid_cnt;
 	memcpy(&spara.pids, pids, sizeof(pids));
 	if (AM_DVR_StartRecord(dev_no, &spara) == AM_SUCCESS)
@@ -485,7 +503,12 @@ static void* inject_entry(void *arg)
 	int len, left=0, send, ret;
 	int cnt=50;
 	AM_AV_VideoStatus_t vStat;
+	struct timeval start_tv;
+	struct timeval now_tv;
+	unsigned int diff_time = 0;
+	unsigned int total_len = 0;
 
+	gettimeofday(&start_tv, NULL);
 	AM_DEBUG(1, "inject thread start");
 	while (inject_running) {
 		len = sizeof(buf) - left;
@@ -498,6 +521,7 @@ static void* inject_entry(void *arg)
 			}
 			cnt--; */
 			left += ret;
+			total_len += ret;
 		} else {
 			if (inject_loop && ((ret==0) ||(errno == EAGAIN))) {
 				printf("loop\n");
@@ -510,6 +534,7 @@ static void* inject_entry(void *arg)
 			}
 		}
 		if (left) {
+			#if 0
 			AM_AV_GetVideoStatus(AV_DEV_NO, &vStat);
 			while ( vStat.vb_data > vStat.vb_size*0.6 ) {
 				AM_DEBUG(1, "bufferrate too high, vBuf_size:%d, data:%d, free:%d, (%f)",
@@ -517,6 +542,18 @@ static void* inject_entry(void *arg)
 				usleep(100*1000);
 				AM_AV_GetVideoStatus(AV_DEV_NO, &vStat);
 			}
+			#endif
+			gettimeofday(&now_tv, NULL);
+			if (now_tv.tv_usec < start_tv.tv_usec) {
+				diff_time = (now_tv.tv_sec - 1 - start_tv.tv_sec) * 1000 + (now_tv.tv_usec + 1*1000*1000 - start_tv.tv_usec) / 1000;
+			} else {
+				diff_time = (now_tv.tv_sec - start_tv.tv_sec) * 1000 + (now_tv.tv_usec - start_tv.tv_usec) / 1000;
+			}
+
+			if ( diff_time != 0 && total_len/1024/1024*8*1000/diff_time > 4) {
+				usleep(20*1000);
+			}
+
 			send = left;
 			AM_AV_InjectData(AV_DEV_NO, inject_type, buf, &send, -1);
 			if (send) {
@@ -527,58 +564,9 @@ static void* inject_entry(void *arg)
 			}
 		}
 	}
-	AM_DEBUG(1, "inject thread end");
+	printf("inject thread end");
 
 	return NULL;
-}
-
-static void inject_play_file(char *name, int fmt, int vpid, int apid, int vfmt, int afmt, int loop)
-{
-	AM_AV_InjectPara_t para;
-	pthread_t th;
-	int running = 1;
-	char buf[256];
-	int fd;
-
-	//AM_DMX_Open(DMX_DEV_NO, &dmx_p);
-	//AM_DMX_SetSource(DMX_DEV_NO, AM_DMX_SRC_HIU);
-
-	fd = open(name, O_RDWR, S_IRUSR);
-	if (fd < 0) {
-		printf("file[%s] open fail. [%d:%s]\n", name, errno, strerror(errno));
-		return;
-	} else
-		printf("file[%s] opened\n", name);
-
-	para.vid_fmt = vfmt;
-	para.aud_fmt = afmt;
-	para.pkg_fmt = fmt;
-	para.vid_id  = vpid;
-	para.aud_id  = apid;
-
-	//AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_HIU);
-	AM_AV_StartInject(AV_DEV_NO, &para);
-
-	inject_loop = loop;
-	inject_running = 1;
-	inject_type = (apid==-1)? AM_AV_INJECT_VIDEO :
-		(vpid==-1)? AM_AV_INJECT_AUDIO :
-		AM_AV_INJECT_MULTIPLEX;
-
-	printf("file inject: [fmt:%d][file:%s][v:%d-%d][a:%d-%d][loop:%d]\n", fmt, name, vpid, vfmt, apid, afmt, loop);
-	pthread_create(&th, NULL, inject_entry, (void*)(long)fd);
-
-	//get_section(DMX_DEV_NO, timeout);
-
-//quit:
-	//running = 0;
-	//inject_running = 0;
-	//pthread_join(th, NULL);
-
-	//AM_AV_StopInject(AV_DEV_NO);
-//end:
-	//AM_DMX_Close(DMX_DEV_NO);
-	//close(fd);
 }
 
 int main(int argc, char **argv)
@@ -602,7 +590,7 @@ int main(int argc, char **argv)
 	int ofd;
 	int opt;
 	pthread_t th;
-	while ((opt = getopt(argc, argv, "rdka")) != -1) {
+	while ((opt = getopt(argc, argv, "rdkax:s:")) != -1) {
 		switch (opt) {
 			case 'r':
 				rec = 1;
@@ -615,6 +603,14 @@ int main(int argc, char **argv)
 				break;
 			case 'a':
 				aes = 1;
+				break;
+			case 'x':
+				dmx_no = *optarg - 0x30;
+				printf("dmx no:%d\n",dmx_no);
+				break;
+			case 's':
+				async_no = *optarg - 0x30;
+				printf("async_no:%d\n",async_no);
 				break;
 			default: /* '?' */
 				arg_usage(argv[0]);
@@ -635,10 +631,11 @@ int main(int argc, char **argv)
 	//pids[0] = 0xd2;
 	//pids[1] = 0xdc;
 	//dvr orig / redbull video
-	pids[0] = 518;
+	//pids[0] = 33;//518;
 	//pids[0] = 0x81;
-	//pids[0] = 128;
-	pids[1] = -1; //no audio //69;
+	pids[0] = 128;
+	//pids[1] = 34;//0x21;//69;
+	//pid_cnt = 2;
 	pid_cnt = 1;
 
 	init_signal_handler();
@@ -660,20 +657,20 @@ int main(int argc, char **argv)
 
 	AM_DEBUG(1, "Openning DMX%d...", 0);
 	memset(&para, 0, sizeof(para));
-	AM_TRY(AM_DMX_Open(0, &para));
-	AM_DMX_SetSource(0, AM_DMX_SRC_HIU);
+	AM_TRY(AM_DMX_Open(dmx_no, &para));
+	AM_DMX_SetSource(dmx_no, AM_DMX_SRC_HIU);
 	AM_DEBUG(1, "Openning DVR%d...", 0);
 	memset(&dpara, 0, sizeof(dpara));
-	AM_TRY(AM_DVR_Open(0, &dpara));
+	AM_TRY(AM_DVR_Open(dmx_no, &dpara));
 
-	data_threads[0].id =0;
-	data_threads[0].fd = -1;
-	data_threads[0].running = 0;
+	data_threads[dmx_no].id =0;
+	data_threads[dmx_no].fd = -1;
+	data_threads[dmx_no].running = 0;
 
 	AM_TRY(AM_AV_Open(AV_DEV_NO, &av_open_para));
 	AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_HIU);
 	AM_AV_StartInject(AV_DEV_NO, &av_para);
-	AM_DVR_SetSource(0, 0);
+	AM_DVR_SetSource(dmx_no,async_no);
 	if (dsc)
 		start_dsc(0 /*dsc*/, 0 /*src*/, pid_cnt, pids);
 	if (aes)
@@ -681,7 +678,7 @@ int main(int argc, char **argv)
 	if (rec)
 		start_record(pids[0], pids[1], pid_cnt);
 	ofd = open(name, O_RDWR, S_IRUSR);
-
+	printf("open file name:%s, handle:%d \n",name,ofd);
 	inject_loop = loop;
 	inject_running = 1;
 	inject_type = (pids[1]==-1)? AM_AV_INJECT_VIDEO :
@@ -700,7 +697,7 @@ int main(int argc, char **argv)
 		AM_DEBUG(1, "Closing DMX%d...", i);
 		AM_DMX_Close(i);
 	}
-	
+
 #ifndef PLAY_FILE
 	AM_FEND_Close(FEND_DEV_NO);
 #endif

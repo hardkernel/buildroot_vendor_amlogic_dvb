@@ -31,11 +31,12 @@ include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)
 LOCAL_VENDOR_MODULE := true
-LOCAL_SRC_FILES:= am_dsc_test2.c
+LOCAL_SRC_FILES:= am_dsc_test2.c am_inject_record.c
 LOCAL_MODULE:= am_dsc_test2
 LOCAL_MODULE_TAGS := optional
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND
-LOCAL_C_INCLUDES :=$(LOCAL_PATH)/../../include/am_adp $(LOCAL_PATH)/../../android/ndk/include
+LOCAL_C_INCLUDES :=$(LOCAL_PATH)/../../include/am_adp $(LOCAL_PATH)/../../android/ndk/include \
+	$(AMADEC_C_INCLUDES)
 LOCAL_SHARED_LIBRARIES :=libam_adp libcutils liblog libc
 include $(BUILD_EXECUTABLE)
 

@@ -60,6 +60,7 @@ struct AM_DSC_Driver
 	AM_ErrorCode_t (*set_pid) (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan, uint16_t pid);
 	AM_ErrorCode_t (*set_key) (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan, AM_DSC_KeyType_t type, const uint8_t *key);
 	AM_ErrorCode_t (*set_source) (AM_DSC_Device_t *dev, AM_DSC_Source_t src);
+	AM_ErrorCode_t (*set_mode) (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan,int mode);
 	AM_ErrorCode_t (*close) (AM_DSC_Device_t *dev);
 };
 
@@ -72,6 +73,7 @@ struct AM_DSC_Channel
 	uint8_t		stream_path;
 	AM_Bool_t          used;
 	void              *drv_data;
+	int 				mode;
 };
 
 /**\brief 解扰器设备*/

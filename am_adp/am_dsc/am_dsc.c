@@ -649,3 +649,25 @@ AM_ErrorCode_t AM_DSC_SetOutput(int dev_no, int dst)
 		AM_DSC_SEC_SetOutput(dev_no, dst);
 	return AM_SUCCESS;
 }
+AM_ErrorCode_t AM_DSC_SetMode(int dev_no, int chan_id, int mode)
+{
+	AM_DSC_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	AM_DSC_Channel_t *chan;
+
+	AM_TRY(dsc_get_openned_dev(dev_no, &dev));
+
+	pthread_mutex_lock(&dev->lock);
+
+	ret = dsc_get_used_chan(dev, chan_id, &chan);
+
+	if (ret == AM_SUCCESS)
+	{
+		if (dev->drv->set_pid)
+			ret = dev->drv->set_mode(dev, chan, mode);
+	}
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return 0;
+}
