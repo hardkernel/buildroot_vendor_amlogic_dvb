@@ -23,7 +23,7 @@
  * \date 2013-3-13: create the document
  ***************************************************************************/
 
-#define AM_DEBUG_LEVEL 1
+#define AM_DEBUG_LEVEL 4
 
 #include <am_debug.h>
 #include <am_mem.h>
@@ -51,7 +51,7 @@
 #define AMSTREAM_IOC_UD_LENGTH _IOR(AMSTREAM_IOC_MAGIC, 0x54, unsigned long)
 #define AMSTREAM_IOC_UD_POC _IOR(AMSTREAM_IOC_MAGIC, 0x55, int)
 #define AMSTREAM_IOC_UD_FLUSH_USERDATA _IOR(AMSTREAM_IOC_MAGIC, 0x56, int)
-#define AMSTREAM_IOC_UD_BUF_READ _IOR(AMSTREAM_IOC_MAGIC, 0x57, unsigned int)
+#define AMSTREAM_IOC_UD_BUF_READ _IOR(AMSTREAM_IOC_MAGIC, 0x57, int)
 #define AMSTREAM_IOC_UD_AVAIBLE_VDEC      _IOR(AMSTREAM_IOC_MAGIC, 0x5c, unsigned int)
 
 /****************************************************************************
@@ -113,6 +113,11 @@ struct userdata_meta_info_t {
 		0: top_field_first_flag is not valid
 		1: top_field_first_flag is valid
 	bit 11: //top_field_first bit val
+	bit 12-13: //picture_struct, used for H264
+		0: Invalid
+		1: TOP_FIELD_PICTURE
+		2: BOT_FIELD_PICTURE
+		3: FRAME_PICTURE
 	**********************************************/
 	uint32_t flags;
 	uint32_t vpts;			/*video frame pts*/
@@ -138,17 +143,14 @@ struct userdata_param_t {
 	void* pbuf_addr; /*input*/
 	struct userdata_meta_info_t meta_info; /*output*/
 };
-#if 0
-typedef struct {
-	 unsigned int poc_info;
-	 unsigned int poc_number;
-} userdata_poc_info_t;
-#endif
 
 typedef struct AM_CCData_s AM_CCData;
 struct AM_CCData_s {
 	AM_CCData *next;
 	uint8_t   *buf;
+	uint32_t pts;
+	uint32_t duration;
+	int pts_valid;
 	int		size;
 	int		cap;
 	int		poc;
@@ -175,6 +177,8 @@ typedef struct {
 	int			 cc_num;
 	userdata_type   format;
 	int			 curr_poc;
+	uint32_t curr_pts;
+	uint32_t curr_duration;
 	int scte_enable;
 } AM_UDDrvData;
 
@@ -203,7 +207,7 @@ static void dump_cc_data(char *who, int poc, uint8_t *buff, int size)
 		sprintf(buf+i*3, "%02x ", buff[i]);
 	}
 
-	AM_DEBUG(0, "CC DUMP:who:%s poc: %d :%s", who, poc, buf);
+	AM_DEBUG(AM_DEBUG_LEVEL, "CC DUMP:who:%s poc: %d :%s", who, poc, buf);
 }
 
 static void aml_free_cc_data (AM_CCData *cc)
@@ -270,19 +274,19 @@ static userdata_type aml_check_userdata_format (uint8_t *buf, int vfmt, int len)
 	{
 		if (IS_H264(buf))
 		{
-			AM_DEBUG(4,"CC format is h264_cc_type");
+			AM_DEBUG(AM_DEBUG_LEVEL,"CC format is h264_cc_type");
 			return H264_CC_TYPE;
 		}
 		else if (IS_DIRECTV(buf))
 		{
-			AM_DEBUG(4,"CC format is directv_cc_type");
+			AM_DEBUG(AM_DEBUG_LEVEL,"CC format is directv_cc_type");
 			return DIRECTV_CC_TYPE;
 		}
 	}
 	else if (vfmt == 7)
 	{
 		if (IS_AVS(buf)) {
-			AM_DEBUG(4,"CC format is avs_cc_type");
+			AM_DEBUG(AM_DEBUG_LEVEL,"CC format is avs_cc_type");
 			return AVS_CC_TYPE;
 		}
 	}
@@ -294,18 +298,38 @@ static userdata_type aml_check_userdata_format (uint8_t *buf, int vfmt, int len)
 
 			if (IS_ATSC(hdr->atsc_flag))
 			{
-				AM_DEBUG(4,"CC format is mpeg_cc_type");
+				AM_DEBUG(AM_DEBUG_LEVEL,"CC format is mpeg_cc_type");
 				return MPEG_CC_TYPE;
 			}
 			else if (IS_SCTE(hdr->atsc_flag))
 			{
-				AM_DEBUG(4, "CC format is scte_cc_type");
+				AM_DEBUG(AM_DEBUG_LEVEL, "CC format is scte_cc_type");
 				return SCTE_CC_TYPE;
 			}
 		}
 	}
 
 	return INVALID_TYPE;
+}
+
+static void aml_write_userdata(AM_USERDATA_Device_t *dev, uint8_t *buffer, int buffer_len, uint32_t
+	pts, int pts_valid, uint32_t duration)
+{
+	uint32_t *pts_in_buffer;
+	uint8_t userdata_with_pts[MAX_CC_DATA_LEN];
+	AM_UDDrvData *ud = dev->drv_data;
+
+	if (pts_valid == 0)
+		pts = ud->curr_pts + ud->curr_duration;
+
+	pts_in_buffer = userdata_with_pts;
+	*pts_in_buffer = pts;
+	memcpy(userdata_with_pts+4, buffer, buffer_len);
+
+	dev->write_package(dev, userdata_with_pts, buffer_len + 4);
+
+	ud->curr_pts = pts;
+	ud->curr_duration = duration;
 }
 
 static void aml_flush_cc_data(AM_USERDATA_Device_t *dev)
@@ -327,9 +351,9 @@ static void aml_flush_cc_data(AM_USERDATA_Device_t *dev)
 			}
 		}
 
-		AM_DEBUG(1, "cc_write_package decode:%s", buf);
+		AM_DEBUG(AM_DEBUG_LEVEL, "cc_write_package decode:%s", buf);
 
-		dev->write_package(dev, cc->buf, cc->size);
+		aml_write_userdata(dev, cc->buf, cc->size, cc->pts, cc->pts_valid, cc->duration);
 
 		cc->next = ud->free_list;
 		ud->free_list = cc;
@@ -340,7 +364,8 @@ static void aml_flush_cc_data(AM_USERDATA_Device_t *dev)
 	ud->curr_poc = -1;
 }
 
-static void aml_add_cc_data(AM_USERDATA_Device_t *dev, int poc, int type, uint8_t *p, int len)
+static void aml_add_cc_data(AM_USERDATA_Device_t *dev, int poc, int type, uint8_t *p, int len, uint32_t
+	pts, int pts_valid, uint32_t duration)
 {
 	AM_UDDrvData *ud = dev->drv_data;
 	AM_CCData **pcc, *cc;
@@ -354,7 +379,7 @@ static void aml_add_cc_data(AM_USERDATA_Device_t *dev, int poc, int type, uint8_
 #else
 		cc = ud->cc_list;
 		//dump_cc_data("add cc ",cc->poc,cc->buf, cc->size);
-		dev->write_package(dev, cc->buf, cc->size);
+		aml_write_userdata(dev, cc->buf, cc->size, cc->pts, cc->pts_valid, cc->duration);
 
 		ud->cc_list = cc->next;
 		cc->next = ud->free_list;
@@ -371,7 +396,7 @@ static void aml_add_cc_data(AM_USERDATA_Device_t *dev, int poc, int type, uint8_
 		}
 	}
 
-	AM_DEBUG(0, "CC poc:%d ptype:%d data:%s", poc, type, buf);
+	AM_DEBUG(AM_DEBUG_LEVEL, "CC poc:%d ptype:%d data:%s", poc, type, buf);
 
 	pcc = &ud->cc_list;
 	if (*pcc && poc < ((*pcc)->poc - 30))
@@ -411,13 +436,17 @@ static void aml_add_cc_data(AM_USERDATA_Device_t *dev, int poc, int type, uint8_
 
 	cc->size = len;
 	cc->poc  = poc;
+	cc->pts = pts;
+	cc->pts_valid = pts_valid;
+	cc->duration = duration;
 	cc->next = *pcc;
 	*pcc = cc;
 
 	ud->cc_num ++;
 }
 
-static void aml_mpeg_userdata_package(AM_USERDATA_Device_t *dev, int poc, int type, uint8_t *p, int len)
+static void aml_mpeg_userdata_package(AM_USERDATA_Device_t *dev, int poc, int type, uint8_t *p, int
+len, uint32_t pts, int pts_valid, uint32_t duration)
 {
 	AM_UDDrvData *ud = dev->drv_data;
 #if 0
@@ -431,7 +460,7 @@ static void aml_mpeg_userdata_package(AM_USERDATA_Device_t *dev, int poc, int ty
 	if (len < 5)
 		return;
 
-	if (p[4+4] != 3)
+	if (p[4] != 3)
 		return;
 
 	if (type == I_TYPE)
@@ -440,7 +469,7 @@ static void aml_mpeg_userdata_package(AM_USERDATA_Device_t *dev, int poc, int ty
 	if (poc == ud->curr_poc + 1) {
 		AM_CCData *cc, **pcc;
 
-		dev->write_package(dev, p, len);
+		aml_write_userdata(dev, p, len, pts, pts_valid, duration);
 		ud->curr_poc ++;
 
 		pcc = &ud->cc_list;
@@ -448,7 +477,7 @@ static void aml_mpeg_userdata_package(AM_USERDATA_Device_t *dev, int poc, int ty
 			if (ud->curr_poc + 1 != cc->poc)
 				break;
 
-			dev->write_package(dev, cc->buf, cc->size);
+			aml_write_userdata(dev, cc->buf, cc->size, cc->pts, cc->pts_valid, cc->duration);
 			*pcc = cc->next;
 			ud->curr_poc ++;
 
@@ -459,10 +488,10 @@ static void aml_mpeg_userdata_package(AM_USERDATA_Device_t *dev, int poc, int ty
 		return;
 	}
 
-	aml_add_cc_data(dev, poc, type, p, len);
+	aml_add_cc_data(dev, poc, type, p, len, pts, pts_valid, duration);
 }
 
-static int aml_process_scte_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, int len, int flags, uint32_t pts)
+static int aml_process_scte_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, int len, struct userdata_meta_info_t* meta_info)
 {
 	int cc_count = 0, cnt, i;
 	int field_num;
@@ -477,14 +506,17 @@ static int aml_process_scte_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 	int left = len;
 	int left_bits;
 	uint32_t v;
-	uint32_t *pts_in_buffer;
-	uint8_t userdata_with_pts[MAX_CC_DATA_LEN];
+	int flags;
+	uint32_t pts;
+	int top_bit_value, top_bit_valid;
+	AM_UDDrvData *ud = dev->drv_data;
+
 #if 0
 	char display_buffer[10240];
 #endif
-	int top_bit_value, top_bit_valid;
 
-	AM_UDDrvData *ud = dev->drv_data;
+	flags = meta_info->flags;
+	pts = meta_info->vpts;
 
 	if (ud->scte_enable != 1)
 		return len;
@@ -558,7 +590,7 @@ static int aml_process_scte_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 		GET(mark, 1);
 		if (field == 3)
 			field = 1;
-		AM_DEBUG(0, "loop %d field %d line %d cc1 %x cc2 %x",
+		AM_DEBUG(AM_DEBUG_LEVEL, "loop %d field %d line %d cc1 %x cc2 %x",
 			i, field, line, cc1, cc2);
 		if (field == 1)
 			line = (top_bit_value)?line+10:line+273;
@@ -589,21 +621,19 @@ static int aml_process_scte_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 	cc_data[5] = 0x40 |cc_count;
 	size = 7 + cc_count*3;
 
-	pts_in_buffer = userdata_with_pts;
-	*pts_in_buffer = pts;
-	memcpy(userdata_with_pts+4, cc_data, size);
 #if 0
 	for (i=0; i<size; i++)
 			sprintf(display_buffer+3*i, " %02x", cc_data[i]);
 		//AM_DEBUG(0, "scte_write_buffer len: %d data: %s", size, display_buffer);
 #endif
 	if (cc_count > 0)
-		aml_add_cc_data(dev, ref, ptype, userdata_with_pts, size+4);
+		aml_add_cc_data(dev, ref, ptype, cc_data, size, pts, meta_info->vpts_valid,
+			meta_info->duration);
 error:
 	return len;
 }
 
-static int aml_process_mpeg_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, int flag, uint32_t pts, int len)
+static int aml_process_mpeg_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, int len, struct userdata_meta_info_t* meta_info)
 {
 	AM_UDDrvData *ud = dev->drv_data;
 	uint8_t *pd = data;
@@ -611,9 +641,12 @@ static int aml_process_mpeg_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 	int r = 0;
 	int i;
 	int package_count = 0;
-	uint32_t *pts_in_buffer;
 	int userdata_length;
-	uint8_t userdata_with_pts[MAX_CC_DATA_LEN];
+	int flag;
+	uint32_t pts;
+
+	flag = meta_info->flags;
+	pts = meta_info->vpts;
 
 	while (left >= (int)sizeof(aml_ud_header_t)) {
 		aml_ud_header_t *hdr = (aml_ud_header_t*)pd;
@@ -637,12 +670,8 @@ static int aml_process_mpeg_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 				return len;
 
 			userdata_length = len-r-8;
-			pts_in_buffer = userdata_with_pts;
-			*pts_in_buffer = pts;
-			memcpy(userdata_with_pts+4, pp, userdata_length);
-			//AM_DEBUG(0, "CC header len: %d pts %x flag %d digi: %02x %02x %02x %02x %02x %02x %02x %02x", userdata_length, pts, flag,
-			//	pd[0], pd[1], pd[2], pd[3], pd[4], pd[5], pd[6], pd[7]);
-			aml_mpeg_userdata_package(dev, ref, ptype, userdata_with_pts, userdata_length+4);
+			aml_mpeg_userdata_package(dev, ref, ptype, pp, userdata_length, pts,
+				meta_info->vpts_valid, meta_info->duration);
 			r = len;
 
 			break;
@@ -656,15 +685,18 @@ static int aml_process_mpeg_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 	return r;
 }
 
-static int aml_process_h264_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, int len, int poc, uint32_t pts)
+static int aml_process_h264_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, int len, struct userdata_meta_info_t* meta_info)
 {
 	AM_UDDrvData *ud = dev->drv_data;
 	int fd = ud->fd;
 	uint8_t *pd = data;
 	int left = len;
 	int r = 0;
-	uint32_t *pts_in_buffer;
-	uint8_t userdata_with_pts[MAX_CC_DATA_LEN];
+	int poc;
+	uint32_t pts;
+
+	poc = meta_info->poc_number;
+	pts = meta_info->vpts;
 
 	while (left >= 8) {
 		if (IS_H264(pd) || IS_DIRECTV(pd) || IS_AVS(pd)) {
@@ -683,11 +715,9 @@ static int aml_process_h264_userdata(AM_USERDATA_Device_t *dev, uint8_t *data, i
 			if (poc == 0) {
 				aml_flush_cc_data(dev);
 			}
-			//dump_cc_data("process h264:", poc, pd, pl);
-			pts_in_buffer = userdata_with_pts;
-			*pts_in_buffer = pts;
-			memcpy(userdata_with_pts+4, pd, pl);
-			aml_add_cc_data(dev, poc, I_TYPE, userdata_with_pts, pl+4);
+
+			aml_add_cc_data(dev, poc, I_TYPE, pd, pl, pts, meta_info->vpts_valid,
+				meta_info->duration);
 
 			pd   += pl;
 			left -= pl + hdr;
@@ -728,7 +758,7 @@ static void* aml_userdata_thread (void *arg)
 		left = 0;
 
 		ret = poll(&pfd, 1, USERDATA_POLL_TIMEOUT);
-		AM_DEBUG(0, "userdata after poll ret %d", ret);
+		AM_DEBUG(AM_DEBUG_LEVEL, "userdata after poll ret %d", ret);
 		if (!ud->running)
 			break;
 		if (ret != 1)
@@ -739,9 +769,9 @@ static void* aml_userdata_thread (void *arg)
 		//For multi-instances support
 		vdec_ids = 0;
 		if (-1 == ioctl(fd, AMSTREAM_IOC_UD_AVAIBLE_VDEC, &vdec_ids)) {
-			printf("get avaible vdec failed\n");
+			AM_DEBUG(AM_DEBUG_LEVEL, "get avaible vdec failed");
 		} else {
-			printf("get avaible vdec OK: 0x%x\n", vdec_ids);
+			AM_DEBUG(AM_DEBUG_LEVEL, "get avaible vdec OK: 0x%x\n", vdec_ids);
 		}
 
 		if (!(vdec_ids & 1))
@@ -790,14 +820,14 @@ static void* aml_userdata_thread (void *arg)
 
 			if (ud->format == MPEG_CC_TYPE) {
 				ud->scte_enable = 0;
-				r = aml_process_mpeg_userdata(dev, pd, user_para_info.meta_info.flags,user_para_info.meta_info.vpts, left);
+				r = aml_process_mpeg_userdata(dev, pd, left, &user_para_info.meta_info);
 			} else if (ud->format == SCTE_CC_TYPE) {
 				if (ud->scte_enable == 1)
-					r = aml_process_scte_userdata(dev, pd, left, user_para_info.meta_info.flags, user_para_info.meta_info.vpts);
+					r = aml_process_scte_userdata(dev, pd, left, &user_para_info.meta_info);
 				else
 					r = left;
 			} else if (ud->format != INVALID_TYPE) {
-				r = aml_process_h264_userdata(dev, pd, left, user_para_info.meta_info.poc_number , user_para_info.meta_info.vpts);
+				r = aml_process_h264_userdata(dev, pd, left, &user_para_info.meta_info);
 			} else {
 				r = left;
 			}
