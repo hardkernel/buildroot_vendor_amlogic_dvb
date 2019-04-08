@@ -2043,6 +2043,13 @@ static AM_ErrorCode_t aml_start_inject(AM_AV_Device_t *dev, AV_InjectData_t *inj
 		}
 	}
 
+	if ((para->pkg_fmt == PFORMAT_ES) && ((afd != -1) || (vfd != -1))) {
+		if ((vfd == -1) && (afd != -1)) {
+			if (ioctl(afd, AMSTREAM_IOC_TSTAMP, 0) == -1)
+				AM_DEBUG(1, "checkin first apts failed [%s]", strerror(errno));
+		}
+	}
+
 #if defined(ANDROID) || defined(CHIP_8626X)
 	if (has_video && has_audio)
 		aml_set_tsync_enable(1);
@@ -4238,7 +4245,7 @@ static void* aml_av_monitor_thread(void *arg)
 		mon = &dev->ts_player.mon;
 		tp = &dev->ts_player.play_para;
 		inj = (AV_InjectData_t *)dev->inject_player.drv_data;
-		ts_temp.fd = inj->vid_fd;
+		ts_temp.fd = (inj->vid_fd != -1) ? inj->vid_fd : inj-> aud_fd;
 		ts_temp.vid_fd = inj->cntl_fd;
 		ts_temp.adec = inj->adec;
 		ts = &ts_temp;
@@ -4316,7 +4323,8 @@ static void* aml_av_monitor_thread(void *arg)
 			abuf_level = astatus.status.data_len;
 			abuf_read_ptr = astatus.status.read_pointer;
 		} else {
-			AM_DEBUG(1, "cannot get audio buffer status or Audio is None");
+			if (has_audio)
+				AM_DEBUG(1, "cannot get audio buffer status [%s]", strerror(errno));
 			abuf_size  = 0;
 			abuf_level = 0;
 			abuf_read_ptr = 0;
@@ -4328,7 +4336,8 @@ static void* aml_av_monitor_thread(void *arg)
 			vbuf_read_ptr = vstatus.status.read_pointer;
 			//is_hd_video = vstatus.vstatus.width > 720;
 		} else {
-			AM_DEBUG(1, "cannot get video buffer status or Video is None ");
+			if (has_video)
+				AM_DEBUG(1, "cannot get video buffer status");
 			vbuf_size  = 0;
 			vbuf_level = 0;
 			vbuf_read_ptr = 0;
@@ -5253,6 +5262,13 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 				AM_DEBUG(1, "set audio format failed");
 				return AM_AV_ERR_SYS;
 			}
+			if (ioctl(src->fd, AMSTREAM_IOC_PORT_INIT, 0) == -1)
+			{
+				AM_DEBUG(1, "amport init failed");
+				return AM_AV_ERR_SYS;
+			}
+			if (ioctl(src->fd, AMSTREAM_IOC_TSTAMP, 0) == -1)
+				AM_DEBUG(1, "checkin first apts failed [%s]", strerror(errno));
 			AM_DEBUG(1, "aml start aes:  A[fmt:%d, loop:%d]", val, dev->aud_player.para.times);
 			aml_start_data_source(src, dev->aud_player.para.data, dev->aud_player.para.len, dev->aud_player.para.times);
 			audio_ops->adec_start_decode(src->fd, val, 0, &src->adec);
