@@ -733,9 +733,13 @@ static AM_Bool_t show_first_frame_nosync(void)
 
 static void set_first_frame_nosync(void)
 {
+#ifdef ANDROID
 	int syncmode = property_get_int32(SHOW_FIRSTFRAME_NOSYNC_PROP, 1);
 	AM_DEBUG(1, "%s %d", __FUNCTION__,syncmode);
 	AM_FileEcho(VIDEO_SHOW_FIRSTFRM_NOSYNC_FILE, syncmode?"1":"0");
+#else
+	AM_FileEcho(VIDEO_SHOW_FIRSTFRM_NOSYNC_FILE, "1");
+#endif
 }
 
 static int get_amstream(AM_AV_Device_t *dev)
