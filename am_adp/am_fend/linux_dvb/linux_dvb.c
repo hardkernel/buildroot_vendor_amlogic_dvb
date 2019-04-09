@@ -343,6 +343,7 @@ static AM_ErrorCode_t dvb_set_para (AM_FEND_Device_t *dev, const struct dvb_fron
 			cmd_num++;
 			break;
 		case SYS_DVBT:
+		case SYS_DVBT2:
 			p[cmd_num].cmd = DTV_BANDWIDTH_HZ;
 //			p[cmd_num].u.data = para->u.ofdm.bandwidth;
 			switch (para->u.ofdm.bandwidth) {
@@ -549,6 +550,7 @@ static AM_ErrorCode_t dvb_get_para (AM_FEND_Device_t *dev, struct dvb_frontend_p
 			break;
 		case SYS_DVBT:
 		case SYS_DTMB:
+		case SYS_DVBT2:
 			p[cmd_num].cmd = DTV_BANDWIDTH_HZ;
 			cmd_num++;
 
