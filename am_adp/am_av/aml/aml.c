@@ -4890,8 +4890,8 @@ static void* aml_av_monitor_thread(void *arg)
 			}
 		}
 
-		AM_DEBUG(1, "tsync_mode:%d--vbuf_level--0x%08x---- abuf_level---0x%08x",
-			tsync_mode,vbuf_level,abuf_level);
+		//AM_DEBUG(1, "tsync_mode:%d--vbuf_level--0x%08x---- abuf_level---0x%08x",
+		//	tsync_mode,vbuf_level,abuf_level);
 #endif
 
 		if (!av_paused && dev->mode == AV_INJECT) {
