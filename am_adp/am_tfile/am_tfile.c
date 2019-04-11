@@ -881,7 +881,7 @@ write_done:
 				if (tfile->rate) {
 					if (tfile->loop) {
 						if (tfile->duration >= 0) {
-							int size = (loff_t)tfile->rate * (loff_t)tfile->duration;
+							loff_t size = (loff_t)tfile->rate * (loff_t)tfile->duration;
 							if (size < tfile->size) {
 								tfile->size = size;
 								AM_DEBUG(1, "[tfile] file size -> %lld", tfile->size);
