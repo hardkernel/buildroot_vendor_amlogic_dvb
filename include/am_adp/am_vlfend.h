@@ -119,6 +119,15 @@ extern AM_ErrorCode_t AM_VLFEND_GetProp(int dev_no, struct dtv_properties *prop)
  */
 extern AM_ErrorCode_t AM_VLFEND_GetStatus(int dev_no, fe_status_t *status);
 
+/**\brief get frontend frequency afc
+ * \param dev_no frontend device number
+ * \param[out] status return frontend frequency afc
+ * \return
+ *   - AM_SUCCESS On success
+ *   - or error code
+ */
+extern AM_ErrorCode_t AM_VLFEND_GetAFC(int dev_no, int *afc);
+
 /**\brief get frontend device's callback function
  * \param dev_no frontend device number
  * \param[out] cb return callback function
@@ -166,6 +175,23 @@ extern AM_ErrorCode_t AM_VLFEND_Lock(int dev_no, const struct dvb_frontend_param
  *   - or error code
  */
 extern AM_ErrorCode_t AM_VLFEND_SetThreadDelay(int dev_no, int delay);
+
+/**\brief get frontend atv tune status
+ * \param dev_no frontend device number
+ * \param atv_status tune status value
+ * \return
+ *   - AM_SUCCESS On success
+ *   - or error code
+ */
+extern AM_ErrorCode_t AM_VLFEND_GetAtvStatus(int dev_no, atv_status_t *atv_status);
+
+/**\brief start frontend detect standard
+ * \param dev_no frontend device number
+ * \return
+ *   - AM_SUCCESS On success
+ *   - or error code
+ */
+extern AM_ErrorCode_t AM_VLFEND_DetectStandard(int dev_no);
 
 #ifdef __cplusplus
 }

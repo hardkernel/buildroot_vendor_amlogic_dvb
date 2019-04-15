@@ -17,7 +17,7 @@
  * Description:
  */
 /**\file
- * \brief DVB前端设备
+ * \brief for ATV frontend interface
  *
  * \author nengwen.chen <nengwen.chen@amlogic.com>
  * \date 2018-04-16: create the document
@@ -36,6 +36,7 @@
 #include <errno.h>
 #include "../am_adp_internal.h"
 #include <am_vlfend.h>
+#include <atv_frontend.h>
 
 /****************************************************************************
  * Macro definitions
@@ -69,7 +70,7 @@ static AM_FEND_Device_t vlfend_devices[FEND_DEV_COUNT] =
  * Static functions
  ***************************************************************************/
 
-/**\brief 根据设备号取得设备结构指针*/
+/**\brief Gets the device structure pointer according to the device number. */
 static AM_INLINE AM_ErrorCode_t vlfend_get_dev(int dev_no, AM_FEND_Device_t **dev)
 {
 	if ((dev_no < 0) || (dev_no >= FEND_DEV_COUNT))
@@ -83,7 +84,7 @@ static AM_INLINE AM_ErrorCode_t vlfend_get_dev(int dev_no, AM_FEND_Device_t **de
 	return AM_SUCCESS;
 }
 
-/**\brief 根据设备号取得设备结构并检查设备是否已经打开*/
+/**\brief Obtain the device structure according to the device number and check whether the device is opened. */
 static AM_INLINE AM_ErrorCode_t vlfend_get_openned_dev(int dev_no, AM_FEND_Device_t **dev)
 {
 	AM_TRY(vlfend_get_dev(dev_no, dev));
@@ -97,7 +98,7 @@ static AM_INLINE AM_ErrorCode_t vlfend_get_openned_dev(int dev_no, AM_FEND_Devic
 	return AM_SUCCESS;
 }
 
-/**\brief 前端设备监控线程*/
+/**\brief The atv frontend device monitors threads */
 static void* vlfend_thread(void *arg)
 {
 	AM_FEND_Device_t *dev = (AM_FEND_Device_t*) arg;
@@ -157,12 +158,12 @@ static void sighand(int signo) {}
  * API functions
  ***************************************************************************/
 
-/**\brief 打开一个DVB前端设备
- * \param dev_no 前端设备号
- * \param[in] para 设备开启参数
+/**\brief Open a atv frontend device
+ * \param dev_no Frontend device number
+ * \param[in] para device opening parameters
  * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_fend.h)
+ *   - AM_SUCCESS succeed
+ *   - Other values (see am_fend.h)
  */
 AM_ErrorCode_t AM_VLFEND_Open(int dev_no, const AM_FEND_OpenPara_t *para)
 {
@@ -231,11 +232,11 @@ final:
 	return ret;
 }
 
-/**\brief 关闭一个DVB前端设备
- * \param dev_no 前端设备号
+/**\brief Close a atv frontend device
+ * \param dev_no Device number
  * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_fend.h)
+ *   - AM_SUCCESS succeed
+ *   - Other values (see am_fend.h)
  */
 AM_ErrorCode_t AM_VLFEND_CloseEx(int dev_no, AM_Bool_t reset)
 {
@@ -280,12 +281,12 @@ AM_ErrorCode_t AM_VLFEND_Close(int dev_no)
 	return AM_VLFEND_CloseEx(dev_no, AM_TRUE);
 }
 
-/**\brief 设定前端解调模式
- * \param dev_no 前端设备号
- * \param mode 解调模式
+/**\brief Set the atv frontend demodulation mode
+ * \param dev_no Device number
+ * \param mode Demodulation mode
  * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_fend.h)
+ *   - AM_SUCCESS succeed
+ *   - Other valuesee (am_fend.h)
  */
 AM_ErrorCode_t AM_VLFEND_SetMode(int dev_no, int mode)
 {
@@ -309,12 +310,12 @@ AM_ErrorCode_t AM_VLFEND_SetMode(int dev_no, int mode)
 	return ret;
 }
 
-/**\brief 设定前端参数
- * \param dev_no 前端设备号
- * \param[in] para 前端设置参数
+/**\brief Set atv frontend parameters
+ * \param dev_no Device number
+ * \param[in] para Frontend setting parameters
  * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_fend.h)
+ *   - AM_SUCCESS succeed
+ *   - Other values see(am_fend.h)
  */
 AM_ErrorCode_t AM_VLFEND_SetPara(int dev_no, const struct dvb_frontend_parameters *para)
 {
@@ -342,12 +343,12 @@ AM_ErrorCode_t AM_VLFEND_SetPara(int dev_no, const struct dvb_frontend_parameter
 	return ret;
 }
 
-/**\brief 取得当前端设备设定的参数
- * \param dev_no 前端设备号
- * \param[out] para 前端设置参数
+/**\brief Gets the parameters set by the atv frontend device
+ * \param dev_no Device number
+ * \param[out] para Frontend setting parameters
  * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_fend.h)
+ *   - AM_SUCCESS succeed
+ *   - Other values see(am_fend.h)
  */
 AM_ErrorCode_t AM_VLFEND_GetPara(int dev_no, struct dvb_frontend_parameters *para)
 {
@@ -373,6 +374,13 @@ AM_ErrorCode_t AM_VLFEND_GetPara(int dev_no, struct dvb_frontend_parameters *par
 	return ret;
 }
 
+/**\brief Set atv frontend properties
+ * \param dev_no Device number
+ * \param para Frontend properties setting parameters
+ * \return
+ *   - AM_SUCCESS succeed
+ *   - Other values see(am_fend.h)
+ */
 AM_ErrorCode_t AM_VLFEND_SetProp(int dev_no, const struct dtv_properties *prop)
 {
 	AM_FEND_Device_t *dev;
@@ -397,6 +405,13 @@ AM_ErrorCode_t AM_VLFEND_SetProp(int dev_no, const struct dtv_properties *prop)
 	return ret;
 }
 
+/**\brief Get atv frontend properties
+ * \param dev_no Device number
+ * \param[out] para Frontend properties setting parameters see(atv_fend.h)
+ * \return
+ *   - AM_SUCCESS succeed
+ *   - Other values see(am_fend.h)
+ */
 AM_ErrorCode_t AM_VLFEND_GetProp(int dev_no, struct dtv_properties *prop)
 {
 	AM_FEND_Device_t *dev;
@@ -421,12 +436,12 @@ AM_ErrorCode_t AM_VLFEND_GetProp(int dev_no, struct dtv_properties *prop)
 	return ret;
 }
 
-/**\brief 取得前端设备当前的锁定状态
- * \param dev_no 前端设备号
- * \param[out] status 返回前端设备的锁定状态
+/**\brief Gets the current lock state of the atv frontend device
+ * \param dev_no device number
+ * \param[out] status Returns the locked state of the frontend device
  * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_fend.h)
+ *   - AM_SUCCESS succeed
+ *   - Other values see(am_fend.h)
  */
 AM_ErrorCode_t AM_VLFEND_GetStatus(int dev_no, fe_status_t *status)
 {
@@ -452,13 +467,38 @@ AM_ErrorCode_t AM_VLFEND_GetStatus(int dev_no, fe_status_t *status)
 	return ret;
 }
 
-/**\brief 取得当前注册的前端状态监控回调函数
- * \param dev_no 前端设备号
- * \param[out] cb 返回注册的状态回调函数
- * \param[out] user_data 返回状态回调函数的参数
+AM_ErrorCode_t AM_VLFEND_GetAFC(int dev_no, int *afc)
+{
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	assert(afc);
+
+	struct dtv_properties props;
+	struct dtv_property prop;
+
+	memset(&props, 0, sizeof(props));
+	memset(&prop, 0, sizeof(prop));
+
+	prop.cmd = V4L2_AFC;
+	prop.u.data = 0;
+
+	props.num = 1;
+	props.props = &prop;
+
+	ret = AM_VLFEND_GetProp(dev_no, &props);
+
+	*afc = prop.u.data;
+
+	return ret;
+}
+
+/**\brief Gets the frontend status monitoring callback function for the current registration
+ * \param dev_no Device number
+ * \param[out] cb Returns the registered status callback function
+ * \param[out] user_data Returns the argument to the status callback function
  * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_fend.h)
+ *   - AM_SUCCESS succeed
+ *   - Other value see(am_fend.h)
  */
 AM_ErrorCode_t AM_VLFEND_GetCallback(int dev_no, AM_FEND_Callback_t *cb, void **user_data)
 {
@@ -484,13 +524,13 @@ AM_ErrorCode_t AM_VLFEND_GetCallback(int dev_no, AM_FEND_Callback_t *cb, void **
 	return ret;
 }
 
-/**\brief 注册前端设备状态监控回调函数
- * \param dev_no 前端设备号
- * \param[in] cb 状态回调函数
- * \param[in] user_data 状态回调函数的参数
+/**\brief Register the frontend device status monitoring callback function
+ * \param dev_no Device number
+ * \param[in] cb State callback function
+ * \param[in] user_data Parameter to the state callback function
  * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_fend.h)
+ *   - AM_SUCCESS succeed
+ *   - Other values see(am_fend.h)
  */
 AM_ErrorCode_t AM_VLFEND_SetCallback(int dev_no, AM_FEND_Callback_t cb, void *user_data)
 {
@@ -505,7 +545,7 @@ AM_ErrorCode_t AM_VLFEND_SetCallback(int dev_no, AM_FEND_Callback_t cb, void *us
 	{
 		if (dev->enable_thread && (dev->thread != pthread_self()))
 		{
-			/*等待回调函数执行完*/
+			/* Wait for the callback function to finish executing */
 			while (dev->flags & VLFEND_FL_RUN_CB)
 			{
 				pthread_cond_wait(&dev->cond, &dev->lock);
@@ -521,12 +561,12 @@ AM_ErrorCode_t AM_VLFEND_SetCallback(int dev_no, AM_FEND_Callback_t cb, void *us
 	return ret;
 }
 
-/**\brief 设置前端设备状态监控回调函数活动状态
- * \param dev_no 前端设备号
- * \param[in] enable_cb 允许或者禁止状态回调函数
+/**\brief Set the activity state of the frontend device state monitoring callback function
+ * \param dev_no Device number
+ * \param[in] enable_cb Allows or disables state callbacks
  * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_fend.h)
+ *   - AM_SUCCESS succeed
+ *   - Other values see(am_fend.h)
  */
 AM_ErrorCode_t AM_VLFEND_SetActionCallback(int dev_no, AM_Bool_t enable_cb)
 {
@@ -542,7 +582,7 @@ AM_ErrorCode_t AM_VLFEND_SetActionCallback(int dev_no, AM_Bool_t enable_cb)
 #if 0
 		if (dev->enable_thread && (dev->thread != pthread_self()))
 		{
-			/*等待回调函数执行完*/
+			/* Wait for the callback function to finish executing */
 			while (dev->flags & VLFEND_FL_RUN_CB)
 			{
 				pthread_cond_wait(&dev->cond, &dev->lock);
@@ -557,7 +597,7 @@ AM_ErrorCode_t AM_VLFEND_SetActionCallback(int dev_no, AM_Bool_t enable_cb)
 	return ret;
 }
 
-/**\brief AM_FEND_Lock的回调函数参数*/
+/**\brief AM_FEND_Lock's parameter to the callback function */
 typedef struct {
 	const struct dvb_frontend_parameters *para;
 	fe_status_t                          *status;
@@ -565,7 +605,7 @@ typedef struct {
 	void                                 *old_data;
 } fend_lock_para_t;
 
-/**\brief AM_FEND_Lock的回调函数*/
+/**\brief AM_FEND_Lock's callback function */
 static void vlfend_lock_cb(int dev_no, struct dvb_frontend_event *evt, void *user_data)
 {
 	AM_FEND_Device_t *dev = NULL;
@@ -593,13 +633,13 @@ static void vlfend_lock_cb(int dev_no, struct dvb_frontend_event *evt, void *use
 	pthread_cond_broadcast(&dev->cond);
 }
 
-/**\brief 设定前端设备参数，并等待参数设定完成
- * \param dev_no 前端设备号
- * \param[in] para 前端设置参数
- * \param[out] status 返回前端设备状态
+/**\brief Set parameters of frontend equipment and wait for the completion of parameter setting
+ * \param dev_no Device number
+ * \param[in] para Frontend setting parameter
+ * \param[out] status Returns the state of the frontend device
  * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_fend.h)
+ *   - AM_SUCCESS succeed
+ *   - Other value see(am_fend.h)
  */
 AM_ErrorCode_t AM_VLFEND_Lock(int dev_no, const struct dvb_frontend_parameters *para, fe_status_t *status)
 {
@@ -627,7 +667,7 @@ AM_ErrorCode_t AM_VLFEND_Lock(int dev_no, const struct dvb_frontend_parameters *
 
 	pthread_mutex_lock(&dev->lock);
 
-	/*等待回调函数执行完*/
+	/* Wait for the callback function to finish executing */
 	while (dev->flags & VLFEND_FL_RUN_CB)
 	{
 		pthread_cond_wait(&dev->cond, &dev->lock);
@@ -649,7 +689,7 @@ AM_ErrorCode_t AM_VLFEND_Lock(int dev_no, const struct dvb_frontend_parameters *
 	AM_DEBUG(1, "AM_VLFEND_Lock line:%d,ret:%d\n", __LINE__, ret);
 	if (ret == AM_SUCCESS)
 	{
-		/*等待回调函数执行完*/
+		/* Wait for the callback function to finish executing */
 		while ((dev->flags & VLFEND_FL_RUN_CB) || (dev->flags & VLFEND_FL_LOCK))
 		{
 			pthread_cond_wait(&dev->cond, &dev->lock);
@@ -665,12 +705,12 @@ AM_ErrorCode_t AM_VLFEND_Lock(int dev_no, const struct dvb_frontend_parameters *
 	return ret;
 }
 
-/**\brief 设定前端管理线程的检测间隔
- * \param dev_no 前端设备号
- * \param delay 间隔时间(单位为毫秒)，0表示没有间隔，<0表示前端管理线程暂停工作
+/**\brief Sets the detection interval for the frontend management thread
+ * \param dev_no Device number
+ * \param delay Interval time (milliseconds), 0 means no interval, and <0 means the frontend administrative thread is suspended
  * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码(见am_fend.h)
+ *   - AM_SUCCESS succeed
+ *   - Other values see(am_fend.h)
  */
 AM_ErrorCode_t AM_VLFEND_SetThreadDelay(int dev_no, int delay)
 {
@@ -699,4 +739,59 @@ AM_ErrorCode_t AM_VLFEND_SetThreadDelay(int dev_no, int delay)
 	pthread_mutex_unlock(&dev->lock);
 
 	return ret;
+}
+
+/**\brief get frontend atv tune status
+ * \param dev_no frontend device number
+ * \param atv_status tune status value
+ * \return
+ *   - AM_SUCCESS On success
+ *   - or error code
+ */
+AM_ErrorCode_t AM_VLFEND_GetAtvStatus(int dev_no, atv_status_t *atv_status)
+{
+	AM_FEND_Device_t *dev = NULL;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_TRY(vlfend_get_openned_dev(dev_no, &dev));
+
+	if (!dev->drv->get_atv_status)
+	{
+		AM_DEBUG(1, "vlfronend %d no not support get atv status", dev_no);
+		return AM_FEND_ERR_NOT_SUPPORTED;
+	}
+
+	pthread_mutex_lock(&dev->lock);
+	ret = dev->drv->get_atv_status(dev, atv_status);
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
+
+/**\brief start frontend detect standard
+ * \param dev_no frontend device number
+ * \return
+ *   - AM_SUCCESS On success
+ *   - or error code
+ */
+AM_ErrorCode_t AM_VLFEND_DetectStandard(int dev_no)
+{
+	int fd = -1;
+	AM_FEND_Device_t *dev = NULL;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+
+	AM_TRY(vlfend_get_openned_dev(dev_no, &dev));
+
+	fd = (int) dev->drv_data;
+
+	pthread_mutex_lock(&dev->lock);
+	if (ioctl(fd, V4L2_DETECT_STANDARD) == -1)
+	{
+		pthread_mutex_unlock(&dev->lock);
+		AM_DEBUG(1, "ioctl V4L2_DETECT_AUDIO failed, errno: %s", strerror(errno));
+		return AM_FAILURE;
+	}
+	pthread_mutex_unlock(&dev->lock);
+
+	return AM_SUCCESS;
 }

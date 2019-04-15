@@ -60,6 +60,7 @@ static AM_ErrorCode_t v4l2_get_prop (AM_FEND_Device_t *dev, struct dtv_propertie
 static AM_ErrorCode_t v4l2_get_status (AM_FEND_Device_t *dev, fe_status_t *status);
 static AM_ErrorCode_t v4l2_wait_event (AM_FEND_Device_t *dev, struct dvb_frontend_event *evt, int timeout);
 static AM_ErrorCode_t v4l2_close (AM_FEND_Device_t *dev);
+static AM_ErrorCode_t v4l2_get_tune_status(AM_FEND_Device_t *dev, atv_status_t *atv_status);
 
 /****************************************************************************
  * Static data
@@ -93,7 +94,7 @@ const AM_FEND_Driver_t linux_v4l2_fend_drv =
 	.blindscan_cancel = NULL,
 	.fine_tune = NULL,
 	.set_cvbs_amp_out = NULL,
-	.get_atv_status =NULL,
+	.get_atv_status = v4l2_get_tune_status,
 	.set_afc = NULL
 };
 
@@ -356,6 +357,26 @@ static AM_ErrorCode_t v4l2_close(AM_FEND_Device_t *dev)
 	int fd = (long) dev->drv_data;
 
 	close(fd);
+
+	return AM_SUCCESS;
+}
+
+static AM_ErrorCode_t v4l2_get_tune_status(AM_FEND_Device_t *dev, atv_status_t *atv_status)
+{
+	int fd = (int) dev->drv_data;
+	struct v4l2_tune_status status = { .lock = 0, .afc = 0, };
+
+	if (ioctl(fd, V4L2_DETECT_TUNE, &status) == -1)
+	{
+		AM_DEBUG(1, "ioctl FE_READ_ANALOG_STATUS failed, errno: %s", strerror(errno));
+		return AM_FAILURE;
+	}
+
+	atv_status->atv_lock = status.lock;
+	atv_status->std = status.std;
+	atv_status->audmode = status.audmode;
+	atv_status->snr = status.snr;
+	atv_status->afc = status.afc;
 
 	return AM_SUCCESS;
 }

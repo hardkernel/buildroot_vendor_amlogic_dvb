@@ -14,6 +14,18 @@
 
 #define V4L2_FE_DEV    "/dev/v4l2_frontend"
 
+struct v4l2_tune_status {
+	unsigned char lock; /* unlocked:0, locked 1 */
+	v4l2_std_id std;
+	unsigned int audmode;
+	int snr;
+	int afc;
+	union {
+		void *resrvred;
+		__u64 reserved1;
+	};
+};
+
 enum v4l2_status {
 	V4L2_HAS_SIGNAL  = 0x01, /* found something above the noise level */
 	V4L2_HAS_CARRIER = 0x02, /* found a DVB signal */
@@ -61,6 +73,8 @@ struct v4l2_frontend_event {
 #define V4L2_READ_STATUS     _IOR('V', 109, enum v4l2_status)
 #define V4L2_SET_PROPERTY    _IOWR('V', 110, struct v4l2_properties)
 #define V4L2_GET_PROPERTY    _IOWR('V', 111, struct v4l2_properties)
+#define V4L2_DETECT_TUNE     _IOR('V', 112, struct v4l2_tune_status)
+#define V4L2_DETECT_STANDARD _IO('V', 113)
 
 #define V4L2_TUNE                1
 #define V4L2_SOUND_SYS           2
@@ -71,6 +85,7 @@ struct v4l2_frontend_event {
 #define V4L2_SIF_OVER_MODULATION 7
 #define V4L2_TUNER_TYPE          8
 #define V4L2_TUNER_IF_FREQ       9
+#define V4L2_AFC                 10
 
 /* audmode */
 
