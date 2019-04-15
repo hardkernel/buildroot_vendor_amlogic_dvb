@@ -78,6 +78,7 @@ static int pat_fid, sdt_fid;
 static DVRData data_threads[DVR_DEV_COUNT];
 static int dmx_no = 0;
 static int async_no = 0;
+static int hiu_no = 0;
 
 static void section_cbf(int dev_no, int fid, const uint8_t *data, int len, void *user_data)
 {
@@ -590,7 +591,7 @@ int main(int argc, char **argv)
 	int ofd;
 	int opt;
 	pthread_t th;
-	while ((opt = getopt(argc, argv, "rdkax:s:")) != -1) {
+	while ((opt = getopt(argc, argv, "rdkax:s:h:")) != -1) {
 		switch (opt) {
 			case 'r':
 				rec = 1;
@@ -611,6 +612,10 @@ int main(int argc, char **argv)
 			case 's':
 				async_no = *optarg - 0x30;
 				printf("async_no:%d\n",async_no);
+				break;
+			case 'h':
+				hiu_no = *optarg - 0x30;
+				printf("hiu:%d\n",hiu_no);
 				break;
 			default: /* '?' */
 				arg_usage(argv[0]);
@@ -658,7 +663,11 @@ int main(int argc, char **argv)
 	AM_DEBUG(1, "Openning DMX%d...", 0);
 	memset(&para, 0, sizeof(para));
 	AM_TRY(AM_DMX_Open(dmx_no, &para));
-	AM_DMX_SetSource(dmx_no, AM_DMX_SRC_HIU);
+	if (hiu_no == 1)
+		AM_DMX_SetSource(dmx_no, AM_DMX_SRC_HIU1);
+	else
+		AM_DMX_SetSource(dmx_no, AM_DMX_SRC_HIU);
+
 	AM_DEBUG(1, "Openning DVR%d...", 0);
 	memset(&dpara, 0, sizeof(dpara));
 	AM_TRY(AM_DVR_Open(dmx_no, &dpara));
@@ -668,7 +677,11 @@ int main(int argc, char **argv)
 	data_threads[dmx_no].running = 0;
 
 	AM_TRY(AM_AV_Open(AV_DEV_NO, &av_open_para));
-	AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_HIU);
+	if (hiu_no == 1)
+		AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_HIU1);
+	else
+		AM_AV_SetTSSource(AV_DEV_NO, AM_AV_TS_SRC_HIU);
+
 	AM_AV_StartInject(AV_DEV_NO, &av_para);
 	AM_DVR_SetSource(dmx_no,async_no);
 	if (dsc)

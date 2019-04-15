@@ -5413,6 +5413,9 @@ static AM_ErrorCode_t aml_ts_source(AM_AV_Device_t *dev, AM_AV_TSSource_t src)
 		case AM_AV_TS_SRC_HIU:
 			cmd = "hiu";
 		break;
+		case AM_AV_TS_SRC_HIU1:
+			cmd = "hiu1";
+		break;
 		case AM_AV_TS_SRC_DMX0:
 			cmd = "dmx0";
 		break;

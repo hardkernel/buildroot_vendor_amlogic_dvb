@@ -694,6 +694,9 @@ static AM_ErrorCode_t dvr_set_source(AM_DMX_Device_t *dev, AM_DMX_Source_t src)
 		case AM_DMX_SRC_HIU:
 			cmd = "hiu";
 		break;
+		case AM_DMX_SRC_HIU1:
+			cmd = "hiu1";
+		break;
 		default:
 			AM_DEBUG(1, "do not support demux source %d", src);
 		return AM_DMX_ERR_NOT_SUPPORTED;

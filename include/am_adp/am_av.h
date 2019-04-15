@@ -162,6 +162,7 @@ typedef enum
 	AM_AV_TS_SRC_TS1,                    /**< TS input port 1*/
 	AM_AV_TS_SRC_TS2,                    /**< TS input port 2*/
 	AM_AV_TS_SRC_HIU,                    /**< HIU port (file input)*/
+	AM_AV_TS_SRC_HIU1,
 	AM_AV_TS_SRC_DMX0,                   /**< Demux 0*/
 	AM_AV_TS_SRC_DMX1,                   /**< Demux 1*/
 	AM_AV_TS_SRC_DMX2                    /**< Demux 2*/
