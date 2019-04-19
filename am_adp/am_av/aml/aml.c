@@ -4879,7 +4879,7 @@ static void* aml_av_monitor_thread(void *arg)
 			AM_DEBUG(1, "[avmon] H264 fatal error");
 			need_replay = AM_TRUE;
 		}
-
+#ifndef USE_ADEC_IN_DVB
 #ifdef ANDROID
 		if (AM_FileRead(TSYNCPCR_RESETFLAG_FILE, buf, sizeof(buf)) >= 0) {
 			int val = 0;
@@ -4893,7 +4893,7 @@ static void* aml_av_monitor_thread(void *arg)
 		//AM_DEBUG(1, "tsync_mode:%d--vbuf_level--0x%08x---- abuf_level---0x%08x",
 		//	tsync_mode,vbuf_level,abuf_level);
 #endif
-
+#endif
 		if (!av_paused && dev->mode == AV_INJECT) {
 			if (has_video && (vbuf_level < DEC_STOP_VIDEO_LEVEL))
 				av_paused = AM_TRUE;
@@ -5854,7 +5854,7 @@ static AM_Bool_t aml_is_audio_valid(AM_AV_Device_t *dev)
 	AM_Bool_t has_audio = AM_FALSE;
 	AV_TimeshiftData_t *tshift = NULL;
 
-	if (dev->mode & AV_PLAY_TS)
+	if ((dev->mode & AV_PLAY_TS) || (dev->mode & AV_INJECT))
 	{
 		has_audio = VALID_AUDIO(dev->ts_player.play_para.apid, dev->ts_player.play_para.afmt);
 	}
@@ -6000,7 +6000,7 @@ static AM_Bool_t aml_is_video_valid(AM_AV_Device_t *dev)
 	AM_Bool_t has_video = AM_FALSE;
 	AV_TimeshiftData_t *tshift = NULL;
 
-	if (dev->mode & AV_PLAY_TS)
+	if ((dev->mode & AV_PLAY_TS) || (dev->mode & AV_INJECT))
 	{
 		has_video = VALID_VIDEO(dev->ts_player.play_para.vpid, dev->ts_player.play_para.vfmt);
 	}

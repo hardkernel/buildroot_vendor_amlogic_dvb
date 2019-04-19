@@ -143,12 +143,12 @@ static AM_ErrorCode_t get_work_mode()
 		g_dsc_sec_lib_handle = dlopen(DSC_SEC_CaLib, RTLD_NOW);
 		if (!g_dsc_sec_lib_handle)
 		{
-			printf("ADP_DSC: dlopen %s failed\n", DSC_SEC_CaLib);
+			AM_DEBUG(1, "ADP_DSC: dlopen %s failed\n", DSC_SEC_CaLib);
 			g_dsc_sec_mode = DSC_MODE_NORMAL;
 		}
 		else
 		{
-			printf("ADP_DSC: dlopen %s ok\n", DSC_SEC_CaLib);
+			AM_DEBUG(1, "ADP_DSC: dlopen %s ok\n", DSC_SEC_CaLib);
 			g_dsc_sec_mode = DSC_MODE_SEC;
 		}
 
@@ -158,7 +158,7 @@ static AM_ErrorCode_t get_work_mode()
 				g_dsc_sec_mode = DSC_MODE_NORMAL;
 		}
 	}
-	printf("ADP_DSC: Work mode %s\n", g_dsc_sec_mode==0?"DSC_MODE_NORMAL":"DSC_MODE_SEC");
+	AM_DEBUG(1, "ADP_DSC: Work mode %s\n", g_dsc_sec_mode==0?"DSC_MODE_NORMAL":"DSC_MODE_SEC");
 	return AM_SUCCESS;
 #else
 	g_dsc_sec_mode = DSC_MODE_NORMAL;
@@ -600,7 +600,6 @@ AM_ErrorCode_t AM_DSC_Close(int dev_no)
 
 	/* Reset status */
 	dev->openned = AM_FALSE;
-	g_dsc_sec_mode = -1;
 
 	pthread_mutex_unlock(&am_gAdpLock);
 	

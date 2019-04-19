@@ -87,7 +87,7 @@ static AM_ErrorCode_t am_init_syscontrol_api()
 #endif
 		if(handle==NULL)
 		{
-			AM_DEBUG(1, "open lib error--%s\r\n",dlerror());
+			//AM_DEBUG(1, "open lib error--%s\r\n",dlerror());
 			return AM_FAILURE;
 		}
 		AM_DEBUG(1, "open lib ok--\r\n");

@@ -340,6 +340,7 @@ LOCAL_PRELINK_MODULE := false
 include $(BUILD_STATIC_LIBRARY)
 
 ###################################################################################################################
+ifeq ($(BOARD_BUILD_VMX_DRM),true)
 include $(CLEAR_VARS)
 
 AMADEC_C_INCLUDES:=hardware/amlogic/media/amcodec/include\
@@ -480,10 +481,10 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 28&& echo OK),OK)
 LOCAL_CFLAGS += -DUSE_VENDOR_ICU
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
-#LOCAL_SHARED_LIBRARIES+=libicuuc libcutils liblog libdl libc libamadec_system
+LOCAL_SHARED_LIBRARIES+=libicuuc libcutils liblog libdl libc libamadec_system
 else
 LOCAL_C_INCLUDES += external/icu/icu4c/source/common
-#LOCAL_SHARED_LIBRARIES+=libicuuc libcutils liblog libdl libc libamadec_system
+LOCAL_SHARED_LIBRARIES+=libicuuc libcutils liblog libdl libc libamadec_system
 endif
 
 LOCAL_PRELINK_MODULE := false
@@ -491,4 +492,5 @@ LOCAL_PRELINK_MODULE := false
 
 #LOCAL_32_BIT_ONLY := true
 
-include $(BUILD_STATIC_LIBRARY)
+include $(BUILD_SHARED_LIBRARY)
+endif
