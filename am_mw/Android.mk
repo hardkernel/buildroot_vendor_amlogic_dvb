@@ -154,7 +154,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include/am_adp\
 ifeq ($(BOARD_VNDK_VERSION), current)
 ifeq ($(BOARD_COMPILE_IN_SYSTEM), true)
     LOCAL_C_INCLUDES += external/icu/icu4c/source/common
-    LOCAL_SHARED_LIBRARIES+= libzvbi libsqlite libam_adp liblog libdl libc libcutils libicui18nEC_LIBS) liblog libdl libc libcutils
+    LOCAL_SHARED_LIBRARIES+= libzvbi libsqlite libam_adp liblog libdl libc libcutils libicui18n liblog libdl libc libcutils
 else
     LOCAL_CFLAGS += -DUSE_VENDOR_ICU
     LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../icu/icu4c/source/common
