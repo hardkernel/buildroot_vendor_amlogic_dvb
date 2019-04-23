@@ -68,6 +68,58 @@ extern void AM_RegisterRWSysfsFun(AM_Read_Sysfs_Cb RCb, AM_Write_Sysfs_Cb WCb);
  */
 extern void AM_UnRegisterRWSysfsFun();
 
+/**\brief 读prop
+ *  name 文件名
+ *  buf  存放字符串的缓冲区
+ *  len  缓冲区大小
+ */
+typedef void (*AM_Read_Prop_Cb)(const char *name, char *buf, int len);
+
+/**\brief 写prop
+ *  name 文件名
+ *  cmd  向文件打印的字符串
+ */
+typedef void (*AM_Write_Prop_Cb)(const char *name, const char *cmd);
+
+
+/**\brief 注册读写sysfs的回调函数
+ * \param[in] fun 回调
+ * \return
+ *	 - AM_SUCCESS 成功
+ *	 - 其他值 错误代码
+ */
+extern void AM_RegisterRWPropFun(AM_Read_Prop_Cb RCb, AM_Write_Prop_Cb WCb);
+
+/**\brief 卸载注册
+ */
+extern void AM_UnRegisterRWPropFun();
+
+
+/**\brief 向一个Prop set字符串
+ * \param[in] name Prop名
+ * \param[in] cmd 向Prop set的字符串
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码
+ */
+extern AM_ErrorCode_t AM_PropEcho(const char *name, const char *cmd);
+
+/**\brief 读取一个Prop的字符串
+ * \param[in] name Prop名
+ * \param[out] buf 存放字符串的缓冲区
+ * \param len 缓冲区大小
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码
+ */
+extern AM_ErrorCode_t AM_PropRead(const char *name, char *buf, int len);
+
+/**\brief 创建本地socket服务
+ * \param[in] name 服务名称
+ * \param[out] fd 返回服务器socket
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码
 
 /**\brief 向一个文件打印字符串
  * \param[in] name 文件名

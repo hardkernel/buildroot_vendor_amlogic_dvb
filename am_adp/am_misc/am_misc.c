@@ -60,6 +60,13 @@ typedef struct am_rw_sysfs_cb_s
 
 am_rw_sysfs_cb_t rwSysfsCb = {.readSysfsCb = NULL, .writeSysfsCb = NULL};
 
+typedef struct am_rw_prop_cb_s
+{
+	AM_Read_Prop_Cb readPropCb;
+	AM_Write_Prop_Cb writePropCb;
+}am_rw_prop_cb_t;
+
+am_rw_prop_cb_t rwPropCb = {.readPropCb = NULL, .writePropCb = NULL};
 
 #ifdef ANDROID
 
@@ -191,6 +198,33 @@ void AM_UnRegisterRWSysfsFun()
 		rwSysfsCb.writeSysfsCb = NULL;
 }
 
+/**\brief 注册读写prop的回调函数
+ * \param[in] fun 回调
+ * \return
+ *	 - AM_SUCCESS 成功
+ *	 - 其他值 错误代码
+ */
+void AM_RegisterRWPropFun(AM_Read_Prop_Cb RCb, AM_Write_Prop_Cb WCb)
+{
+	assert(RCb && WCb);
+
+	if (!rwPropCb.readPropCb)
+		rwPropCb.readPropCb = RCb;
+	if (!rwPropCb.writePropCb)
+		rwPropCb.writePropCb = WCb;
+
+	AM_DEBUG(1, "AM_RegisterRWSysfsFun !!");
+}
+
+/**\brief 卸载prop注册
+ */
+void AM_UnRegisterRWPropFun()
+{
+	if (rwPropCb.readPropCb)
+		rwPropCb.readPropCb = NULL;
+	if (rwPropCb.writePropCb)
+		rwPropCb.writePropCb = NULL;
+}
 
 /**\brief 向一个文件打印字符串
  * \param[in] name 文件名
@@ -202,7 +236,7 @@ void AM_UnRegisterRWSysfsFun()
 AM_ErrorCode_t AM_FileEcho(const char *name, const char *cmd)
 {
 	int fd, len, ret;
-	
+
 	assert(name && cmd);
 
 	if (rwSysfsCb.writeSysfsCb)
@@ -236,7 +270,7 @@ AM_ErrorCode_t AM_FileEcho(const char *name, const char *cmd)
 	}
 
 	close(fd);
-	
+
 	return AM_SUCCESS;
 }
 
@@ -285,6 +319,52 @@ AM_ErrorCode_t AM_FileRead(const char *name, char *buf, int len)
 	fclose(fp);
 	
 	return ret ? AM_SUCCESS : AM_FAILURE;
+}
+
+
+/**\brief 向一个prop set字符串
+ * \param[in] name 文件名
+ * \param[in] cmd 向propset 的字符串
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码
+ */
+AM_ErrorCode_t AM_PropEcho(const char *name, const char *cmd)
+{
+	int fd, len, ret;
+
+	assert(name && cmd);
+
+	if (rwPropCb.writePropCb)
+	{
+		rwPropCb.writePropCb(name, cmd);
+		return AM_SUCCESS;
+	}
+
+	return AM_SUCCESS;
+}
+
+/**\brief 读取一个prop字符串
+ * \param[in] name prop名
+ * \param[out] buf 存放字符串的缓冲区
+ * \param len 缓冲区大小
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码
+ */
+AM_ErrorCode_t AM_PropRead(const char *name, char *buf, int len)
+{
+	FILE *fp;
+	char *ret;
+
+	assert(name && buf);
+
+	if (rwPropCb.readPropCb)
+	{
+		rwPropCb.readPropCb(name, buf, len);
+		return AM_SUCCESS;
+	}
+	return AM_FAILURE;
 }
 
 /**\brief 创建本地socket服务
