@@ -533,7 +533,7 @@ AM_ErrorCode_t AM_LocalGetResp(int fd, char *buf, int len)
  * -4 = character encoded incorrectly (not minimal length).
  */
 
-int UTF8_getc(const unsigned char *str, int len, unsigned long *val)
+static int UTF8_getc(const unsigned char *str, int len, unsigned long *val)
 {
 	const unsigned char *p;
 	unsigned long value;
