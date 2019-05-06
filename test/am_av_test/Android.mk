@@ -31,8 +31,8 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../include/am_adp $(LOCAL_PATH)/../../andro
 			$(AMADEC_C_INCLUDES)\
 			common/include/linux/amlogic
 
-LOCAL_STATIC_LIBRARIES := libam_adp_adec
-LOCAL_SHARED_LIBRARIES := $(AMADEC_LIBS) libcutils liblog libc
+LOCAL_SHARED_LIBRARIES += libam_adp_adec
+LOCAL_SHARED_LIBRARIES += $(AMADEC_LIBS) libcutils liblog libc
 
 include $(BUILD_EXECUTABLE)
 

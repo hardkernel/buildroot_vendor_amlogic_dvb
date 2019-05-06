@@ -340,7 +340,6 @@ LOCAL_PRELINK_MODULE := false
 include $(BUILD_STATIC_LIBRARY)
 
 ###################################################################################################################
-ifeq ($(BOARD_BUILD_VMX_DRM),true)
 include $(CLEAR_VARS)
 
 AMADEC_C_INCLUDES:=hardware/amlogic/media/amcodec/include\
@@ -493,7 +492,6 @@ LOCAL_PRELINK_MODULE := false
 #LOCAL_32_BIT_ONLY := true
 
 include $(BUILD_SHARED_LIBRARY)
-endif
 
 #########################################################################################################
 ifeq ($(BOARD_COMPILE_IN_SYSTEM), true)
