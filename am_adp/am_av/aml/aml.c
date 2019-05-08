@@ -704,6 +704,12 @@ static int aml_set_sync_mode(AM_AV_Device_t *dev, int mode);
  * support multi instance video decoder
  * use /dev/amstream_mpts_sched
  ***************************************************************************/
+static float getUptimeSeconds() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+
+    return (float)(ts.tv_sec +(float)ts.tv_nsec / 1000000000);
+}
 static AM_Bool_t check_vfmt_support_sched(AM_AV_VFormat_t vfmt)
 {
 	if (vfmt == VFORMAT_MPEG12 ||
@@ -2457,7 +2463,7 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AV_TimeShi
 
 static int aml_start_av_monitor(AM_AV_Device_t *dev, AV_Monitor_t *mon)
 {
-	AM_DEBUG(1, "[avmon] start av monitor");
+	AM_DEBUG(1, "[avmon] start av monitor SwitchSourceTime = %fs",getUptimeSeconds());
 	mon->av_thread_running = AM_TRUE;
 	if (pthread_create(&mon->av_mon_thread, NULL, aml_av_monitor_thread, (void*)dev))
 	{
@@ -4743,7 +4749,7 @@ static void* aml_av_monitor_thread(void *arg)
 
 				if ((vframes_now >= 1) ) {
 					if (no_video) {
-						AM_DEBUG(1, "[avmon] video available");
+						AM_DEBUG(1, "[avmon] video available SwitchSourceTime = %fs",getUptimeSeconds());
 						AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_AVAILABLE, NULL);
 					}
 					no_video = AM_FALSE;
