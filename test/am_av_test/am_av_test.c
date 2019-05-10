@@ -59,6 +59,9 @@
 #define OSD_W       1280
 #define OSD_H       720
 #endif
+
+#define VALID_PID(_pid_) ((_pid_)>0 && (_pid_)<0x1fff)
+
 /****************************************************************************
  * Functions
  ***************************************************************************/
@@ -919,7 +922,7 @@ static int get_section(int dmx, int timeout)
 	struct dmx_pes_filter_params pparam;
 
 	for(i=0; i<USER_MAX; i++) {
-		if(u_pid[i]!=-1) {
+		if(VALID_PID(u_pid[i])) {
 			AM_TRY(AM_DMX_AllocateFilter(dmx, &fid_user[i]));
 
 			AM_TRY(AM_DMX_SetCallback(dmx, fid_user[i], dump_bytes, (void*)(long)(i+1)));
@@ -990,7 +993,7 @@ static int get_section(int dmx, int timeout)
 	sleep(timeout);
 
 	for(i=0; i<USER_MAX; i++) {
-		if(u_pid[i]!=-1) {
+		if(VALID_PID(u_pid[i])) {
 			AM_TRY(AM_DMX_StopFilter(dmx, fid_user[i]));
 			AM_TRY(AM_DMX_FreeFilter(dmx, fid_user[i]));
 			if((get_upara(i)&UPARA_FILE) && fp[i])
@@ -1057,6 +1060,10 @@ static void inject_play_file(char *name, int fmt, int vpid, int apid, int vfmt, 
 	AM_DMX_Open(DMX_DEV_NO, &dmx_p);
 	AM_DMX_SetSource(DMX_DEV_NO, AM_DMX_SRC_HIU);
 
+	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_RESOLUTION_CHANGED, video_callback, NULL);
+	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED, video_callback, NULL);
+	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_AVAILABLE, video_callback, NULL);
+
 	fd = open(name, O_RDWR, S_IRUSR);
 	if(fd<0)
 		printf("file[%s] open fail. [%d:%s]\n", name, errno, strerror(errno));
@@ -1074,8 +1081,8 @@ static void inject_play_file(char *name, int fmt, int vpid, int apid, int vfmt, 
 
 	inject_loop = loop;
 	inject_running = 1;
-	inject_type = (apid==-1)? AM_AV_INJECT_VIDEO : 
-					(vpid==-1)? AM_AV_INJECT_AUDIO : 
+	inject_type = (!VALID_PID(apid))? AM_AV_INJECT_VIDEO :
+					(!VALID_PID(vpid))? AM_AV_INJECT_AUDIO :
 							AM_AV_INJECT_MULTIPLEX;
 
 	printf("file inject: [fmt:%d][file:%s][v:%d-%d][a:%d-%d][loop:%d]\n", fmt, name, vpid, vfmt, apid, afmt, loop);
@@ -1290,7 +1297,7 @@ int main(int argc, char **argv)
 			else if (strncmp(s, "dmx=", 4) == 0)
 				sscanf(s, "dmx=%i", &dmx);
 		}
-		if (ppid == -1 && vpid != -1)
+		if ((ppid == -1) && VALID_PID(vpid))
 			ppid = vpid;
 		dvb_play(vpid, apid, ppid, vfmt, afmt,
 			freq, tssrc, dmx, fe_mod, argc, argv);
