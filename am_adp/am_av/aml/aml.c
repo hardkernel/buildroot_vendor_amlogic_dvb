@@ -936,6 +936,8 @@ static void adec_start_decode_cb(int fd, int fmt, int has_video, void **padec)
 	}
 
 	AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv_cb, NULL);
+	// just for compatile with native decoder.
+	adec_handle = (void *) 1;
 }
 
 static void adec_pause_decode_cb(void *handle)
@@ -974,6 +976,7 @@ static void adec_stop_decode_cb(void **padec)
 	if (s_audio_cb) {
 	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
 	}
+	adec_handle = NULL;
 	return ;
 }
 static void adec_set_decode_ad_cb(int enable, int pid, int fmt, void *adec)
