@@ -394,6 +394,7 @@ static AM_ErrorCode_t dvb_set_para (AM_FEND_Device_t *dev, const struct dvb_fron
 			break;
 
 		case SYS_DVBS:
+		case SYS_DVBS2:
 			p[cmd_num].cmd = DTV_SYMBOL_RATE;
 			p[cmd_num].u.data = para->u.qpsk.symbol_rate;
 			cmd_num++;
@@ -480,14 +481,12 @@ static AM_ErrorCode_t dvb_set_para (AM_FEND_Device_t *dev, const struct dvb_fron
 			break;
 		/*now don't support below
 		case SYS_DSS:
-		case SYS_DVBS2:
 		case SYS_DVBH:
 		case SYS_ISDBS:
 		case SYS_ISDBC:
 		case SYS_ATSCMH:
 		case SYS_CMMB:
 		case SYS_DAB:
-		case SYS_DVBT2:
 		case SYS_TURBO:
 		case SYS_DVBC_ANNEX_C:*/
 		default:
