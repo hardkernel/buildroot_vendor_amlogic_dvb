@@ -312,6 +312,7 @@ static int _get_aud_disabled();
 static AM_ErrorCode_t set_dec_control(AM_Bool_t enable);
 
 #define VALID_VIDEO(_pid_, _fmt_) (VALID_PID(_pid_))
+#define VALID_PCR(_pid_) (VALID_PID(_pid_))
 
 #ifdef USE_ADEC_IN_DVB
 #define VALID_AUDIO(_pid_, _fmt_) (VALID_PID(_pid_) && audio_get_format_supported(_fmt_))
@@ -692,7 +693,7 @@ static dec_sysinfo_t am_sysinfo;
 
 
 static AM_ErrorCode_t aml_set_ad_source(AM_AD_Handle_t *ad, int enable, int pid, int fmt, void *user);
-static int aml_calc_sync_mode(AM_AV_Device_t *dev, int has_audio, int has_video, int afmt, int *force_reason);
+static int aml_calc_sync_mode(AM_AV_Device_t *dev, int has_audio, int has_video, int has_pcr, int afmt, int *force_reason);
 static int aml_set_sync_mode(AM_AV_Device_t *dev, int mode);
 
 /****************************************************************************
@@ -1861,7 +1862,7 @@ static AV_InjectData_t* aml_create_inject_data(void)
 }
 
 /**\brief 设置数据注入参赛*/
-static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AV_InjectPlayPara_t *inj_para)
+static AM_ErrorCode_t aml_start_inject(AM_AV_Device_t *dev, AV_InjectData_t *inj, AV_InjectPlayPara_t *inj_para)
 {
 	int vfd=-1, afd=-1;
 	AM_AV_InjectPara_t *para = &inj_para->para;
@@ -2047,6 +2048,17 @@ static AM_ErrorCode_t aml_start_inject(AV_InjectData_t *inj, AV_InjectPlayPara_t
 			return AM_AV_ERR_SYS;
 		}
 	}
+
+#if defined(ANDROID) || defined(CHIP_8626X)
+	if (has_video && has_audio)
+		aml_set_tsync_enable(1);
+	else
+		aml_set_tsync_enable(0);
+#endif
+
+	aml_set_sync_mode(dev,
+		aml_calc_sync_mode(dev, has_audio, has_video, 0, para->aud_fmt, NULL));
+
 
 	if (has_audio)
 	{
@@ -2384,7 +2396,7 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AV_TimeShi
 		}
 	}
 
-	sync_mode = aml_calc_sync_mode(tshift->dev, has_audio, has_video, tp->afmt, &sync_force);
+	sync_mode = aml_calc_sync_mode(tshift->dev, has_audio, has_video, 0, tp->afmt, &sync_force);
 	aml_set_sync_mode(tshift->dev, sync_mode);
 
 	if (has_audio && (sync_force != FORCE_AC3_AMASTER)) {
@@ -3816,7 +3828,7 @@ static int aml_get_audio_digital_raw(void)
 	return mode;
 }
 
-static int aml_calc_sync_mode(AM_AV_Device_t *dev, int has_audio, int has_video, int afmt, int *force_reason)
+static int aml_calc_sync_mode(AM_AV_Device_t *dev, int has_audio, int has_video, int has_pcr, int afmt, int *force_reason)
 {
 	int is_dts_dolby = 0;
 	int ac3_amaster = 0;
@@ -3846,6 +3858,8 @@ static int aml_calc_sync_mode(AM_AV_Device_t *dev, int has_audio, int has_video,
 	}
 
 	tsync_mode = PCRMASTER;
+	if (!has_pcr)
+		tsync_mode = AMASTER;
 
 	if (ac3_amaster) {
 		//force
@@ -3855,7 +3869,9 @@ static int aml_calc_sync_mode(AM_AV_Device_t *dev, int has_audio, int has_video,
 	}
 
 	//no pcrmaster for timeshifting
-	if ((tsync_mode == PCRMASTER) && (dev->mode == AV_TIMESHIFT))
+	if ((tsync_mode == PCRMASTER)
+		&& ((dev->mode == AV_TIMESHIFT)
+			||(dev->mode == AV_INJECT)))
 		tsync_mode = AMASTER;
 
 	if ((aml_get_audio_digital_raw() != 0) && is_dts_dolby)
@@ -3866,6 +3882,9 @@ static int aml_calc_sync_mode(AM_AV_Device_t *dev, int has_audio, int has_video,
 
 	if (afmt == AFORMAT_DRA && has_audio)
 		tsync_mode = AMASTER;
+
+	printf("tsync mode calc:%d v:%d a:%d af:%d force:%d\n",
+		tsync_mode, has_video, has_audio, afmt, force_reason? *force_reason : 0);
 
 	return tsync_mode;
 }
@@ -3885,6 +3904,7 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	int val;
 	AM_Bool_t has_video = VALID_VIDEO(tp->vpid, tp->vfmt);
 	AM_Bool_t has_audio = VALID_AUDIO(tp->apid, tp->afmt);
+	AM_Bool_t has_pcr = VALID_PCR(tp->pcrpid);
 	int sync_mode, sync_force;
 
 	AM_DEBUG(1, "aml start ts: V[%d:%d] A[%d:%d] P[%d]", tp->vpid, tp->vfmt, tp->apid, tp->afmt, tp->pcrpid);
@@ -4048,10 +4068,10 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	}
 
 //#ifdef ENABLE_PCR
-	sync_mode = aml_calc_sync_mode(dev, has_audio, has_video, tp->afmt, &sync_force);
+	sync_mode = aml_calc_sync_mode(dev, has_audio, has_video, has_pcr, tp->afmt, &sync_force);
 
 	if ((sync_force != FORCE_AC3_AMASTER)) {
-		if (tp->pcrpid && (tp->pcrpid < 0x1fff)) {
+		if (has_pcr) {
 			val = tp->pcrpid;
 			if (ioctl(ts->fd, AMSTREAM_IOC_PCRID, val) == -1)
 			{
@@ -5299,7 +5319,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 		case AV_INJECT:
 			inj_p = (AV_InjectPlayPara_t *)para;
 			inj = dev->inject_player.drv_data;
-			if (aml_start_inject(inj, inj_p) != AM_SUCCESS)
+			if (aml_start_inject(dev, inj, inj_p) != AM_SUCCESS)
 				{
 				AM_DEBUG(1,"[aml_start_mode]  AM_AV_ERR_SYS");
 				return AM_AV_ERR_SYS;
@@ -6558,7 +6578,7 @@ static AM_ErrorCode_t aml_switch_ts_audio_legacy(AM_AV_Device_t *dev, uint16_t a
 	}
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
 	aml_set_sync_mode(dev,
-		aml_calc_sync_mode(dev, audio_valid, has_video, afmt, NULL));
+		aml_calc_sync_mode(dev, audio_valid, has_video, 1, afmt, NULL));
 	audio_ops->adec_start_decode(fd, afmt, has_video, &ts->adec);
 	uint16_t sub_apid = dev->ts_player.play_para.sub_apid ;
 	AM_AV_AFormat_t sub_afmt = dev->ts_player.play_para.sub_afmt;
@@ -6576,6 +6596,7 @@ static AM_ErrorCode_t aml_switch_ts_audio_fmt(AM_AV_Device_t *dev)
 {
 	AM_Bool_t has_audio = AM_FALSE;
 	AM_Bool_t has_video = AM_FALSE;
+	AM_Bool_t has_pcr = AM_FALSE;
 	AV_TSData_t *ts = NULL;
 	AV_TSPlayPara_t *tp = NULL;
 	int sub_apid;
@@ -6610,6 +6631,7 @@ static AM_ErrorCode_t aml_switch_ts_audio_fmt(AM_AV_Device_t *dev)
 
 	has_audio = VALID_AUDIO(tp->apid, tp->afmt);
 	has_video = VALID_VIDEO(tp->vpid, tp->vfmt);
+	has_pcr = VALID_PCR(tp->vpid);
 
 	aml_set_ad_source(&ts->ad, 0, 0, 0, ts->adec);
 	audio_ops->adec_set_decode_ad(0, 0, 0, ts->adec);
@@ -6649,7 +6671,7 @@ static AM_ErrorCode_t aml_switch_ts_audio_fmt(AM_AV_Device_t *dev)
 	}
 	AM_FileEcho(ENABLE_RESAMPLE_FILE, "1");
 	aml_set_sync_mode(dev,
-		aml_calc_sync_mode(dev, has_audio, has_video, tp->afmt, NULL));
+		aml_calc_sync_mode(dev, has_audio, has_video, has_pcr, tp->afmt, NULL));
 	audio_ops->adec_start_decode(ts->fd, tp->afmt, has_video, &ts->adec);
 
 	if (VALID_PID(sub_apid))
@@ -7015,7 +7037,7 @@ static int aml_restart_inject_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread
 	inj_data.para.data_width = 0;
 	inj_data.para.sample_rate = 0;
 
-	if (aml_start_inject(inj, &inj_data) != AM_SUCCESS)
+	if (aml_start_inject(dev, inj, &inj_data) != AM_SUCCESS)
 	{
 		AM_DEBUG(1,"[aml_start_mode]  AM_AV_ERR_SYS");
 		return AM_AV_ERR_SYS;
