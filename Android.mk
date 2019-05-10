@@ -20,4 +20,10 @@ else
 include $(DVB_TOP)/am_adp/Android.mk $(DVB_TOP)/am_mw/Android.mk $(DVB_TOP)/am_ver/Android.mk
 endif
 
-include $(call all-makefiles-under,$(DVB_TOP)/test)
+#include $(call all-makefiles-under,$(DVB_TOP)/test)
+include $(DVB_TOP)/test/am_fend_test/Android.mk
+include $(DVB_TOP)/test/am_dmx_test/Android.mk
+include $(DVB_TOP)/test/am_av_test/Android.mk
+include $(DVB_TOP)/test/am_dvr_test/Android.mk
+include $(DVB_TOP)/test/am_dsc_test/Android.mk
+include $(DVB_TOP)/test/am_userdata_test/Android.mk
