@@ -131,6 +131,7 @@ typedef struct
 	AM_Isdb_UpdataJson_t json_update;
 	void* user_data;
 	int horizon_layout;
+	int code_set_flag;
 #define JSON_SIZE 4096
 }ctx_t;
 
@@ -901,6 +902,7 @@ static int parse_command(ctx_t *ctx, const uint8_t *buf, int len)
 				/* SS3: Code to invoke character code set. */
 			case 0xD:
 				isdb_log("Command: SS3\n");
+				ctx->code_set_flag = 3;
 				break;
 
 				/**
@@ -1196,7 +1198,11 @@ static int append_char(ctx_t *ctx, const char ch)
 	}
 
 	reserve_buf(text, 2); //+1 for terminating '\0'
-	text->buf[text->used] = ch;
+	if (ctx->code_set_flag == 3 && ch == 0x21)
+		text->buf[text->used] = 0xEF;
+	else
+		text->buf[text->used] = ch;
+	ctx->code_set_flag = 0;
 	text->used ++;
 	text->buf[text->used] = '\0';
 
