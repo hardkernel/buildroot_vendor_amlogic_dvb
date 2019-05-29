@@ -5929,8 +5929,6 @@ static AM_ErrorCode_t aml_get_astatus(AM_AV_Device_t *dev, AM_AV_AudioStatus_t *
 		return AM_FAILURE;
 	}
 
-	pthread_mutex_lock(&gAVMonLock);
-
 #if 1
 	switch (dev->mode) {
 		case AV_PLAY_TS:
@@ -6033,11 +6031,9 @@ static AM_ErrorCode_t aml_get_astatus(AM_AV_Device_t *dev, AM_AV_AudioStatus_t *
 	para->ab_data = astatus.status.data_len;
 	para->ab_free = astatus.status.free_len;
 
-	pthread_mutex_unlock(&gAVMonLock);
 	return AM_SUCCESS;
 
 get_fail:
-	pthread_mutex_unlock(&gAVMonLock);
 	return AM_FAILURE;
 }
 static AM_Bool_t aml_is_video_valid(AM_AV_Device_t *dev)
@@ -6071,7 +6067,6 @@ static AM_ErrorCode_t aml_get_vstatus(AM_AV_Device_t *dev, AM_AV_VideoStatus_t *
 		return AM_FAILURE;
 	}
 
-	pthread_mutex_lock(&gAVMonLock);
 	fd = get_amstream(dev);
 	if (fd == -1)
 	{
@@ -6139,11 +6134,9 @@ static AM_ErrorCode_t aml_get_vstatus(AM_AV_Device_t *dev, AM_AV_VideoStatus_t *
 	para->vb_data = vstatus.status.data_len;
 	para->vb_free = vstatus.status.free_len;
 
-	pthread_mutex_unlock(&gAVMonLock);
 	return AM_SUCCESS;
 
 get_fail:
-	pthread_mutex_unlock(&gAVMonLock);
 	return AM_FAILURE;
 }
 
