@@ -39,7 +39,7 @@
 #define AM_TT2_ROWS (25)
 
 #define VBI_DEV_FILE "/dev/vbi"
-#define DEBUG_TT
+//#define DEBUG_TT
 
 typedef struct AM_TT2_CachedPage_s
 {
@@ -350,9 +350,11 @@ static void tt2_draw(AM_TT2_Parser_t *parser, vbi_page* page, char* subs, int su
 
 	is_subtitle = page_type & 0xC000;
 
-	vbi_draw_vt_page_region(page,
+	if (*(parser->para.bitmap))
+	{
+		vbi_draw_vt_page_region(page,
 							VBI_PIXFMT_RGBA32_LE,
-							parser->para.bitmap,
+							*(parser->para.bitmap),
 							parser->para.pitch,
 							0,
 							0,
@@ -366,6 +368,7 @@ static void tt2_draw(AM_TT2_Parser_t *parser, vbi_page* page, char* subs, int su
 							parser->lock_subpg,
 							parser->time,
 							0);
+	}
 
 	if (parser->para.draw_end)
 		parser->para.draw_end(parser,
@@ -388,15 +391,15 @@ static void tt2_cache_page(AM_TT2_Parser_t *parser, int pgno, int sub_pgno)
 
 	cached = vbi_fetch_vt_page(parser->dec, &page,
 		pgno, sub_pgno,
-		VBI_WST_LEVEL_3p5, AM_TT2_ROWS, AM_TRUE, &page_type);
+		VBI_WST_LEVEL_2p5, AM_TT2_ROWS, AM_TRUE, &page_type);
 	if(!cached)
 	{
-		AM_DEBUG(0, "vbi_fetch_vt_page cache null");
+		AM_DEBUG(0, "vbi_fetch_vt_page cache null pg: %x %d", pgno, sub_pgno);
 		return;
 	}
 	if (vbi_dec2bcd(parser->page_no) == pgno && parser->lock_subpg == 0)
 		parser->sub_page_no      = page.subno;
-	
+
 	tt2_add_cached_page(parser, &page, page_type);
 }
 
@@ -467,7 +470,8 @@ static void* tt2_thread(void *arg)
 		{
 			if (new_page_to_draw)
 			{
-				tt2_draw(parser, &page, subs, sub_cnt, page_type, flash_switch);
+				if (*(parser->para.bitmap))
+					tt2_draw(parser, &page, subs, sub_cnt, page_type, flash_switch);
 				new_page_to_draw = 0;
 			}
 		}
@@ -481,10 +485,8 @@ static void tt2_time_update(vbi_event *ev, void *user_data)
 
 	if (ev->type == VBI_EVENT_TIME)
 	{
-		pthread_mutex_lock(&parser->lock);
 		memcpy(parser->time, ev->time, 8);
 		parser->disp_update = AM_TRUE;
-		pthread_mutex_unlock(&parser->lock);
 
 		pthread_cond_signal(&parser->cond);
 	}
@@ -499,7 +501,6 @@ static void tt2_event_handler(vbi_event *ev, void *user_data)
 	if(ev->type != VBI_EVENT_TTX_PAGE)
 		return;
 
-	pthread_mutex_lock(&parser->lock);
 	pgno  = ev->ev.ttx_page.pgno;
 	subno = ev->ev.ttx_page.subno;
 #ifdef DEBUG_TT
@@ -514,7 +515,6 @@ static void tt2_event_handler(vbi_event *ev, void *user_data)
 
 	if (parser->para.new_page)
 		parser->para.new_page((AM_TT2_Handle_t)parser, pgno, subno);
-	pthread_mutex_unlock(&parser->lock);
 }
 
 static void *tt2_vbi_data_thread(void *arg)
@@ -560,17 +560,16 @@ static void *tt2_vbi_data_thread(void *arg)
 			AM_DEBUG(4, "am_vbi_data_thread running read data == %d",ret);
 
 			if (ret >= (int)sizeof(struct vbi_data_s)) {
-				if (!notify_data)
-				{
-					parser->para.notify_tt_data(parser, 1);
-					notify_data = 1;
-				}
 				while (ret >= (int)sizeof(struct vbi_data_s)) {
 					//TODO
 					s->line = pd->line_num;
 					s->id = VBI_SLICED_TELETEXT_B;
 					memcpy(s->data, pd->b, 42);
+
+					pthread_mutex_lock(&parser->lock);
 					vbi_decode(parser->dec, s, 1, 0);
+
+					pthread_mutex_unlock(&parser->lock);
 
 					pd ++;
 					ret -= sizeof(struct vbi_data_s);
@@ -594,11 +593,6 @@ static void *tt2_vbi_data_thread(void *arg)
 #endif
 			if (ret >= sizeof(struct vbi_data_s))
 			{
-				if (!notify_data)
-				{
-					parser->para.notify_tt_data(parser, 1);
-					notify_data = 1;
-				}
 				if (vbi.vbi_type != 3)
 					continue;
 			}
@@ -615,7 +609,9 @@ static void *tt2_vbi_data_thread(void *arg)
 					s->line = vbi.line_num;
 					s->id = VBI_SLICED_TELETEXT_B;
 					memcpy(s->data, vbi.b, 42);
+					pthread_mutex_lock(&parser->lock);
 					vbi_decode(parser->dec, s, 1, 0);
+					pthread_mutex_unlock(&parser->lock);
 					ret -= sizeof(struct vbi_data_s);
 				}
 			}
@@ -666,7 +662,16 @@ AM_ErrorCode_t AM_TT2_Create(AM_TT2_Handle_t *handle, AM_TT2_Para_t *para)
 	pthread_cond_init(&parser->cond, NULL);
 
 	parser->para    = *para;
-	parser->dec = NULL;
+	parser->dec = vbi_decoder_new();
+	if (!parser->dec)
+	{
+		free(parser);
+		parser->dec = NULL;
+		return AM_TT2_ERR_CREATE_DECODE;
+	}
+
+	vbi_event_handler_register(parser->dec, VBI_EVENT_TTX_PAGE, tt2_event_handler, parser);
+	vbi_event_handler_register(parser->dec, VBI_EVENT_TIME, tt2_time_update, parser);
 
 	*handle = parser;
 
@@ -690,7 +695,14 @@ AM_ErrorCode_t AM_TT2_Destroy(AM_TT2_Handle_t handle)
 		return AM_TT2_ERR_INVALID_HANDLE;
 	}
 
-	AM_TT2_Stop(handle);
+	if (parser->running != AM_FALSE)
+		AM_TT2_Stop(handle);
+
+	if (parser->search)
+		vbi_search_delete(parser->search);
+
+	if (parser->dec)
+		vbi_decoder_delete(parser->dec);
 
 	/* Free all cached pages */
 #if 0
@@ -1014,18 +1026,9 @@ AM_ErrorCode_t AM_TT2_Start(AM_TT2_Handle_t handle, int region_id)
 	memset(&parser->last_display_page, 0, sizeof(AM_TT2_CachedPage_t));
 	memset(&parser->nav_link, 0, sizeof(nav_link_t));
 
-	parser->dec = vbi_decoder_new();
-	if (!parser->dec)
-	{
-		free(parser);
-		parser->dec = NULL;
-		return AM_TT2_ERR_CREATE_DECODE;
-	}
-
 	/* Set teletext default region, See libzvbi/src/lang.c */
 
-	vbi_event_handler_register(parser->dec, VBI_EVENT_TTX_PAGE, tt2_event_handler, parser);
-	vbi_event_handler_register(parser->dec, VBI_EVENT_TIME, tt2_time_update, parser);
+
 
 	vbi_teletext_set_default_region(parser->dec, region_id);
 
@@ -1096,12 +1099,6 @@ AM_ErrorCode_t AM_TT2_Stop(AM_TT2_Handle_t handle)
 	{
 		pthread_join(parser->vbi_tid, NULL);
 	}
-
-	if (parser->search)
-		vbi_search_delete(parser->search);
-
-	if (parser->dec)
-		vbi_decoder_delete(parser->dec);
 
 	cache_page = parser->cached_pages;
 

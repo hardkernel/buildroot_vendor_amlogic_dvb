@@ -100,9 +100,8 @@ typedef struct
 	AM_TT2_DrawBegin_t draw_begin;   /**< start draw teletext callback function*/
 	AM_TT2_DrawEnd_t   draw_end;     /**< stop draw teletext callback function*/
 	AM_TT2_NewPage_t   new_page;     /**< get new teletext page callback function*/
-	AM_TT2_NotifyData_t notify_tt_data; /**< notify stream have tt_data */
 	AM_Bool_t        is_subtitle;    /**< is subtitle or not*/
-	uint8_t         *bitmap;         /**< draw bitmap buffer*/
+	uint8_t         **bitmap;         /**< draw bitmap buffer*/
 	int              pitch;          /**< the length of draw bitmap buffer per line*/
 	void            *user_data;      /**< user data*/
 	int             default_region;  /**< default region，see vbi_font_descriptors in libzvbi/src/lang.c*/
