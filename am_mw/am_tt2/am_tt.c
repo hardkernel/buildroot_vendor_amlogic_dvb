@@ -29,6 +29,7 @@
 #include <am_util.h>
 #include <am_misc.h>
 #include <sys/ioctl.h>
+#include <signal.h>
 
 
 #include "tvin_vbi.h"
