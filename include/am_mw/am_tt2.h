@@ -157,7 +157,7 @@ extern AM_ErrorCode_t AM_TT2_Decode(AM_TT2_Handle_t handle, uint8_t *buf, int si
  * \retval AM_SUCCESS On success
  * \return Error code
  */
-extern AM_ErrorCode_t AM_TT2_Start(AM_TT2_Handle_t handle);
+extern AM_ErrorCode_t AM_TT2_Start(AM_TT2_Handle_t handle, int region_id);
 
 /**\brief stop show teletext
  * \param handle the handle of parser

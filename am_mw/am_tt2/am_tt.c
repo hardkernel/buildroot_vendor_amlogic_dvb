@@ -444,13 +444,19 @@ static void* tt2_thread(void *arg)
 				cached = vbi_fetch_vt_page(parser->dec, &page,
 										   target_page->page.pgno, target_page->page.subno,
 										   VBI_WST_LEVEL_3p5, AM_TT2_ROWS, AM_TRUE, NULL);
-				if (!cached)
+				if (cached)
+				{
 					page = target_page->page;
-				new_page_to_draw = 1;
-				sub_cnt = get_subs(parser, target_page->page.pgno, subs);
-				page_type = target_page->page_type;
-				draw_page = *target_page;
-				parser->curr_page = target_page;
+					new_page_to_draw = 1;
+					sub_cnt = get_subs(parser, target_page->page.pgno, subs);
+					page_type = target_page->page_type;
+					draw_page = *target_page;
+					parser->curr_page = target_page;
+				}
+				else
+				{
+					AM_DEBUG(0, "vbi_fetch_vt_page failed");
+				}
 			}
 		}
 
@@ -601,7 +607,7 @@ static void *tt2_vbi_data_thread(void *arg)
 				lseek(fd, 0, SEEK_SET);
 				continue;
 			}
-#if 1
+#if 0
 			AM_DEBUG(0, "am_vbi_data_thread running read data == %d",ret);
 #endif
 			if (ret >= (int)sizeof(struct vbi_data_s)) {
@@ -982,7 +988,7 @@ end:
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_tt2.h)
  */
-AM_ErrorCode_t AM_TT2_Start(AM_TT2_Handle_t handle)
+AM_ErrorCode_t AM_TT2_Start(AM_TT2_Handle_t handle, int region_id)
 {
 	AM_TT2_Parser_t *parser = (AM_TT2_Parser_t*)handle;
 	AM_ErrorCode_t ret = AM_SUCCESS;
@@ -1004,7 +1010,7 @@ AM_ErrorCode_t AM_TT2_Start(AM_TT2_Handle_t handle)
 	parser->cached_tail = NULL;
 	parser->display_page = NULL;
 	parser->subtitle_head = NULL;
-	parser->region_id = 0;
+	parser->region_id = region_id;
 	memset(&parser->last_display_page, 0, sizeof(AM_TT2_CachedPage_t));
 	memset(&parser->nav_link, 0, sizeof(nav_link_t));
 
@@ -1017,10 +1023,11 @@ AM_ErrorCode_t AM_TT2_Start(AM_TT2_Handle_t handle)
 	}
 
 	/* Set teletext default region, See libzvbi/src/lang.c */
-	vbi_teletext_set_default_region(parser->dec, parser->para.default_region);
 
 	vbi_event_handler_register(parser->dec, VBI_EVENT_TTX_PAGE, tt2_event_handler, parser);
 	vbi_event_handler_register(parser->dec, VBI_EVENT_TIME, tt2_time_update, parser);
+
+	vbi_teletext_set_default_region(parser->dec, region_id);
 
 	if (!parser->running)
 	{
