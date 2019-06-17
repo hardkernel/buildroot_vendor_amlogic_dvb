@@ -269,24 +269,6 @@ static int get_subs(AM_TT2_Parser_t *parser, int pgno, char* subs)
 	return sub_cnt;
 }
 
-static int check_page(AM_TT2_Parser_t *parser, int pgno, int subno, unsigned int sub_mask)
-{
-	AM_TT2_CachedPage_t *target_page = NULL;
-
-	if (!parser || !parser->cached_pages)
-		return 0;
-
-	target_page = parser->cached_pages;
-
-	while (target_page)
-	{
-		if (pgno == target_page->page.pgno && ((subno & sub_mask) == (target_page->page.subno & sub_mask)))
-			return 1;
-		target_page = target_page->next;
-	}
-	return 0;
-}
-
 static AM_TT2_CachedPage_t* tt2_check(AM_TT2_Parser_t *parser)
 {
 	AM_TT2_CachedPage_t     *target_page;
@@ -341,7 +323,29 @@ static AM_TT2_CachedPage_t* tt2_check(AM_TT2_Parser_t *parser)
 	return target_page;
 }
 
-static void tt2_draw(AM_TT2_Parser_t *parser, vbi_page* page, char* subs, int sub_cnt, int page_type, int flash_switch)
+int tt2_check_pgno(AM_TT2_Parser_t *parser, int pgno)
+{
+	AM_TT2_CachedPage_t* target_page;
+	int found_pg = 0;
+
+	target_page = parser->cached_pages;
+	while (target_page)
+	{
+		if (target_page->page.pgno == pgno)
+		{
+			found_pg = 1;
+			break;
+		}
+		target_page = target_page->next;
+	}
+	if (found_pg)
+		return pgno;
+	else
+		return 0;
+}
+
+static void tt2_draw(AM_TT2_Parser_t *parser, vbi_page* page, char* subs, int sub_cnt, int page_type,
+int flash_switch, int nav0, int nav1, int nav2, int nav3)
 {
 	int is_subtitle;
 
@@ -376,10 +380,10 @@ static void tt2_draw(AM_TT2_Parser_t *parser, vbi_page* page, char* subs, int su
 							  vbi_bcd2dec(page->pgno),
 							  subs,
 							  sub_cnt,
-							  vbi_bcd2dec(page->nav_link[0].pgno),
-							  vbi_bcd2dec(page->nav_link[1].pgno),
-							  vbi_bcd2dec(page->nav_link[2].pgno),
-							  vbi_bcd2dec(page->nav_link[3].pgno),
+							  vbi_bcd2dec(nav0),
+							  vbi_bcd2dec(nav1),
+							  vbi_bcd2dec(nav2),
+							  vbi_bcd2dec(nav3),
 							  page->subno);
 }
 
@@ -419,6 +423,7 @@ static void* tt2_thread(void *arg)
 	vbi_page                            page;
 	int                                     cached;
 	int                                     page_type;
+	int nav0, nav1, nav2, nav3;
 
 	while (parser->running)
 	{
@@ -463,6 +468,14 @@ static void* tt2_thread(void *arg)
 			}
 		}
 
+		if (new_page_to_draw)
+		{
+			nav0 = tt2_check_pgno(parser, page.nav_link[0].pgno);
+			nav1 = tt2_check_pgno(parser, page.nav_link[1].pgno);
+			nav2 = tt2_check_pgno(parser, page.nav_link[2].pgno);
+			nav3 = tt2_check_pgno(parser, page.nav_link[3].pgno);
+		}
+
 		pthread_mutex_unlock(&parser->lock);
 
 		if ((parser->input == AM_TT_INPUT_VBI) ||
@@ -471,7 +484,7 @@ static void* tt2_thread(void *arg)
 			if (new_page_to_draw)
 			{
 				if (*(parser->para.bitmap))
-					tt2_draw(parser, &page, subs, sub_cnt, page_type, flash_switch);
+					tt2_draw(parser, &page, subs, sub_cnt, page_type, flash_switch, nav0, nav1, nav2, nav3);
 				new_page_to_draw = 0;
 			}
 		}
