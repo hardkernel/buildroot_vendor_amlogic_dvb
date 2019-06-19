@@ -362,6 +362,13 @@ typedef enum
 	AM_AV_INJECT_MULTIPLEX        /**< Multiplexed data*/
 } AM_AV_InjectType_t;
 
+typedef enum
+{
+	AM_AV_NO_DRM,
+	AM_AV_DRM_WITH_SECURE_INPUT_BUFFER, /**< Use for HLS, input buffer is clear and protected*/
+	AM_AV_DRM_WITH_NORMAL_INPUT_BUFFER  /**< Use for IPTV, input buffer is normal and scramble*/
+} AM_AV_DrmMode_t;
+
 /**\brief Decoder injection parameters*/
 typedef struct
 {
@@ -375,6 +382,7 @@ typedef struct
 	int              channel;     /**< Audio channel number (used in playing audio PCM data)*/
 	int              sample_rate; /**< Audio sample rate (used in playing audio PCM data)*/
 	int              data_width;  /**< Audio data width (used in playing audio PCM data)*/
+	int              drm_mode;    /**< Drm mode*/
 } AM_AV_InjectPara_t;
 
 /**\brief Video decoder status*/
