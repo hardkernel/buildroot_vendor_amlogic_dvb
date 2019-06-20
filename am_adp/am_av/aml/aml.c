@@ -1926,6 +1926,26 @@ static AM_ErrorCode_t aml_start_inject(AM_AV_Device_t *dev, AV_InjectData_t *inj
 					return AM_AV_ERR_CANNOT_OPEN_FILE;
 				}
 			}
+			if (para->drm_mode == AM_AV_DRM_WITH_SECURE_INPUT_BUFFER)
+			{
+				if (ioctl(vfd, AMSTREAM_IOC_SET_DRMMODE, (void *)(long)para->drm_mode) == -1)
+				{
+					AM_DEBUG(1, "set drm_mode with secure buffer failed\n");
+					return AM_AV_ERR_SYS;
+				} else {
+					AM_DEBUG(1, "set drm_mode with secure buffer success\n");
+				}
+			}
+			if (para->drm_mode == AM_AV_DRM_WITH_NORMAL_INPUT_BUFFER)
+			{
+				if (ioctl(vfd, AMSTREAM_IOC_SET_DRMMODE, (void *)(long)para->drm_mode) == -1)
+				{
+					AM_DEBUG(1, "set drm_mode with normal buffer failed\n");
+					return AM_AV_ERR_SYS;
+				} else {
+					AM_DEBUG(1, "set drm_mode with normal buffer success\n");
+				}
+			}
 			inj->vid_fd = afd = vfd;
 		break;
 		case PFORMAT_REAL:
