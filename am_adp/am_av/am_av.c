@@ -1810,6 +1810,55 @@ AM_ErrorCode_t AM_AV_SetVideoWindow(int dev_no, int x, int y, int w, int h)
 	return ret;
 }
 
+/**\brief 设定视频裁切
+ * \param dev_no 音视频设备号
+ * \param x 窗口左上顶点x坐标
+ * \param y 窗口左上顶点y坐标
+ * \param w 窗口宽度
+ * \param h 窗口高度
+ * \return
+ *   - AM_SUCCESS 成功
+ *   - 其他值 错误代码(见am_av.h)
+ */
+AM_ErrorCode_t AM_AV_SetVideoCropping(int dev_no, int Voffset0, int Hoffset0, int Voffset1, int Hoffset1)
+{
+	AM_AV_Device_t *dev;
+	AM_ErrorCode_t ret = AM_SUCCESS;
+	AV_VideoWindow_t win;
+
+	AM_TRY(av_get_openned_dev(dev_no, &dev));
+
+	win.x = Voffset0;
+	win.y = Hoffset0;
+	win.w = Voffset1;
+	win.h = Hoffset1;
+
+	pthread_mutex_lock(&dev->lock);
+
+	//if ((dev->video_x != x) || (dev->video_y != y) || (dev->video_w != w) || (dev->video_h != h))
+	{
+		if (dev->drv->set_video_para)
+		{
+			ret = dev->drv->set_video_para(dev, AV_VIDEO_PARA_CROP, &win);
+		}
+
+		if (ret == AM_SUCCESS)
+		{
+			AM_AV_VideoWindow_t win;
+
+			win.x = Voffset0;
+            win.y = Hoffset0;
+            win.w = Voffset1;
+            win.h = Hoffset1;
+
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_CROPPING_CHANGED, &win);
+		}
+	}
+
+	pthread_mutex_unlock(&dev->lock);
+
+	return ret;
+}
 /**\brief 返回视频窗口
  * \param dev_no 音视频设备号
  * \param[out] x 返回窗口左上顶点x坐标

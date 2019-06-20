@@ -114,6 +114,7 @@ enum AM_AV_EventType
 	AM_AV_EVT_AUDIO_CB, /**< Audio function will implement in cb */
 	AM_AV_EVT_VIDEO_RESOLUTION_CHANGED, /**< Video resolution changed, the parameter is the AM_AV_VideoStatus_t with new width&height valid only */
 	AM_AV_EVT_VIDEO_AFD_CHANGED, /**< Video AFD info changed, parameter is AM_USERDATA_AFD_t*/
+	AM_AV_EVT_VIDEO_CROPPING_CHANGED,    /**< Video cropping change, the parameter is the new cropping window(AM_AV_VideoWindow_t)*/
 	AM_AV_EVT_END
 };
 
@@ -841,6 +842,17 @@ extern AM_ErrorCode_t AM_AV_StopInject(int dev_no);
  * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_SetVideoWindow(int dev_no, int x, int y, int w, int h);
+
+/**\brief Set the video cropping
+ * \param dev_no AV decoder device number
+ * \param Voffset0 vertical crop of the top left corner
+ * \param Hoffset0 horizontal crop of the top left corner
+ * \param Voffset1 vertical crop of the bottom right corner
+ * \param Hoffset1 horizontal crop of the bottom right corner
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
+extern AM_ErrorCode_t AM_AV_SetVideoCropping(int dev_no, int Voffset0, int Hoffset0, int Voffset1, int Hoffset1);
 
 /**\brief Get the video window
  * \param dev_no AV decoder device number
