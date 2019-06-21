@@ -5028,6 +5028,7 @@ static void* aml_av_monitor_thread(void *arg)
 			aml_close_ts_mode(dev, AM_FALSE);
 			aml_open_ts_mode(dev);
 			aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_PLAYER_STATE_CHANGED, NULL);
 			tp = &dev->ts_player.play_para;
 			ts = (AV_TSData_t*)dev->ts_player.drv_data;
 #ifndef ENABLE_PCR
@@ -5062,6 +5063,7 @@ static void* aml_av_monitor_thread(void *arg)
 
 			tshift = dev->timeshift_player.drv_data;
 			am_timeshift_reset_continue(tshift, -1, AM_TRUE);
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_PLAYER_STATE_CHANGED, NULL);
 #ifndef ENABLE_PCR
 			adec_start = AM_FALSE;
 			av_paused  = AM_TRUE;
@@ -5092,6 +5094,7 @@ static void* aml_av_monitor_thread(void *arg)
 			AM_DEBUG(1, "[avmon] replay AV_INJECT vlevel %d alevel %d vpts_stop %d vmaster %d",
 				vbuf_level, abuf_level, vpts_stop_dur, vmaster_dur);
 			aml_restart_inject_mode(dev, AM_FALSE);
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_PLAYER_STATE_CHANGED, NULL);
 			tp = &dev->ts_player.play_para;
 			inj = (AV_InjectData_t *)dev->inject_player.drv_data;
 			ts_temp.fd = inj->vid_fd;
