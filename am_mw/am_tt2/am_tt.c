@@ -1036,13 +1036,12 @@ AM_ErrorCode_t AM_TT2_Start(AM_TT2_Handle_t handle, int region_id)
 	parser->display_page = NULL;
 	parser->subtitle_head = NULL;
 	parser->region_id = region_id;
+	parser->thread = 0;
+	parser->vbi_tid = 0;
 	memset(&parser->last_display_page, 0, sizeof(AM_TT2_CachedPage_t));
 	memset(&parser->nav_link, 0, sizeof(nav_link_t));
 
 	/* Set teletext default region, See libzvbi/src/lang.c */
-
-
-
 	vbi_teletext_set_default_region(parser->dec, region_id);
 
 	if (!parser->running)
@@ -1100,15 +1099,15 @@ AM_ErrorCode_t AM_TT2_Stop(AM_TT2_Handle_t handle)
 	pthread_mutex_unlock(&parser->lock);
 	pthread_cond_broadcast(&parser->cond);
 
-	if (parser->input == AM_TT_INPUT_VBI)
+	if (parser->input == AM_TT_INPUT_VBI && (parser->vbi_tid != 0))
 		pthread_kill(parser->vbi_tid, SIGALRM);
 
-	if (wait)
+	if (wait && (th != 0))
 	{
 		pthread_join(th, NULL);
 	}
 
-	if (parser->input == AM_TT_INPUT_VBI && wait)
+	if (parser->input == AM_TT_INPUT_VBI && wait && (parser->vbi_tid != 0))
 	{
 		pthread_join(parser->vbi_tid, NULL);
 	}
@@ -1124,6 +1123,8 @@ AM_ErrorCode_t AM_TT2_Stop(AM_TT2_Handle_t handle)
 		free(free_cache_page);
 	}
 	parser->cached_pages = NULL;
+	parser->vbi_tid = 0;
+	parser->thread = 0;
 
 	return AM_SUCCESS;
 }
@@ -1253,7 +1254,7 @@ AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir)
 
 	if (dir > 0)
 	{
-		next_page_no = 0x8FF;
+		next_page_no = 0x900;
 		while (target_page)
 		{
 			if (target_page->page.pgno > pgno && target_page->page.pgno < next_page_no)
@@ -1268,12 +1269,12 @@ AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir)
 			min_page_no = min_page_no < target_page->page.pgno ? min_page_no : target_page->page.pgno;
 			target_page = target_page->next;
 		}
-		if (next_page_no == 0x8FF)
+		if (next_page_no > 0x900)
 			next_page_no = pgno;
 	}
 	else
 	{
-		next_page_no = 0x100;
+		next_page_no = 0;
 		while (target_page)
 		{
 			if (target_page->page.pgno < pgno && target_page->page.pgno > next_page_no)
