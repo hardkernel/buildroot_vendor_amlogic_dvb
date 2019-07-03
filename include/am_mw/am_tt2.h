@@ -99,6 +99,7 @@ typedef struct
 	AM_TT_Input_t input;
 	AM_TT2_DrawBegin_t draw_begin;   /**< start draw teletext callback function*/
 	AM_TT2_DrawEnd_t   draw_end;     /**< stop draw teletext callback function*/
+	AM_TT2_NotifyData_t     notify_contain_data;
 	AM_TT2_NewPage_t   new_page;     /**< get new teletext page callback function*/
 	AM_Bool_t        is_subtitle;    /**< is subtitle or not*/
 	uint8_t         **bitmap;         /**< draw bitmap buffer*/

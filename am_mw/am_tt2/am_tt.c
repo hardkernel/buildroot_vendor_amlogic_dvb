@@ -513,6 +513,8 @@ static void tt2_event_handler(vbi_event *ev, void *user_data)
 
 	if(ev->type != VBI_EVENT_TTX_PAGE)
 		return;
+	if (parser->para.notify_contain_data)
+		parser->para.notify_contain_data((AM_TT2_Handle_t)parser, AM_TRUE);
 
 	pgno  = ev->ev.ttx_page.pgno;
 	subno = ev->ev.ttx_page.subno;
