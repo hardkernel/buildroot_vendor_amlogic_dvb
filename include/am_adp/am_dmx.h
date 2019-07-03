@@ -72,6 +72,7 @@ typedef enum
 	AM_DMX_SRC_TS0,                    /**< TS input port 0*/
 	AM_DMX_SRC_TS1,                    /**< TS input port 1*/
 	AM_DMX_SRC_TS2,                    /**< TS input port 2*/
+	AM_DMX_SRC_TS3,                    /**< TS input port 3*/
 	AM_DMX_SRC_HIU,                     /**< HIU input (memory)*/
 	AM_DMX_SRC_HIU1
 } AM_DMX_Source_t;

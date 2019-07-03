@@ -326,7 +326,9 @@ static AM_ErrorCode_t dvb_set_source(AM_DMX_Device_t *dev, AM_DMX_Source_t src)
 			cmd = "ts2";
 		break;
 #endif
-
+		case AM_DMX_SRC_TS3:
+			cmd = "ts3";
+		break;
 		case AM_DMX_SRC_HIU:
 			cmd = "hiu";
 		break;
