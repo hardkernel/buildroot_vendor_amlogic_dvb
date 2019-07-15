@@ -62,6 +62,8 @@ typedef struct
 {
 	AM_ErrorCode_t (*open)(AM_USERDATA_Device_t *dev, const AM_USERDATA_OpenPara_t *para);
 	AM_ErrorCode_t (*close)(AM_USERDATA_Device_t *dev);
+	AM_ErrorCode_t (*set_mode)(AM_USERDATA_Device_t *dev, int mode);
+	AM_ErrorCode_t (*get_mode)(AM_USERDATA_Device_t *dev, int *mode);
 } AM_USERDATA_Driver_t;
 
 /**\brief USERDATA设备*/
@@ -75,6 +77,7 @@ struct AM_USERDATA_Device
 	AM_USERDATA_RingBuffer_t pkg_buf;
 
 	int (*write_package)(AM_USERDATA_Device_t *dev, const uint8_t *buf, size_t size);
+
 };
 
 

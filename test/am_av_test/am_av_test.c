@@ -492,6 +492,13 @@ static void video_callback(long dev_no, int event_type, void *param, void *data)
 	case AM_AV_EVT_VIDEO_AVAILABLE:
 		printf("[evt] video available\n");
 		break;
+	case AM_AV_EVT_VIDEO_AFD_CHANGED:
+		{
+			AM_USERDATA_AFD_t *afd = param;
+			printf("[evt] video afd changed: flg[0x%x] fmt[0x%x]\n",
+				afd->af_flag, afd->af);
+		}
+		break;
 	default:
 		break;
 	}
@@ -511,6 +518,7 @@ static void dvb_play(int vpid, int apid, int ppid, int vfmt, int afmt, int freq,
 	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_RESOLUTION_CHANGED, video_callback, NULL);
 	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED, video_callback, NULL);
 	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_AVAILABLE, video_callback, NULL);
+	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_AFD_CHANGED, video_callback, NULL);
 
 	if(freq>0)
 	{
@@ -922,7 +930,7 @@ static int get_section(int dmx, int timeout)
 	struct dmx_pes_filter_params pparam;
 
 	for(i=0; i<USER_MAX; i++) {
-		if(VALID_PID(u_pid[i])) {
+		if (VALID_PID(u_pid[i])) {
 			AM_TRY(AM_DMX_AllocateFilter(dmx, &fid_user[i]));
 
 			AM_TRY(AM_DMX_SetCallback(dmx, fid_user[i], dump_bytes, (void*)(long)(i+1)));
@@ -978,7 +986,7 @@ static int get_section(int dmx, int timeout)
 
 			AM_TRY(AM_DMX_SetBufferSize(dmx, fid_user[i], 64*1024));
 
-			if(get_upara(i)&UPARA_FILE) {
+			if (get_upara(i)&UPARA_FILE) {
 				char name[32];
 				sprintf(name, "/storage/external_storage/u_%d.dump", i);
 				fp[i] = fopen(name, "wb");
@@ -992,8 +1000,8 @@ static int get_section(int dmx, int timeout)
 
 	sleep(timeout);
 
-	for(i=0; i<USER_MAX; i++) {
-		if(VALID_PID(u_pid[i])) {
+	for (i=0; i<USER_MAX; i++) {
+		if (VALID_PID(u_pid[i])) {
 			AM_TRY(AM_DMX_StopFilter(dmx, fid_user[i]));
 			AM_TRY(AM_DMX_FreeFilter(dmx, fid_user[i]));
 			if((get_upara(i)&UPARA_FILE) && fp[i])
@@ -1063,6 +1071,7 @@ static void inject_play_file(char *name, int fmt, int vpid, int apid, int vfmt, 
 	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_RESOLUTION_CHANGED, video_callback, NULL);
 	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_ASPECT_RATIO_CHANGED, video_callback, NULL);
 	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_AVAILABLE, video_callback, NULL);
+	AM_EVT_Subscribe(0, AM_AV_EVT_VIDEO_AFD_CHANGED, video_callback, NULL);
 
 	fd = open(name, O_RDWR, S_IRUSR);
 	if(fd<0)
@@ -1131,7 +1140,9 @@ int main(int argc, char **argv)
 	int i, v, loop=0, pos=0, port=1234;
 	struct in_addr addr;
 	AM_AOUT_OpenPara_t aout_para;
-	
+
+	int afd = 0;
+
 	if(argc<2)
 		usage();
 	
@@ -1296,12 +1307,19 @@ int main(int argc, char **argv)
 				sscanf(s, "src=%i", &tssrc);
 			else if (strncmp(s, "dmx=", 4) == 0)
 				sscanf(s, "dmx=%i", &dmx);
+			else if (strncmp(s, "afd=", 4) == 0)
+				sscanf(s, "afd=%i", &afd);
 		}
 		if ((ppid == -1) && VALID_PID(vpid))
 			ppid = vpid;
+		if (afd != 0) {
+			AM_AV_Close(AV_DEV_NO);
+			para.afd_enable = afd;
+			AM_TRY(AM_AV_Open(AV_DEV_NO, &para));
+		}
 		dvb_play(vpid, apid, ppid, vfmt, afmt,
 			freq, tssrc, dmx, fe_mod, argc, argv);
-    }
+	}
 	else
 	{
 		for(i=2; i<argc; i++)

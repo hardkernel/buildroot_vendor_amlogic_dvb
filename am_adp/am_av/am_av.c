@@ -462,6 +462,7 @@ AM_ErrorCode_t AM_AV_Open(int dev_no, const AM_AV_OpenPara_t *para)
 	dev->vpath_fs         = -1;
 	dev->vpath_di         = -1;
 	dev->vpath_ppmgr      = -1;
+	dev->afd_enable       = para->afd_enable;
 
 	if (dev->drv->open)
 	{
