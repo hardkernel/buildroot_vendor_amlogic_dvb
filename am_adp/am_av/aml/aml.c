@@ -154,6 +154,7 @@ void *adec_handle = NULL;
 #define PPMGR_FILE			"/dev/ppmgr"
 
 #define VID_AXIS_FILE       "/sys/class/video/axis"
+#define VID_CROP_FILE       "/sys/class/video/crop"
 #define VID_CONTRAST_FILE   "/sys/class/video/contrast"
 #define VID_SATURATION_FILE "/sys/class/video/saturation"
 #define VID_BRIGHTNESS_FILE "/sys/class/video/brightness"
@@ -215,6 +216,7 @@ void *adec_handle = NULL;
 #define PPMGR_FILE			"/dev/ppmgr"
 
 #define VID_AXIS_FILE       "/sys/class/video/axis"
+#define VID_CROP_FILE       "/sys/class/video/crop"
 #define VID_CONTRAST_FILE   "/sys/class/video/contrast"
 
 /*not find,but android is exist*/
@@ -5727,6 +5729,12 @@ static AM_ErrorCode_t aml_set_video_para(AM_AV_Device_t *dev, AV_VideoParaType_t
 			name = VID_AXIS_FILE;
 			win = (AV_VideoWindow_t *)val;
 			snprintf(buf, sizeof(buf), "%d %d %d %d", win->x, win->y, win->x+win->w, win->y+win->h);
+			cmd = buf;
+		break;
+		case AV_VIDEO_PARA_CROP:
+			name = VID_CROP_FILE;
+			win = (AV_VideoWindow_t *)val;
+			snprintf(buf, sizeof(buf), "%d %d %d %d", win->x, win->y, win->w, win->h);
 			cmd = buf;
 		break;
 		case AV_VIDEO_PARA_CONTRAST:
