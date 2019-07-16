@@ -80,7 +80,7 @@ typedef void (*AM_TT2_DrawEnd_t)(AM_TT2_Handle_t handle,
 							     int blue,
 								 int curr_subpg);
 
-typedef void (*AM_TT2_NotifyData_t)(AM_TT2_Handle_t handle, int have_data);
+typedef void (*AM_TT2_NotifyData_t)(AM_TT2_Handle_t handle, int pgno);
 
 /**\brief get PTS callback function */
 typedef uint64_t (*AM_TT2_GetPTS_t)(AM_TT2_Handle_t handle, uint64_t pts);

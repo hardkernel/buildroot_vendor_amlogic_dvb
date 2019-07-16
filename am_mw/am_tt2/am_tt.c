@@ -468,27 +468,36 @@ static void* tt2_thread(void *arg)
 			}
 		}
 
-		if (new_page_to_draw)
-		{
-			nav0 = tt2_check_pgno(parser, page.nav_link[0].pgno);
-			nav1 = tt2_check_pgno(parser, page.nav_link[1].pgno);
-			nav2 = tt2_check_pgno(parser, page.nav_link[2].pgno);
-			nav3 = tt2_check_pgno(parser, page.nav_link[3].pgno);
-		}
-
-		pthread_mutex_unlock(&parser->lock);
-
-		if ((parser->input == AM_TT_INPUT_VBI) ||
-				((target_page->pts - tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16) <= 0) && parser->input != AM_TT_INPUT_VBI))
+		if (target_page)
 		{
 			if (new_page_to_draw)
 			{
-				if (*(parser->para.bitmap))
-					tt2_draw(parser, &page, subs, sub_cnt, page_type, flash_switch, nav0, nav1, nav2, nav3);
-				new_page_to_draw = 0;
+				nav0 = tt2_check_pgno(parser, page.nav_link[0].pgno);
+				nav1 = tt2_check_pgno(parser, page.nav_link[1].pgno);
+				nav2 = tt2_check_pgno(parser, page.nav_link[2].pgno);
+				nav3 = tt2_check_pgno(parser, page.nav_link[3].pgno);
+			}
+
+			pthread_mutex_unlock(&parser->lock);
+
+			if ((parser->input == AM_TT_INPUT_VBI) ||
+					((target_page->pts - tt2_get_pts("/sys/class/tsync/pts_pcrscr", 16) <= 0) && parser->input != AM_TT_INPUT_VBI))
+			{
+				if (new_page_to_draw)
+				{
+					if (*(parser->para.bitmap))
+					{
+						AM_DEBUG(0, "tt2_draw page 0x%x type 0x%x", page.pgno, page_type);
+						tt2_draw(parser, &page, subs, sub_cnt, page_type, flash_switch, nav0, nav1, nav2, nav3);
+					}
+					new_page_to_draw = 0;
+				}
 			}
 		}
+		else
+			pthread_mutex_unlock(&parser->lock);
 	}
+	AM_DEBUG(0, "Exit tt2_thread");
 	return NULL;
 }
 
@@ -513,11 +522,13 @@ static void tt2_event_handler(vbi_event *ev, void *user_data)
 
 	if(ev->type != VBI_EVENT_TTX_PAGE)
 		return;
-	if (parser->para.notify_contain_data)
-		parser->para.notify_contain_data((AM_TT2_Handle_t)parser, AM_TRUE);
 
 	pgno  = ev->ev.ttx_page.pgno;
 	subno = ev->ev.ttx_page.subno;
+
+	if (parser->para.notify_contain_data)
+		parser->para.notify_contain_data((AM_TT2_Handle_t)parser, vbi_bcd2dec(pgno));
+
 #ifdef DEBUG_TT
 	AM_DEBUG(0, "TT event handler: pgno %d, subno %d, parser->page_no %d, parser->sub_page_no %d",
 		vbi_bcd2dec(pgno), subno, parser->page_no, parser->sub_page_no	);
@@ -582,7 +593,8 @@ static void *tt2_vbi_data_thread(void *arg)
 					memcpy(s->data, pd->b, 42);
 
 					pthread_mutex_lock(&parser->lock);
-					vbi_decode(parser->dec, s, 1, 0);
+					if (parser->dec)
+						vbi_decode(parser->dec, s, 1, 0);
 
 					pthread_mutex_unlock(&parser->lock);
 
@@ -630,7 +642,7 @@ static void *tt2_vbi_data_thread(void *arg)
 					ret -= sizeof(struct vbi_data_s);
 				}
 			}
-			usleep(100);
+			usleep(10000);
 		}
 	}
 #endif
@@ -677,16 +689,6 @@ AM_ErrorCode_t AM_TT2_Create(AM_TT2_Handle_t *handle, AM_TT2_Para_t *para)
 	pthread_cond_init(&parser->cond, NULL);
 
 	parser->para    = *para;
-	parser->dec = vbi_decoder_new();
-	if (!parser->dec)
-	{
-		free(parser);
-		parser->dec = NULL;
-		return AM_TT2_ERR_CREATE_DECODE;
-	}
-
-	vbi_event_handler_register(parser->dec, VBI_EVENT_TTX_PAGE, tt2_event_handler, parser);
-	vbi_event_handler_register(parser->dec, VBI_EVENT_TIME, tt2_time_update, parser);
 
 	*handle = parser;
 
@@ -713,11 +715,6 @@ AM_ErrorCode_t AM_TT2_Destroy(AM_TT2_Handle_t handle)
 	if (parser->running != AM_FALSE)
 		AM_TT2_Stop(handle);
 
-	if (parser->search)
-		vbi_search_delete(parser->search);
-
-	if (parser->dec)
-		vbi_decoder_delete(parser->dec);
 
 	/* Free all cached pages */
 #if 0
@@ -1027,6 +1024,17 @@ AM_ErrorCode_t AM_TT2_Start(AM_TT2_Handle_t handle, int region_id)
 
 	pthread_mutex_lock(&parser->lock);
 
+	parser->dec = vbi_decoder_new();
+	if (!parser->dec)
+	{
+		free(parser);
+		parser->dec = NULL;
+		return AM_TT2_ERR_CREATE_DECODE;
+	}
+
+	vbi_event_handler_register(parser->dec, VBI_EVENT_TTX_PAGE, tt2_event_handler, parser);
+	vbi_event_handler_register(parser->dec, VBI_EVENT_TIME, tt2_time_update, parser);
+
 	parser->page_no = 100;
 	parser->sub_page_no = AM_TT2_ANY_SUBNO;
 	parser->display_mode = 0;
@@ -1078,7 +1086,6 @@ AM_ErrorCode_t AM_TT2_Start(AM_TT2_Handle_t handle, int region_id)
 AM_ErrorCode_t AM_TT2_Stop(AM_TT2_Handle_t handle)
 {
 	AM_TT2_Parser_t *parser = (AM_TT2_Parser_t*)handle;
-	pthread_t th;
 	AM_Bool_t wait = AM_FALSE;
 	int count = 0;
 	AM_TT2_CachedPage_t *cache_page;
@@ -1095,7 +1102,6 @@ AM_ErrorCode_t AM_TT2_Stop(AM_TT2_Handle_t handle)
 	{
 		parser->running = AM_FALSE;
 		wait = AM_TRUE;
-		th = parser->thread;
 	}
 
 	pthread_mutex_unlock(&parser->lock);
@@ -1104,9 +1110,9 @@ AM_ErrorCode_t AM_TT2_Stop(AM_TT2_Handle_t handle)
 	if (parser->input == AM_TT_INPUT_VBI && (parser->vbi_tid != 0))
 		pthread_kill(parser->vbi_tid, SIGALRM);
 
-	if (wait && (th != 0))
+	if (wait && (parser->thread != 0))
 	{
-		pthread_join(th, NULL);
+		pthread_join(parser->thread, NULL);
 	}
 
 	if (parser->input == AM_TT_INPUT_VBI && wait && (parser->vbi_tid != 0))
@@ -1127,6 +1133,16 @@ AM_ErrorCode_t AM_TT2_Stop(AM_TT2_Handle_t handle)
 	parser->cached_pages = NULL;
 	parser->vbi_tid = 0;
 	parser->thread = 0;
+
+	vbi_event_handler_unregister(parser->dec, tt2_event_handler, parser);
+	vbi_event_handler_unregister(parser->dec, tt2_time_update, parser);
+
+	if (parser->search)
+		vbi_search_delete(parser->search);
+
+	if (parser->dec)
+		vbi_decoder_delete(parser->dec);
+	parser->dec = NULL;
 
 	return AM_SUCCESS;
 }
@@ -1271,8 +1287,8 @@ AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir)
 			min_page_no = min_page_no < target_page->page.pgno ? min_page_no : target_page->page.pgno;
 			target_page = target_page->next;
 		}
-		if (next_page_no > 0x900)
-			next_page_no = pgno;
+		if (next_page_no == 0x900)
+			next_page_no = min_page_no;
 	}
 	else
 	{
@@ -1291,13 +1307,7 @@ AM_ErrorCode_t AM_TT2_NextPage(AM_TT2_Handle_t handle, int dir)
 			min_page_no = min_page_no < target_page->page.pgno ? min_page_no : target_page->page.pgno;
 			target_page = target_page->next;
 		}
-	}
-
-	if (next_page_no == pgno)
-	{
-		if (dir > 0)
-			next_page_no = min_page_no;
-		else
+		if (next_page_no == 0)
 			next_page_no = max_page_no;
 	}
 
