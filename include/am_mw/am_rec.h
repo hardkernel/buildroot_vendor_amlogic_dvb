@@ -195,6 +195,7 @@ extern AM_ErrorCode_t AM_REC_GetTFile(AM_REC_Handle_t handle, AM_TFile_t *tfile,
 extern AM_ErrorCode_t AM_REC_PauseRecord(AM_REC_Handle_t handle);
 extern AM_ErrorCode_t AM_REC_ResumeRecord(AM_REC_Handle_t handle);
 
+extern AM_ErrorCode_t AM_REC_GetMediaInfoFromFile(const char *name, AM_REC_MediaInfo_t *info);
 #ifdef __cplusplus
 }
 #endif

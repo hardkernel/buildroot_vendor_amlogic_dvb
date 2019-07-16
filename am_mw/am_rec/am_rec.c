@@ -941,3 +941,90 @@ AM_ErrorCode_t AM_REC_GetTFile(AM_REC_Handle_t handle, AM_TFile_t *tfile, int *f
 	return ret;
 }
 
+AM_ErrorCode_t AM_REC_GetMediaInfoFromFile(const char *file_path, AM_REC_MediaInfo_t *info)
+{
+	uint8_t buffer[2][sizeof(AM_REC_MediaInfo_t) + 4*(sizeof(AM_REC_MediaInfo_t)/188 + 1)];
+	uint8_t *buf = buffer[0];
+	uint8_t *pkt_buf = buffer[1];
+	int pos = 0, info_len, i, fd, name_len, data_len;
+
+#define READ_INT(_i)\
+	AM_MACRO_BEGIN\
+	if ((info_len-pos) >= 4) {\
+		(_i) = ((int)buf[pos]<<24) | ((int)buf[pos+1]<<16) | ((int)buf[pos+2]<<8) | (int)buf[pos+3];\
+		pos += 4;\
+	} else {\
+		goto read_error;\
+	}\
+	AM_MACRO_END
+
+	fd = open(file_path, O_RDONLY, 0666);
+	if (fd < 0) {
+		AM_DEBUG(0, "Cannot open file '%s'", file_path);
+		return AM_REC_ERR_INVALID_PARAM;
+	}
+
+	info_len = read(fd, pkt_buf, sizeof(buffer[1]));
+
+	data_len = 0;
+	/*skip the packet headers*/
+	for (i=0; i<info_len; i++) {
+		if ((i%188) > 3) {
+			buf[data_len++] = pkt_buf[i];
+		}
+	}
+
+	info_len = data_len;
+
+	READ_INT(info->duration);
+
+	name_len = sizeof(info->program_name);
+	if ((info_len-pos) >= name_len) {
+		memcpy(info->program_name, buf+pos, name_len);
+		info->program_name[name_len - 1] = 0;
+		pos += name_len;
+	} else {
+		goto read_error;
+	}
+	READ_INT(info->vid_pid);
+	READ_INT(info->vid_fmt);
+
+	READ_INT(info->aud_cnt);
+	AM_DEBUG(2, "audio count %d", info->aud_cnt);
+	for (i=0; i<info->aud_cnt; i++) {
+		READ_INT(info->audios[i].pid);
+		READ_INT(info->audios[i].fmt);
+		memcpy(info->audios[i].lang, buf+pos, 4);
+		pos += 4;
+	}
+	READ_INT(info->sub_cnt);
+	AM_DEBUG(2, "subtitle count %d", info->sub_cnt);
+	for (i=0; i<info->sub_cnt; i++) {
+		READ_INT(info->subtitles[i].pid);
+		READ_INT(info->subtitles[i].type);
+		READ_INT(info->subtitles[i].composition_page);
+		READ_INT(info->subtitles[i].ancillary_page);
+		READ_INT(info->subtitles[i].magzine_no);
+		READ_INT(info->subtitles[i].page_no);
+		memcpy(info->subtitles[i].lang, buf+pos, 4);
+		pos += 4;
+	}
+	READ_INT(info->ttx_cnt);
+	AM_DEBUG(2, "teletext count %d", info->ttx_cnt);
+	for (i=0; i<info->ttx_cnt; i++) {
+		READ_INT(info->teletexts[i].pid);
+		READ_INT(info->teletexts[i].magzine_no);
+		READ_INT(info->teletexts[i].page_no);
+		memcpy(info->teletexts[i].lang, buf+pos, 4);
+		pos += 4;
+	}
+	close(fd);
+	return AM_SUCCESS;
+
+read_error:
+	AM_DEBUG(2, "Read media info from file error, len %d, pos %d", info_len, pos);
+	close(fd);
+
+	return AM_REC_ERR_INVALID_PARAM;
+}
+
