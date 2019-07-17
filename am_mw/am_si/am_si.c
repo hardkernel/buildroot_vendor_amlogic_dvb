@@ -2223,6 +2223,41 @@ AM_ErrorCode_t AM_SI_ExtractAVFromVC(dvbpsi_atsc_vct_channel_t *vcinfo, int *vid
 	return AM_SUCCESS;
 }
 
+AM_ErrorCode_t AM_SI_ExtractScte27SubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_Scte27SubtitleInfo_t *sub_info)
+{
+	dvbpsi_descriptor_t *descr;
+	int i, found = 0;
+
+	if (es->i_type == 0x82)
+	{
+		for (i=0; i<sub_info->subtitle_count; i++)
+		{
+			if (es->i_pid == sub_info->subtitles[i].pid)
+			{
+				found = 1;
+				break;
+			}
+		}
+
+		if (found != 1)
+		{
+			sub_info->subtitles[sub_info->subtitle_count].pid = es->i_pid;
+			sub_info->subtitle_count++;
+		}
+
+		AM_DEBUG(0, "Scte27 stream found pid 0x%x count %d", es->i_pid, sub_info->subtitle_count);
+		AM_SI_LIST_BEGIN(es->p_first_descriptor, descr)
+		{
+			if (descr->p_decoded)
+			{
+				AM_DEBUG(0, "scte27 i_tag table_id 0x%x", descr->i_tag);
+			}
+		}
+		AM_SI_LIST_END()
+	}
+	return AM_SUCCESS;
+}
+
 AM_ErrorCode_t AM_SI_ExtractDVBSubtitleFromES(dvbpsi_pmt_es_t *es, AM_SI_SubtitleInfo_t *sub_info)
 {
 	dvbpsi_descriptor_t *descr;

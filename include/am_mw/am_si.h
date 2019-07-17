@@ -255,6 +255,17 @@ typedef struct
 												15:0 bit:no use*/
 	}audios[AM_SI_MAX_AUD_CNT];/**<audio info*/
 }AM_SI_AudioInfo_t;
+
+/**\brief scte27 info type*/
+typedef struct
+{
+	int subtitle_count;	/**<subtitle count*/
+	struct
+	{
+		int pid;					/**<subtitle stream pid*/
+	}subtitles[AM_SI_MAX_SUB_CNT];/**<subtitle info*/
+}AM_SI_Scte27SubtitleInfo_t;
+
 /**\brief subtitle info type*/
 typedef struct
 {
