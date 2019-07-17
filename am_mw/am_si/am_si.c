@@ -2015,7 +2015,7 @@ AM_ErrorCode_t AM_SI_ExtractAVFromES(dvbpsi_pmt_es_t *es, int *vid, int *vfmt, A
 			AM_SI_LIST_END()
 			break;
 		case 0x8A:
-		case 0x82:
+		//case 0x82:
 		case 0x85:
 		case 0x86:
 			afmt_tmp = AFORMAT_DTS;
