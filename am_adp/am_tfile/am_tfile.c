@@ -451,9 +451,12 @@ static int aml_timeshift_subfile_close(AM_TFile_t tfile)
 			close(sub_file->wfd);
 		}
 
-		if (tfile->is_timeshift)
+		if (tfile->delete_on_close)
 		{
-			snprintf(fname, sizeof(fname), "%s.%d", tfile->name, sub_file->findex);
+			if (sub_file->findex == 0 && !tfile->is_timeshift)
+				snprintf(fname, sizeof(fname), "%s", tfile->name);
+			else
+				snprintf(fname, sizeof(fname), "%s.%d", tfile->name, sub_file->findex);
 			AM_DEBUG(1, "[tfile] unlinking file: %s", fname);
 			unlink(fname);
 		}
@@ -552,6 +555,8 @@ AM_ErrorCode_t AM_TFile_Open(AM_TFile_t *tfile, const char *file_name, AM_Bool_t
 	pfile->is_timeshift = (strstr(pfile->name, "TimeShifting") != NULL);
 	pfile->loop = loop;
 	pfile->duration = max_duration;
+	if (pfile->is_timeshift)
+		pfile->delete_on_close = 1;
 
 	if (pfile->loop)
 	{

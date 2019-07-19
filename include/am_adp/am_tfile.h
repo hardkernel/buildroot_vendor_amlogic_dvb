@@ -89,6 +89,8 @@ struct AM_TFileData_s
 	AM_TFile_Sub_t *cur_wsub_file;
 
 	void *timer;
+
+	int delete_on_close;
 };
 
 /****************************************************************************
