@@ -185,6 +185,7 @@ void *adec_handle = NULL;
 #define VIDEO_NEW_FRAME_TOGGLED_FILE "/sys/module/amvideo/parameters/first_frame_toggled"
 #define TSYNC_FIRSTCHECKIN_APTS_FILE "/sys/class/tsync/checkin_firstapts"
 #define TSYNC_FIRSTCHECKIN_VPTS_FILE "/sys/class/tsync/checkin_firstvpts"
+#define TSYNC_PCR_MODE_FILE	"/sys/class/tsync_pcr/tsync_pcr_mode"
 #else
 
 /*for add new path*/
@@ -4312,7 +4313,7 @@ static void* aml_av_monitor_thread(void *arg)
 
 	int mChange_audio_flag = -1;
 	//int mCur_audio_digital_raw_value = 0;
-	int is_dts_dolby = 0;
+	int is_dts_dolby = 0, tsync_pcr_mode = 0;
 
 	AV_Monitor_t *mon;
 	AV_TSData_t *ts,ts_temp;
@@ -5065,7 +5066,14 @@ static void* aml_av_monitor_thread(void *arg)
 			AM_DEBUG(1, "[avmon] dmx_vpts:%d,vpts:%d",dmx_vpts,vpts);
 		}
 
-		if (apts_discontinue && vpts_discontinue) {
+		if (AM_FileRead(TSYNC_PCR_MODE_FILE, buf, sizeof(buf)) >= 0) {
+            sscanf(buf, "%x", &tsync_pcr_mode);
+        } else {
+			AM_DEBUG(1, "[avmon] cannot read \"%s\"", TSYNC_PCR_MODE_FILE);
+            tsync_pcr_mode = 0;
+        }
+
+		if (apts_discontinue && vpts_discontinue && tsync_pcr_mode == 1) {
 			AM_Bool_t sf[2];
 			AM_DEBUG(1, "[avmon] apts_discontinue vpts_discontinue replay %d",need_replay);
 			apts_discontinue = 0;
