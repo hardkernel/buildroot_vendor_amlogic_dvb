@@ -1154,7 +1154,7 @@ AM_ErrorCode_t AM_AV_StartInject(int dev_no, const AM_AV_InjectPara_t *para)
  *   - AM_SUCCESS 成功
  *   - 其他值 错误代码(见am_av.h)
  */
-AM_ErrorCode_t AM_AV_SetDRMMode(int dev_no, int enable)
+AM_ErrorCode_t AM_AV_SetDRMMode(int dev_no, AM_AV_DrmMode_t drm_mode)
 {
 	AM_AV_Device_t *dev;
 	AM_ErrorCode_t ret = AM_AV_ERR_SYS;
@@ -1166,7 +1166,7 @@ AM_ErrorCode_t AM_AV_SetDRMMode(int dev_no, int enable)
 	pthread_mutex_lock(&dev->lock);
 
 	if (dev->drv->set_drm_mode)
-		ret = dev->drv->set_drm_mode(dev, enable);
+		ret = dev->drv->set_drm_mode(dev, drm_mode);
 
 	pthread_mutex_unlock(&dev->lock);
 

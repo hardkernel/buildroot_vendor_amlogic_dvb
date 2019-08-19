@@ -504,7 +504,7 @@ static AM_ErrorCode_t aml_set_vpath(AM_AV_Device_t *dev);
 static AM_ErrorCode_t aml_switch_ts_audio_fmt(AM_AV_Device_t *dev);
 static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt);
 static AM_ErrorCode_t aml_reset_audio_decoder(AM_AV_Device_t *dev);
-static AM_ErrorCode_t aml_set_drm_mode(AM_AV_Device_t *dev, int enable);
+static AM_ErrorCode_t aml_set_drm_mode(AM_AV_Device_t *dev, AM_AV_DrmMode_t drm_mode);
 static AM_ErrorCode_t aml_set_audio_ad(AM_AV_Device_t *dev, int enable, uint16_t apid, AM_AV_AFormat_t afmt);
 static AM_ErrorCode_t aml_set_inject_audio(AM_AV_Device_t *dev, uint16_t apid, AM_AV_AFormat_t afmt);
 static AM_ErrorCode_t aml_set_inject_subtitle(AM_AV_Device_t *dev, uint16_t spid, int stype);
@@ -1979,24 +1979,20 @@ static AM_ErrorCode_t aml_start_inject(AM_AV_Device_t *dev, AV_InjectData_t *inj
 					return AM_AV_ERR_CANNOT_OPEN_FILE;
 				}
 			}
-			if (para->drm_mode == AM_AV_DRM_WITH_SECURE_INPUT_BUFFER)
+			if (inj_para->drm_mode == AM_AV_DRM_WITH_SECURE_INPUT_BUFFER)
 			{
-				if (ioctl(vfd, AMSTREAM_IOC_SET_DRMMODE, (void *)(long)para->drm_mode) == -1)
+				if (ioctl(vfd, AMSTREAM_IOC_SET_DRMMODE, (void *)(long)inj_para->drm_mode) == -1)
 				{
 					AM_DEBUG(1, "set drm_mode with secure buffer failed\n");
 					return AM_AV_ERR_SYS;
-				} else {
-					AM_DEBUG(1, "set drm_mode with secure buffer success\n");
 				}
 			}
-			if (para->drm_mode == AM_AV_DRM_WITH_NORMAL_INPUT_BUFFER)
+			if (inj_para->drm_mode == AM_AV_DRM_WITH_NORMAL_INPUT_BUFFER)
 			{
-				if (ioctl(vfd, AMSTREAM_IOC_SET_DRMMODE, (void *)(long)para->drm_mode) == -1)
+				if (ioctl(vfd, AMSTREAM_IOC_SET_DRMMODE, (void *)(long)inj_para->drm_mode) == -1)
 				{
 					AM_DEBUG(1, "set drm_mode with normal buffer failed\n");
 					return AM_AV_ERR_SYS;
-				} else {
-					AM_DEBUG(1, "set drm_mode with normal buffer success\n");
 				}
 			}
 			inj->vid_fd = afd = vfd;
@@ -4049,7 +4045,22 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 		}
 	}
 #endif
-
+	if (tp->drm_mode == AM_AV_DRM_WITH_SECURE_INPUT_BUFFER)
+	{
+		if (ioctl(ts->fd, AMSTREAM_IOC_SET_DRMMODE, (void *)(long)tp->drm_mode) == -1)
+		{
+			AM_DEBUG(1, "set drm_mode with secure buffer failed\n");
+			return AM_AV_ERR_SYS;
+		}
+	}
+	if (tp->drm_mode == AM_AV_DRM_WITH_NORMAL_INPUT_BUFFER)
+	{
+		if (ioctl(ts->fd, AMSTREAM_IOC_SET_DRMMODE, (void *)(long)tp->drm_mode) == -1)
+		{
+			AM_DEBUG(1, "set drm_mode with normal buffer failed\n");
+			return AM_AV_ERR_SYS;
+		}
+	}
 
 #if defined(ANDROID) || defined(CHIP_8626X)
 	/*Set tsync enable/disable*/
@@ -5373,6 +5384,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 		break;
 		case AV_PLAY_TS:
 			tp = (AV_TSPlayPara_t *)para;
+			tp->drm_mode = dev->curr_para.drm_mode;
 #if defined(ANDROID) || defined(CHIP_8626X)
 #ifdef ENABLE_PCR_RECOVER
 			AM_FileEcho(PCR_RECOVER_FILE, "1");
@@ -5427,6 +5439,7 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 		case AV_INJECT:
 			inj_p = (AV_InjectPlayPara_t *)para;
 			inj = dev->inject_player.drv_data;
+			inj_p->drm_mode = dev->curr_para.drm_mode;
 			if (aml_start_inject(dev, inj, inj_p) != AM_SUCCESS)
 				{
 				AM_DEBUG(1,"[aml_start_mode]  AM_AV_ERR_SYS");
@@ -6865,24 +6878,12 @@ AM_ErrorCode_t aml_reset_audio_decoder(AM_AV_Device_t *dev)
        return AM_SUCCESS;
 }
 
-static AM_ErrorCode_t aml_set_drm_mode(AM_AV_Device_t *dev, int enable)
+static AM_ErrorCode_t aml_set_drm_mode(AM_AV_Device_t *dev, AM_AV_DrmMode_t drm_mode)
 {
 	int fd = -1;
 
-	if (dev->inject_player.drv_data) {
-		fd = ((AV_InjectData_t *)dev->inject_player.drv_data)->vid_fd;
-	}
+	dev->curr_para.drm_mode = drm_mode;
 
-	if (fd < 0)
-	{
-		AM_DEBUG(1, "inject_player fd < 0, error!");
-		return AM_AV_ERR_SYS;
-	}
-
-	if (ioctl(fd, AMSTREAM_IOC_SET_DRMMODE, (void *)(long)enable) == -1)
-	{
-		return AM_AV_ERR_SYS;
-	}
 	return AM_SUCCESS;
 }
 

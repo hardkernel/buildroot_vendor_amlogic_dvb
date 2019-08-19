@@ -386,7 +386,6 @@ typedef struct
 	int              channel;     /**< Audio channel number (used in playing audio PCM data)*/
 	int              sample_rate; /**< Audio sample rate (used in playing audio PCM data)*/
 	int              data_width;  /**< Audio data width (used in playing audio PCM data)*/
-	int              drm_mode;    /**< Drm mode*/
 } AM_AV_InjectPara_t;
 
 /**\brief Video decoder status*/
@@ -759,7 +758,7 @@ extern AM_ErrorCode_t AM_AV_StopAudioES(int dev_no);
  * \retval AM_SUCCESS On success
  * \return Error code
  */
-extern AM_ErrorCode_t AM_AV_SetDRMMode(int dev_no, int enable);
+extern AM_ErrorCode_t AM_AV_SetDRMMode(int dev_no, AM_AV_DrmMode_t drm_mode);
 
 /**\brief Start AV data injection playing mode
  * \param dev_no AV decoder device number

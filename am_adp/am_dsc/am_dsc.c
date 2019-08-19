@@ -173,7 +173,7 @@ static AM_ErrorCode_t dsc_init_dev_db( int *dev_num )
 	if(AM_FileRead("/sys/module/aml_dmx/parameters/dsc_max", buf, sizeof(buf)) >= 0)
 		sscanf(buf, "%d", &num);
 	else
-		num = 1;
+		num = 2;
 
 	if (num) {
 		int i;
