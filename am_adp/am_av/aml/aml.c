@@ -4975,6 +4975,7 @@ static void* aml_av_monitor_thread(void *arg)
 		}
 
 		if (dev->mode != AV_TIMESHIFT
+			&& (dev->mode != AV_INJECT)
 			&& (has_video && (vdec_stop_dur > NO_DATA_CHECK_TIME))) {
 			if (AM_ABS(checkin_firstapts - checkin_firstvpts) < TIME_UNIT90K * 5)
 				need_replay = AM_TRUE;
