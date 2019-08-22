@@ -70,6 +70,7 @@ typedef struct
 	void			*user_data;
     int       tfile_flag;
     AM_TFile_t      tfile;
+	void                    *cryptor;
 }AM_REC_Recorder_t;
 
 /****************************************************************************

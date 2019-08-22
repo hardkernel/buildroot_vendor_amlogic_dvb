@@ -288,6 +288,8 @@ struct AM_AV_Device
 	void				*ad_date;
 	int                          afd_enable;
 	AM_USERDATA_AFD_t            afd;
+	AM_Crypt_Ops_t               *crypt_ops;
+	void                         *cryptor;
 };
 
 /****************************************************************************

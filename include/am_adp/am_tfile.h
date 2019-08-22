@@ -153,6 +153,8 @@ extern int AM_TFile_TimeGetStart(AM_TFile_t tfile);
 
 extern int AM_TFile_TimeGetEnd(AM_TFile_t tfile);
 
+extern loff_t AM_TFile_GetAvailable(AM_TFile_t tfile);
+
 #ifdef __cplusplus
 }
 #endif

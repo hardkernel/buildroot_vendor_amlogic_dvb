@@ -14,6 +14,8 @@
 #include <errno.h>
 #include "am_evt.h"
 
+#include "am_crypt.h"
+
 /****************************************************************************
  * Macro definitions
  ***************************************************************************/
@@ -71,6 +73,44 @@ static void display_usage(void)
     fprintf(stderr, "*quit\n");
     fprintf(stderr, "==================\n");
 }
+
+static uint8_t des_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77};
+
+static void *des_open()
+{
+    char buf[4096];
+    char *p1, *p2;
+
+    AM_FileRead("/proc/cpuinfo", buf, sizeof(buf));
+    if ((p1 = strstr(buf, "Serial"))) {
+        if ((p2 = strstr(p1, ": ")))
+            sscanf(p2, ": %02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx",
+                &des_key[0], &des_key[1], &des_key[2], &des_key[3],
+                &des_key[4], &des_key[5], &des_key[6], &des_key[7]);
+    }
+
+    printf("des key: %02x%02x%02x%02x%02x%02x%02x%02x\n",
+        des_key[0], des_key[1], des_key[2], des_key[3],
+        des_key[4], des_key[5], des_key[6], des_key[7]);
+
+    return AM_CRYPT_des_open(des_key, 64);
+}
+
+static int des_close(void *cryptor)
+{
+    return AM_CRYPT_des_close(cryptor);
+}
+
+static void des_crypt(void *cryptor, uint8_t *dst, uint8_t *src, int len, int decrypt)
+{
+    AM_CRYPT_des_crypt(cryptor, dst, src, len, NULL, decrypt);
+}
+
+static AM_Crypt_Ops_t des_ops = {
+    .open = des_open,
+    .close = des_close,
+    .crypt = des_crypt,
+};
 
 int start_timeshift_test(void)
 {
@@ -229,6 +269,7 @@ int main(int argc, char **argv)
     int size=1024*1024*1024;
     int tssrc=0;
     int pause=0;
+    char crypt[16] = { 0 };
 
     int i;
     for (i = 1; i < argc; i++) {
@@ -244,6 +285,8 @@ int main(int argc, char **argv)
             sscanf(argv[i], "tsin=%i", &tssrc);
         else if (!strncmp(argv[i], "pause", 5))
             sscanf(argv[i], "pause=%i", &pause);
+        else if (!strncmp(argv[i], "crypt", 5))
+            sscanf(argv[i], "crypt=%s", &crypt[0]);
         else if (!strncmp(argv[i], "help", 4)) {
             printf("Usage: %s [v=pid:fmt] [a=pid:fmt] [tsin=n] [dur=s] [pause=n]\n", argv[0]);
             exit(0);
@@ -309,6 +352,10 @@ int main(int argc, char **argv)
     rsparam.is_timeshift = 1;
     rsparam.total_time = duration;
     rsparam.total_size = size;
+
+    if (strncmp(crypt, "des", 3) == 0)
+        rsparam.crypt_ops = &des_ops;
+
     ret = AM_REC_StartRecord(rec, &rsparam);
     if (ret != AM_SUCCESS) {
         printf("rec start fail. err=0x%x\n", ret);
@@ -330,6 +377,9 @@ int main(int argc, char **argv)
     } else {
         printf("rec get tfile fail, err=0x%x\n", ret);
     }
+
+    if (strncmp(crypt, "des", 3) == 0)
+        AM_AV_SetCryptOps(AV_DEV_NO, &des_ops);
 
     AM_AV_TimeshiftPara_t tparam;
     memset(&tparam, 0, sizeof(tparam));

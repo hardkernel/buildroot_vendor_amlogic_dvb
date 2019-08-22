@@ -38,6 +38,7 @@
 #include "am_misc.h"
 #include "am_tfile.h"
 #include "am_userdata.h"
+#include "am_crypt.h"
 #include <amports/vformat.h>
 #include <amports/aformat.h>
 
@@ -1219,6 +1220,15 @@ extern AM_ErrorCode_t AM_AV_GetVideoPts(int dev_no, uint64_t *pts);
  * \return Error code
  */
 extern AM_ErrorCode_t AM_AV_GetAudioPts(int dev_no, uint64_t *pts);
+
+/**
+ * brief Set Crypt operators
+ * \param dev_no AV decoder device number
+ * \param ops Crypt ops
+ * \retval AM_SUCCESS On success
+ * \return Error code
+ */
+extern AM_ErrorCode_t AM_AV_SetCryptOps(int dev_no, AM_Crypt_Ops_t *ops);
 
 #ifdef __cplusplus
 }
