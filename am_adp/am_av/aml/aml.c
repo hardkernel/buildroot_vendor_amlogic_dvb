@@ -257,6 +257,7 @@ void *adec_handle = NULL;
 #define DEC_CONTROL_MPEG12 "/sys/module/vmpeg12/parameters/dec_control"
 #define VIDEO_NEW_FRAME_COUNT_FILE "/sys/module/frame_sink/parameters/new_frame_count"
 #define AUDIO_DSP_DIGITAL_RAW_FILE "/sys/class/audiodsp/digital_raw"
+#define TSYNC_PCR_MODE_FILE	"/sys/class/tsync_pcr/tsync_pcr_mode"
 #endif
 
 #ifdef ANDROID
