@@ -514,6 +514,7 @@ static void 		  aml_set_audio_cb(AM_AV_Device_t *dev,AM_AV_Audio_CB_t cb,void *u
 
 static int aml_restart_inject_mode(AM_AV_Device_t *dev, AM_Bool_t destroy_thread);
 static AM_ErrorCode_t aml_get_pts(AM_AV_Device_t *dev, int type, uint64_t *pts);
+static AM_ErrorCode_t aml_get_timeout_real(int timeout, struct timespec *ts);
 
 const AM_AV_Driver_t aml_av_drv =
 {
@@ -4335,6 +4336,8 @@ static void* aml_av_monitor_thread(void *arg)
 	unsigned int last_replay_time = 0;
 #define REPLAY_TIME_INTERVAL   1000
 
+	int replay_done = 0;
+
 	if (dev->mode == AV_TIMESHIFT) {
 		AV_TimeshiftData_t *tshift_d = (AV_TimeshiftData_t*)dev->timeshift_player.drv_data;
 		mon = &dev->timeshift_player.mon;
@@ -5102,6 +5105,18 @@ static void* aml_av_monitor_thread(void *arg)
 		//	need_replay = AM_FALSE;
 		//}
 
+		{
+			int r2;
+			do {
+				struct timespec rt2;
+				aml_get_timeout_real(20, &rt2);
+				r2 = pthread_mutex_timedlock(&dev->lock, &rt2);
+			} while (mon->av_thread_running && (r2 == ETIMEDOUT));
+
+			if (!mon->av_thread_running)
+				break;
+		}
+
 		AM_TIME_GetClock(&cur_time);
 		if (need_replay && (dev->mode == AV_PLAY_TS) && (AM_ABS(cur_time - last_replay_time) > REPLAY_TIME_INTERVAL)) {
 			AM_DEBUG(1, "[avmon] replay ts vlevel %d alevel %d vpts_stop %d vmaster %d",
@@ -5109,7 +5124,6 @@ static void* aml_av_monitor_thread(void *arg)
 			aml_close_ts_mode(dev, AM_FALSE);
 			aml_open_ts_mode(dev);
 			aml_start_ts_mode(dev, &dev->ts_player.play_para, AM_FALSE);
-			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_PLAYER_STATE_CHANGED, NULL);
 			tp = &dev->ts_player.play_para;
 			ts = (AV_TSData_t*)dev->ts_player.drv_data;
 #ifndef ENABLE_PCR
@@ -5137,6 +5151,7 @@ static void* aml_av_monitor_thread(void *arg)
 			vdec_stop_dur  = 0;
 			has_amaster = AM_FALSE;
 			AM_TIME_GetClock(&last_replay_time);
+			replay_done = 1;
 		}else if (need_replay && (dev->mode == AV_TIMESHIFT) && (AM_ABS(cur_time - last_replay_time) > REPLAY_TIME_INTERVAL)) {
 			AM_DEBUG(1, "[avmon] replay timshift vlevel %d alevel %d vpts_stop %d vmaster %d",
 				vbuf_level, abuf_level, vpts_stop_dur, vmaster_dur);
@@ -5144,7 +5159,6 @@ static void* aml_av_monitor_thread(void *arg)
 
 			tshift = dev->timeshift_player.drv_data;
 			am_timeshift_reset_continue(tshift, -1, AM_TRUE);
-			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_PLAYER_STATE_CHANGED, NULL);
 #ifndef ENABLE_PCR
 			adec_start = AM_FALSE;
 			av_paused  = AM_TRUE;
@@ -5170,12 +5184,12 @@ static void* aml_av_monitor_thread(void *arg)
 			vdec_stop_dur  = 0;
 			has_amaster = AM_FALSE;
 			AM_TIME_GetClock(&last_replay_time);
+			replay_done = 1;
 		}
 		else if (need_replay && (dev->mode == AV_INJECT) && (AM_ABS(cur_time - last_replay_time) > REPLAY_TIME_INTERVAL)) {
 			AM_DEBUG(1, "[avmon] replay AV_INJECT vlevel %d alevel %d vpts_stop %d vmaster %d",
 				vbuf_level, abuf_level, vpts_stop_dur, vmaster_dur);
 			aml_restart_inject_mode(dev, AM_FALSE);
-			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_PLAYER_STATE_CHANGED, NULL);
 			tp = &dev->ts_player.play_para;
 			inj = (AV_InjectData_t *)dev->inject_player.drv_data;
 			ts_temp.fd = inj->vid_fd;
@@ -5207,7 +5221,16 @@ static void* aml_av_monitor_thread(void *arg)
 			vdec_stop_dur  = 0;
 			has_amaster = AM_FALSE;
 			AM_TIME_GetClock(&last_replay_time);
+			replay_done = 1;
 		}
+
+		pthread_mutex_unlock(&dev->lock);
+
+		if (replay_done) {
+			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_PLAYER_STATE_CHANGED, NULL);
+			replay_done = 0;
+		}
+
 	}
 
 	pthread_mutex_unlock(&gAVMonLock);
@@ -7237,3 +7260,29 @@ static AM_ErrorCode_t aml_get_pts(AM_AV_Device_t *dev, int type, uint64_t *pts)
 	return AM_SUCCESS;
 }
 
+AM_ErrorCode_t aml_get_timeout_real(int timeout, struct timespec *ts)
+{
+	struct timespec ots;
+	int left, diff;
+
+	clock_gettime(CLOCK_REALTIME, &ots);
+
+	ts->tv_sec  = ots.tv_sec + timeout/1000;
+	ts->tv_nsec = ots.tv_nsec;
+
+	left = timeout % 1000;
+	left *= 1000000;
+	diff = 1000000000-ots.tv_nsec;
+
+	if (diff <= left)
+	{
+		ts->tv_sec++;
+		ts->tv_nsec = left-diff;
+	}
+	else
+	{
+		ts->tv_nsec += left;
+	}
+
+	return AM_SUCCESS;
+}
