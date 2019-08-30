@@ -2577,6 +2577,8 @@ static void aml_stop_av_monitor(AM_AV_Device_t *dev, AV_Monitor_t *mon)
 		pthread_join(mon->av_mon_thread, NULL);
 		AM_DEBUG(1, "[avmon] stop av monitor ---join end\r\n");
 	}
+	if (dev)
+	   dev->audio_switch = AM_FALSE;
 }
 
 /**\brief 释放Timeshift相关数据*/
