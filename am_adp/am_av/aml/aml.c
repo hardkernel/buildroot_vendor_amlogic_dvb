@@ -107,7 +107,7 @@ void *adec_handle = NULL;
 #define TIMESHIFT_FFFB_ERROR_CNT	 5
 #define VIDEO_AVAILABLE_MIN_CNT     2
 #define TIME_UNIT90K                 90000
-
+#define AUDIO_NO_DATA_TIME          20
 #ifdef ENABLE_PCR
 #ifndef AMSTREAM_IOC_PCRID
 #define AMSTREAM_IOC_PCRID        _IOW(AMSTREAM_IOC_MAGIC, 0x4f, int)
@@ -4930,6 +4930,11 @@ static void* aml_av_monitor_thread(void *arg)
 		} else if (is_avs_plus &&(tp->vfmt == VFORMAT_AVS)) {
 			AM_EVT_Signal(dev->dev_no, AM_AV_EVT_VIDEO_NOT_SUPPORT, NULL);//not  unsupport , just  FORMAT  is AVS
 		}
+        //this Radio Program Stop
+        if (has_audio && !has_video && adec_start && !no_audio_data && (dmx_apts_stop_dur > AUDIO_NO_DATA_TIME) && (arp_stop_dur > AUDIO_NO_DATA_TIME)) {
+            AM_DEBUG(1, "[avmon] radio program data stopped");
+            no_audio_data = AM_TRUE;
+        }
 		//add (vpts_stop_dur > NO_DATA_CHECK_TIME) for first into thread,because no_audio_data no_video_data
 		//init value is true and no_data_evt init value is false.
 		if (no_audio_data && no_video_data && !no_data_evt && vpts_stop_dur > NO_DATA_CHECK_TIME) {
