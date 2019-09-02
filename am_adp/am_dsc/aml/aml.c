@@ -228,7 +228,12 @@ static AM_ErrorCode_t aml_set_mode (AM_DSC_Device_t *dev, AM_DSC_Channel_t *chan
 }
 static AM_ErrorCode_t aml_close (AM_DSC_Device_t *dev)
 {
+	int fd;
 	UNUSED(dev);
+	fd = (long)dev->drv_data;
+	if (fd != -1) {
+		close(fd);
+	}
 	return AM_SUCCESS;
 }
 
