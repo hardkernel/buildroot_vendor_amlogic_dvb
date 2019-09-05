@@ -694,7 +694,7 @@ static dec_sysinfo_t am_sysinfo;
 static AM_ErrorCode_t aml_set_ad_source(AM_AD_Handle_t *ad, int enable, int pid, int fmt, void *user);
 static int aml_calc_sync_mode(AM_AV_Device_t *dev, int has_audio, int has_video, int has_pcr, int afmt, int *force_reason);
 static int aml_set_sync_mode(AM_AV_Device_t *dev, int mode);
-
+static void *aml_try_open_crypt(AM_Crypt_Ops_t *ops);
 /****************************************************************************
  * Static functions
  ***************************************************************************/
@@ -2929,6 +2929,38 @@ static void aml_timeshift_update_info(AV_TimeshiftData_t *tshift, AM_AV_Timeshif
 	pthread_mutex_unlock(&tshift->lock);
 }
 
+static int aml_timeshift_fetch_data(AV_TimeshiftData_t *tshift, uint8_t *buf, size_t size, int timeout)
+{
+	int cnt = 0;
+	int ret;
+	uint8_t ts_pkt[188];
+	AM_Crypt_Ops_t *crypt_ops = tshift->dev->crypt_ops;
+	void *cryptor = tshift->dev->cryptor;
+
+	if (CRYPT_SET(crypt_ops)) {
+		while ((cnt + 188) <= size) {
+			if (AM_TFile_GetAvailable(tshift->file) < 188)
+				break;
+
+			ret = AM_TFile_Read(tshift->file, ts_pkt, sizeof(ts_pkt), timeout);
+			if (ret <= 0 || ret != sizeof(ts_pkt)) {
+				if (!cnt)
+					return 0;
+				else
+					break;
+			}
+
+			if (crypt_ops && crypt_ops->crypt)
+				crypt_ops->crypt(cryptor, buf+cnt, ts_pkt, 188, 1);
+
+			cnt += 188;
+		}
+	} else {
+		cnt = AM_TFile_Read(tshift->file, buf, size, timeout);
+	}
+	return cnt;
+}
+
 static char *cmd2string(int cmd)
 {
 	char buf[64];
@@ -2988,6 +3020,8 @@ static void *aml_timeshift_thread(void *arg)
 	aml_timeshift_notify_current(tshift, (void*)&info);
 
 	AM_TIME_GetClock(&update_time);
+
+	tshift->dev->cryptor = aml_try_open_crypt(tshift->dev->crypt_ops);
 
 	while (tshift->running || tshift->cmd != tshift->last_cmd )
 	{
@@ -3053,15 +3087,16 @@ static void *aml_timeshift_thread(void *arg)
 			 *	## end of 100351
 			 */
 
-			ret = AM_TFile_Read(tshift->file, buf+tshift->left, len, 100);
+			ret = aml_timeshift_fetch_data(tshift, buf+tshift->left, len, 100);
 			if (ret > 0)
 			{
 				tshift->left += ret;
 			}
 			else
 			{
+				int error = errno;
 				AM_DEBUG(4, "read playback file failed: %s", strerror(errno));
-				if (errno == EIO && is_playback_mode)
+				if (error == EIO && is_playback_mode)
 				{
 					AM_DEBUG(1, "Disk may be plugged out, exit playback.");
 					break;
@@ -3240,6 +3275,11 @@ wait_for_next_loop:
 			pthread_cond_timedwait(&tshift->cond, &tshift->lock, &rt);
 			pthread_mutex_unlock(&tshift->lock);
 		}
+	}
+
+	if (tshift->dev->crypt_ops && tshift->dev->crypt_ops->close) {
+		tshift->dev->crypt_ops->close(tshift->dev->cryptor);
+		tshift->dev->cryptor = NULL;
 	}
 
 	AM_DEBUG(1, "[timeshift] timeshift player thread exit now");
@@ -7292,4 +7332,14 @@ AM_ErrorCode_t aml_get_timeout_real(int timeout, struct timespec *ts)
 	}
 
 	return AM_SUCCESS;
+}
+
+#ifdef open
+#undef open
+#endif
+static void *aml_try_open_crypt(AM_Crypt_Ops_t *ops)
+{
+	if (ops && ops->open)
+		return ops->open();
+	return NULL;
 }

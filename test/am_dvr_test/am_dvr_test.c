@@ -303,7 +303,7 @@ static void* dvr_data_thread(void *arg)
 			usleep(200*1000);
 			continue;
 		}
-		//printf("read from DVR%d return %d bytes\n", dd->id, cnt);
+		printf("read from DVR%d return %d bytes\n", dd->id, cnt);
 		if (dd->fd != -1)
 		{
 		        if (dd->is_socket)

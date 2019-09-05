@@ -135,6 +135,8 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_open_lib/am_ci/am_ci.c \
 		   am_open_lib/am_ci/ca_ci.c \
 		   am_open_lib/am_freesat/freesat.c \
+		   am_open_lib/am_crypt/am_crypt.c \
+		   am_open_lib/am_crypt/des.c \
 		   am_tfile/am_tfile.c
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND -DLOG_LEVEL=1
@@ -298,6 +300,8 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_open_lib/am_ci/am_ci.c \
 		   am_open_lib/am_ci/ca_ci.c \
 		   am_open_lib/am_freesat/freesat.c \
+		   am_open_lib/am_crypt/am_crypt.c \
+		   am_open_lib/am_crypt/des.c \
 		   am_tfile/am_tfile.c
 
 
@@ -455,6 +459,8 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_open_lib/am_ci/am_ci.c \
 		   am_open_lib/am_ci/ca_ci.c \
 		   am_open_lib/am_freesat/freesat.c \
+		   am_open_lib/am_crypt/am_crypt.c \
+		   am_open_lib/am_crypt/des.c \
 		   am_tfile/am_tfile.c
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND -DLOG_LEVEL=1
@@ -608,6 +614,8 @@ LOCAL_SRC_FILES := am_dmx/am_dmx.c am_dmx/linux_dvb/linux_dvb.c\
 		   am_open_lib/am_ci/am_ci.c \
 		   am_open_lib/am_ci/ca_ci.c \
 		   am_open_lib/am_freesat/freesat.c \
+		   am_open_lib/am_crypt/am_crypt.c \
+		   am_open_lib/am_crypt/des.c \
 		   am_tfile/am_tfile.c
 
 LOCAL_CFLAGS+=-DANDROID -DAMLINUX -DCHIP_8226M -DLINUX_DVB_FEND -DLOG_LEVEL=1

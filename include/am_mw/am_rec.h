@@ -22,6 +22,7 @@
 #include <am_dvr.h>
 #include <am_av.h>
 #include <am_si.h>
+#include "am_crypt.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -109,6 +110,7 @@ typedef struct
 	int64_t total_size;                 /**< Max size, <=0 means no limit*/
 	char prefix_name[AM_REC_NAME_MAX];    /**< Filename prefix*/
 	char suffix_name[AM_REC_SUFFIX_MAX];  /**< Filename suffix*/
+	AM_Crypt_Ops_t *crypt_ops;
 }AM_REC_RecPara_t;
 
 /**\brief Recording information*/

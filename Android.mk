@@ -27,3 +27,4 @@ include $(DVB_TOP)/test/am_av_test/Android.mk
 include $(DVB_TOP)/test/am_dvr_test/Android.mk
 include $(DVB_TOP)/test/am_dsc_test/Android.mk
 include $(DVB_TOP)/test/am_userdata_test/Android.mk
+include $(DVB_TOP)/test/am_timeshift_test/Android.mk

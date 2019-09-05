@@ -403,7 +403,16 @@ static void *am_rec_record_thread(void* arg)
 	AM_REC_RecEndPara_t epara;
 	const int UPDATE_TIME_PERIOD = 1000;
 	const int stat_flag = rec->stat_flag;
-	
+
+#define CRYPT_BUF_SIZE (256*1024)
+	uint8_t *crypt_buf;
+	int ib, left;
+	int lost = 0;
+	int lost2 = 0;
+
+	uint8_t *pdata;
+	int ldata;
+
 	memset(&epara, 0, sizeof(epara));
 	epara.hrec = rec;
 	/*设置DVR设备参数*/
@@ -426,9 +435,21 @@ static void *am_rec_record_thread(void* arg)
 
 	AM_EVT_Signal((long)rec, AM_REC_EVT_RECORD_START, NULL);
 
+	if (CRYPT_SET(rec->rec_para.crypt_ops)) {
+		crypt_buf = (uint8_t *)malloc(CRYPT_BUF_SIZE);
+		if (!crypt_buf) {
+			AM_DEBUG(0, "no memory for DVR%d", rec->create_para.dvr_dev);
+			err = AM_REC_ERR_NO_MEM;
+			goto close_dvr;
+		}
+		left = 0;
+	}
+
 	/*从DVR设备读取数据并存入文件*/
 	while (rec->stat_flag & REC_STAT_FL_RECORDING)
 	{
+		int do_write = 0;
+
 		if (rec->rec_start_time != 0)
 		{
 			AM_TIME_GetClock(&check_time);
@@ -463,14 +484,77 @@ static void *am_rec_record_thread(void* arg)
 				break;
 		}
 
-		if (rec->stat_flag & REC_STAT_FL_PAUSED)
+		if (rec->stat_flag & REC_STAT_FL_PAUSED) {
+			/*drop left*/
+			left = 0;
 			continue;
+		}
+
+		if (CRYPT_SET(rec->rec_para.crypt_ops)) {
+
+			ib = 0;
+
+			/*do encrypt per pkt*/
+
+			/*complete the last data, which has a 0x47 header*/
+			if (left) {
+				int full_pkt = ((left + cnt) >= 188)? 1 : 0;
+				int len = (full_pkt) ? 188 - left : cnt;
+				memcpy(crypt_buf+left, buf, len);
+				ib = len;
+				left += ib;
+
+				if (!full_pkt)
+					continue;
+
+				if (rec->rec_para.crypt_ops && rec->rec_para.crypt_ops->crypt)
+					rec->rec_para.crypt_ops->crypt(rec->cryptor,
+						crypt_buf, crypt_buf, 188, 0);
+
+				do_write = 1;
+			}
+
+			while ((ib + 188) <= cnt) {
+				if (buf[ib] != 0x47) {
+					ib++;
+					lost++;
+					continue;
+				}
+				if (rec->rec_para.crypt_ops && rec->rec_para.crypt_ops->crypt)
+					rec->rec_para.crypt_ops->crypt(rec->cryptor,
+						crypt_buf+left, buf+ib, 188, 0);
+				else
+					memcpy(crypt_buf+left, buf+ib, 188);
+
+				ib += 188;
+				left += 188;
+
+				do_write = 1;
+			}
+
+			if (!do_write)
+				continue;
+
+			pdata = crypt_buf;
+			ldata = left;
+
+		} else {
+			pdata = buf;
+			ldata = cnt;
+
+			do_write = 1;
+		}
+
+		if (!do_write)
+			continue;
+
+		/*AM_DEBUG(1, "rec [read] %d, [write] %d", cnt, ldata);*/
 
 		if (rec->rec_para.is_timeshift)
 		{
 			if (rec->tfile_flag & REC_TFILE_FLAG_AUTO_CREATE)
 			{
-				if (AM_TFile_Write(rec->tfile, buf, cnt) != cnt)
+				if (AM_TFile_Write(rec->tfile, pdata, ldata) != ldata)
 				{
 					err = AM_REC_ERR_CANNOT_WRITE_FILE;
 					break;
@@ -478,7 +562,7 @@ static void *am_rec_record_thread(void* arg)
 			}
 			else
 			{
-				if (AM_AV_TimeshiftFillData(0, buf, cnt) != AM_SUCCESS)
+				if (AM_AV_TimeshiftFillData(0, pdata, ldata) != AM_SUCCESS)
 				{
 					err = AM_REC_ERR_CANNOT_WRITE_FILE;
 					break;
@@ -487,7 +571,7 @@ static void *am_rec_record_thread(void* arg)
 		}
 		else
 		{
-			if (am_rec_data_write(rec, buf, cnt) != cnt)
+			if (am_rec_data_write(rec, pdata, ldata) != ldata)
 			{
 				err = AM_REC_ERR_CANNOT_WRITE_FILE;
 				break;
@@ -498,7 +582,30 @@ static void *am_rec_record_thread(void* arg)
 				AM_TIME_GetClock(&rec->rec_start_time);
 			}
 		}
+
+		if (CRYPT_SET(rec->rec_para.crypt_ops)) {
+
+			/*reset left*/
+			left = 0;
+
+			/*resync*/
+			while (ib < cnt && (buf[ib] != 0x47)) {
+				ib++;
+				lost2++;
+			}
+
+			/*restore left*/
+			if (ib < cnt) {
+				left = cnt - ib;
+				memcpy(crypt_buf, buf+ib, left);
+			}
+		}
+
+		/*AM_DEBUG(1, "rec left: %d, lost: %d : %d", left, lost, lost2);*/
 	}
+
+	if (CRYPT_SET(rec->rec_para.crypt_ops))
+		free(crypt_buf);
 
 close_dvr:
 	AM_DVR_StopRecord(rec->create_para.dvr_dev);
@@ -604,6 +711,9 @@ static int am_rec_start_record(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start_p
 	rec->rec_fd = -1;
 	rec->rec_para = *start_para;
 
+	if (rec->rec_para.crypt_ops && rec->rec_para.crypt_ops->open)
+		rec->cryptor = rec->rec_para.crypt_ops->open();
+
 	if (! rec->rec_para.is_timeshift)
 	{
 		rec->rec_fd = open(rec->rec_file_name, O_TRUNC|O_CREAT|O_WRONLY, 0666);
@@ -681,7 +791,12 @@ static int am_rec_stop_record(AM_REC_Recorder_t *rec)
 	pthread_join(rec->rec_thread, NULL);
 	pthread_mutex_lock(&rec->lock);
 	rec->rec_start_time = 0;
-	
+
+	if (rec->rec_para.crypt_ops && rec->rec_para.crypt_ops->close) {
+		rec->rec_para.crypt_ops->close(rec->cryptor);
+		rec->cryptor = NULL;
+	}
+
 	return 0;
 }
 

@@ -954,6 +954,21 @@ loff_t AM_TFile_Tell(AM_TFile_t tfile)
 	return ret;
 }
 
+loff_t AM_TFile_GetAvailable(AM_TFile_t tfile)
+{
+	int ret = 0;
+	if (! tfile->opened)
+	{
+		AM_DEBUG(0, "[tfile] has not opened");
+		return AM_FAILURE;
+	}
+
+	pthread_mutex_lock(&tfile->lock);
+	ret = tfile->avail;
+	pthread_mutex_unlock(&tfile->lock);
+	return ret;
+}
+
 int AM_TFile_TimeStart(AM_TFile_t tfile)
 {
 	if (! tfile->opened)
