@@ -5160,8 +5160,11 @@ static void* aml_av_monitor_thread(void *arg)
 				r2 = pthread_mutex_timedlock(&dev->lock, &rt2);
 			} while (mon->av_thread_running && (r2 == ETIMEDOUT));
 
-			if (!mon->av_thread_running)
+			if (!mon->av_thread_running) {
+				if (r2 == 0)
+					pthread_mutex_unlock(&dev->lock);
 				break;
+			}
 		}
 
 		AM_TIME_GetClock(&cur_time);
