@@ -3102,25 +3102,24 @@ static void *aml_timeshift_thread(void *arg)
 					AM_DEBUG(1, "cannot read \"%s\"", VIDEO_PTS_FILE);
 					vpts = 0;
 				}
-				if (tshift->state == AV_TIMESHIFT_STAT_PLAY &&
-					ioctl(tshift->ts.fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1)
-				{
-					AM_DEBUG(4, "vstat_len:%d , file_avail:%lld", vstatus.status.data_len , tshift->file->avail);
-				}
-				else
-				{
-					AM_DEBUG(1,"get v_stat_len failed");
-				}
 
-				diff = (dmx_vpts - vpts)/90000;
-				//AM_DEBUG(3, "#### vpts:%#x, dmx_vpts:%#x, diff:%d, %s, %s, play_stat:%d\n",
-				// vpts, dmx_vpts, diff, diff>TIMESHIFT_INJECT_DIFF_TIME?"large":"small", (diff==last_diff)?"equal":"not equal", tshift->state);
-				if (vpts != 0 && dmx_vpts != 0 && diff > TIMESHIFT_INJECT_DIFF_TIME &&
-					vstatus.status.data_len > DEC_STOP_VIDEO_LEVEL && tshift->state == AV_TIMESHIFT_STAT_PLAY)
-				{
-					last_diff = diff;
-					tshift->timeout = 10;
-					goto wait_for_next_loop;
+				if (tshift->state == AV_TIMESHIFT_STAT_PLAY) {
+					if (ioctl(tshift->ts.fd, AMSTREAM_IOC_VB_STATUS, (unsigned long)&vstatus) != -1) {
+						AM_DEBUG(4, "vstat_len:%d , file_avail:%lld", vstatus.status.data_len , tshift->file->avail);
+					} else {
+						AM_DEBUG(1,"get v_stat_len failed, %d(%s)", errno, strerror(errno));
+					}
+
+					diff = (dmx_vpts - vpts)/90000;
+					//AM_DEBUG(3, "#### vpts:%#x, dmx_vpts:%#x, diff:%d, %s, %s, play_stat:%d\n",
+					// vpts, dmx_vpts, diff, diff>TIMESHIFT_INJECT_DIFF_TIME?"large":"small", (diff==last_diff)?"equal":"not equal", tshift->state);
+					if (vpts != 0 && dmx_vpts != 0 && diff > TIMESHIFT_INJECT_DIFF_TIME &&
+						vstatus.status.data_len > DEC_STOP_VIDEO_LEVEL)
+					{
+						last_diff = diff;
+						tshift->timeout = 10;
+						goto wait_for_next_loop;
+					}
 				}
 				/*
 				 *	## end of 100351
@@ -5192,6 +5191,21 @@ static void* aml_av_monitor_thread(void *arg)
 		//	AM_DEBUG(1, "[avmon] avoid replay checkin_firstapts checkin_firstvpts %d",need_replay);
 		//	need_replay = AM_FALSE;
 		//}
+
+		if (dev->mode == AV_TIMESHIFT
+			&& (
+				(has_audio && apts_discontinue
+					&& (abuf_level > (DEC_STOP_AUDIO_LEVEL*2))
+					&& (arp_stop_dur > NO_DATA_CHECK_TIME))
+				||
+				(has_video && no_video_data
+					&& (vbuf_level > (DEC_STOP_VIDEO_LEVEL*2))
+					&& (vrp_stop_dur > NO_DATA_CHECK_TIME))
+				)
+			) {
+			AM_DEBUG(1, "[avmon] replay timeshift adec stuck or vdec stuck");
+			need_replay = AM_TRUE;
+		}
 
 		{
 			int r2;
