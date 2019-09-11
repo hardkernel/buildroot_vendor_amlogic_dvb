@@ -5010,7 +5010,7 @@ static void* aml_av_monitor_thread(void *arg)
 #endif
 		if (has_video && (tp->vfmt == VFORMAT_H264) && ((vdec_status >> 16) & 0xFFFF)) {
 			AM_DEBUG(1, "[avmon] H264 fatal error");
-			need_replay = AM_TRUE;
+//			need_replay = AM_TRUE;
 		}
 #ifndef USE_ADEC_IN_DVB
 #ifdef ANDROID
