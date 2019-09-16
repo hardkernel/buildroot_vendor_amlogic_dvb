@@ -713,6 +713,7 @@ static int am_rec_start_record(AM_REC_Recorder_t *rec, AM_REC_RecPara_t *start_p
 
 	if (rec->rec_para.crypt_ops && rec->rec_para.crypt_ops->open)
 		rec->cryptor = rec->rec_para.crypt_ops->open();
+	AM_DEBUG(1, "rec crypt mode : %d", (rec->cryptor)? 1 : 0);
 
 	if (! rec->rec_para.is_timeshift)
 	{

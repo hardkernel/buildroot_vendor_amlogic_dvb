@@ -2938,6 +2938,14 @@ static int aml_timeshift_fetch_data(AV_TimeshiftData_t *tshift, uint8_t *buf, si
 	void *cryptor = tshift->dev->cryptor;
 
 	if (CRYPT_SET(crypt_ops)) {
+		int skip = 0;
+
+		/*skip the header*/
+		if (tshift->para.para.mode == AM_AV_TIMESHIFT_MODE_PLAYBACK) {
+			if (AM_TFile_Tell(tshift->file) == 0)
+				skip = 2;
+		}
+
 		while ((cnt + 188) <= size) {
 			if (AM_TFile_GetAvailable(tshift->file) < 188)
 				break;
@@ -2950,8 +2958,13 @@ static int aml_timeshift_fetch_data(AV_TimeshiftData_t *tshift, uint8_t *buf, si
 					break;
 			}
 
-			if (crypt_ops && crypt_ops->crypt)
-				crypt_ops->crypt(cryptor, buf+cnt, ts_pkt, 188, 1);
+			if (!skip) {
+				if (crypt_ops && crypt_ops->crypt)
+					crypt_ops->crypt(cryptor, buf+cnt, ts_pkt, 188, 1);
+			} else {
+				skip--;
+				memcpy(buf+cnt, ts_pkt, 188);
+			}
 
 			cnt += 188;
 		}
@@ -3022,6 +3035,7 @@ static void *aml_timeshift_thread(void *arg)
 	AM_TIME_GetClock(&update_time);
 
 	tshift->dev->cryptor = aml_try_open_crypt(tshift->dev->crypt_ops);
+	AM_DEBUG(1, "[timeshift] crypt mode : %d", (tshift->dev->cryptor)? 1 : 0);
 
 	while (tshift->running || tshift->cmd != tshift->last_cmd )
 	{
