@@ -186,6 +186,7 @@ void *adec_handle = NULL;
 #define TSYNC_FIRSTCHECKIN_APTS_FILE "/sys/class/tsync/checkin_firstapts"
 #define TSYNC_FIRSTCHECKIN_VPTS_FILE "/sys/class/tsync/checkin_firstvpts"
 #define TSYNC_PCR_MODE_FILE	"/sys/class/tsync_pcr/tsync_pcr_mode"
+#define TSYNC_AUDIO_STATE_FILE	"/sys/class/tsync_pcr/tsync_audio_state"
 #else
 
 /*for add new path*/
@@ -258,6 +259,7 @@ void *adec_handle = NULL;
 #define VIDEO_NEW_FRAME_COUNT_FILE "/sys/module/frame_sink/parameters/new_frame_count"
 #define AUDIO_DSP_DIGITAL_RAW_FILE "/sys/class/audiodsp/digital_raw"
 #define TSYNC_PCR_MODE_FILE	"/sys/class/tsync_pcr/tsync_pcr_mode"
+#define TSYNC_AUDIO_STATE_FILE	"/sys/class/tsync_pcr/tsync_audio_state"
 #endif
 
 #ifdef ANDROID
@@ -2583,6 +2585,28 @@ static void aml_stop_av_monitor(AM_AV_Device_t *dev, AV_Monitor_t *mon)
 	   dev->audio_switch = AM_FALSE;
 }
 
+static void aml_check_audio_state(void)
+{
+	char buf[32];
+	int tsync_audio_state = 0;
+	int check_count = 0;
+	while (check_count++ < 10) {
+		usleep(100 * 1000);
+		if (AM_FileRead(TSYNC_AUDIO_STATE_FILE, buf, sizeof(buf)) >= 0) {
+			sscanf(buf, "%x", &tsync_audio_state);
+		} else {
+			break;
+		}
+		AM_DEBUG(1, "tsync_audio_state %d", tsync_audio_state);
+		if (tsync_audio_state == 7) {
+			break;
+		} else if (tsync_audio_state == 0) {
+			usleep(100 * 1000);
+			break;
+		}
+	}
+}
+
 /**\brief 释放Timeshift相关数据*/
 static void aml_destroy_timeshift_data(AV_TimeshiftData_t *tshift, AM_Bool_t destroy_thread)
 {
@@ -2636,7 +2660,8 @@ static int am_timeshift_reset(AV_TimeshiftData_t *tshift, int deinterlace_val, A
 	UNUSED(deinterlace_val);
 
 	aml_destroy_timeshift_data(tshift, AM_FALSE);
-
+	if (start_audio)
+		aml_check_audio_state();
 	aml_start_timeshift(tshift, &tshift->para, AM_FALSE, start_audio);
 
 	/*Set the left to 0, we will read from the new point*/
