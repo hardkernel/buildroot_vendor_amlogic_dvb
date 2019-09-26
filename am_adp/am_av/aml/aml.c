@@ -267,6 +267,7 @@ void *adec_handle = NULL;
 #define AC3_AMASTER_PROP "media.ac3_amaster"
 #endif
 #define SHOW_FIRSTFRAME_NOSYNC_PROP "tv.dtv.showfirstframe_nosync"
+#define REPLAY_ENABLE_PROP	"tv.dtv.replay_enable"
 
 #define CANVAS_ALIGN(x)    (((x)+7)&~7)
 #define JPEG_WRTIE_UNIT    (32*1024)
@@ -5093,20 +5094,25 @@ static void* aml_av_monitor_thread(void *arg)
 			&& (dev->mode != AV_INJECT)
 			&& (has_video && (vdec_stop_dur > NO_DATA_CHECK_TIME))) {
 			if (AM_ABS(checkin_firstapts - checkin_firstvpts) < TIME_UNIT90K * 5)
+			if (dev->replay_enable)
 				need_replay = AM_TRUE;
+			AM_DEBUG(1, "[avmon] should't replay vdec_stop_dur=%d\n",
+				vdec_stop_dur);
 			AM_DEBUG(1, "[avmon] apts_dmx_stop: %d arp_stop: %d vpts_dmx_stop: %d vrp_stop: %d",
 					dmx_apts_stop_dur, arp_stop_dur, dmx_vpts_stop_dur, vrp_stop_dur);
 		}
 		if (dev->mode == AV_PLAY_TS) {
 			if (has_video && (vbuf_level * 5 > vbuf_size * 4))
 			{
-				need_replay = AM_TRUE;
-				AM_DEBUG(1, "[avmon] 1 replay ts vlevel %d vbuf_size %d",vbuf_level*6, vbuf_size*5);
+				if (dev->replay_enable)
+					need_replay = AM_TRUE;
+				AM_DEBUG(1, "[avmon] 1 shouldn't replay ts vlevel %d vbuf_size %d",vbuf_level*6, vbuf_size*5);
 			}
 			if (has_audio && (abuf_level * 5 > abuf_size * 4))
 			{
-				need_replay = AM_TRUE;
-				AM_DEBUG(1, "[avmon] 2 replay ts alevel %d abuf_size %d",abuf_level*6, abuf_size*5);
+				if (dev->replay_enable)
+					need_replay = AM_TRUE;
+				AM_DEBUG(1, "[avmon] 2 shouldn't replay ts alevel %d abuf_size %d",abuf_level*6, abuf_size*5);
 			}
 		}
 		//if(adec_start && !av_paused && has_amaster && !apts_stop_dur && !vpts_stop_dur && (vmaster_dur > VMASTER_REPLAY_TIME))
@@ -5116,12 +5122,17 @@ static void* aml_av_monitor_thread(void *arg)
 		if (has_video && (tp->vfmt == VFORMAT_H264) && (vdec_status & DECODER_FATAL_ERROR_SIZE_OVERFLOW)) {
 			AM_DEBUG(1, "[avmon] switch to h264 4K/2K");
 			tp->vfmt = VFORMAT_H264_4K2K;
-			need_replay = AM_TRUE;
+			AM_DEBUG(1, "DECODER_FTAL_ERROR_SIZE_OVERFLOW, vdec_status=0x%x\n",
+				vdec_status);
+			if (dev->replay_enable)
+				need_replay = AM_TRUE;
 		} else
 #endif
 		if (has_video && (tp->vfmt == VFORMAT_H264) && ((vdec_status >> 16) & 0xFFFF)) {
-			AM_DEBUG(1, "[avmon] H264 fatal error");
-//			need_replay = AM_TRUE;
+			AM_DEBUG(1, "[avmon] H264 fatal error,vdec_status=0x%x",
+				vdec_status);
+			if (dev->replay_enable)
+				need_replay = AM_TRUE;
 		}
 #ifndef USE_ADEC_IN_DVB
 #ifdef ANDROID
@@ -5129,7 +5140,8 @@ static void* aml_av_monitor_thread(void *arg)
 			int val = 0;
 			sscanf(buf, "%d", &val);
 			if (val == 1) {
-				need_replay = AM_TRUE;
+				if (dev->replay_enable)
+					need_replay = AM_TRUE;
 				AM_DEBUG(1, "[avmon] pcr need reset");
 			}
 		}
@@ -5209,7 +5221,9 @@ static void* aml_av_monitor_thread(void *arg)
 
 			AM_DMX_GetScrambleStatus(0, sf);
 			if (sf[0] == 0 && sf[1] == 0) {
-				need_replay = AM_TRUE;
+				if (dev->replay_enable)
+					need_replay = AM_TRUE;
+				AM_DEBUG(1, "[avmon] sf[0]=sf[1]=0");
 			}
 		}
 
@@ -5229,8 +5243,9 @@ static void* aml_av_monitor_thread(void *arg)
 					&& (vrp_stop_dur > NO_DATA_CHECK_TIME))
 				)
 			) {
-			AM_DEBUG(1, "[avmon] replay timeshift adec stuck or vdec stuck");
-			need_replay = AM_TRUE;
+			AM_DEBUG(1, "[avmon] not replay timeshift adec stuck or vdec stuck");
+			if (dev->replay_enable)
+				need_replay = AM_TRUE;
 		}
 
 		{
@@ -5505,7 +5520,10 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 	} else {
 		AM_DEBUG(1, "open /dev/amvideo error");
 	}
-
+#ifdef ANDROID
+	dev->replay_enable = property_get_int32(REPLAY_ENABLE_PROP, 0);
+	AM_DEBUG(1, "set replay_enable=%d\n", dev->replay_enable);
+#endif
 	switch (mode)
 	{
 		case AV_PLAY_VIDEO_ES:

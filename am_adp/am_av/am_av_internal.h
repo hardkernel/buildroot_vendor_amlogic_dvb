@@ -290,6 +290,7 @@ struct AM_AV_Device
 	AM_USERDATA_AFD_t            afd;
 	AM_Crypt_Ops_t               *crypt_ops;
 	void                         *cryptor;
+	AM_Bool_t	replay_enable;		/*enable or disable replay when abnormal*/
 };
 
 /****************************************************************************
