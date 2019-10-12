@@ -684,7 +684,10 @@ ssize_t AM_TFile_Read(AM_TFile_t tfile, uint8_t *buf, size_t size, int timeout)
 		tfile->read %= tfile->size;
 		ret = size - todo;
 	}
-
+	if (tfile->read == 0) {
+		AM_DEBUG(0, "[tfile] reed is set 0 need to seek 0");
+		aml_timeshift_subfile_seek(tfile, 0, AM_TRUE);
+	}
 read_done:
 	if (ret > 0)
 	{
@@ -801,7 +804,11 @@ adjust_pos:
 		off_t sleft = tfile->size - tfile->total;
 
 		tfile->write = (tfile->write + size_act) % tfile->size;
-
+		if (tfile->write == 0) {
+			/*rewind the file*/
+			AM_DEBUG(0, "[tfile] write == 0, need seek write(0)read(%lld)", tfile->read);
+			aml_timeshift_subfile_seek(tfile, 0, AM_FALSE);
+		}
 		//check the start pointer
 		if (size_act > sleft) {
 			if (tfile->timer) {

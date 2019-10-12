@@ -2241,7 +2241,7 @@ static int aml_timeshift_inject(AV_TimeshiftData_t *tshift, uint8_t *data, int s
 		}
 	}
 
-	if (size)
+	if (size && fd > 0)
 	{
 		ret = write(fd, data, size);
 		if ((ret == -1) && (errno != EAGAIN))
@@ -2498,7 +2498,6 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AV_TimeShi
 		if (VALID_PID(tshift_para->sub_aud_pid))
 			aml_set_audio_ad(tshift->dev, 1, tshift_para->sub_aud_pid, tshift_para->sub_aud_fmt);
 	}
-
 	if (ioctl(ts->fd, AMSTREAM_IOC_PORT_INIT, 0) == -1)
 	{
 		AM_DEBUG(1, "amport init failed");
@@ -2634,6 +2633,7 @@ static void aml_destroy_timeshift_data(AV_TimeshiftData_t *tshift, AM_Bool_t des
 		audio_ops->adec_stop_decode(&tshift->ts.adec);
 		AM_DEBUG(1, "Closing mpts");
 		close(tshift->ts.fd);
+		tshift->ts.fd = -1;
 	}
 	AM_DEBUG(1, "Closing demux 1");
 	if (tshift->dmxfd != -1)
@@ -2673,12 +2673,14 @@ static int am_timeshift_reset(AV_TimeshiftData_t *tshift, int deinterlace_val, A
 
 static int am_timeshift_reset_continue(AV_TimeshiftData_t *tshift, int deinterlace_val, AM_Bool_t start_audio)
 {
-	UNUSED(deinterlace_val);
 
+	UNUSED(deinterlace_val);
+	AM_DEBUG(1, "am_timeshift_reset_continue reset inject size");
+	tshift->inject_size = 0;
 	aml_destroy_timeshift_data(tshift, AM_FALSE);
 
 	aml_start_timeshift(tshift, &tshift->para, AM_FALSE, start_audio);
-
+	tshift->inject_size = 64*1024;
 	return 0;
 }
 
