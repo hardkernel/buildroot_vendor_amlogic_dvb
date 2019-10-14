@@ -3060,10 +3060,11 @@ static void *aml_timeshift_thread(void *arg)
 	int vbuf_len = 0;
 	int abuf_len = 0;
 	int skip_flag_count = 0;
-	int dmx_vpts = 0,  vpts = 0;
+	int dmx_vpts = 0,  vpts = 0, last_vpts = 0;
 	char pts_buf[32];
 	int diff = 0, last_diff = 0;
 	int error_cnt = 0;
+	int v_stuck = -1;
 
 	AV_TSPlayPara_t *tp = &tshift->tp;
 	AM_Bool_t has_video = VALID_VIDEO(tp->vpid, tp->vfmt);
@@ -3138,12 +3139,40 @@ static void *aml_timeshift_thread(void *arg)
 						AM_DEBUG(1,"get v_stat_len failed, %d(%s)", errno, strerror(errno));
 					}
 
+					/*treat little data as replay*/
+					if (vstatus.status.data_len < DEC_STOP_VIDEO_LEVEL)
+						v_stuck = -1;
+
+					if (last_vpts != vpts) {
+						if (v_stuck > 0)
+							v_stuck = 0;
+						last_vpts = vpts;
+					} else {
+						v_stuck++;
+					}
 					diff = (dmx_vpts - vpts)/90000;
-					//AM_DEBUG(3, "#### vpts:%#x, dmx_vpts:%#x, diff:%d, %s, %s, play_stat:%d\n",
-					// vpts, dmx_vpts, diff, diff>TIMESHIFT_INJECT_DIFF_TIME?"large":"small", (diff==last_diff)?"equal":"not equal", tshift->state);
-					if (vpts != 0 && dmx_vpts != 0 && diff > TIMESHIFT_INJECT_DIFF_TIME &&
-						vstatus.status.data_len > DEC_STOP_VIDEO_LEVEL)
+
+					//AM_DEBUG(3, "#### vpts:%#x, dmx_vpts:%#x, diff:%d, %s, %s, play_stat:%d vdata_len:0x%x\n",
+					// vpts, dmx_vpts, diff, diff>TIMESHIFT_INJECT_DIFF_TIME?"large":"small", (diff==last_diff)?"equal":"not equal", tshift->state, vstatus.status.data_len);
+
+					/*prevent the data sink into buffer all, which causes sub/txt lost*/
+					if (
+						/*pts discontinue*/
+						vpts != 0 && dmx_vpts != 0 && diff > TIMESHIFT_INJECT_DIFF_TIME
+						/*data ready, (not exact)*/
+						&& vstatus.status.data_len > DEC_STOP_VIDEO_LEVEL
+						/*bypass inject, only if !(stuck || firstrun)*/
+						&& (v_stuck >= 0 && v_stuck < 3)
+					)
 					{
+						AM_DEBUG(5, "[timeshift] bypass inject: vpts:%#x, dmx_vpts:%#x, diff:%d, %s, %s, play_stat:%d vdata_len:0x%x\n",
+							vpts, dmx_vpts,
+							diff,
+							diff>TIMESHIFT_INJECT_DIFF_TIME?"large":"small",
+							(diff==last_diff)?"equal":"not equal",
+							tshift->state,
+							vstatus.status.data_len);
+
 						last_diff = diff;
 						tshift->timeout = 10;
 						goto wait_for_next_loop;
