@@ -116,6 +116,7 @@ enum AM_AV_EventType
 	AM_AV_EVT_VIDEO_RESOLUTION_CHANGED, /**< Video resolution changed, the parameter is the AM_AV_VideoStatus_t with new width&height valid only */
 	AM_AV_EVT_VIDEO_AFD_CHANGED, /**< Video AFD info changed, parameter is AM_USERDATA_AFD_t*/
 	AM_AV_EVT_VIDEO_CROPPING_CHANGED,    /**< Video cropping change, the parameter is the new cropping window(AM_AV_VideoWindow_t)*/
+	AM_AV_EVT_PLAYER_EOF,              /**< Update the current player information*/
 	AM_AV_EVT_END
 };
 
