@@ -1581,7 +1581,11 @@ AM_ErrorCode_t AM_SI_GetDVBTextCodingAndData(char *in, int in_len, char *coding,
 		} else if (fbyte == 0x13) {
 			SET_CODING("GB2312");
 		} else if (fbyte == 0x14) {
-			SET_CODING("big5hk");
+                        if (!strcmp(forced_dvb_text_coding, "unicode")) {/*unicode or big5hk*/
+                            SET_CODING(forced_dvb_text_coding);
+                        } else {
+                            SET_CODING("big5hk");
+                        }
 		} else if (fbyte == 0x15) {
 			SET_CODING("utf-8");
 		} else if (fbyte >= 0x20) {
