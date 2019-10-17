@@ -3065,6 +3065,7 @@ static void *aml_timeshift_thread(void *arg)
 	int diff = 0, last_diff = 0;
 	int error_cnt = 0;
 	int v_stuck = -1;
+	int fetch_fail = 0;
 
 	AV_TSPlayPara_t *tp = &tshift->tp;
 	AM_Bool_t has_video = VALID_VIDEO(tp->vpid, tp->vfmt);
@@ -3187,11 +3188,19 @@ static void *aml_timeshift_thread(void *arg)
 			if (ret > 0)
 			{
 				tshift->left += ret;
+				fetch_fail = 0;
 			}
-			else
+			else if (len != 0)
 			{
 				int error = errno;
-				AM_DEBUG(4, "read playback file failed: %s", strerror(errno));
+				//AM_DEBUG(4, "read playback file failed: %s", strerror(errno));
+				fetch_fail++;
+				/*fetch fail, treat as data break*/
+				if (fetch_fail == 1000)
+				{
+					AM_DEBUG(1, "[timeshift] data break, eof, try:%d", len);
+					AM_EVT_Signal(tshift->dev->dev_no, AM_AV_EVT_PLAYER_EOF, NULL);
+				}
 				if (error == EIO && is_playback_mode)
 				{
 					AM_DEBUG(1, "Disk may be plugged out, exit playback.");
