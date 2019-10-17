@@ -50,6 +50,8 @@ typedef void*      AM_SCTE27_Handle_t;
 typedef void (*AM_SCTE27_DrawBegin_t)(AM_SCTE27_Handle_t handle);
 typedef void (*AM_SCTE27_DrawEnd_t)(AM_SCTE27_Handle_t handle);
 typedef void (*AM_SCTE27_LangCb_t)(AM_SCTE27_Handle_t handle, char* buffer, int size);
+typedef void (*AM_SCTE27_UpdateSize)(AM_SCTE27_Handle_t handle, int width, int height);
+
 
 
 typedef struct
@@ -57,6 +59,7 @@ typedef struct
 	AM_SCTE27_DrawBegin_t   draw_begin;
 	AM_SCTE27_DrawEnd_t     draw_end;
 	AM_SCTE27_LangCb_t  lang_cb;
+	AM_SCTE27_UpdateSize update_size;
 	uint8_t         **bitmap;         /**< draw bitmap buffer*/
 	int              pitch;          /**< the length of draw bitmap buffer per line*/
 	int width;
