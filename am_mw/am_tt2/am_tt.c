@@ -1134,9 +1134,6 @@ AM_ErrorCode_t AM_TT2_Stop(AM_TT2_Handle_t handle)
 	parser->vbi_tid = 0;
 	parser->thread = 0;
 
-	vbi_event_handler_unregister(parser->dec, tt2_event_handler, parser);
-	vbi_event_handler_unregister(parser->dec, tt2_time_update, parser);
-
 	if (parser->search)
 		vbi_search_delete(parser->search);
 
