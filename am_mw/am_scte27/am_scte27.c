@@ -231,6 +231,12 @@ static void clear_bitmap(AM_SCTE27_Parser_t *parser, int left, int top, int righ
 	int i;
 	uint8_t* matrix;
 
+	if (!parser)
+		return;
+
+	if (!parser->para.bitmap)
+		return;
+
 	matrix = *parser->para.bitmap + top * parser->para.pitch + left * 4;
 
 	for (i=0; i<bottom - top; i++)
@@ -433,11 +439,31 @@ static void generate_bitmap(AM_SCTE27_Parser_t *parser, scte_simple_bitmap_t *si
 static void decode_bitmap(AM_SCTE27_Parser_t *parser, scte_subtitle_t *sub_info, uint8_t* buffer, int size)
 {
 	uint32_t frame_time;
+	char frame_rate_buf[256];
+	int vframe_rate = 0;
 	int frame_rate;
+	char* frame_rate_tmp;
+
 	scte_simple_bitmap_t *simple_bitmap = malloc(sizeof(scte_simple_bitmap_t));
 
 	if (!buffer || !simple_bitmap)
 		return;
+
+	AM_FileRead("/sys/class/video/frame_rate", frame_rate_buf, sizeof(frame_rate_buf));
+
+	frame_rate_tmp = strstr(frame_rate_buf, "panel");
+	if (frame_rate_tmp)
+	{
+
+		frame_rate_tmp = strstr(frame_rate_tmp, "fps");
+		scte_log("fps %s", frame_rate_tmp);
+		if (frame_rate_tmp)
+		{
+			//frame_rate_tmp = strstr(frame_rate_tmp, " ");
+			vframe_rate = strtoul(frame_rate_tmp + 4, NULL, 10);
+			scte_log("framerate %d", vframe_rate);
+		}
+	}
 
 	memset(simple_bitmap, 0, sizeof(scte_simple_bitmap_t));
 	//Get reveal and hide pts
@@ -461,13 +487,16 @@ static void decode_bitmap(AM_SCTE27_Parser_t *parser, scte_subtitle_t *sub_info,
 			scte_log("display standard error");
 			break;
 	}
+	if (vframe_rate != 0 && vframe_rate > frame_rate)
+		frame_rate = vframe_rate;
+
 	simple_bitmap->pre_clear = sub_info->pre_clear;
 	simple_bitmap->immediate = sub_info->immediate;
 	simple_bitmap->show_status = DISPLAY_STATUS_INIT;
 	frame_time = PTS_PER_SEC * sub_info->duration / frame_rate;
 	simple_bitmap->reveal_pts = sub_info->pts;
 	simple_bitmap->disapear_pts = sub_info->pts + frame_time;
-#if 0
+#if 1
 	scte_log("display_std %d frame_rate %d dur %d rev_pts %x hide_pts %x",
 		sub_info->display_std,
 		frame_rate,
@@ -594,7 +623,7 @@ static void node_check(AM_SCTE27_Parser_t *parser)
 	{
 		video_pts = am_scte_get_video_pts();
 
-		//scte_log("node_check vpts %x bmp_pts %x outdata_pts %x",video_pts,simple_bitmap->reveal_pts,simple_bitmap->disapear_pts);
+		scte_log("node_check vpts %x bmp_pts %x outdata_pts %x",video_pts,simple_bitmap->reveal_pts,simple_bitmap->disapear_pts);
 
 		//Drop node out of date
 		if (pts_bigger_than(video_pts, simple_bitmap->disapear_pts))
@@ -742,6 +771,12 @@ int decode_message_body(AM_SCTE27_Parser_t *parser, const uint8_t *buf, int size
 {
 	scte_subtitle_t sub_node = {0};
 	uint8_t *bitmap = NULL;
+	int width;
+	int height;
+	int video_width;
+	int video_height;
+	char read_buff[64];
+
 	memcpy(sub_node.lang, buf, 3);
 	if (parser->para.lang_cb)
 		parser->para.lang_cb(parser, sub_node.lang, 4);
@@ -762,19 +797,61 @@ int decode_message_body(AM_SCTE27_Parser_t *parser, const uint8_t *buf, int size
 	}
 
 	bitmap = &buf[12];
+
+	AM_FileRead("/sys/class/video/frame_height", read_buff, sizeof(read_buff));
+	video_height = strtoul(read_buff, NULL, 10);
+	AM_FileRead("/sys/class/video/frame_width", read_buff, sizeof(read_buff));
+	video_width = strtoul(read_buff, NULL, 10);
+
+	switch (sub_node.display_std)
+	{
+		case DISPLAY_STD_720_480_30:
+			width = 720;
+			height = 480;
+			break;
+		case DISPLAY_STD_720_576_25:
+			//frame_rate = 25; //Protocol says 25
+			width = 720;
+			height = 576;
+			break;
+		case DISPLAY_STD_1280_720_60:
+			width = 1280;
+			height = 720;
+			break;
+		case DISPLAY_STD_1920_1080_60:
+			width = 1920;
+			height = 1080;
+			break;
+		default:
+			width = 720;
+			height = 480;
+			scte_log("display standard error");
+			break;
+	}
+
+	//Special treatment.
+	if (video_height == 480)
+	{
+		width = 720;
+		height = 480;
+	}
+
 #if 0
-	scte_log("msg_len %d lang: %c%c%c clear %d imm %d std %d pts 0x%x sub_t %d duration 0x%x b_len 0x%x desc_tag 0x%x",
+	scte_log("msg_w %d msg_h %d video width %d height %d std %d",
+	width, height, video_width, video_height, sub_node.display_std);
+	scte_log("!!msg_len %d lang: %c%c%c clear %d imm %d std %d pts 0x%x sub_t %d duration 0x%x b_len 0x%x",
 		size,
 		buf[0], buf[1], buf[2],
-		sub_node->pre_clear,
-		sub_node->immediate,
-		sub_node->display_std,
-		sub_node->pts,
-		sub_node->sub_type,
-		sub_node->duration,
-		sub_node->block_len,
-		descriptor[0]);
+		sub_node.pre_clear,
+		sub_node.immediate,
+		sub_node.display_std,
+		sub_node.pts,
+		sub_node.sub_type,
+		sub_node.duration,
+		sub_node.block_len);
 #endif
+
+	parser->para.update_size(parser, width, height);
 	if (sub_node.sub_type == SUB_TYPE_SIMPLE_BITMAP)
 			decode_bitmap(parser, &sub_node, bitmap, sub_node.block_len);
 
