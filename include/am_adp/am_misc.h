@@ -107,13 +107,6 @@ extern AM_ErrorCode_t AM_PropEcho(const char *name, const char *cmd);
  */
 extern AM_ErrorCode_t AM_PropRead(const char *name, char *buf, int len);
 
-/**\brief 创建本地socket服务
- * \param[in] name 服务名称
- * \param[out] fd 返回服务器socket
- * \return
- *   - AM_SUCCESS 成功
- *   - 其他值 错误代码
-
 /**\brief 向一个文件打印字符串
  * \param[in] name 文件名
  * \param[in] cmd 向文件打印的字符串
