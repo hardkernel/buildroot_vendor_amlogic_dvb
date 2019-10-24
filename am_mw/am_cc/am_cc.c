@@ -542,7 +542,7 @@ static int am_cc_render(AM_CC_Decoder_t *cc)
 			{
 				AM_DEBUG(AM_DEBUG_LEVEL, "render_thread pts gap large than 0, value %d", decode_time_gap);
 				has_data_to_render = 0;
-				break;
+				goto NEXT_NODE;
 			}
 			AM_DEBUG(AM_DEBUG_LEVEL, "render_thread pts in range, node->pts %x videopts %x", node->pts, cc->video_pts);
 		}
@@ -551,10 +551,14 @@ static int am_cc_render(AM_CC_Decoder_t *cc)
 			// (now.tv_nsec - node->decode_time.tv_nsec)/1000;
 //		if (decode_time_gap < 300)
 		{
-            if (cc->cpara.json_buffer)
+		if (cc->cpara.json_buffer)
+		{
 				memcpy(cc->cpara.json_buffer, node->buffer, JSON_STRING_LENGTH);
+				has_data_to_render = 1;
+        	}
 			AM_DEBUG(AM_DEBUG_LEVEL, "json--> %s", node->buffer);
-			has_data_to_render = 1;
+			if (cc->cpara.json_update && has_data_to_render)
+				cc->cpara.json_update(cc);
 		}
 		//AM_DEBUG(1, "Render json: %s, %d", node->buffer, count);
 		//count++;
@@ -570,12 +574,9 @@ NEXT_NODE:
 			free(node_reset);
 		//if (has_data_to_render == 1)
 		//	break;
-		if (cc->cpara.json_update && has_data_to_render)
-			cc->cpara.json_update(cc);
 	}
 
-	if (cc->cpara.json_update && has_data_to_render)
-		cc->cpara.json_update(cc);
+
 	//if (cc->cpara.draw_end)
 	//	cc->cpara.draw_end(cc, &draw_para);
 	AM_DEBUG(AM_DEBUG_LEVEL, "render_thread render exit, has_data %d chain_left %d", has_data_to_render,json_chain_head->count);
@@ -935,14 +936,14 @@ static void *am_cc_render_thread(void *arg)
 	if (timeout == 0)
 		timeout = 16;
 #endif
-	timeout = 30;
+	timeout = 10;
 
 	while (cc->running)
 	{
 		// Update video pts
 		node = cc->json_chain_head->json_chain_next;
-                if (node == cc->json_chain_head)
-                       node = NULL;
+		if (node == cc->json_chain_head)
+			node = NULL;
 
 		vpts = am_cc_get_video_pts();
 
@@ -961,13 +962,13 @@ static void *am_cc_render_thread(void *arg)
 				AM_DEBUG(AM_DEBUG_LEVEL, "render_thread timeout node_pts %x vpts %x gap %d calculate %d", node->pts, vpts, pts_gap_cc_video, timeout);
 				// Set timeout to 1 second If pts gap is more than 1 second.
 				// We need to judge if video is continuous
-				timeout = (timeout>30)?30:timeout;
+				timeout = (timeout>10)?10:timeout;
 			}
 		}
 		else
 		{
 			AM_DEBUG(AM_DEBUG_LEVEL, "render_thread no node in chain, timeout set to 1000");
-			timeout = 30;
+			timeout = 10;
 		}
 
 		AM_TIME_GetTimeSpecTimeout(timeout, &ts);
