@@ -461,8 +461,8 @@ struct AM_AUDIO_Driver
 {
 	void (*adec_start_decode)(int fd, int fmt, int has_video, void **padec);
 	void (*adec_stop_decode)(void **padec);
-	void (*adec_pause_decode)(void *handle);
-	void (*adec_resume_decode)(void *handle);
+	void (*adec_pause_decode)(void *adec);
+	void (*adec_resume_decode)(void *adec);
 	void (*adec_set_decode_ad)(int enable, int pid, int fmt, void *adec);
 	void (*adec_get_status)(void *adec, AM_AV_AudioStatus_t *para);
 	AM_ErrorCode_t (*adec_set_volume)(AM_AOUT_Device_t *dev, int vol);
@@ -643,8 +643,8 @@ static AM_ErrorCode_t adec_set_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mute);
 static AM_ErrorCode_t adec_set_output_mode_cb(AM_AOUT_Device_t *dev, AM_AOUT_OutputMode_t mode);
 static AM_ErrorCode_t adec_set_pre_gain_cb(AM_AOUT_Device_t *dev, float gain);
 static AM_ErrorCode_t adec_set_pre_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mute);
-static void adec_pause_decode_cb(void *handle);
-static void adec_resume_decode_cb(void *handle);
+static void adec_pause_decode_cb(void *adec);
+static void adec_resume_decode_cb(void *adec);
 static void adec_get_status_cb(void *adec, AM_AV_AudioStatus_t *para);
 
 const AM_AUDIO_Driver_t callback_audio_drv =
@@ -847,9 +847,10 @@ static AM_ErrorCode_t adec_aout_open_cb(AM_AOUT_Device_t *dev, const AM_AOUT_Ope
 }
 static AM_ErrorCode_t adec_aout_set_volume_cb(AM_AOUT_Device_t *dev, int vol)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_SET_VOLUME;
 	audio_parms.param1 = vol;
@@ -862,9 +863,10 @@ static AM_ErrorCode_t adec_aout_set_volume_cb(AM_AOUT_Device_t *dev, int vol)
 }
 static AM_ErrorCode_t adec_aout_set_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_SET_MUTE;
 	audio_parms.param1 = mute;
@@ -877,9 +879,10 @@ static AM_ErrorCode_t adec_aout_set_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mut
 }
 static AM_ErrorCode_t adec_aout_set_output_mode_cb(AM_AOUT_Device_t *dev, AM_AOUT_OutputMode_t mode)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_SET_OUTPUT_MODE;
 	audio_parms.param1 = mode;
@@ -895,9 +898,10 @@ static AM_ErrorCode_t adec_aout_close_cb(AM_AOUT_Device_t *dev)
 }
 static AM_ErrorCode_t adec_aout_set_pre_gain_cb(AM_AOUT_Device_t *dev, float gain)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_SET_PRE_GAIN;
 	audio_parms.param1 = gain*100;
@@ -910,9 +914,10 @@ static AM_ErrorCode_t adec_aout_set_pre_gain_cb(AM_AOUT_Device_t *dev, float gai
 }
 static AM_ErrorCode_t adec_aout_set_pre_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_SET_PRE_MUTE;
 	audio_parms.param1 = mute;
@@ -926,9 +931,10 @@ static AM_ErrorCode_t adec_aout_set_pre_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t
 
 static void adec_start_decode_cb(int fd, int fmt, int has_video, void **padec)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_START_DECODE;
 	audio_parms.param1 = fmt;
@@ -939,15 +945,23 @@ static void adec_start_decode_cb(int fd, int fmt, int has_video, void **padec)
 	}
 
 	AM_AOUT_SetDriver(AOUT_DEV_NO, &adec_aout_drv_cb, NULL);
+
 	// just for compatile with native decoder.
+	*padec = (void *)1;
 	adec_handle = (void *) 1;
 }
 
-static void adec_pause_decode_cb(void *handle)
+static void adec_pause_decode_cb(void *adec)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
+	if (!adec) {
+		AM_DEBUG(1, "audio closed, ignore");
+		return;
+	}
+
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_PAUSE_DECODE;
 
@@ -955,11 +969,17 @@ static void adec_pause_decode_cb(void *handle)
 	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
 	}
 }
-static void adec_resume_decode_cb(void *handle)
+static void adec_resume_decode_cb(void *adec)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
+	if (!adec) {
+		AM_DEBUG(1, "audio closed, ignore");
+		return;
+	}
+
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_RESUME_DECODE;
 
@@ -970,23 +990,37 @@ static void adec_resume_decode_cb(void *handle)
 
 static void adec_stop_decode_cb(void **padec)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
+	if (!padec || !*padec) {
+		AM_DEBUG(1, "audio closed, ignore");
+		return;
+	}
+
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_STOP_DECODE;
 
 	if (s_audio_cb) {
 	    s_audio_cb(AM_AV_EVT_AUDIO_CB,&audio_parms,pUserData);
 	}
+
+	*padec = NULL;
 	adec_handle = NULL;
 	return ;
 }
 static void adec_set_decode_ad_cb(int enable, int pid, int fmt, void *adec)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d pid:%d,fmt:%d\n", __FUNCTION__,__LINE__,pid,fmt);
 
-	AudioParms audio_parms;
+	if (!adec) {
+		AM_DEBUG(1, "audio closed, ignore");
+		return;
+	}
+
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_SET_DECODE_AD;
 	audio_parms.param1 = fmt;
@@ -999,9 +1033,10 @@ static void adec_set_decode_ad_cb(int enable, int pid, int fmt, void *adec)
 }
 static AM_ErrorCode_t adec_set_volume_cb(AM_AOUT_Device_t *dev, int vol)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_SET_VOLUME;
 	audio_parms.param1 = vol;
@@ -1013,9 +1048,10 @@ static AM_ErrorCode_t adec_set_volume_cb(AM_AOUT_Device_t *dev, int vol)
 }
 static AM_ErrorCode_t adec_set_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_SET_MUTE;
 	audio_parms.param1 = mute;
@@ -1027,9 +1063,10 @@ static AM_ErrorCode_t adec_set_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 }
 static AM_ErrorCode_t adec_set_output_mode_cb(AM_AOUT_Device_t *dev, AM_AOUT_OutputMode_t mode)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_SET_OUTPUT_MODE;
 	audio_parms.param1 = mode;
@@ -1041,9 +1078,10 @@ static AM_ErrorCode_t adec_set_output_mode_cb(AM_AOUT_Device_t *dev, AM_AOUT_Out
 }
 static AM_ErrorCode_t adec_set_pre_gain_cb(AM_AOUT_Device_t *dev, float gain)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_SET_PRE_GAIN;
 	audio_parms.param1 = gain*100;
@@ -1055,9 +1093,10 @@ static AM_ErrorCode_t adec_set_pre_gain_cb(AM_AOUT_Device_t *dev, float gain)
 }
 static AM_ErrorCode_t adec_set_pre_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mute)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_SET_PRE_MUTE;
 	audio_parms.param1 = mute;
@@ -1069,9 +1108,15 @@ static AM_ErrorCode_t adec_set_pre_mute_cb(AM_AOUT_Device_t *dev, AM_Bool_t mute
 }
 static void adec_get_status_cb(void *adec, AM_AV_AudioStatus_t *para)
 {
+	AudioParms audio_parms;
+
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
 
-	AudioParms audio_parms;
+	if (!adec) {
+		AM_DEBUG(1, "audio closed, ignore");
+		return;
+	}
+
 	memset(&audio_parms,0,sizeof(AudioParms));
 	audio_parms.cmd = ADEC_GET_STATUS;
 
@@ -1107,15 +1152,15 @@ static void adec_start_decode(int fd, int fmt, int has_video, void **padec)
 		}
 #endif
 }
-static void adec_pause_decode(void *handle)
+static void adec_pause_decode(void *adec)
 {
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
-	audio_decode_pause(handle);
+	audio_decode_pause(adec);
 }
-static void adec_resume_decode(void *handle)
+static void adec_resume_decode(void *adec)
 {
 	AM_DEBUG(1, "%s %d", __FUNCTION__,__LINE__);
-	audio_decode_resume(handle);
+	audio_decode_resume(adec);
 }
 
 static void adec_stop_decode(void **padec)
@@ -2463,7 +2508,7 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AV_TimeShi
 		}
 	}
 
-	if (has_audio) {
+	if (has_audio && start_audio) {
 		if ((tp->afmt == AFORMAT_AC3) || (tp->afmt == AFORMAT_DTS)) {
 			//set_arc_freq(1);
 		}
@@ -2482,10 +2527,10 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AV_TimeShi
 		}
 	}
 
-	sync_mode = aml_calc_sync_mode(tshift->dev, has_audio, has_video, 0, tp->afmt, &sync_force);
+	sync_mode = aml_calc_sync_mode(tshift->dev, (has_audio && start_audio), has_video, 0, tp->afmt, &sync_force);
 	aml_set_sync_mode(tshift->dev, sync_mode);
 
-	if (has_audio && (sync_force != FORCE_AC3_AMASTER)) {
+	if ((has_audio && start_audio) && (sync_force != FORCE_AC3_AMASTER)) {
 		if (!show_first_frame_nosync()) {
 #ifdef ANDROID
 			//property_set("sys.amplayer.drop_pcm", "1");
