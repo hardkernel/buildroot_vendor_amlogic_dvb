@@ -291,6 +291,10 @@ struct AM_AV_Device
 	AM_Crypt_Ops_t               *crypt_ops;
 	void                         *cryptor;
 	AM_Bool_t	replay_enable;		/*enable or disable replay when abnormal*/
+
+	/*for audio switching*/
+	uint16_t                     alt_apid;
+	AM_AV_AFormat_t              alt_afmt;
 };
 
 /****************************************************************************

@@ -1975,6 +1975,15 @@ static AM_ErrorCode_t aml_start_inject(AM_AV_Device_t *dev, AV_InjectData_t *inj
 	AM_Bool_t has_video = VALID_VIDEO(para->vid_id, para->vid_fmt);
 	AM_Bool_t has_audio = VALID_AUDIO(para->aud_id, para->aud_fmt);
 
+	if (para->aud_id != dev->alt_apid || para->aud_fmt != dev->alt_afmt) {
+		AM_DEBUG(1, "switch to pending audio: A[%d:%d] -> A[%d:%d]",
+			para->aud_id, para->aud_fmt, dev->alt_apid, dev->alt_afmt);
+		para->aud_id = dev->alt_apid;
+		para->aud_fmt = dev->alt_afmt;
+
+		has_audio = VALID_AUDIO(para->aud_id, para->aud_fmt);
+	}
+
 	inj->pkg_fmt = para->pkg_fmt;
 
 	switch (para->pkg_fmt)
@@ -2365,11 +2374,21 @@ static AM_ErrorCode_t aml_start_timeshift(AV_TimeshiftData_t *tshift, AV_TimeShi
 	AM_AV_TimeshiftPara_t *para = &tshift_para->para;
 	AV_TSData_t *ts = &tshift->ts;
 	AV_TSPlayPara_t *tp = &tshift->tp;
+	AM_AV_Device_t *dev = tshift->dev;
 	int val;
 	int sync_mode, sync_force;
 
 	AM_Bool_t has_video = VALID_VIDEO(tp->vpid, tp->vfmt);
 	AM_Bool_t has_audio = VALID_AUDIO(tp->apid, tp->afmt);
+
+	if (tp->apid != dev->alt_apid || tp->afmt != dev->alt_afmt) {
+		AM_DEBUG(1, "switch to pending audio: A[%d:%d] -> A[%d:%d]",
+			tp->apid, tp->afmt, dev->alt_apid, dev->alt_afmt);
+		tp->apid = dev->alt_apid;
+		tp->afmt = dev->alt_afmt;
+
+		has_audio = VALID_AUDIO(tp->apid, tp->afmt);
+	}
 
 	AM_DEBUG(1, "aml start timeshift: V[%d:%d] A[%d:%d]", tp->vpid, tp->vfmt, tp->apid, tp->afmt);
 
@@ -2627,7 +2646,7 @@ static void aml_stop_av_monitor(AM_AV_Device_t *dev, AV_Monitor_t *mon)
 		AM_DEBUG(1, "[avmon] stop av monitor ---join end\r\n");
 	}
 	if (dev)
-	   dev->audio_switch = AM_FALSE;
+		dev->audio_switch = AM_FALSE;
 }
 
 static void aml_check_audio_state(void)
@@ -4178,8 +4197,16 @@ static AM_ErrorCode_t aml_start_ts_mode(AM_AV_Device_t *dev, AV_TSPlayPara_t *tp
 	AM_Bool_t has_pcr = VALID_PCR(tp->pcrpid);
 	int sync_mode, sync_force;
 
-	AM_DEBUG(1, "aml start ts: V[%d:%d] A[%d:%d] P[%d]", tp->vpid, tp->vfmt, tp->apid, tp->afmt, tp->pcrpid);
+	if (tp->apid != dev->alt_apid || tp->afmt != dev->alt_afmt) {
+		AM_DEBUG(1, "switch to pending audio: A[%d:%d] -> A[%d:%d]",
+			tp->apid, tp->afmt, dev->alt_apid, dev->alt_afmt);
+		tp->apid = dev->alt_apid;
+		tp->afmt = dev->alt_afmt;
 
+		has_audio = VALID_AUDIO(tp->apid, tp->afmt);
+	}
+
+	AM_DEBUG(1, "aml start ts: V[%d:%d] A[%d:%d] P[%d]", tp->vpid, tp->vfmt, tp->apid, tp->afmt, tp->pcrpid);
 	ts = (AV_TSData_t *)dev->ts_player.drv_data;
 
 	/*patch dec control*/
@@ -4596,6 +4623,7 @@ static void* aml_av_monitor_thread(void *arg)
 		{
 			aml_switch_ts_audio_fmt(dev, ts, tp);
 			dev->audio_switch = AM_FALSE;
+			adec_start = (adec_handle != NULL);
 		}
 
 		AM_TIME_GetClock(&now);
@@ -5628,6 +5656,8 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 		break;
 		case AV_PLAY_TS:
 			tp = (AV_TSPlayPara_t *)para;
+			dev->alt_apid = tp->apid;
+			dev->alt_afmt = tp->afmt;
 			tp->drm_mode = dev->curr_para.drm_mode;
 #if defined(ANDROID) || defined(CHIP_8626X)
 #ifdef ENABLE_PCR_RECOVER
@@ -5684,20 +5714,22 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 			inj_p = (AV_InjectPlayPara_t *)para;
 			inj = dev->inject_player.drv_data;
 			inj_p->drm_mode = dev->curr_para.drm_mode;
+			dev->alt_apid = inj->aud_id;
+			dev->alt_afmt = inj->aud_fmt;
 			if (aml_start_inject(dev, inj, inj_p) != AM_SUCCESS)
-				{
+			{
 				AM_DEBUG(1,"[aml_start_mode]  AM_AV_ERR_SYS");
 				return AM_AV_ERR_SYS;
-				} else {
-		dev->ts_player.play_para.afmt = inj->aud_fmt;
-		dev->ts_player.play_para.apid = inj->aud_id;
-			dev->ts_player.play_para.vfmt = inj->vid_fmt;
-			dev->ts_player.play_para.vpid = inj->vid_id;
-			dev->ts_player.play_para.sub_afmt = inj->sub_type;
-			dev->ts_player.play_para.sub_apid = inj->sub_id;
-			dev->ts_player.play_para.pcrpid = 0x1fff;
-			aml_start_av_monitor(dev, &dev->ts_player.mon);
-				}
+			} else {
+				dev->ts_player.play_para.afmt = inj->aud_fmt;
+				dev->ts_player.play_para.apid = inj->aud_id;
+				dev->ts_player.play_para.vfmt = inj->vid_fmt;
+				dev->ts_player.play_para.vpid = inj->vid_id;
+				dev->ts_player.play_para.sub_afmt = inj->sub_type;
+				dev->ts_player.play_para.sub_apid = inj->sub_id;
+				dev->ts_player.play_para.pcrpid = 0x1fff;
+				aml_start_av_monitor(dev, &dev->ts_player.mon);
+			}
 		break;
 		case AV_TIMESHIFT:
 			tshift_p = (AV_TimeShiftPlayPara_t *)para;
@@ -5710,6 +5742,8 @@ static AM_ErrorCode_t aml_start_mode(AM_AV_Device_t *dev, AV_PlayMode_t mode, vo
 				tshift->tp.apid = tshift_p->para.media_info.audios[0].pid;
 				tshift->tp.afmt = tshift_p->para.media_info.audios[0].fmt;
 			}
+			dev->alt_apid = tshift->tp.apid;
+			dev->alt_afmt = tshift->tp.afmt;
 			if (aml_start_timeshift(tshift, tshift_p, AM_TRUE, AM_TRUE) != AM_SUCCESS)
 				return AM_AV_ERR_SYS;
 		break;
@@ -6968,7 +7002,17 @@ static AM_ErrorCode_t aml_switch_ts_audio_fmt(AM_AV_Device_t *dev, AV_TSData_t *
 		return AM_AV_ERR_ILLEGAL_OP;
 	}
 
-	AM_DEBUG(1, "do switch ts audio: A[%d:%d]", tp->apid, tp->afmt);
+	if (tp->apid != dev->alt_apid
+		|| tp->afmt != dev->alt_afmt) {
+		AM_DEBUG(1, "do switch ts audio: A[%d:%d] -> A[%d:%d]",
+			tp->apid, tp->afmt, dev->alt_apid, dev->alt_afmt);
+		tp->apid = dev->alt_apid;
+		tp->afmt = dev->alt_afmt;
+	} else {
+		AM_DEBUG(1, "do switch ts audio: A[%d:%d] -> A[%d:%d], ignore",
+			tp->apid, tp->afmt, dev->alt_apid, dev->alt_afmt);
+		return AM_SUCCESS;
+	}
 
 	if (ts->fd < 0)
 	{
@@ -7041,22 +7085,9 @@ static AM_ErrorCode_t aml_switch_ts_audio(AM_AV_Device_t *dev, uint16_t apid, AM
 
 	AM_DEBUG(1, "switch ts audio: A[%d:%d]", apid, afmt);
 
-	switch (dev->mode) {
-	case AV_PLAY_TS:
-		tp = &dev->ts_player.play_para;
-	break;
-	case AV_TIMESHIFT: {
-		AV_TimeshiftData_t *tshift_d = (AV_TimeshiftData_t *)dev->timeshift_player.drv_data;
-		tp = &tshift_d->tp;
-	}break;
-	default:
-		AM_DEBUG(1, "switch audio not support for AV mode(%d)", dev->mode);
-		return AM_AV_ERR_ILLEGAL_OP;
-	}
-
+	dev->alt_apid = apid;
+	dev->alt_afmt = afmt;
 	dev->audio_switch = AM_TRUE;
-	tp->apid = apid;
-	tp->afmt = afmt;
 
 	return err;
 }
